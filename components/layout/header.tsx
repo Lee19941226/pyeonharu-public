@@ -1,0 +1,207 @@
+"use client"
+
+import Link from "next/link"
+import { useState } from "react"
+import { Menu, X, User, Heart } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export function Header() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+            <span className="text-lg font-bold text-primary-foreground">편</span>
+          </div>
+          <span className="text-xl font-bold text-foreground">편하루</span>
+        </Link>
+
+        {/* Desktop Navigation */}
+        <nav className="hidden items-center gap-1 md:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                병원/약국
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem asChild>
+                <Link href="/search">지도로 검색</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/symptom">증상으로 추천</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/medicine">약 정보 검색</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                오늘 뭐 입지?
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem asChild>
+                <Link href="/today">오늘의 코디</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/closet">내 옷장</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/weather">날씨 상세</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/history">코디 기록</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/about">서비스 소개</Link>
+          </Button>
+          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/faq">FAQ</Link>
+          </Button>
+        </nav>
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" asChild className="hidden md:flex">
+            <Link href="/bookmarks">
+              <Heart className="h-5 w-5" />
+              <span className="sr-only">즐겨찾기</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" asChild className="hidden md:flex">
+            <Link href="/mypage">
+              <User className="h-5 w-5" />
+              <span className="sr-only">마이페이지</span>
+            </Link>
+          </Button>
+          <Button asChild className="hidden md:flex">
+            <Link href="/login">로그인</Link>
+          </Button>
+
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <span className="sr-only">메뉴</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile Navigation */}
+      {isMobileMenuOpen && (
+        <div className="border-t border-border bg-background md:hidden">
+          <nav className="container mx-auto flex flex-col gap-1 px-4 py-4">
+            <p className="px-3 py-2 text-xs font-semibold text-muted-foreground">병원/약국</p>
+            <Link
+              href="/search"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              지도로 검색
+            </Link>
+            <Link
+              href="/symptom"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              증상으로 추천
+            </Link>
+            <Link
+              href="/medicine"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              약 정보 검색
+            </Link>
+
+            <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">오늘 뭐 입지?</p>
+            <Link
+              href="/today"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              오늘의 코디
+            </Link>
+            <Link
+              href="/closet"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              내 옷장
+            </Link>
+            <Link
+              href="/weather"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              날씨 상세
+            </Link>
+            <Link
+              href="/history"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              코디 기록
+            </Link>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <Link
+                href="/about"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                서비스 소개
+              </Link>
+              <Link
+                href="/faq"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                FAQ
+              </Link>
+              <Link
+                href="/bookmarks"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                즐겨찾기
+              </Link>
+              <Link
+                href="/mypage"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                마이페이지
+              </Link>
+            </div>
+
+            <Button asChild className="mt-4">
+              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                로그인
+              </Link>
+            </Button>
+          </nav>
+        </div>
+      )}
+    </header>
+  )
+}
