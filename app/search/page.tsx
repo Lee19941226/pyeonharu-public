@@ -1,30 +1,30 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Header } from "@/components/layout/header"
-import { MobileNav } from "@/components/layout/mobile-nav"
-import { MapPlaceholder } from "@/components/medical/map-placeholder"
-import { SearchFilters } from "@/components/medical/search-filters"
-import { PlaceList } from "@/components/medical/place-list"
-import { Button } from "@/components/ui/button"
-import { Map, List } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Header } from "@/components/layout/header";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { NaverMap } from "@/components/medical/naver-map";
+import { SearchFilters } from "@/components/medical/search-filters";
+import { PlaceList } from "@/components/medical/place-list";
+import { Button } from "@/components/ui/button";
+import { Map, List } from "lucide-react";
 
-export type PlaceType = "hospital" | "pharmacy"
-export type ViewMode = "map" | "list"
+export type PlaceType = "hospital" | "pharmacy";
+export type ViewMode = "map" | "list";
 
 export interface Place {
-  id: string
-  name: string
-  type: PlaceType
-  address: string
-  phone: string
-  distance: string
-  isOpen: boolean
-  openTime: string
-  closeTime: string
-  departments?: string[]
-  lat: number
-  lng: number
+  id: string;
+  name: string;
+  type: PlaceType;
+  address: string;
+  phone: string;
+  distance: string;
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+  departments?: string[];
+  lat: number;
+  lng: number;
 }
 
 // 샘플 데이터
@@ -97,14 +97,17 @@ const samplePlaces: Place[] = [
     lat: 37.4881,
     lng: 127.0855,
   },
-]
+];
 
 export default function SearchPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>("map")
-  const [placeType, setPlaceType] = useState<PlaceType | "all">("all")
-  const [showOpenOnly, setShowOpenOnly] = useState(false)
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>("map");
+  const [placeType, setPlaceType] = useState<PlaceType | "all">("all");
+  const [showOpenOnly, setShowOpenOnly] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   useEffect(() => {
     // 현재 위치 가져오기
@@ -114,26 +117,26 @@ export default function SearchPage() {
           setUserLocation({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          })
+          });
         },
         () => {
           // 기본 위치 (서울 시청)
-          setUserLocation({ lat: 37.5665, lng: 126.978 })
-        }
-      )
+          setUserLocation({ lat: 37.5665, lng: 126.978 });
+        },
+      );
     }
-  }, [])
+  }, []);
 
   const filteredPlaces = samplePlaces.filter((place) => {
-    if (placeType !== "all" && place.type !== placeType) return false
-    if (showOpenOnly && !place.isOpen) return false
-    return true
-  })
+    if (placeType !== "all" && place.type !== placeType) return false;
+    if (showOpenOnly && !place.isOpen) return false;
+    return true;
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      
+
       <main className="flex-1 pb-16 md:pb-0">
         {/* Search Header */}
         <div className="border-b border-border bg-card">
@@ -180,7 +183,7 @@ export default function SearchPage() {
               viewMode === "list" ? "hidden md:block" : ""
             }`}
           >
-            <MapPlaceholder
+            <NaverMap
               places={filteredPlaces}
               selectedPlace={selectedPlace}
               onSelectPlace={setSelectedPlace}
@@ -205,5 +208,5 @@ export default function SearchPage() {
 
       <MobileNav />
     </div>
-  )
+  );
 }
