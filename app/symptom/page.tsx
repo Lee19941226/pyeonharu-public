@@ -20,7 +20,6 @@ import {
   Navigation,
   Bookmark,
   Search,
-  Clock,
   Check,
   Circle,
   ChevronRight,
@@ -45,61 +44,41 @@ interface NearbyHospital {
   address: string
   distance: string
   phone: string
-  openTime: string
-  closeTime: string
-  isOpen: boolean
   isAiRecommended: boolean
   lat: number
   lng: number
+  clCdNm?: string
 }
 
 type ScreenState = "input" | "analyzing" | "result" | "detail"
 
-// ─── Sample hospitals (공공데이터 API 연동 전 샘플) ───
-const getSampleHospitals = (dept: string): NearbyHospital[] => [
-  {
-    id: "1",
-    name: `굿모닝${dept}의원`,
-    department: dept,
-    address: "경기도 군포시 산본로 123",
-    distance: "350m",
-    phone: "031-123-4567",
-    openTime: "09:00",
-    closeTime: "18:00",
-    isOpen: true,
-    isAiRecommended: true,
-    lat: 37.3608,
-    lng: 126.9320,
-  },
-  {
-    id: "2",
-    name: `군포중앙${dept}의원`,
-    department: dept,
-    address: "경기도 군포시 번영로 456",
-    distance: "820m",
-    phone: "031-987-6543",
-    openTime: "09:00",
-    closeTime: "17:30",
-    isOpen: true,
-    isAiRecommended: false,
-    lat: 37.3625,
-    lng: 126.9365,
-  },
-  {
-    id: "3",
-    name: `산본${dept}의원`,
-    department: dept,
-    address: "경기도 군포시 광정로 78",
-    distance: "1.2km",
-    phone: "031-456-7890",
-    openTime: "08:30",
-    closeTime: "18:30",
-    isOpen: true,
-    isAiRecommended: false,
-    lat: 37.3578,
-    lng: 126.9290,
-  },
-]
+// ─── 공공데이터 API로 주변 병원 검색 ───
+async function fetchNearbyHospitals(
+  lat: number,
+  lng: number,
+  department: string
+): Promise<NearbyHospital[]> {
+  try {
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+      department,
+      radius: "3000",
+    })
+    const res = await fetch(`/api/hospitals?${params.toString()}`)
+    const data = await res.json()
+
+    if (!res.ok || !data.hospitals?.length) {
+      console.warn("[fetchNearbyHospitals] API 결과 없음, 빈 배열 반환")
+      return []
+    }
+
+    return data.hospitals.slice(0, 5) // 최대 5개
+  } catch (err) {
+    console.error("[fetchNearbyHospitals] 에러:", err)
+    return []
+  }
+}
 
 // ─── Daily usage limit (localStorage) ───
 const DAILY_LIMIT = 5
@@ -198,7 +177,12 @@ export default function SymptomPage() {
       await new Promise((r) => setTimeout(r, 400))
 
       setResult(data)
-      setHospitals(getSampleHospitals(data.department))
+
+      // 공공데이터 API로 주변 병원 검색
+      const loc = userLocation || { lat: 37.3595, lng: 126.9354 }
+      const nearbyHospitals = await fetchNearbyHospitals(loc.lat, loc.lng, data.department)
+      setHospitals(nearbyHospitals)
+
       setUsageCount(incrementUsage())
       setScreen("result")
     } catch {
@@ -206,7 +190,7 @@ export default function SymptomPage() {
       setError("네트워크 오류가 발생했습니다.")
       setScreen("input")
     }
-  }, [limitReached])
+  }, [limitReached, userLocation])
 
   // 병원 목록 → 지도 마커 변환
   const hospitalMarkers: MapMarker[] = hospitals.map((h) => ({
@@ -546,12 +530,6 @@ function ResultScreen({
                   <p className="flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5 shrink-0" />{h.phone}
                   </p>
-                  <p className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />{h.openTime} - {h.closeTime}
-                    <Badge variant={h.isOpen ? "default" : "secondary"} className="ml-1 px-1.5 py-0 text-xs">
-                      {h.isOpen ? "진료 중" : "진료 종료"}
-                    </Badge>
-                  </p>
                 </div>
 
                 {/* D 즉시 행동 버튼 */}
@@ -636,7 +614,6 @@ function DetailScreen({
           <div className="space-y-3">
             <InfoRow icon={<MapPin className="h-5 w-5" />} label="주소" value={hospital.address} />
             <InfoRow icon={<Phone className="h-5 w-5" />} label="전화번호" value={hospital.phone} />
-            <InfoRow icon={<Clock className="h-5 w-5" />} label="진료시간" value={`평일 ${hospital.openTime}-${hospital.closeTime} · 토 ${hospital.openTime}-13:00`} />
             <InfoRow icon={<Stethoscope className="h-5 w-5" />} label="진료과목" value={hospital.department} />
           </div>
         </div>
