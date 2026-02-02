@@ -1,221 +1,189 @@
 "use client"
 
-import React from "react"
-
+import React, { useState } from "react"
 import Link from "next/link"
-import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Mail, Lock, User, Eye, EyeOff, Check } from "lucide-react"
+import { ArrowLeft, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
 
 export default function SignUpPage() {
   const router = useRouter()
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [agreedTerms, setAgreedTerms] = useState(false)
+  const [agreedMarketing, setAgreedMarketing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const passwordRequirements = [
-    { met: password.length >= 8, text: "8자 이상" },
-    { met: /[A-Za-z]/.test(password), text: "영문 포함" },
-    { met: /[0-9]/.test(password), text: "숫자 포함" },
-  ]
-
-  const isPasswordValid = passwordRequirements.every((req) => req.met)
-  const doPasswordsMatch = password === confirmPassword && confirmPassword.length > 0
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!isPasswordValid) {
-      setError("비밀번호 조건을 확인해주세요.")
-      return
-    }
-    
-    if (!doPasswordsMatch) {
-      setError("비밀번호가 일치하지 않습니다.")
-      return
-    }
-
+  const handleOAuthSignUp = async (provider: "kakao" | "google" | "naver") => {
+    if (!agreedTerms) return
     setIsLoading(true)
-    setError(null)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: provider as any,
       options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-          `${window.location.origin}/`,
-        data: {
-          name,
-        },
+        redirectTo: `${window.location.origin}/auth/callback?next=/sign-up-complete`,
       },
     })
 
     if (error) {
-      if (error.message.includes("already registered")) {
-        setError("이미 가입된 이메일입니다.")
-      } else {
-        setError("회원가입 중 오류가 발생했습니다. 다시 시도해주세요.")
-      }
       setIsLoading(false)
-      return
     }
+  }
 
-    router.push("/sign-up-success")
+  const handleEmailSignUp = () => {
+    if (!agreedTerms) return
+    // 약관 동의 상태를 query param으로 전달
+    router.push(`/sign-up/email?terms=true&marketing=${agreedMarketing}`)
   }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 px-4 py-8">
-      <Link href="/" className="mb-8 flex items-center gap-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-          <span className="text-xl font-bold text-primary-foreground">편</span>
+      {/* Back button */}
+      <div className="w-full max-w-md">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          뒤로
+        </button>
+      </div>
+
+      {/* Logo */}
+      <Link href="/" className="mb-6 flex items-center gap-2">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+          <span className="text-2xl font-bold text-primary-foreground">편</span>
         </div>
-        <span className="text-2xl font-bold">편하루</span>
       </Link>
+      <h1 className="text-2xl font-bold">편하루</h1>
 
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">회원가입</CardTitle>
-          <CardDescription>
-            편하루 계정을 만들고 더 많은 기능을 이용하세요
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignUp} className="space-y-4">
-            {error && (
-              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
+      {/* Sign up card */}
+      <div className="mt-6 w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg">
+        <div className="mb-5 text-center">
+          <h2 className="text-lg font-semibold">회원가입</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            간편하게 가입하고 편하루를 시작하세요
+          </p>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="name">이름</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="홍길동"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+        {/* OAuth Buttons */}
+        <div className="space-y-2.5">
+          <button
+            onClick={() => handleOAuthSignUp("kakao")}
+            disabled={!agreedTerms || isLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 py-3 text-sm font-medium text-[#191919] transition-all disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.76 1.84 5.18 4.6 6.56-.2.76-.74 2.76-.84 3.2-.12.52.2.52.4.38.16-.1 2.56-1.74 3.6-2.44.72.1 1.48.16 2.24.16 5.52 0 10-3.48 10-7.86S17.52 3 12 3z" />
+            </svg>
+            카카오로 시작하기
+          </button>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">이메일</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="example@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+          <button
+            onClick={() => handleOAuthSignUp("google")}
+            disabled={!agreedTerms || isLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            Google로 시작하기
+          </button>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">비밀번호</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="비밀번호를 입력하세요"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">
-                    {showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
-                  </span>
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {passwordRequirements.map((req) => (
-                  <span
-                    key={req.text}
-                    className={`flex items-center gap-1 ${
-                      req.met ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    <Check className="h-3 w-3" />
-                    {req.text}
-                  </span>
-                ))}
-              </div>
-            </div>
+          <button
+            onClick={() => handleOAuthSignUp("naver")}
+            disabled={!agreedTerms || isLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#03C75A] px-4 py-3 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="text-lg font-bold">N</span>
+            네이버로 시작하기
+          </button>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="비밀번호를 다시 입력하세요"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-              {confirmPassword && (
-                <p
-                  className={`text-xs ${
-                    doPasswordsMatch ? "text-primary" : "text-destructive"
-                  }`}
-                >
-                  {doPasswordsMatch ? "비밀번호가 일치합니다" : "비밀번호가 일치하지 않습니다"}
-                </p>
-              )}
-            </div>
+        {/* Divider */}
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-background px-3 text-muted-foreground">또는</span>
+          </div>
+        </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading || !isPasswordValid || !doPasswordsMatch}
+        {/* Email Sign Up Button */}
+        <button
+          onClick={handleEmailSignUp}
+          disabled={!agreedTerms || isLoading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-primary/30 bg-white px-4 py-3 text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <span>✉️</span>
+          이메일로 가입하기
+        </button>
+
+        {/* Terms Checkboxes */}
+        <div className="mt-5 space-y-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <div
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                agreedTerms
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/30"
+              }`}
+              onClick={() => setAgreedTerms(!agreedTerms)}
             >
-              {isLoading ? "가입 중..." : "회원가입"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
+              {agreedTerms && <Check className="h-3.5 w-3.5" />}
+            </div>
+            <div className="text-sm">
+              <span onClick={() => setAgreedTerms(!agreedTerms)}>
+                이용약관 및 개인정보처리방침에 동의합니다{" "}
+                <span className="text-destructive">(필수)</span>
+              </span>
+              <div className="mt-0.5 flex gap-2 text-xs text-muted-foreground">
+                <Link href="/terms" className="underline hover:text-primary">
+                  이용약관 보기
+                </Link>
+                <span>|</span>
+                <Link href="/privacy" className="underline hover:text-primary">
+                  개인정보처리방침 보기
+                </Link>
+              </div>
+            </div>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3">
+            <div
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                agreedMarketing
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/30"
+              }`}
+              onClick={() => setAgreedMarketing(!agreedMarketing)}
+            >
+              {agreedMarketing && <Check className="h-3.5 w-3.5" />}
+            </div>
+            <span className="text-sm" onClick={() => setAgreedMarketing(!agreedMarketing)}>
+              마케팅 정보 수신에 동의합니다{" "}
+              <span className="text-muted-foreground">(선택)</span>
+            </span>
+          </label>
+        </div>
+
+        {/* Bottom Links */}
+        <div className="mt-5 space-y-1 text-center text-sm">
+          <p className="text-muted-foreground">
             이미 계정이 있으신가요?{" "}
             <Link href="/login" className="font-medium text-primary hover:underline">
               로그인
             </Link>
           </p>
-        </CardFooter>
-      </Card>
+          <p className="text-xs text-muted-foreground">
+            로그인 없이도 기본 기능을 이용할 수 있어요
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
