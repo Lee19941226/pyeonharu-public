@@ -1,278 +1,630 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Stethoscope, MapPin, ArrowRight, Loader2, AlertTriangle, Info } from "lucide-react"
-import Link from "next/link"
+import {
+  Sparkles,
+  Stethoscope,
+  MapPin,
+  ArrowLeft,
+  Loader2,
+  AlertTriangle,
+  Phone,
+  Navigation,
+  Bookmark,
+  Search,
+  Clock,
+  Check,
+  Circle,
+  ChevronRight,
+  ExternalLink,
+} from "lucide-react"
 
+// ─── Types ───
 interface AnalysisResult {
+  suspectedDisease: string
   department: string
-  description: string
   confidence: number
-  additionalAdvice?: string
+  healthAdvice: string[]
+  visitTip: string
+  emergencyLevel: "normal" | "urgent" | "emergency"
   possibleDepartments?: string[]
 }
 
-const commonSymptoms = [
-  "두통이 있어요",
-  "열이 나요",
-  "기침이 나와요",
-  "배가 아파요",
-  "허리가 아파요",
-  "피부에 발진이 생겼어요",
-]
-
-const departmentInfo: Record<string, string> = {
-  "내과": "소화기, 호흡기, 심혈관 질환 등 내부 장기 관련 증상",
-  "정형외과": "뼈, 관절, 근육 관련 증상",
-  "피부과": "피부 질환, 알러지, 발진 등",
-  "이비인후과": "귀, 코, 목 관련 증상",
-  "안과": "눈 관련 증상",
-  "신경과": "두통, 어지러움, 신경계 증상",
+interface NearbyHospital {
+  id: string
+  name: string
+  department: string
+  address: string
+  distance: string
+  phone: string
+  openTime: string
+  closeTime: string
+  isOpen: boolean
+  isAiRecommended: boolean
+  lat: number
+  lng: number
 }
 
+type ScreenState = "input" | "analyzing" | "result" | "detail"
+
+// ─── Sample hospitals (공공데이터 API 연동 전 샘플) ───
+const getSampleHospitals = (dept: string): NearbyHospital[] => [
+  {
+    id: "1",
+    name: `굿모닝${dept}의원`,
+    department: dept,
+    address: "경기도 군포시 산본로 123",
+    distance: "350m",
+    phone: "031-123-4567",
+    openTime: "09:00",
+    closeTime: "18:00",
+    isOpen: true,
+    isAiRecommended: true,
+    lat: 37.3595,
+    lng: 126.9354,
+  },
+  {
+    id: "2",
+    name: `군포중앙${dept}의원`,
+    department: dept,
+    address: "경기도 군포시 번영로 456",
+    distance: "820m",
+    phone: "031-987-6543",
+    openTime: "09:00",
+    closeTime: "17:30",
+    isOpen: true,
+    isAiRecommended: false,
+    lat: 37.3612,
+    lng: 126.9381,
+  },
+  {
+    id: "3",
+    name: `산본${dept}의원`,
+    department: dept,
+    address: "경기도 군포시 광정로 78",
+    distance: "1.2km",
+    phone: "031-456-7890",
+    openTime: "08:30",
+    closeTime: "18:30",
+    isOpen: true,
+    isAiRecommended: false,
+    lat: 37.3578,
+    lng: 126.9312,
+  },
+]
+
+// ─── Daily usage limit (localStorage) ───
+const DAILY_LIMIT = 5
+const STORAGE_KEY = "pyeonharu_symptom_usage"
+
+function getUsageToday(): number {
+  if (typeof window === "undefined") return 0
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
+    const today = new Date().toISOString().split("T")[0]
+    return d.date === today ? d.count : 0
+  } catch {
+    return 0
+  }
+}
+
+function incrementUsage(): number {
+  const today = new Date().toISOString().split("T")[0]
+  const n = getUsageToday() + 1
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: today, count: n }))
+  return n
+}
+
+// ═══════════════════════════════════════
+// Main component
+// ═══════════════════════════════════════
 export default function SymptomPage() {
   const searchParams = useSearchParams()
+  const [screen, setScreen] = useState<ScreenState>("input")
   const [symptom, setSymptom] = useState("")
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
+  const [hospitals, setHospitals] = useState<NearbyHospital[]>([])
+  const [selectedHospital, setSelectedHospital] = useState<NearbyHospital | null>(null)
   const [error, setError] = useState("")
-
+  const [usageCount, setUsageCount] = useState(0)
+  const [analysisStep, setAnalysisStep] = useState(0)
   const hasAutoAnalyzed = useRef(false)
 
-  // URL 쿼리 파라미터에서 증상 텍스트를 받아 자동 분석 실행
+  useEffect(() => { setUsageCount(getUsageToday()) }, [])
+
   useEffect(() => {
-    const querySymptom = searchParams.get("q")
-    if (querySymptom && !hasAutoAnalyzed.current) {
+    const q = searchParams.get("q")
+    if (q && !hasAutoAnalyzed.current) {
       hasAutoAnalyzed.current = true
-      setSymptom(querySymptom)
-      setTimeout(() => {
-        runAnalysis(querySymptom)
-      }, 300)
+      setSymptom(q)
+      setTimeout(() => runAnalysis(q), 300)
     }
   }, [searchParams])
 
-  const runAnalysis = async (text: string) => {
-    if (!text.trim()) return
+  const remaining = DAILY_LIMIT - usageCount
+  const limitReached = remaining <= 0
 
-    setIsAnalyzing(true)
+  const runAnalysis = useCallback(async (text: string) => {
+    if (!text.trim() || limitReached) return
+    setScreen("analyzing")
+    setAnalysisStep(0)
     setResult(null)
     setError("")
 
+    const timers = [
+      setTimeout(() => setAnalysisStep(1), 600),
+      setTimeout(() => setAnalysisStep(2), 1400),
+    ]
+
     try {
-      const response = await fetch("/api/symptom-analyze", {
+      const res = await fetch("/api/symptom-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symptom: text.trim() }),
       })
+      const data = await res.json()
 
-      const data = await response.json()
-
-      if (!response.ok) {
+      if (!res.ok) {
+        timers.forEach(clearTimeout)
         setError(data.error || "분석 중 오류가 발생했습니다.")
+        setScreen("input")
         return
       }
 
+      setAnalysisStep(3)
+      await new Promise((r) => setTimeout(r, 500))
+      setAnalysisStep(4)
+      await new Promise((r) => setTimeout(r, 400))
+
       setResult(data)
-    } catch (err) {
-      setError("네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.")
-    } finally {
-      setIsAnalyzing(false)
+      setHospitals(getSampleHospitals(data.department))
+      setUsageCount(incrementUsage())
+      setScreen("result")
+    } catch {
+      timers.forEach(clearTimeout)
+      setError("네트워크 오류가 발생했습니다.")
+      setScreen("input")
     }
-  }
-
-  const handleAnalyze = () => {
-    runAnalysis(symptom)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      if (symptom.trim() && !isAnalyzing) {
-        handleAnalyze()
-      }
-    }
-  }
+  }, [limitReached])
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-
       <main className="flex-1 pb-16 md:pb-0">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Stethoscope className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold md:text-3xl">증상으로 진료과 추천</h1>
-            <p className="mt-2 text-muted-foreground">
-              증상을 입력하면 AI가 적합한 진료과를 추천해드립니다
-            </p>
-          </div>
+        {screen === "input" && (
+          <InputScreen
+            symptom={symptom}
+            setSymptom={setSymptom}
+            remaining={remaining}
+            limitReached={limitReached}
+            error={error}
+            setError={setError}
+            onAnalyze={() => runAnalysis(symptom)}
+          />
+        )}
+        {screen === "analyzing" && (
+          <AnalyzingScreen symptom={symptom} step={analysisStep} />
+        )}
+        {screen === "result" && result && (
+          <ResultScreen
+            result={result}
+            hospitals={hospitals}
+            onBack={() => { setScreen("input"); setResult(null) }}
+            onDetail={(h) => { setSelectedHospital(h); setScreen("detail") }}
+            onNew={() => { setScreen("input"); setSymptom(""); setResult(null) }}
+          />
+        )}
+        {screen === "detail" && selectedHospital && result && (
+          <DetailScreen
+            hospital={selectedHospital}
+            result={result}
+            onBack={() => { setScreen("result"); setSelectedHospital(null) }}
+          />
+        )}
+      </main>
+      <MobileNav />
+    </div>
+  )
+}
 
-          <div className="mx-auto max-w-2xl">
-            {/* Input Area */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="text-lg">증상을 알려주세요</CardTitle>
-                <CardDescription>
-                  현재 겪고 있는 증상을 자세히 설명해주세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea
-                  placeholder="예: 머리가 아프고 열이 나요. 목도 좀 칼칼한 것 같아요."
-                  value={symptom}
-                  onChange={(e) => {
+// ═══════════════════════════════════════
+// ① 증상 입력 화면
+// ═══════════════════════════════════════
+function InputScreen({
+  symptom, setSymptom, remaining, limitReached, error, setError, onAnalyze,
+}: {
+  symptom: string
+  setSymptom: (v: string) => void
+  remaining: number
+  limitReached: boolean
+  error: string
+  setError: (v: string) => void
+  onAnalyze: () => void
+}) {
+  const MAX = 500
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mx-auto max-w-2xl">
+        {/* A 히어로 */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <Stethoscope className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold md:text-3xl">어디가 불편하신가요?</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            증상을 직접 입력하면 AI가 분석하여<br />맞춤 진료과와 가까운 병원을 추천해드려요
+          </p>
+        </div>
+
+        {/* B 증상 입력 */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">증상을 알려주세요</CardTitle>
+            <p className="text-sm text-muted-foreground">현재 겪고 있는 증상을 자세히 설명해주세요</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="relative">
+              <Textarea
+                placeholder="예: 기침하고 콧물이 나와요. 열은 없어요. 36.7도에요. 3일째 계속되고 있어요."
+                value={symptom}
+                onChange={(e) => {
+                  if (e.target.value.length <= MAX) {
                     setSymptom(e.target.value)
                     if (error) setError("")
-                  }}
-                  onKeyDown={handleKeyDown}
-                  rows={4}
-                  className="resize-none"
-                />
+                  }
+                }}
+                rows={5}
+                className="resize-none pb-8"
+                disabled={limitReached}
+              />
+              <span className={`absolute bottom-3 right-3 text-xs ${symptom.length > MAX * 0.9 ? "text-destructive" : "text-muted-foreground"}`}>
+                {symptom.length}/{MAX}
+              </span>
+            </div>
 
-                {/* Quick symptoms */}
-                <div>
-                  <p className="mb-2 text-sm text-muted-foreground">빠른 입력:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {commonSymptoms.map((s) => (
-                      <Badge
-                        key={s}
-                        variant="outline"
-                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                        onClick={() => setSymptom(s)}
-                      >
-                        {s}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
 
-                {/* Error message */}
-                {error && (
-                  <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <p>{error}</p>
-                  </div>
-                )}
+            {/* C AI 분석하기 버튼 */}
+            <Button
+              onClick={onAnalyze}
+              disabled={!symptom.trim() || limitReached}
+              className="w-full rounded-full py-6 text-base"
+              size="lg"
+            >
+              <Sparkles className="mr-2 h-5 w-5" />
+              AI 분석하기
+            </Button>
+          </CardContent>
+        </Card>
 
-                <Button
-                  onClick={handleAnalyze}
-                  disabled={!symptom.trim() || isAnalyzing}
-                  className="w-full"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      AI 분석 중...
-                    </>
+        {/* D 의료 면책 안내 */}
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <p className="text-amber-800 dark:text-amber-200">
+            AI 분석 결과는 참고용이며, 정확한 진단은 의료 전문가와 상담하세요.
+            응급 시 <a href="tel:119" className="font-semibold underline">119</a> 연락.
+          </p>
+        </div>
+
+        {/* E 남은 분석 횟수 */}
+        <p className={`text-center text-sm ${limitReached ? "font-semibold text-destructive" : "text-muted-foreground"}`}>
+          {limitReached ? "오늘 분석 횟수를 모두 사용했습니다" : `오늘 남은 분석 횟수 ${remaining}/${DAILY_LIMIT}`}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// ② AI 분석 중 화면
+// ═══════════════════════════════════════
+function AnalyzingScreen({ symptom, step }: { symptom: string; step: number }) {
+  const steps = ["증상 키워드 추출", "질환 가능성 분석", "주변 병원 검색", "맞춤 가이드 생성"]
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mx-auto max-w-md">
+        <div className="mb-8 flex justify-center">
+          <Badge variant="secondary" className="gap-1 px-3 py-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            AI 분석 중 화면
+          </Badge>
+        </div>
+
+        {/* A 펄스 애니메이션 */}
+        <div className="mb-8 flex flex-col items-center">
+          <div className="relative mb-6 flex h-32 w-32 items-center justify-center">
+            <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" style={{ animationDuration: "2s" }} />
+            <div className="absolute inset-2 animate-ping rounded-full bg-primary/15" style={{ animationDuration: "2.5s", animationDelay: "0.3s" }} />
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+              <Search className="h-10 w-10 text-primary" />
+            </div>
+          </div>
+          <h2 className="text-xl font-bold">증상을 분석하고 있어요</h2>
+        </div>
+
+        {/* B 사용자 입력 원문 */}
+        <div className="mb-8 rounded-lg border bg-muted/50 p-4">
+          <p className="text-center text-sm italic text-muted-foreground">
+            &ldquo; {symptom} &rdquo;
+          </p>
+        </div>
+
+        {/* C 단계별 진행 */}
+        <div className="space-y-4">
+          {steps.map((label, i) => {
+            const done = step >= i + 1
+            const current = step === i
+            return (
+              <div key={label} className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+                  {done ? (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary">
+                      <Check className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                  ) : current ? (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-primary">
+                      <div className="h-3 w-3 animate-pulse rounded-full bg-primary" />
+                    </div>
                   ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      AI 분석하기
-                    </>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-muted-foreground/30">
+                      <Circle className="h-3 w-3 text-muted-foreground/30" />
+                    </div>
                   )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Result */}
-            {result && (
-              <div className="space-y-4">
-                <Card className="border-primary">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      AI 추천 결과
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="rounded-lg bg-primary/10 p-4">
-                      <p className="mb-1 text-sm text-muted-foreground">추천 진료과</p>
-                      <p className="text-2xl font-bold text-primary">{result.department}</p>
-                      <p className="mt-2 text-sm text-muted-foreground">{result.description}</p>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">AI 신뢰도</span>
-                      <span className="font-medium">{result.confidence}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-primary transition-all duration-500"
-                        style={{ width: `${result.confidence}%` }}
-                      />
-                    </div>
-
-                    {/* Additional advice */}
-                    {result.additionalAdvice && (
-                      <div className="flex gap-2 rounded-lg bg-blue-50 p-3 text-sm dark:bg-blue-950/30">
-                        <Info className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
-                        <p className="text-blue-700 dark:text-blue-300">{result.additionalAdvice}</p>
-                      </div>
-                    )}
-
-                    {/* Alternative departments */}
-                    {result.possibleDepartments && result.possibleDepartments.length > 0 && (
-                      <div>
-                        <p className="mb-2 text-sm text-muted-foreground">이런 진료과도 고려해보세요:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {result.possibleDepartments.map((dept) => (
-                            <Badge key={dept} variant="secondary">
-                              {dept}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="text-xs text-muted-foreground">
-                      * AI 추천은 참고용이며, 정확한 진단은 의료 전문가와 상담하세요.
-                    </p>
-
-                    <Button asChild className="w-full">
-                      <Link href={`/search?department=${encodeURIComponent(result.department)}`}>
-                        <MapPin className="mr-2 h-4 w-4" />
-                        주변 {result.department} 검색하기
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Department List - 결과 없을 때만 표시 */}
-            {!result && !isAnalyzing && (
-              <div className="mt-8">
-                <h2 className="mb-4 text-lg font-semibold">진료과 안내</h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {Object.entries(departmentInfo).map(([name, desc]) => (
-                    <Card key={name} className="cursor-pointer transition-all hover:shadow-md"
-                      onClick={() => setSymptom(`${name}에서 볼 수 있는 증상이 있어요`)}
-                    >
-                      <CardContent className="p-4">
-                        <h3 className="font-medium">{name}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
                 </div>
+                <span className={`flex-1 text-sm font-medium ${done ? "text-foreground" : current ? "text-primary" : "text-muted-foreground/50"}`}>
+                  {label}
+                </span>
+                <span className={`text-xs ${done ? "text-primary font-medium" : current ? "text-primary" : "text-muted-foreground/40"}`}>
+                  {done ? "완료" : current ? "분석 중..." : "대기"}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// ③ 분석 결과 화면
+// ═══════════════════════════════════════
+function ResultScreen({
+  result, hospitals, onBack, onDetail, onNew,
+}: {
+  result: AnalysisResult
+  hospitals: NearbyHospital[]
+  onBack: () => void
+  onDetail: (h: NearbyHospital) => void
+  onNew: () => void
+}) {
+  const isEmergency = result.emergencyLevel === "emergency"
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      <div className="mx-auto max-w-2xl">
+        {/* 헤더 */}
+        <div className="mb-6 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-bold">AI 분석 결과</h1>
+        </div>
+
+        {/* A AI 메시지 카드 */}
+        <Card className={`mb-6 ${isEmergency ? "border-destructive" : "border-primary/30"}`}>
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
+                <span className="text-sm font-bold text-primary-foreground">편</span>
+              </div>
+              <div>
+                <span className="font-semibold">편하루 AI</span>
+                <Badge className="ml-2 bg-primary/10 text-primary hover:bg-primary/10" variant="secondary">분석완료</Badge>
+              </div>
+            </div>
+
+            <p className="mb-3 text-sm text-muted-foreground">입력하신 증상을 분석했어요.</p>
+
+            <div className={`mb-4 rounded-lg p-3 ${isEmergency ? "bg-destructive/10" : "bg-primary/5"}`}>
+              <p className="text-sm font-medium">
+                🔬 의심 질환: <span className={`font-bold ${isEmergency ? "text-destructive" : "text-primary"}`}>{result.suspectedDisease}</span>
+              </p>
+            </div>
+
+            {isEmergency && (
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3">
+                <p className="mb-2 text-sm font-semibold text-destructive">🚨 응급 상황이 의심됩니다</p>
+                <Button asChild variant="destructive" size="sm" className="w-full">
+                  <a href="tel:119">📞 119 응급 전화</a>
+                </Button>
               </div>
             )}
+
+            <div className="space-y-2">
+              {result.healthAdvice.map((a, i) => (
+                <p key={i} className="text-sm leading-relaxed">{a}</p>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* B 지도 미리보기 */}
+        <div className="mb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <MapPin className="h-4 w-4 text-primary" />
+              주변 추천 병원
+            </h2>
+            <Button variant="ghost" size="sm" asChild className="text-xs text-primary">
+              <a href={`/search?department=${encodeURIComponent(result.department)}`}>
+                <ExternalLink className="mr-1 h-3 w-3" />
+                크게 보기
+              </a>
+            </Button>
+          </div>
+          <div className="mb-4 flex h-36 items-center justify-center rounded-xl border bg-muted/50">
+            <div className="text-center text-sm text-muted-foreground">
+              <MapPin className="mx-auto mb-1 h-8 w-8 text-primary/40" />
+              <p>지도 미리보기</p>
+              <p className="text-xs">네이버 지도 API 연동 예정</p>
+            </div>
           </div>
         </div>
-      </main>
 
-      <MobileNav />
+        {/* C 추천 병원 카드 */}
+        <div className="mb-6 space-y-3">
+          {hospitals.map((h) => (
+            <Card
+              key={h.id}
+              className={`cursor-pointer transition-all hover:shadow-md ${h.isAiRecommended ? "border-primary/50 ring-1 ring-primary/20" : ""}`}
+              onClick={() => onDetail(h)}
+            >
+              <CardContent className="p-4">
+                {h.isAiRecommended && (
+                  <Badge className="mb-2 bg-primary/10 text-primary hover:bg-primary/10" variant="secondary">⭐ AI 추천</Badge>
+                )}
+                <div className="mb-2 flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold">{h.name}</h3>
+                    <Badge variant="outline" className="mt-1 text-xs">{h.department}</Badge>
+                  </div>
+                  <ChevronRight className="mt-1 h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="mb-3 space-y-1 text-sm text-muted-foreground">
+                  <p className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />{h.address} · {h.distance}
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 shrink-0" />{h.phone}
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />{h.openTime} - {h.closeTime}
+                    <Badge variant={h.isOpen ? "default" : "secondary"} className="ml-1 px-1.5 py-0 text-xs">
+                      {h.isOpen ? "진료 중" : "진료 종료"}
+                    </Badge>
+                  </p>
+                </div>
+
+                {/* D 즉시 행동 버튼 */}
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
+                    <a href={`tel:${h.phone}`}><Phone className="mr-1 h-3.5 w-3.5" />전화하기</a>
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
+                    <a href={`nmap://route/public?dlat=${h.lat}&dlng=${h.lng}&dname=${encodeURIComponent(h.name)}`} target="_blank" rel="noopener noreferrer">
+                      <Navigation className="mr-1 h-3.5 w-3.5" />길찾기
+                    </a>
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs"><Bookmark className="h-3.5 w-3.5" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>공공데이터 기반 정보이며, 방문 전 전화 확인을 권장합니다.</p>
+        </div>
+
+        <Button variant="outline" className="w-full" onClick={onNew}>다른 증상 분석하기</Button>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// ④ 병원 상세 화면
+// ═══════════════════════════════════════
+function DetailScreen({
+  hospital, result, onBack,
+}: {
+  hospital: NearbyHospital
+  result: AnalysisResult
+  onBack: () => void
+}) {
+  return (
+    <div className="container mx-auto px-4 py-6">
+      <div className="mx-auto max-w-2xl">
+        {/* A 지도 */}
+        <div className="relative mb-6 flex h-48 items-center justify-center rounded-xl border bg-muted/50">
+          <div className="text-center text-sm text-muted-foreground">
+            <MapPin className="mx-auto mb-1 h-10 w-10 text-primary/40" />
+            <p>병원 위치 지도</p>
+            <p className="text-xs">네이버 지도 API 연동 예정</p>
+          </div>
+          <Button variant="secondary" size="icon" className="absolute left-3 top-3 h-9 w-9 rounded-full shadow-md" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* B 병원 상세 */}
+        <div className="mb-6">
+          <h1 className="mb-2 text-2xl font-bold">{hospital.name}</h1>
+          <div className="mb-4 flex items-center gap-2">
+            <Badge>{hospital.department}</Badge>
+            {hospital.isAiRecommended && <Badge variant="secondary" className="bg-primary/10 text-primary">AI 추천</Badge>}
+          </div>
+          <div className="space-y-3">
+            <InfoRow icon={<MapPin className="h-5 w-5" />} label="주소" value={hospital.address} />
+            <InfoRow icon={<Phone className="h-5 w-5" />} label="전화번호" value={hospital.phone} />
+            <InfoRow icon={<Clock className="h-5 w-5" />} label="진료시간" value={`평일 ${hospital.openTime}-${hospital.closeTime} · 토 ${hospital.openTime}-13:00`} />
+            <InfoRow icon={<Stethoscope className="h-5 w-5" />} label="진료과목" value={`${hospital.department}`} />
+          </div>
+        </div>
+
+        {/* C 행동 버튼 */}
+        <div className="mb-6 flex gap-3">
+          <Button className="flex-1 rounded-full py-6" asChild>
+            <a href={`tel:${hospital.phone}`}><Phone className="mr-2 h-5 w-5" />전화하기</a>
+          </Button>
+          <Button variant="outline" className="flex-1 rounded-full py-6" asChild>
+            <a href={`nmap://route/public?dlat=${hospital.lat}&dlng=${hospital.lng}&dname=${encodeURIComponent(hospital.name)}`} target="_blank" rel="noopener noreferrer">
+              <Navigation className="mr-2 h-5 w-5" />길찾기
+            </a>
+          </Button>
+        </div>
+
+        {/* D AI 방문 팁 */}
+        {result.visitTip && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="flex gap-3 p-4">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="mb-1 text-sm font-semibold text-primary">편하루 AI 방문 팁</p>
+                <p className="text-sm leading-relaxed text-foreground/80">{result.visitTip}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Helper ───
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5 shrink-0 text-muted-foreground">{icon}</div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm">{value}</p>
+      </div>
     </div>
   )
 }
