@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const foodData = await foodResponse.json();
 
     // 사용자 알레르기 정보 조회
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

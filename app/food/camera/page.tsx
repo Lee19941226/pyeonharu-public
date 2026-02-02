@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Camera as CameraIcon, RotateCw, Zap, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner"; // ✅ 변경
 
 export default function CameraPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -17,7 +17,6 @@ export default function CameraPage() {
     "environment",
   );
   const router = useRouter();
-  const { toast } = useToast();
 
   const startCamera = async () => {
     try {
@@ -30,11 +29,7 @@ export default function CameraPage() {
       setStream(mediaStream);
     } catch (error) {
       console.error("카메라 접근 오류:", error);
-      toast({
-        title: "카메라 오류",
-        description: "카메라에 접근할 수 없습니다",
-        variant: "destructive",
-      });
+      toast.error("카메라에 접근할 수 없습니다"); // ✅ 변경
     }
   };
 
@@ -83,22 +78,18 @@ export default function CameraPage() {
       }
     } catch (error) {
       console.error(error);
-      toast({
-        title: "분석 실패",
-        description: "이미지 분석 중 오류가 발생했습니다",
-        variant: "destructive",
-      });
+      toast.error("이미지 분석 중 오류가 발생했습니다"); // ✅ 변경
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     startCamera();
     return () => {
       stream?.getTracks().forEach((track) => track.stop());
     };
-  });
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-black">
