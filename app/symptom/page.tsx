@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { MobileNav } from "@/components/layout/mobile-nav"
+import { NaverMap, type MapMarker } from "@/components/medical/naver-map"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,8 +68,8 @@ const getSampleHospitals = (dept: string): NearbyHospital[] => [
     closeTime: "18:00",
     isOpen: true,
     isAiRecommended: true,
-    lat: 37.3595,
-    lng: 126.9354,
+    lat: 37.3608,
+    lng: 126.9320,
   },
   {
     id: "2",
@@ -81,8 +82,8 @@ const getSampleHospitals = (dept: string): NearbyHospital[] => [
     closeTime: "17:30",
     isOpen: true,
     isAiRecommended: false,
-    lat: 37.3612,
-    lng: 126.9381,
+    lat: 37.3625,
+    lng: 126.9365,
   },
   {
     id: "3",
@@ -96,7 +97,7 @@ const getSampleHospitals = (dept: string): NearbyHospital[] => [
     isOpen: true,
     isAiRecommended: false,
     lat: 37.3578,
-    lng: 126.9312,
+    lng: 126.9290,
   },
 ]
 
@@ -135,10 +136,23 @@ export default function SymptomPage() {
   const [error, setError] = useState("")
   const [usageCount, setUsageCount] = useState(0)
   const [analysisStep, setAnalysisStep] = useState(0)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const hasAutoAnalyzed = useRef(false)
 
-  useEffect(() => { setUsageCount(getUsageToday()) }, [])
+  useEffect(() => {
+    setUsageCount(getUsageToday())
+    // 사용자 위치
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setUserLocation({ lat: 37.3595, lng: 126.9354 }) // 군포 기본값
+      )
+    } else {
+      setUserLocation({ lat: 37.3595, lng: 126.9354 })
+    }
+  }, [])
 
+  // URL 쿼리 자동 분석
   useEffect(() => {
     const q = searchParams.get("q")
     if (q && !hasAutoAnalyzed.current) {
@@ -194,6 +208,15 @@ export default function SymptomPage() {
     }
   }, [limitReached])
 
+  // 병원 목록 → 지도 마커 변환
+  const hospitalMarkers: MapMarker[] = hospitals.map((h) => ({
+    id: h.id,
+    lat: h.lat,
+    lng: h.lng,
+    label: h.name.length > 8 ? h.name.slice(0, 8) + "…" : h.name,
+    isAiRecommended: h.isAiRecommended,
+  }))
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -216,15 +239,22 @@ export default function SymptomPage() {
           <ResultScreen
             result={result}
             hospitals={hospitals}
+            markers={hospitalMarkers}
+            userLocation={userLocation}
             onBack={() => { setScreen("input"); setResult(null) }}
             onDetail={(h) => { setSelectedHospital(h); setScreen("detail") }}
             onNew={() => { setScreen("input"); setSymptom(""); setResult(null) }}
+            onMarkerClick={(id) => {
+              const h = hospitals.find((h) => h.id === id)
+              if (h) { setSelectedHospital(h); setScreen("detail") }
+            }}
           />
         )}
         {screen === "detail" && selectedHospital && result && (
           <DetailScreen
             hospital={selectedHospital}
             result={result}
+            userLocation={userLocation}
             onBack={() => { setScreen("result"); setSelectedHospital(null) }}
           />
         )}
@@ -403,13 +433,16 @@ function AnalyzingScreen({ symptom, step }: { symptom: string; step: number }) {
 // ③ 분석 결과 화면
 // ═══════════════════════════════════════
 function ResultScreen({
-  result, hospitals, onBack, onDetail, onNew,
+  result, hospitals, markers, userLocation, onBack, onDetail, onNew, onMarkerClick,
 }: {
   result: AnalysisResult
   hospitals: NearbyHospital[]
+  markers: MapMarker[]
+  userLocation: { lat: number; lng: number } | null
   onBack: () => void
   onDetail: (h: NearbyHospital) => void
   onNew: () => void
+  onMarkerClick: (id: string) => void
 }) {
   const isEmergency = result.emergencyLevel === "emergency"
 
@@ -462,7 +495,7 @@ function ResultScreen({
           </CardContent>
         </Card>
 
-        {/* B 지도 미리보기 */}
+        {/* B 지도 미리보기 (네이버 지도 연동) */}
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-semibold">
@@ -476,13 +509,15 @@ function ResultScreen({
               </a>
             </Button>
           </div>
-          <div className="mb-4 flex h-36 items-center justify-center rounded-xl border bg-muted/50">
-            <div className="text-center text-sm text-muted-foreground">
-              <MapPin className="mx-auto mb-1 h-8 w-8 text-primary/40" />
-              <p>지도 미리보기</p>
-              <p className="text-xs">네이버 지도 API 연동 예정</p>
-            </div>
-          </div>
+
+          {/* ★ 네이버 지도: 사용자 위치(주황) + 병원 마커(파랑/초록) */}
+          <NaverMap
+            height="200px"
+            userLocation={userLocation}
+            markers={markers}
+            fitBounds={true}
+            onMarkerClick={onMarkerClick}
+          />
         </div>
 
         {/* C 추천 병원 카드 */}
@@ -551,23 +586,42 @@ function ResultScreen({
 // ④ 병원 상세 화면
 // ═══════════════════════════════════════
 function DetailScreen({
-  hospital, result, onBack,
+  hospital, result, userLocation, onBack,
 }: {
   hospital: NearbyHospital
   result: AnalysisResult
+  userLocation: { lat: number; lng: number } | null
   onBack: () => void
 }) {
+  const singleMarker: MapMarker[] = [
+    {
+      id: hospital.id,
+      lat: hospital.lat,
+      lng: hospital.lng,
+      label: hospital.name.length > 10 ? hospital.name.slice(0, 10) + "…" : hospital.name,
+      isAiRecommended: hospital.isAiRecommended,
+    },
+  ]
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mx-auto max-w-2xl">
-        {/* A 지도 */}
-        <div className="relative mb-6 flex h-48 items-center justify-center rounded-xl border bg-muted/50">
-          <div className="text-center text-sm text-muted-foreground">
-            <MapPin className="mx-auto mb-1 h-10 w-10 text-primary/40" />
-            <p>병원 위치 지도</p>
-            <p className="text-xs">네이버 지도 API 연동 예정</p>
-          </div>
-          <Button variant="secondary" size="icon" className="absolute left-3 top-3 h-9 w-9 rounded-full shadow-md" onClick={onBack}>
+        {/* A 지도 (병원 중심) */}
+        <div className="relative mb-6">
+          <NaverMap
+            height="240px"
+            userLocation={userLocation}
+            markers={singleMarker}
+            center={{ lat: hospital.lat, lng: hospital.lng }}
+            zoom={16}
+            fitBounds={false}
+          />
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute left-3 top-3 z-20 h-9 w-9 rounded-full shadow-md"
+            onClick={onBack}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </div>
@@ -583,7 +637,7 @@ function DetailScreen({
             <InfoRow icon={<MapPin className="h-5 w-5" />} label="주소" value={hospital.address} />
             <InfoRow icon={<Phone className="h-5 w-5" />} label="전화번호" value={hospital.phone} />
             <InfoRow icon={<Clock className="h-5 w-5" />} label="진료시간" value={`평일 ${hospital.openTime}-${hospital.closeTime} · 토 ${hospital.openTime}-13:00`} />
-            <InfoRow icon={<Stethoscope className="h-5 w-5" />} label="진료과목" value={`${hospital.department}`} />
+            <InfoRow icon={<Stethoscope className="h-5 w-5" />} label="진료과목" value={hospital.department} />
           </div>
         </div>
 

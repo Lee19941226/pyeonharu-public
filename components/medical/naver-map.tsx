@@ -1,320 +1,245 @@
-"use client";
+"use client"
 
-import { useEffect, useRef, useState } from "react";
-import { MapPin, Navigation, Building2, Cross } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import type { Place } from "@/app/search/page";
+import { useEffect, useRef, useState, useCallback } from "react"
+import { MapPin, Loader2 } from "lucide-react"
 
+// ─── 전역 타입 선언 ───
 declare global {
   interface Window {
-    naver: any;
+    naver: any
   }
+}
+
+// ─── 마커 데이터 타입 ───
+export interface MapMarker {
+  id: string
+  lat: number
+  lng: number
+  label: string
+  isAiRecommended?: boolean
 }
 
 interface NaverMapProps {
-  places: Place[];
-  selectedPlace: Place | null;
-  onSelectPlace: (place: Place | null) => void;
-  userLocation: { lat: number; lng: number } | null;
+  height?: string
+  userLocation?: { lat: number; lng: number } | null
+  markers?: MapMarker[]
+  center?: { lat: number; lng: number }
+  zoom?: number
+  onMarkerClick?: (id: string) => void
+  fitBounds?: boolean
 }
 
+// ─── naver.maps 준비 대기 ───
+function waitForNaverMaps(timeout = 10000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.naver?.maps) {
+      resolve()
+      return
+    }
+    const start = Date.now()
+    const check = setInterval(() => {
+      if (window.naver?.maps) {
+        clearInterval(check)
+        resolve()
+      } else if (Date.now() - start > timeout) {
+        clearInterval(check)
+        reject(new Error("네이버 지도 API 로드 시간 초과. 인증 정보를 확인하세요."))
+      }
+    }, 100)
+  })
+}
+
+// ─── 커스텀 마커 HTML ───
+function createHospitalMarkerHtml(label: string, isAiRecommended: boolean): string {
+  const bg = isAiRecommended ? "#16a34a" : "#2563eb"
+  const border = isAiRecommended ? "#15803d" : "#1d4ed8"
+  const truncated = label.length > 8 ? label.slice(0, 8) + "…" : label
+  const badge = isAiRecommended
+    ? `<span style="position:absolute;top:-8px;right:-8px;background:#f59e0b;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;font-weight:700;white-space:nowrap;">AI</span>`
+    : ""
+
+  return `
+    <div style="position:relative;cursor:pointer;">
+      ${badge}
+      <div style="background:${bg};border:2px solid ${border};color:#fff;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.2);max-width:120px;overflow:hidden;text-overflow:ellipsis;">
+        🏥 ${truncated}
+      </div>
+      <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${bg};margin:0 auto;"></div>
+    </div>
+  `
+}
+
+function createUserMarkerHtml(): string {
+  return `
+    <div style="position:relative;">
+      <div style="width:18px;height:18px;background:#f97316;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>
+      <div style="position:absolute;top:-2px;left:-2px;width:22px;height:22px;border-radius:50%;background:rgba(249,115,22,0.25);animation:pulse-ring 2s ease-out infinite;"></div>
+    </div>
+    <style>
+      @keyframes pulse-ring {
+        0% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(2.5); opacity: 0; }
+      }
+    </style>
+  `
+}
+
+// ═══════════════════════════════════════
+// NaverMap 컴포넌트
+// ═══════════════════════════════════════
 export function NaverMap({
-  places,
-  selectedPlace,
-  onSelectPlace,
+  height = "200px",
   userLocation,
+  markers = [],
+  center,
+  zoom = 14,
+  onMarkerClick,
+  fitBounds = true,
 }: NaverMapProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const userMarkerRef = useRef<any>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const markerInstancesRef = useRef<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [mapReady, setMapReady] = useState(false) // ★ 핵심: 지도 준비 상태
 
-  // 네이버 지도 스크립트 로드
+  const clearMarkers = useCallback(() => {
+    markerInstancesRef.current.forEach((m) => m.setMap(null))
+    markerInstancesRef.current = []
+  }, [])
+
+  // ─── 지도 초기화 ───
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
+    let mounted = true
 
-    if (!clientId) {
-      setMapError("네이버 지도 API 키가 설정되지 않았습니다.");
-      return;
+    async function init() {
+      try {
+        await waitForNaverMaps()
+        if (!mounted || !mapRef.current) return
+
+        const naver = window.naver
+        const defaultCenter = center
+          || (userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null)
+          || { lat: 37.3595, lng: 126.9354 }
+
+        const map = new naver.maps.Map(mapRef.current, {
+          center: new naver.maps.LatLng(defaultCenter.lat, defaultCenter.lng),
+          zoom,
+          zoomControl: true,
+          zoomControlOptions: {
+            position: naver.maps.Position.TOP_RIGHT,
+            style: naver.maps.ZoomControlStyle.SMALL,
+          },
+          mapTypeControl: false,
+          scaleControl: false,
+          logoControl: true,
+          mapDataControl: false,
+        })
+
+        mapInstanceRef.current = map
+        if (mounted) {
+          setMapReady(true) // ★ 마커 useEffect 트리거
+          setIsLoading(false)
+        }
+      } catch (err: any) {
+        if (mounted) {
+          console.error("[NaverMap] 초기화 실패:", err)
+          setError(err.message || "지도를 불러올 수 없습니다.")
+          setIsLoading(false)
+        }
+      }
     }
 
-    // 이미 로드된 경우
-    if (window.naver && window.naver.maps) {
-      setIsMapLoaded(true);
-      return;
-    }
+    init()
+    return () => { mounted = false }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // 스크립트 로드
-    const script = document.createElement("script");
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}`;
-    script.async = true;
-    script.onload = () => {
-      setIsMapLoaded(true);
-    };
-    script.onerror = () => {
-      setMapError("네이버 지도를 로드하는데 실패했습니다.");
-    };
-    document.head.appendChild(script);
-
-    return () => {
-      // 클린업 시 스크립트 제거하지 않음 (재사용을 위해)
-    };
-  }, []);
-
-  // 지도 초기화
+  // ─── 마커 업데이트 (mapReady 의존성 추가) ───
   useEffect(() => {
-    if (!isMapLoaded || !mapRef.current || !window.naver) return;
+    if (!mapReady) return // 지도 아직 준비 안 됨
+    const map = mapInstanceRef.current
+    const naver = window.naver
+    if (!map || !naver?.maps) return
 
-    const defaultCenter = userLocation
-      ? new window.naver.maps.LatLng(userLocation.lat, userLocation.lng)
-      : new window.naver.maps.LatLng(37.5665, 126.978); // 서울 시청
+    clearMarkers()
+    const bounds = new naver.maps.LatLngBounds()
 
-    const mapOptions = {
-      center: defaultCenter,
-      zoom: 14,
-      minZoom: 10,
-      maxZoom: 19,
-      zoomControl: true,
-      zoomControlOptions: {
-        position: window.naver.maps.Position.TOP_RIGHT,
-      },
-    };
-
-    mapInstanceRef.current = new window.naver.maps.Map(
-      mapRef.current,
-      mapOptions,
-    );
-  }, [isMapLoaded, userLocation]);
-
-  // 사용자 위치 마커
-  useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation || !window.naver) return;
-
-    // 기존 사용자 마커 제거
-    if (userMarkerRef.current) {
-      userMarkerRef.current.setMap(null);
-    }
-
-    // 사용자 위치 마커 생성
-    userMarkerRef.current = new window.naver.maps.Marker({
-      position: new window.naver.maps.LatLng(
-        userLocation.lat,
-        userLocation.lng,
-      ),
-      map: mapInstanceRef.current,
-      icon: {
-        content: `
-          <div style="
-            width: 24px;
-            height: 24px;
-            background: #3b82f6;
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          "></div>
-        `,
-        anchor: new window.naver.maps.Point(12, 12),
-      },
-    });
-  }, [userLocation, isMapLoaded]);
-
-  // 장소 마커 업데이트
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.naver) return;
-
-    // 기존 마커 제거
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    markersRef.current = [];
-
-    // 새 마커 생성
-    places.forEach((place) => {
-      const isSelected = selectedPlace?.id === place.id;
-      const isHospital = place.type === "hospital";
-      const bgColor = isHospital ? "#3b82f6" : "#22c55e";
-      const selectedBorder = isSelected ? "3px solid #000" : "2px solid white";
-
-      const marker = new window.naver.maps.Marker({
-        position: new window.naver.maps.LatLng(place.lat, place.lng),
-        map: mapInstanceRef.current,
+    // 사용자 위치 마커 (주황)
+    if (userLocation) {
+      const pos = new naver.maps.LatLng(userLocation.lat, userLocation.lng)
+      const userMarker = new naver.maps.Marker({
+        position: pos,
+        map,
         icon: {
-          content: `
-            <div style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: ${isSelected ? "40px" : "32px"};
-              height: ${isSelected ? "40px" : "32px"};
-              background: ${bgColor};
-              border: ${selectedBorder};
-              border-radius: 50%;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-              cursor: pointer;
-              transition: all 0.2s;
-            ">
-              <svg width="${isSelected ? "20" : "16"}" height="${isSelected ? "20" : "16"}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                ${
-                  isHospital
-                    ? '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>'
-                    : '<path d="M11 2a2 2 0 0 0-2 2v5H4a2 2 0 0 0-2 2v2c0 1.1.9 2 2 2h5v5c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2v-5h5a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-5V4a2 2 0 0 0-2-2h-2z"/>'
-                }
-              </svg>
-            </div>
-          `,
-          anchor: new window.naver.maps.Point(
-            isSelected ? 20 : 16,
-            isSelected ? 20 : 16,
-          ),
+          content: createUserMarkerHtml(),
+          anchor: new naver.maps.Point(11, 11),
         },
-      });
+        zIndex: 200,
+      })
+      markerInstancesRef.current.push(userMarker)
+      bounds.extend(pos)
+    }
 
-      // 마커 클릭 이벤트
-      window.naver.maps.Event.addListener(marker, "click", () => {
-        onSelectPlace(place);
-      });
+    // 병원 마커 (파랑/초록)
+    markers.forEach((m) => {
+      const pos = new naver.maps.LatLng(m.lat, m.lng)
+      const hospitalMarker = new naver.maps.Marker({
+        position: pos,
+        map,
+        icon: {
+          content: createHospitalMarkerHtml(m.label, !!m.isAiRecommended),
+          anchor: new naver.maps.Point(40, 45),
+        },
+        zIndex: m.isAiRecommended ? 150 : 100,
+      })
 
-      markersRef.current.push(marker);
-    });
-  }, [places, selectedPlace, isMapLoaded, onSelectPlace]);
+      if (onMarkerClick) {
+        naver.maps.Event.addListener(hospitalMarker, "click", () => {
+          onMarkerClick(m.id)
+        })
+      }
 
-  // 선택된 장소로 지도 이동
-  useEffect(() => {
-    if (!mapInstanceRef.current || !selectedPlace || !window.naver) return;
+      markerInstancesRef.current.push(hospitalMarker)
+      bounds.extend(pos)
+    })
 
-    const position = new window.naver.maps.LatLng(
-      selectedPlace.lat,
-      selectedPlace.lng,
-    );
-    mapInstanceRef.current.setCenter(position);
-    mapInstanceRef.current.setZoom(16);
-  }, [selectedPlace]);
+    // 범위 자동 조정
+    if (fitBounds && (markers.length > 0 || userLocation)) {
+      if (markers.length === 0 && userLocation) {
+        map.setCenter(new naver.maps.LatLng(userLocation.lat, userLocation.lng))
+        map.setZoom(zoom)
+      } else if (center) {
+        map.setCenter(new naver.maps.LatLng(center.lat, center.lng))
+        map.setZoom(zoom)
+      } else {
+        map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 })
+      }
+    }
+  }, [mapReady, userLocation, markers, center, zoom, fitBounds, onMarkerClick, clearMarkers])
 
-  // 현재 위치로 이동
-  const moveToCurrentLocation = () => {
-    if (!mapInstanceRef.current || !userLocation || !window.naver) return;
-
-    const position = new window.naver.maps.LatLng(
-      userLocation.lat,
-      userLocation.lng,
-    );
-    mapInstanceRef.current.setCenter(position);
-    mapInstanceRef.current.setZoom(15);
-  };
-
-  // 에러 상태
-  if (mapError) {
+  if (error) {
     return (
-      <div className="relative h-full w-full bg-muted">
-        <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-            <MapPin className="h-8 w-8 text-destructive" />
-          </div>
-          <h3 className="mb-2 text-lg font-semibold">
-            지도를 불러올 수 없습니다
-          </h3>
-          <p className="max-w-sm text-sm text-muted-foreground">{mapError}</p>
+      <div className="flex items-center justify-center rounded-xl border bg-muted/50" style={{ height }}>
+        <div className="text-center text-sm text-muted-foreground p-4">
+          <MapPin className="mx-auto mb-2 h-8 w-8 text-destructive/40" />
+          <p className="font-medium mb-1">지도를 표시할 수 없습니다</p>
+          <p className="text-xs">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="relative h-full w-full">
-      {/* 지도 컨테이너 */}
-      <div ref={mapRef} className="h-full w-full" />
-
-      {/* 로딩 상태 */}
-      {!isMapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">
-              지도를 불러오는 중...
-            </p>
+    <div className="relative overflow-hidden rounded-xl border" style={{ height }}>
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted/80">
+          <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p>지도를 불러오는 중...</p>
           </div>
         </div>
       )}
-
-      {/* 범례 */}
-      <div className="absolute left-4 top-4 flex gap-2 rounded-lg bg-background/95 p-2 shadow-lg backdrop-blur">
-        <div className="flex items-center gap-1 text-xs">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
-            <Building2 className="h-3 w-3 text-white" />
-          </div>
-          <span>병원</span>
-        </div>
-        <div className="flex items-center gap-1 text-xs">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
-            <Cross className="h-3 w-3 text-white" />
-          </div>
-          <span>약국</span>
-        </div>
-      </div>
-
-      {/* 현재 위치 버튼 */}
-      <Button
-        variant="secondary"
-        size="icon"
-        className="absolute bottom-4 right-4 h-12 w-12 rounded-full shadow-lg"
-        onClick={moveToCurrentLocation}
-        disabled={!userLocation}
-      >
-        <Navigation className="h-5 w-5" />
-        <span className="sr-only">내 위치로 이동</span>
-      </Button>
-
-      {/* 선택된 장소 정보 카드 */}
-      {selectedPlace && (
-        <div className="absolute bottom-20 left-4 right-4 rounded-lg bg-background p-4 shadow-lg md:left-auto md:right-4 md:w-80">
-          <div className="flex items-start gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                selectedPlace.type === "hospital"
-                  ? "bg-blue-100 text-blue-600"
-                  : "bg-green-100 text-green-600"
-              }`}
-            >
-              {selectedPlace.type === "hospital" ? (
-                <Building2 className="h-5 w-5" />
-              ) : (
-                <Cross className="h-5 w-5" />
-              )}
-            </div>
-            <div className="flex-1">
-              <h4 className="font-semibold">{selectedPlace.name}</h4>
-              <p className="text-sm text-muted-foreground">
-                {selectedPlace.address}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {selectedPlace.phone}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    selectedPlace.isOpen
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {selectedPlace.isOpen ? "영업중" : "영업종료"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {selectedPlace.openTime} - {selectedPlace.closeTime}
-                </span>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={() => onSelectPlace(null)}
-            >
-              ×
-            </Button>
-          </div>
-        </div>
-      )}
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
     </div>
-  );
+  )
 }

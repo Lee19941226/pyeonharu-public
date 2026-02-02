@@ -5,18 +5,12 @@ export async function POST(req: NextRequest) {
     const { symptom } = await req.json()
 
     if (!symptom || typeof symptom !== "string" || !symptom.trim()) {
-      return NextResponse.json(
-        { error: "증상을 입력해주세요." },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "증상을 입력해주세요." }, { status: 400 })
     }
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      return NextResponse.json(
-        { error: "OpenAI API 키가 설정되지 않았습니다." },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: "OpenAI API 키가 설정되지 않았습니다." }, { status: 500 })
     }
 
     const systemPrompt = `당신은 한국의 의료 안내 AI 어시스턴트 "편하루 AI"입니다.
@@ -64,33 +58,21 @@ export async function POST(req: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error("OpenAI API error:", errorData)
-      return NextResponse.json(
-        { error: "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
-        { status: 502 }
-      )
+      console.error("OpenAI API error:", await response.json().catch(() => ({})))
+      return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 502 })
     }
 
     const data = await response.json()
     const content = data.choices?.[0]?.message?.content
 
     if (!content) {
-      return NextResponse.json(
-        { error: "AI 응답을 받지 못했습니다." },
-        { status: 502 }
-      )
+      return NextResponse.json({ error: "AI 응답을 받지 못했습니다." }, { status: 502 })
     }
 
     const cleaned = content.replace(/```json\s?/g, "").replace(/```/g, "").trim()
-    const result = JSON.parse(cleaned)
-
-    return NextResponse.json(result)
+    return NextResponse.json(JSON.parse(cleaned))
   } catch (error) {
     console.error("Symptom analyze error:", error)
-    return NextResponse.json(
-      { error: "분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "분석 중 오류가 발생했습니다." }, { status: 500 })
   }
 }
