@@ -2,17 +2,25 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { Menu, X, User, Heart } from "lucide-react"
+import { Menu, X, User, Heart, LogOut, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/contexts/auth-context"
 
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user, isLoading, openLoginModal, logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+    window.location.href = "/"
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -30,6 +38,7 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 병원/약국
+                <ChevronDown className="ml-1 h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center">
@@ -45,10 +54,15 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/can-i-eat">먹어도 돼?</Link>
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 오늘 뭐 입지?
+                <ChevronDown className="ml-1 h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center">
@@ -66,32 +80,65 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
-            <Link href="/about">서비스 소개</Link>
-          </Button>
-          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
-            <Link href="/faq">FAQ</Link>
-          </Button>
         </nav>
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" asChild className="hidden md:flex">
-            <Link href="/bookmarks">
-              <Heart className="h-5 w-5" />
-              <span className="sr-only">즐겨찾기</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" asChild className="hidden md:flex">
-            <Link href="/mypage">
-              <User className="h-5 w-5" />
-              <span className="sr-only">마이페이지</span>
-            </Link>
-          </Button>
-          <Button asChild className="hidden md:flex">
-            <Link href="/login">로그인</Link>
-          </Button>
+          {!isLoading && (
+            <>
+              {user ? (
+                <>
+                  <Button variant="ghost" size="icon" asChild className="hidden md:flex">
+                    <Link href="/bookmarks">
+                      <Heart className="h-5 w-5" />
+                      <span className="sr-only">즐겨찾기</span>
+                    </Link>
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="hidden md:flex">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <div className="px-2 py-1.5">
+                        <p className="text-sm font-medium">{user.name}</p>
+                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      </div>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/mypage">마이페이지</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/bookmarks">즐겨찾기</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        로그아웃
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="hidden text-muted-foreground hover:text-foreground md:flex"
+                    onClick={openLoginModal}
+                  >
+                    로그인
+                  </Button>
+                  <Button asChild className="hidden md:flex">
+                    <Link href="/sign-up">회원가입</Link>
+                  </Button>
+                </>
+              )}
+            </>
+          )}
 
           {/* Mobile Menu Button */}
           <Button
@@ -133,6 +180,15 @@ export function Header() {
               약 정보 검색
             </Link>
 
+            <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">먹어도 돼?</p>
+            <Link
+              href="/can-i-eat"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              이거 먹어도 돼?
+            </Link>
+
             <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">오늘 뭐 입지?</p>
             <Link
               href="/today"
@@ -148,57 +204,58 @@ export function Header() {
             >
               내 옷장
             </Link>
-            <Link
-              href="/weather"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              날씨 상세
-            </Link>
-            <Link
-              href="/history"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              코디 기록
-            </Link>
 
             <div className="mt-4 border-t border-border pt-4">
-              <Link
-                href="/about"
-                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                서비스 소개
-              </Link>
-              <Link
-                href="/faq"
-                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                FAQ
-              </Link>
-              <Link
-                href="/bookmarks"
-                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                즐겨찾기
-              </Link>
-              <Link
-                href="/mypage"
-                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                마이페이지
-              </Link>
+              {user ? (
+                <>
+                  <div className="mb-2 px-3 py-2">
+                    <p className="text-sm font-medium">{user.name}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                  <Link
+                    href="/mypage"
+                    className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    마이페이지
+                  </Link>
+                  <Link
+                    href="/bookmarks"
+                    className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    즐겨찾기
+                  </Link>
+                  <button
+                    onClick={() => {
+                      handleLogout()
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className="mt-2 block w-full rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      openLoginModal()
+                    }}
+                  >
+                    로그인
+                  </Button>
+                  <Button asChild className="flex-1">
+                    <Link href="/sign-up" onClick={() => setIsMobileMenuOpen(false)}>
+                      회원가입
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </div>
-
-            <Button asChild className="mt-4">
-              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                로그인
-              </Link>
-            </Button>
           </nav>
         </div>
       )}

@@ -2,6 +2,8 @@ import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
+import { AuthProvider } from "@/contexts/auth-context";
+import { LoginModal } from "@/components/auth/login-modal";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -57,7 +59,10 @@ export default function RootLayout({
           strategy="beforeInteractive"
           src={`https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
         />
-        {children}
+        <AuthProvider>
+          <LoginModal />
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

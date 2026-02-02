@@ -4,7 +4,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid gap-8 md:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-5">
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center gap-2">
@@ -35,6 +35,18 @@ export function Footer() {
               <li>
                 <Link href="/medicine" className="hover:text-foreground">
                   약 정보 검색
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* 먹어도 돼? */}
+          <div>
+            <h3 className="mb-4 text-sm font-semibold">먹어도 돼?</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <Link href="/can-i-eat" className="hover:text-foreground">
+                  음식 알러지 확인
                 </Link>
               </li>
             </ul>
