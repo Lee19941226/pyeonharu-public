@@ -20,6 +20,8 @@ export interface FoodResult {
   manufacturer: string;
   weight: string;
   allergens: string[];
+  allergyWarning?: string;
+  crossContamination?: string[];
   userAllergens: string[];
   detectedAllergens: DetectedAllergen[];
   ingredients: string[];
@@ -39,6 +41,7 @@ export interface NutritionInfo {
   carbs: number;
   protein: number;
   fat: number;
+  sugar?: number;
 }
 
 export interface GuideData {

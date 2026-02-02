@@ -23,6 +23,8 @@ interface FoodResult {
   manufacturer: string;
   weight: string;
   allergens: string[];
+  allergyWarning?: string; // ✅ 추가
+  crossContamination?: string[]; // ✅ 추가
   userAllergens: string[];
   detectedAllergens: Array<{
     name: string;
@@ -36,6 +38,7 @@ interface FoodResult {
     carbs: number;
     protein: number;
     fat: number;
+    sugar?: number; // ✅ 추가
   };
   isSafe: boolean;
 }
@@ -45,6 +48,7 @@ export default function FoodResultPage() {
   const router = useRouter();
   const [result, setResult] = useState<FoodResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
@@ -52,15 +56,25 @@ export default function FoodResultPage() {
   }, [params.id]);
 
   const loadFoodResult = async () => {
+    console.log("🔍 페이지에서 로딩 시작, ID:", params.id); // 디버깅
+
     try {
       const response = await fetch(`/api/food/result?code=${params.id}`);
+      console.log("📡 API 응답 상태:", response.status); // 디버깅
+
       const data = await response.json();
+      console.log("📦 API 응답 데이터:", data); // 디버깅
 
       if (data.success) {
         setResult(data.result);
+        console.log("✅ 결과 설정 완료:", data.result); // 디버깅
+      } else {
+        setError(data.error || "결과를 불러올 수 없습니다");
+        console.error("❌ API 에러:", data.error); // 디버깅
       }
     } catch (error) {
-      console.error(error);
+      console.error("💥 로딩 에러:", error); // 디버깅
+      setError("결과를 불러오는 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }
@@ -95,16 +109,29 @@ export default function FoodResultPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>분석 중...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 text-4xl">🔍</div>
+          <p className="text-lg font-medium">분석 중...</p>
+          <p className="text-sm text-muted-foreground">잠시만 기다려주세요</p>
+        </div>
       </div>
     );
   }
 
-  if (!result) {
+  if (error || !result) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>결과를 불러올 수 없습니다</p>
+      <div className="flex min-h-screen flex-col items-center justify-center px-4">
+        <div className="text-center">
+          <div className="mb-4 text-4xl">❌</div>
+          <p className="mb-2 text-lg font-medium">
+            {error || "결과를 불러올 수 없습니다"}
+          </p>
+          <p className="mb-4 text-sm text-muted-foreground">
+            식품 정보를 찾을 수 없거나 오류가 발생했습니다
+          </p>
+          <Button onClick={() => router.back()}>돌아가기</Button>
+        </div>
       </div>
     );
   }
@@ -222,7 +249,60 @@ export default function FoodResultPage() {
                 </div>
               </CardContent>
             </Card>
+            {/* 원재료 정보 추가 */}
+            {result.ingredients.length > 0 && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold">📝 원재료명 및 함량</h3>
+                  <div className="space-y-2">
+                    {result.ingredients.map((ingredient, idx) => (
+                      <div key={idx} className="rounded bg-muted p-3 text-sm">
+                        {ingredient}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {/* 알레르기 유발물질 표시 */}
+            {result.allergyWarning && (
+              <Card className="mb-6 border-orange-200 bg-orange-50">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold text-orange-900">
+                    ⚠️ 알레르기 유발물질 표시
+                  </h3>
+                  <p className="text-sm text-orange-800 leading-relaxed">
+                    {result.allergyWarning}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
+            {/* 교차오염 주의 */}
+            {result.crossContamination &&
+              result.crossContamination.length > 0 && (
+                <Card className="mb-6 border-yellow-200 bg-yellow-50">
+                  <CardContent className="p-6">
+                    <h3 className="mb-4 font-semibold text-yellow-900">
+                      ⚠️ 제조공정 교차오염 가능
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {result.crossContamination.map((item, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded-full bg-yellow-100 border border-yellow-300 px-3 py-1 text-sm text-yellow-900"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-yellow-800">
+                      이 제품은 위 알레르기 유발 식품과 같은 제조시설에서
+                      제조됩니다
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             {/* Allergen Info */}
             <Card className="mb-6">
               <CardContent className="p-6">
@@ -276,6 +356,12 @@ export default function FoodResultPage() {
                     <span className="text-muted-foreground">탄수화물</span>
                     <span>{result.nutrition.carbs}g</span>
                   </div>
+                  {(result.nutrition.sugar ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">당류</span>
+                      <span>{result.nutrition.sugar}g</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">단백질</span>
                     <span>{result.nutrition.protein}g</span>

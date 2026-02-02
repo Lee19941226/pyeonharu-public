@@ -35,7 +35,21 @@ export default function FoodSearchPage() {
       const data = await response.json();
 
       if (data.success) {
-        setResults(data.items);
+        // ✅ 중복 제거: foodCode 기준으로 유니크하게
+        const uniqueItems = data.items.reduce(
+          (acc: FoodItem[], current: FoodItem) => {
+            const exists = acc.find(
+              (item) => item.foodCode === current.foodCode,
+            );
+            if (!exists) {
+              acc.push(current);
+            }
+            return acc;
+          },
+          [],
+        );
+
+        setResults(uniqueItems);
       }
     } catch (error) {
       console.error(error);
@@ -91,9 +105,9 @@ export default function FoodSearchPage() {
                 <h2 className="text-lg font-semibold">
                   검색 결과 ({results.length}개)
                 </h2>
-                {results.map((item) => (
+                {results.map((item, i) => (
                   <Link
-                    key={item.foodCode}
+                    key={`${item.foodCode}-${i}`}
                     href={`/food/result/${item.foodCode}`}
                   >
                     <Card className="cursor-pointer transition-all hover:shadow-md">
