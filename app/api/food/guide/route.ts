@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       resultData.result.detectedAllergens[0]?.severity || "medium";
 
     // 캐시 확인
-    const supabase = createClient();
+    const supabase = await createClient();
     const cacheKey = `${allergen}_${severity}`;
 
     const { data: cached } = await supabase

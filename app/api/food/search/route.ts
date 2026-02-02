@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const data = await response.json();
 
     // 사용자 알레르기 정보 조회
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
