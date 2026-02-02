@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import { AuthProvider } from "@/contexts/auth-context";
 import { LoginModal } from "@/components/auth/login-modal";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -62,6 +63,7 @@ export default function RootLayout({
         <AuthProvider>
           <LoginModal />
           {children}
+          <Toaster />
         </AuthProvider>
         <Analytics />
       </body>

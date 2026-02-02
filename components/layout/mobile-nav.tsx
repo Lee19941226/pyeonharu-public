@@ -1,46 +1,42 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Home, MapPin, Shirt, User, UtensilsCrossed } from "lucide-react"
-import { cn } from "@/lib/utils"
-
-const navItems = [
-  { href: "/", icon: Home, label: "홈" },
-  { href: "/search", icon: MapPin, label: "병원/약국" },
-  { href: "/can-i-eat", icon: UtensilsCrossed, label: "먹어도돼?" },
-  { href: "/today", icon: Shirt, label: "코디" },
-  { href: "/mypage", icon: User, label: "마이" },
-]
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, Search, MapPin, UtensilsCrossed, User } from "lucide-react";
 
 export function MobileNav() {
-  const pathname = usePathname()
+  const pathname = usePathname();
+
+  const links = [
+    { href: "/", icon: Home, label: "홈" },
+    { href: "/search", icon: MapPin, label: "병원/약국" },
+    { href: "/food", icon: UtensilsCrossed, label: "식품 확인" }, // 🆕 추가
+    { href: "/medicine", icon: Search, label: "약 검색" },
+    { href: "/mypage", icon: User, label: "마이페이지" },
+  ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
-      <div className="flex h-16 items-center justify-around">
-        {navItems.map((item) => {
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background md:hidden">
+      <div className="flex items-center justify-around">
+        {links.map((link) => {
+          const Icon = link.icon;
           const isActive =
-            pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href))
+            pathname === link.href || pathname.startsWith(link.href + "/");
 
           return (
             <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors",
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+              key={link.href}
+              href={link.href}
+              className={`flex flex-1 flex-col items-center gap-1 py-2 ${
+                isActive ? "text-primary" : "text-muted-foreground"
+              }`}
             >
-              <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
+              <Icon className="h-5 w-5" />
+              <span className="text-xs">{link.label}</span>
             </Link>
-          )
+          );
         })}
       </div>
     </nav>
-  )
+  );
 }

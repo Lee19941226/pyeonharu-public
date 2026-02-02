@@ -1,69 +1,60 @@
-"use client"
+"use client";
 
-import React, { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import {
-  Search,
-  Camera,
-  ChevronRight,
-  Sun,
-  Cloud,
-  CloudRain,
-  Snowflake,
-  Thermometer,
-  Wind,
-  Shield,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useAuth } from "@/contexts/auth-context"
-import { Header } from "@/components/layout/header"
-import { MobileNav } from "@/components/layout/mobile-nav"
-import { Footer } from "@/components/layout/footer"
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Search, Camera, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/auth-context";
+import { Header } from "@/components/layout/header";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { Footer } from "@/components/layout/footer";
 
 const quickSymptomTags = [
   { label: "🤒 발열", value: "발열" },
   { label: "🤕 두통", value: "두통" },
   { label: "🤢 복통", value: "복통" },
   { label: "🤧 감기", value: "감기" },
-]
+];
 
 export default function HomePage() {
-  const router = useRouter()
-  const { user, isLoading, openLoginModal } = useAuth()
-  const [symptomQuery, setSymptomQuery] = useState("")
-  const [foodQuery, setFoodQuery] = useState("")
+  const router = useRouter();
+  const { user, isLoading, openLoginModal } = useAuth();
+  const [symptomQuery, setSymptomQuery] = useState("");
+  const [foodQuery, setFoodQuery] = useState("");
 
   const handleSymptomSearch = (query?: string) => {
-    const searchQuery = query || symptomQuery
-    if (!searchQuery.trim()) return
+    const searchQuery = query || symptomQuery;
+    if (!searchQuery.trim()) return;
 
     // AI 기능 → 로그인 필수
     if (!user) {
-      openLoginModal()
-      return
+      openLoginModal();
+      return;
     }
-    router.push(`/symptom?q=${encodeURIComponent(searchQuery)}`)
-  }
+    router.push(`/symptom?q=${encodeURIComponent(searchQuery)}`);
+  };
 
   const handleFoodCheck = () => {
     if (!user) {
-      openLoginModal()
-      return
+      openLoginModal();
+      return;
     }
     if (foodQuery.trim()) {
-      router.push(`/can-i-eat?q=${encodeURIComponent(foodQuery)}`)
+      // 식품 검색 페이지로 이동
+      router.push(`/food/search?q=${encodeURIComponent(foodQuery)}`);
     }
-  }
+  };
 
   const handleFoodPhoto = () => {
     if (!user) {
-      openLoginModal()
-      return
+      openLoginModal();
+      return;
     }
-    router.push("/can-i-eat?mode=camera")
-  }
+    // 카메라 촬영 페이지로 이동
+    router.push("/food/camera");
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -108,7 +99,7 @@ export default function HomePage() {
                   onChange={(e) => setSymptomQuery(e.target.value)}
                   className="pl-10 pr-20"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSymptomSearch()
+                    if (e.key === "Enter") handleSymptomSearch();
                   }}
                 />
                 <Button
@@ -142,15 +133,15 @@ export default function HomePage() {
 
           {/* Section 2: 이거 먹어도 돼? */}
           <section className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
-            <div className="border-b border-border bg-orange-50/50 px-5 py-4">
+            <div className="border-b border-border bg-green-50/50 px-5 py-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <span className="text-xl">🍽</span>
+                    <span className="text-xl">🍽️</span>
                     이거 먹어도 돼?
                   </h2>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    음식 사진이나 이름으로 알러지를 확인하세요
+                    음식 사진이나 이름으로 알레르기를 확인하세요
                   </p>
                 </div>
                 <button
@@ -168,69 +159,23 @@ export default function HomePage() {
                   className="flex items-center gap-2 rounded-lg border border-dashed border-border px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                 >
                   <Camera className="h-4 w-4" />
-                  사진 업로드
+                  사진 촬영
                 </button>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="새우볶음밥"
+                    placeholder="새우깡, 바나나우유 등"
                     value={foodQuery}
                     onChange={(e) => setFoodQuery(e.target.value)}
                     className="pl-10"
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleFoodCheck()
+                      if (e.key === "Enter") handleFoodCheck();
                     }}
                   />
                 </div>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                내 알러지 정보를 기반으로 안전 여부를 AI가 분석해드려요
-              </p>
-            </div>
-          </section>
-
-          {/* Section 3: 오늘 뭐 입지? */}
-          <section className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
-            <div className="border-b border-border bg-sky-50/50 px-5 py-4">
-              <h2 className="flex items-center gap-2 text-lg font-semibold">
-                <span className="text-xl">👕</span>
-                오늘 뭐 입지?
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                날씨에 딱 맞는 옷차림을 추천해드려요
-              </p>
-            </div>
-            <div className="p-5">
-              {/* Weather Preview */}
-              <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-sky-50 to-blue-50 p-4">
-                <div className="flex items-center gap-3">
-                  <Sun className="h-8 w-8 text-amber-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">서울</p>
-                    <p className="text-xl font-bold">-3°C</p>
-                  </div>
-                </div>
-                <div className="text-right text-xs text-muted-foreground">
-                  <p className="flex items-center justify-end gap-1">
-                    <Thermometer className="h-3 w-3" />
-                    체감 -8°C
-                  </p>
-                  <p>맑음</p>
-                  <p className="flex items-center justify-end gap-1">
-                    <Wind className="h-3 w-3" />
-                    미세먼지 보통
-                  </p>
-                </div>
-              </div>
-
-              <Button asChild className="mt-3 w-full" variant="outline">
-                <Link href="/today">
-                  코디 보기 <ChevronRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-
-              <p className="mt-3 text-xs text-muted-foreground">
-                기상청 데이터 기반, 옷장에 등록한 옷으로 개인화 추천
+                내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요
               </p>
             </div>
           </section>
@@ -245,7 +190,9 @@ export default function HomePage() {
                       <Shield className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-semibold">🔐 로그인하고 알러지 정보 등록하기</p>
+                      <p className="font-semibold">
+                        🔐 로그인하고 알레르기 정보 등록하기
+                      </p>
                       <p className="mt-0.5 text-sm text-primary-foreground/80">
                         맞춤 서비스를 위해 프로필을 완성해보세요
                       </p>
@@ -265,16 +212,19 @@ export default function HomePage() {
                 <section className="overflow-hidden rounded-2xl border-2 border-primary/20 bg-primary/5 p-5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <span className="text-lg">🍽</span>
+                      <span className="text-lg">🍽️</span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-semibold">알러지 정보를 등록해보세요</p>
+                      <p className="font-semibold">
+                        알레르기 정보를 등록해보세요
+                      </p>
                       <p className="mt-0.5 text-sm text-muted-foreground">
-                        &quot;이거 먹어도 돼?&quot; 기능을 더 정확하게 이용할 수 있어요
+                        &quot;이거 먹어도 돼?&quot; 기능을 더 정확하게 이용할 수
+                        있어요
                       </p>
                     </div>
                     <Button asChild size="sm" variant="outline">
-                      <Link href="/mypage#allergy">등록하기</Link>
+                      <Link href="/food/profile">등록하기</Link>
                     </Button>
                   </div>
                 </section>
@@ -287,5 +237,5 @@ export default function HomePage() {
       <Footer />
       <MobileNav />
     </div>
-  )
+  );
 }
