@@ -89,20 +89,7 @@ function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)}km`
 }
 
-// ─── 현재 영업 여부 판단 (간이) ───
-function checkIsOpen(): { isOpen: boolean; openTime: string; closeTime: string } {
-  const now = new Date()
-  const hour = now.getHours()
-  const day = now.getDay() // 0=일, 6=토
-
-  if (day === 0) {
-    return { isOpen: false, openTime: "휴진", closeTime: "휴진" }
-  }
-  if (day === 6) {
-    return { isOpen: hour >= 9 && hour < 13, openTime: "09:00", closeTime: "13:00" }
-  }
-  return { isOpen: hour >= 9 && hour < 18, openTime: "09:00", closeTime: "18:00" }
-}
+// ─── 병원 API 응답에 영업시간 데이터가 없으므로 시간 관련 정보는 제공하지 않음 ───
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -191,7 +178,6 @@ export async function GET(request: NextRequest) {
 
     const userLat = parseFloat(lat)
     const userLng = parseFloat(lng)
-    const { isOpen, openTime, closeTime } = checkIsOpen()
 
     // 병원 데이터 가공
     const hospitals = items
@@ -200,6 +186,7 @@ export async function GET(request: NextRequest) {
         const hLat = parseFloat(item.YPos)
         const hLng = parseFloat(item.XPos)
         const dist = calcDistance(userLat, userLng, hLat, hLng)
+        const clCdNm = item.clCdNm || "의원"
 
         return {
           id: item.ykiho || `h-${idx}`,
@@ -209,13 +196,10 @@ export async function GET(request: NextRequest) {
           distance: formatDistance(dist),
           distanceMeters: dist,
           phone: item.telno || "",
-          openTime,
-          closeTime,
-          isOpen,
-          isAiRecommended: idx === 0, // 가장 가까운 병원을 AI 추천으로
+          isAiRecommended: false,
           lat: hLat,
           lng: hLng,
-          clCdNm: item.clCdNm || "", // 종별코드명 (의원, 병원, 종합병원 등)
+          clCdNm,
         }
       })
       .sort((a: any, b: any) => a.distanceMeters - b.distanceMeters) // 거리순 정렬

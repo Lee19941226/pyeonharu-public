@@ -20,7 +20,6 @@ import {
   Navigation,
   Bookmark,
   Search,
-  Clock,
   Check,
   Circle,
   ChevronRight,
@@ -45,12 +44,10 @@ interface NearbyHospital {
   address: string
   distance: string
   phone: string
-  openTime: string
-  closeTime: string
-  isOpen: boolean
   isAiRecommended: boolean
   lat: number
   lng: number
+  clCdNm?: string
 }
 
 type ScreenState = "input" | "analyzing" | "result" | "detail"
@@ -533,12 +530,6 @@ function ResultScreen({
                   <p className="flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5 shrink-0" />{h.phone}
                   </p>
-                  <p className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />{h.openTime} - {h.closeTime}
-                    <Badge variant={h.isOpen ? "default" : "secondary"} className="ml-1 px-1.5 py-0 text-xs">
-                      {h.isOpen ? "진료 중" : "진료 종료"}
-                    </Badge>
-                  </p>
                 </div>
 
                 {/* D 즉시 행동 버튼 */}
@@ -623,7 +614,6 @@ function DetailScreen({
           <div className="space-y-3">
             <InfoRow icon={<MapPin className="h-5 w-5" />} label="주소" value={hospital.address} />
             <InfoRow icon={<Phone className="h-5 w-5" />} label="전화번호" value={hospital.phone} />
-            <InfoRow icon={<Clock className="h-5 w-5" />} label="진료시간" value={`평일 ${hospital.openTime}-${hospital.closeTime} · 토 ${hospital.openTime}-13:00`} />
             <InfoRow icon={<Stethoscope className="h-5 w-5" />} label="진료과목" value={hospital.department} />
           </div>
         </div>
