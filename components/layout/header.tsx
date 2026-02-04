@@ -1,18 +1,76 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
-import { Menu, X, User, Heart } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Menu, X, User, Heart, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { createClient } from "@/lib/supabase/client"
 
 export function Header() {
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // 로그인 상태 체크
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        
+        if (authUser) {
+          setUser({
+            email: authUser.email || "",
+            name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "사용자",
+          })
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    checkUser()
+
+    // Auth 상태 변경 리스너
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          email: session.user.email || "",
+          name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "사용자",
+        })
+      } else {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // 로그아웃 처리
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setUser(null)
+    router.push("/")
+    router.refresh()
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -92,9 +150,44 @@ export function Header() {
               <span className="sr-only">즐겨찾기</span>
             </Link>
           </Button>
-          <Button asChild>
-            <Link href="/login">로그인</Link>
-          </Button>
+          
+          {isLoading ? (
+            <Button variant="ghost" disabled>
+              <span className="h-4 w-16 animate-pulse rounded bg-muted" />
+            </Button>
+          ) : user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[100px] truncate">{user.name}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/mypage" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    마이페이지
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/bookmarks" className="flex items-center gap-2">
+                    <Heart className="h-4 w-4" />
+                    즐겨찾기
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 text-destructive">
+                  <LogOut className="h-4 w-4" />
+                  로그아웃
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild>
+              <Link href="/login">로그인</Link>
+            </Button>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -191,13 +284,37 @@ export function Header() {
               >
                 서비스 소개
               </Link>
-              <Link
-                href="/login"
-                className="mt-2 block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                로그인
-              </Link>
+              
+              {user ? (
+                <>
+                  <Link
+                    href="/mypage"
+                    className="mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <User className="h-4 w-4" />
+                    {user.name}님
+                  </Link>
+                  <button
+                    onClick={() => {
+                      handleLogout()
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-muted"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/login"
+                  className="mt-2 block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  로그인
+                </Link>
+              )}
             </div>
           </nav>
         </div>
