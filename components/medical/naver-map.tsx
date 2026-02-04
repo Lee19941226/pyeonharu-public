@@ -1,16 +1,16 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { MapPin, Loader2 } from "lucide-react"
+import { MapPin, Navigation, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-// ─── 전역 타입 선언 ───
 declare global {
   interface Window {
-    naver: any
+    naver: typeof naver
   }
 }
 
-// ─── 마커 데이터 타입 ───
+// 기존 symptom 페이지에서 사용하는 마커 타입
 export interface MapMarker {
   id: string
   lat: number
@@ -20,226 +20,307 @@ export interface MapMarker {
 }
 
 interface NaverMapProps {
-  height?: string
-  userLocation?: { lat: number; lng: number } | null
+  // 기존 symptom 페이지용 props
   markers?: MapMarker[]
   center?: { lat: number; lng: number }
   zoom?: number
-  onMarkerClick?: (id: string) => void
   fitBounds?: boolean
+  onMarkerClick?: (id: string) => void
+  
+  // search 페이지용 props (하위 호환)
+  places?: Array<{
+    id: string
+    name: string
+    type: "hospital" | "pharmacy"
+    lat: number
+    lng: number
+  }>
+  selectedPlace?: { id: string; lat: number; lng: number } | null
+  onSelectPlace?: (place: unknown) => void
+  
+  // 공통 props
+  userLocation?: { lat: number; lng: number } | null
+  height?: string
 }
 
-// ─── naver.maps 준비 대기 ───
-function waitForNaverMaps(timeout = 10000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.naver?.maps) {
-      resolve()
-      return
-    }
-    const start = Date.now()
-    const check = setInterval(() => {
-      if (window.naver?.maps) {
-        clearInterval(check)
-        resolve()
-      } else if (Date.now() - start > timeout) {
-        clearInterval(check)
-        reject(new Error("네이버 지도 API 로드 시간 초과. 인증 정보를 확인하세요."))
-      }
-    }, 100)
-  })
-}
-
-// ─── 커스텀 마커 HTML ───
-function createHospitalMarkerHtml(label: string, isAiRecommended: boolean): string {
-  const bg = isAiRecommended ? "#16a34a" : "#2563eb"
-  const border = isAiRecommended ? "#15803d" : "#1d4ed8"
-  const truncated = label.length > 8 ? label.slice(0, 8) + "…" : label
-  const badge = isAiRecommended
-    ? `<span style="position:absolute;top:-8px;right:-8px;background:#f59e0b;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;font-weight:700;white-space:nowrap;">AI</span>`
-    : ""
-
-  return `
-    <div style="position:relative;cursor:pointer;">
-      ${badge}
-      <div style="background:${bg};border:2px solid ${border};color:#fff;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.2);max-width:120px;overflow:hidden;text-overflow:ellipsis;">
-        🏥 ${truncated}
-      </div>
-      <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${bg};margin:0 auto;"></div>
-    </div>
-  `
-}
-
-function createUserMarkerHtml(): string {
-  return `
-    <div style="position:relative;">
-      <div style="width:18px;height:18px;background:#f97316;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>
-      <div style="position:absolute;top:-2px;left:-2px;width:22px;height:22px;border-radius:50%;background:rgba(249,115,22,0.25);animation:pulse-ring 2s ease-out infinite;"></div>
-    </div>
-    <style>
-      @keyframes pulse-ring {
-        0% { transform: scale(1); opacity: 1; }
-        100% { transform: scale(2.5); opacity: 0; }
-      }
-    </style>
-  `
-}
-
-// ═══════════════════════════════════════
-// NaverMap 컴포넌트
-// ═══════════════════════════════════════
 export function NaverMap({
-  height = "200px",
-  userLocation,
   markers = [],
   center,
   zoom = 14,
+  fitBounds = false,
   onMarkerClick,
-  fitBounds = true,
+  places = [],
+  selectedPlace,
+  onSelectPlace,
+  userLocation = null,
+  height = "100%",
 }: NaverMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<any>(null)
-  const markerInstancesRef = useRef<any[]>([])
+  const mapInstanceRef = useRef<naver.maps.Map | null>(null)
+  const markersRef = useRef<naver.maps.Marker[]>([])
+  const userMarkerRef = useRef<naver.maps.Marker | null>(null)
+  const [isMapLoaded, setIsMapLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [mapReady, setMapReady] = useState(false) // ★ 핵심: 지도 준비 상태
 
-  const clearMarkers = useCallback(() => {
-    markerInstancesRef.current.forEach((m) => m.setMap(null))
-    markerInstancesRef.current = []
+  // 네이버 지도 스크립트 로드
+  useEffect(() => {
+    const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "4q5sd2kb26"
+    
+    if (window.naver && window.naver.maps) {
+      setIsMapLoaded(true)
+      setIsLoading(false)
+      return
+    }
+
+    const script = document.createElement("script")
+    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${NAVER_CLIENT_ID}`
+    script.async = true
+    script.onload = () => {
+      setIsMapLoaded(true)
+      setIsLoading(false)
+    }
+    script.onerror = () => {
+      console.error("네이버 지도 로드 실패")
+      setIsLoading(false)
+    }
+    document.head.appendChild(script)
   }, [])
 
-  // ─── 지도 초기화 ───
+  // 중심 좌표 계산
+  const centerLat = center?.lat ?? userLocation?.lat ?? 37.5665
+  const centerLng = center?.lng ?? userLocation?.lng ?? 126.978
+
+  // 지도 초기화
   useEffect(() => {
-    let mounted = true
+    if (!isMapLoaded || !mapRef.current || !window.naver) return
 
-    async function init() {
-      try {
-        await waitForNaverMaps()
-        if (!mounted || !mapRef.current) return
+    const mapCenter = new window.naver.maps.LatLng(centerLat, centerLng)
 
-        const naver = window.naver
-        const defaultCenter = center
-          || (userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null)
-          || { lat: 37.3595, lng: 126.9354 }
-
-        const map = new naver.maps.Map(mapRef.current, {
-          center: new naver.maps.LatLng(defaultCenter.lat, defaultCenter.lng),
-          zoom,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: naver.maps.Position.TOP_RIGHT,
-            style: naver.maps.ZoomControlStyle.SMALL,
-          },
-          mapTypeControl: false,
-          scaleControl: false,
-          logoControl: true,
-          mapDataControl: false,
-        })
-
-        mapInstanceRef.current = map
-        if (mounted) {
-          setMapReady(true) // ★ 마커 useEffect 트리거
-          setIsLoading(false)
-        }
-      } catch (err: any) {
-        if (mounted) {
-          console.error("[NaverMap] 초기화 실패:", err)
-          setError(err.message || "지도를 불러올 수 없습니다.")
-          setIsLoading(false)
-        }
-      }
+    const mapOptions: naver.maps.MapOptions = {
+      center: mapCenter,
+      zoom: zoom,
+      minZoom: 10,
+      maxZoom: 19,
+      zoomControl: true,
+      zoomControlOptions: {
+        position: window.naver.maps.Position.TOP_RIGHT,
+      },
     }
 
-    init()
-    return () => { mounted = false }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    mapInstanceRef.current = new window.naver.maps.Map(mapRef.current, mapOptions)
+  }, [isMapLoaded, centerLat, centerLng, zoom])
 
-  // ─── 마커 업데이트 (mapReady 의존성 추가) ───
+  // 사용자 위치 마커
   useEffect(() => {
-    if (!mapReady) return // 지도 아직 준비 안 됨
-    const map = mapInstanceRef.current
-    const naver = window.naver
-    if (!map || !naver?.maps) return
+    if (!mapInstanceRef.current || !window.naver || !isMapLoaded || !userLocation) return
 
-    clearMarkers()
-    const bounds = new naver.maps.LatLngBounds()
-
-    // 사용자 위치 마커 (주황)
-    if (userLocation) {
-      const pos = new naver.maps.LatLng(userLocation.lat, userLocation.lng)
-      const userMarker = new naver.maps.Marker({
-        position: pos,
-        map,
-        icon: {
-          content: createUserMarkerHtml(),
-          anchor: new naver.maps.Point(11, 11),
-        },
-        zIndex: 200,
-      })
-      markerInstancesRef.current.push(userMarker)
-      bounds.extend(pos)
+    // 기존 사용자 마커 제거
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setMap(null)
     }
 
-    // 병원 마커 (파랑/초록)
-    markers.forEach((m) => {
-      const pos = new naver.maps.LatLng(m.lat, m.lng)
-      const hospitalMarker = new naver.maps.Marker({
-        position: pos,
-        map,
+    // 사용자 위치 마커 (주황색)
+    userMarkerRef.current = new window.naver.maps.Marker({
+      position: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
+      map: mapInstanceRef.current,
+      icon: {
+        content: `
+          <div style="
+            width: 20px;
+            height: 20px;
+            background: #f97316;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          "></div>
+        `,
+        anchor: new window.naver.maps.Point(10, 10),
+      },
+    })
+  }, [userLocation, isMapLoaded])
+
+  // 마커 업데이트 (markers prop 사용 - symptom 페이지용)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.naver || !isMapLoaded) return
+
+    // 기존 마커 제거
+    markersRef.current.forEach((marker) => marker.setMap(null))
+    markersRef.current = []
+
+    // markers가 있으면 사용 (symptom 페이지)
+    const markerData = markers.length > 0 ? markers : places.map(p => ({
+      id: p.id,
+      lat: p.lat,
+      lng: p.lng,
+      label: p.name,
+      isAiRecommended: false,
+      type: p.type,
+    }))
+
+    if (markerData.length === 0) return
+
+    const bounds = new window.naver.maps.LatLngBounds(
+      new window.naver.maps.LatLng(90, 180),
+      new window.naver.maps.LatLng(-90, -180)
+    )
+
+    markerData.forEach((item, index) => {
+      if (!item.lat || !item.lng) return
+
+      const position = new window.naver.maps.LatLng(item.lat, item.lng)
+      bounds.extend(position)
+
+      // 마커 색상 결정
+      const isRecommended = 'isAiRecommended' in item && item.isAiRecommended
+      const isPharmacy = 'type' in item && item.type === 'pharmacy'
+      const bgColor = isRecommended ? "#22c55e" : isPharmacy ? "#3b82f6" : "#22c55e"
+
+      const marker = new window.naver.maps.Marker({
+        position,
+        map: mapInstanceRef.current!,
         icon: {
-          content: createHospitalMarkerHtml(m.label, !!m.isAiRecommended),
-          anchor: new naver.maps.Point(40, 45),
+          content: `
+            <div style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+            ">
+              <div style="
+                width: 32px;
+                height: 32px;
+                background: ${bgColor};
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                border: 2px solid white;
+                cursor: pointer;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+              ">
+                ${isRecommended ? "★" : index + 1}
+              </div>
+              <div style="
+                margin-top: 4px;
+                padding: 2px 6px;
+                background: white;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 500;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+                white-space: nowrap;
+                max-width: 100px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              ">
+                ${item.label || ''}
+              </div>
+            </div>
+          `,
+          anchor: new window.naver.maps.Point(16, 50),
         },
-        zIndex: m.isAiRecommended ? 150 : 100,
       })
 
-      if (onMarkerClick) {
-        naver.maps.Event.addListener(hospitalMarker, "click", () => {
-          onMarkerClick(m.id)
-        })
-      }
+      // 마커 클릭 이벤트
+      window.naver.maps.Event.addListener(marker, "click", () => {
+        if (onMarkerClick) {
+          onMarkerClick(item.id)
+        }
+        if (onSelectPlace && places.length > 0) {
+          const place = places.find(p => p.id === item.id)
+          if (place) onSelectPlace(place)
+        }
+        mapInstanceRef.current?.panTo(position)
+      })
 
-      markerInstancesRef.current.push(hospitalMarker)
-      bounds.extend(pos)
+      markersRef.current.push(marker)
     })
 
-    // 범위 자동 조정
-    if (fitBounds && (markers.length > 0 || userLocation)) {
-      if (markers.length === 0 && userLocation) {
-        map.setCenter(new naver.maps.LatLng(userLocation.lat, userLocation.lng))
-        map.setZoom(zoom)
-      } else if (center) {
-        map.setCenter(new naver.maps.LatLng(center.lat, center.lng))
-        map.setZoom(zoom)
-      } else {
-        map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 })
+    // fitBounds가 true이고 마커가 있으면 모든 마커가 보이도록 조정
+    if (fitBounds && markerData.length > 0) {
+      // 사용자 위치도 bounds에 포함
+      if (userLocation) {
+        bounds.extend(new window.naver.maps.LatLng(userLocation.lat, userLocation.lng))
       }
+      
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: 50 })
+        }
+      }, 100)
     }
-  }, [mapReady, userLocation, markers, center, zoom, fitBounds, onMarkerClick, clearMarkers])
+  }, [markers, places, onMarkerClick, onSelectPlace, isMapLoaded, fitBounds, userLocation])
 
-  if (error) {
+  // 선택된 장소 변경 시 지도 이동
+  useEffect(() => {
+    if (!mapInstanceRef.current || !selectedPlace || !window.naver) return
+    if (!selectedPlace.lat || !selectedPlace.lng) return
+
+    mapInstanceRef.current.panTo(
+      new window.naver.maps.LatLng(selectedPlace.lat, selectedPlace.lng)
+    )
+  }, [selectedPlace])
+
+  // 현재 위치로 이동
+  const handleMoveToCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) return
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        if (mapInstanceRef.current && window.naver) {
+          mapInstanceRef.current.panTo(
+            new window.naver.maps.LatLng(latitude, longitude)
+          )
+        }
+      },
+      (error) => {
+        console.error("위치 정보를 가져올 수 없습니다:", error)
+      }
+    )
+  }, [])
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center rounded-xl border bg-muted/50" style={{ height }}>
-        <div className="text-center text-sm text-muted-foreground p-4">
-          <MapPin className="mx-auto mb-2 h-8 w-8 text-destructive/40" />
-          <p className="font-medium mb-1">지도를 표시할 수 없습니다</p>
-          <p className="text-xs">{error}</p>
+      <div className="relative w-full bg-muted flex items-center justify-center" style={{ height }}>
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">지도를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isMapLoaded) {
+    return (
+      <div className="relative w-full bg-muted flex items-center justify-center" style={{ height }}>
+        <div className="text-center p-4">
+          <MapPin className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold">지도를 불러올 수 없습니다</h3>
+          <p className="text-sm text-muted-foreground">
+            네이버 지도 API 연결에 실패했습니다.
+          </p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl border" style={{ height }}>
-      {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted/80">
-          <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p>지도를 불러오는 중...</p>
-          </div>
-        </div>
-      )}
-      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+    <div className="relative w-full rounded-lg overflow-hidden" style={{ height }}>
+      <div ref={mapRef} className="h-full w-full" />
+      
+      {/* 현재 위치 버튼 */}
+      <Button
+        variant="secondary"
+        size="icon"
+        className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg z-10"
+        onClick={handleMoveToCurrentLocation}
+      >
+        <Navigation className="h-4 w-4" />
+        <span className="sr-only">내 위치로 이동</span>
+      </Button>
     </div>
   )
 }

@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
-import { Menu, X, User, Heart, LogOut, ChevronDown } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Menu, X, User, Heart, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,15 +12,64 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAuth } from "@/contexts/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export function Header() {
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { user, isLoading, openLoginModal, logout } = useAuth()
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
+  // 로그인 상태 체크
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        
+        if (authUser) {
+          setUser({
+            email: authUser.email || "",
+            name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "사용자",
+          })
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    checkUser()
+
+    // Auth 상태 변경 리스너
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          email: session.user.email || "",
+          name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "사용자",
+        })
+      } else {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // 로그아웃 처리
   const handleLogout = async () => {
-    await logout()
-    window.location.href = "/"
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setUser(null)
+    router.push("/")
+    router.refresh()
   }
 
   return (
@@ -38,7 +88,6 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 병원/약국
-                <ChevronDown className="ml-1 h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center">
@@ -54,15 +103,26 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
-            <Link href="/can-i-eat">먹어도 돼?</Link>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                이거 먹어도 돼?
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem asChild>
+                <Link href="/can-i-eat">알러지 분석</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/mypage">알러지 정보 등록</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 오늘 뭐 입지?
-                <ChevronDown className="ml-1 h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center">
@@ -82,69 +142,59 @@ export function Header() {
           </DropdownMenu>
         </nav>
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-2">
-          {!isLoading && (
-            <>
-              {user ? (
-                <>
-                  <Button variant="ghost" size="icon" asChild className="hidden md:flex">
-                    <Link href="/bookmarks">
-                      <Heart className="h-5 w-5" />
-                      <span className="sr-only">즐겨찾기</span>
-                    </Link>
-                  </Button>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="hidden md:flex">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                          <User className="h-4 w-4 text-primary" />
-                        </div>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <div className="px-2 py-1.5">
-                        <p className="text-sm font-medium">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                      </div>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/mypage">마이페이지</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/bookmarks">즐겨찾기</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        로그아웃
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="ghost"
-                    className="hidden text-muted-foreground hover:text-foreground md:flex"
-                    onClick={openLoginModal}
-                  >
-                    로그인
-                  </Button>
-                  <Button asChild className="hidden md:flex">
-                    <Link href="/sign-up">회원가입</Link>
-                  </Button>
-                </>
-              )}
-            </>
+        {/* Desktop Buttons */}
+        <div className="hidden items-center gap-2 md:flex">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/bookmarks">
+              <Heart className="h-5 w-5" />
+              <span className="sr-only">즐겨찾기</span>
+            </Link>
+          </Button>
+          
+          {isLoading ? (
+            <Button variant="ghost" disabled>
+              <span className="h-4 w-16 animate-pulse rounded bg-muted" />
+            </Button>
+          ) : user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[100px] truncate">{user.name}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/mypage" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    마이페이지
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/bookmarks" className="flex items-center gap-2">
+                    <Heart className="h-4 w-4" />
+                    즐겨찾기
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 text-destructive">
+                  <LogOut className="h-4 w-4" />
+                  로그아웃
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild>
+              <Link href="/login">로그인</Link>
+            </Button>
           )}
+        </div>
 
-          {/* Mobile Menu Button */}
+        {/* Mobile Menu Button */}
+        <div className="flex items-center gap-2 md:hidden">
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -180,13 +230,20 @@ export function Header() {
               약 정보 검색
             </Link>
 
-            <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">먹어도 돼?</p>
+            <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">이거 먹어도 돼?</p>
             <Link
               href="/can-i-eat"
               className="rounded-md px-3 py-2 text-sm hover:bg-muted"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              이거 먹어도 돼?
+              알러지 분석
+            </Link>
+            <Link
+              href="/mypage"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              알러지 정보 등록
             </Link>
 
             <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">오늘 뭐 입지?</p>
@@ -204,56 +261,59 @@ export function Header() {
             >
               내 옷장
             </Link>
+            <Link
+              href="/weather"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              날씨 상세
+            </Link>
+            <Link
+              href="/history"
+              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              코디 기록
+            </Link>
 
             <div className="mt-4 border-t border-border pt-4">
+              <Link
+                href="/about"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                서비스 소개
+              </Link>
+              
               {user ? (
                 <>
-                  <div className="mb-2 px-3 py-2">
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                  </div>
                   <Link
                     href="/mypage"
-                    className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                    className="mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    마이페이지
-                  </Link>
-                  <Link
-                    href="/bookmarks"
-                    className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    즐겨찾기
+                    <User className="h-4 w-4" />
+                    {user.name}님
                   </Link>
                   <button
                     onClick={() => {
                       handleLogout()
                       setIsMobileMenuOpen(false)
                     }}
-                    className="mt-2 block w-full rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
+                    className="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-muted"
                   >
+                    <LogOut className="h-4 w-4" />
                     로그아웃
                   </button>
                 </>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false)
-                      openLoginModal()
-                    }}
-                  >
-                    로그인
-                  </Button>
-                  <Button asChild className="flex-1">
-                    <Link href="/sign-up" onClick={() => setIsMobileMenuOpen(false)}>
-                      회원가입
-                    </Link>
-                  </Button>
-                </div>
+                <Link
+                  href="/login"
+                  className="mt-2 block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  로그인
+                </Link>
               )}
             </div>
           </nav>
