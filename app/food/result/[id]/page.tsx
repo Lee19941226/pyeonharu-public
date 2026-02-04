@@ -22,9 +22,15 @@ interface FoodResult {
   foodName: string;
   manufacturer: string;
   weight: string;
+  expirationInfo?: string;
   allergens: string[];
-  allergyWarning?: string; // ✅ 추가
-  crossContamination?: string[]; // ✅ 추가
+  allergyWarning?: string;
+  crossContamination?: string[];
+  crossContaminationRisks?: Array<{
+    name: string;
+    type: string;
+    severity: string;
+  }>;
   userAllergens: string[];
   detectedAllergens: Array<{
     name: string;
@@ -33,14 +39,24 @@ interface FoodResult {
   }>;
   ingredients: string[];
   nutrition: {
+    servingSize?: string;
     calories: number;
     sodium: number;
     carbs: number;
+    sugar?: number;
     protein: number;
     fat: number;
-    sugar?: number; // ✅ 추가
+    transFat?: number;
+    saturatedFat?: number;
+    cholesterol?: number;
   };
+  nutritionDetails?: Array<{
+    name: string;
+    content: string;
+    unit: string;
+  }>;
   isSafe: boolean;
+  hasNutritionInfo?: boolean;
 }
 
 export default function FoodResultPage() {
@@ -278,28 +294,37 @@ export default function FoodResultPage() {
               </Card>
             )}
 
-            {/* 교차오염 주의 */}
-            {result.crossContamination &&
-              result.crossContamination.length > 0 && (
-                <Card className="mb-6 border-yellow-200 bg-yellow-50">
+            {/* 교차오염 위험 경고 (사용자 알레르기와 일치하는 경우) */}
+            {result.crossContaminationRisks &&
+              result.crossContaminationRisks.length > 0 && (
+                <Card className="mb-6 border-orange-500 bg-orange-50">
                   <CardContent className="p-6">
-                    <h3 className="mb-4 font-semibold text-yellow-900">
-                      ⚠️ 제조공정 교차오염 가능
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {result.crossContamination.map((item, idx) => (
-                        <span
-                          key={idx}
-                          className="rounded-full bg-yellow-100 border border-yellow-300 px-3 py-1 text-sm text-yellow-900"
-                        >
-                          {item}
-                        </span>
+                    <div className="mb-4 flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
+                        <AlertTriangle className="h-6 w-6 text-orange-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-orange-900">
+                          교차오염 주의!
+                        </h2>
+                        <p className="text-sm text-orange-800">
+                          제조시설에서 귀하의 알레르기 성분을 취급합니다
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {result.crossContaminationRisks.map((risk, idx) => (
+                        <div key={idx} className="rounded-lg bg-orange-100 p-3">
+                          <p className="font-medium text-orange-900">
+                            ⚠️ {risk.name} (심각도: {risk.severity})
+                          </p>
+                          <p className="text-sm text-orange-800">
+                            같은 제조시설에서 {risk.name}를 사용한 제품을
+                            제조합니다
+                          </p>
+                        </div>
                       ))}
                     </div>
-                    <p className="mt-3 text-xs text-yellow-800">
-                      이 제품은 위 알레르기 유발 식품과 같은 제조시설에서
-                      제조됩니다
-                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -338,41 +363,41 @@ export default function FoodResultPage() {
             </Card>
 
             {/* Nutrition Info */}
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="mb-4 font-semibold">
-                  📊 영양 정보 (1회 제공량 기준)
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">열량</span>
-                    <span>{result.nutrition.calories}kcal</span>
+            {result.hasNutritionInfo &&
+            result.nutritionDetails &&
+            result.nutritionDetails.length > 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold">📊 영양 정보</h3>
+
+                  {/* 전체 영양성분 표시 */}
+                  <div className="space-y-2">
+                    {result.nutritionDetails.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between border-b border-muted py-2 last:border-0"
+                      >
+                        <span className="text-muted-foreground">
+                          {item.name}
+                        </span>
+                        <span className="font-medium">
+                          {item.content}
+                          {item.unit}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">나트륨</span>
-                    <span>{result.nutrition.sodium}mg</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">탄수화물</span>
-                    <span>{result.nutrition.carbs}g</span>
-                  </div>
-                  {(result.nutrition.sugar ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">당류</span>
-                      <span>{result.nutrition.sugar}g</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">단백질</span>
-                    <span>{result.nutrition.protein}g</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">지방</span>
-                    <span>{result.nutrition.fat}g</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    영양 정보가 제공되지 않습니다
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Favorite Button for Safe Foods */}
             {result.isSafe && !isFavorite && (
