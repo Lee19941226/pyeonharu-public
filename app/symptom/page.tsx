@@ -24,14 +24,24 @@ import {
   Circle,
   ChevronRight,
   ExternalLink,
+  UtensilsCrossed,
+  Ban,
 } from "lucide-react"
 
 // ─── Types ───
+interface DietaryAdvice {
+  item: string
+  emoji: string
+  reason: string
+}
+
 interface AnalysisResult {
   suspectedDisease: string
   department: string
   confidence: number
   healthAdvice: string[]
+  dietaryAdvice?: DietaryAdvice[]
+  avoidFoods?: string[]
   visitTip: string
   emergencyLevel: "normal" | "urgent" | "emergency"
   possibleDepartments?: string[]
@@ -478,6 +488,46 @@ function ResultScreen({
             </div>
           </CardContent>
         </Card>
+
+        {/* ★ 식이요법 추천 카드 (NEW) */}
+        {result.dietaryAdvice && result.dietaryAdvice.length > 0 && (
+          <Card className="mb-6 border-green-200 dark:border-green-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UtensilsCrossed className="h-5 w-5 text-green-600" />
+                증상 완화에 좋은 음식
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {result.dietaryAdvice.map((item, index) => (
+                <div key={index} className="flex items-start gap-3 rounded-lg bg-green-50 p-3 dark:bg-green-950/30">
+                  <span className="text-2xl">{item.emoji}</span>
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200">{item.item}</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">{item.reason}</p>
+                  </div>
+                </div>
+              ))}
+
+              {/* 피해야 할 음식 */}
+              {result.avoidFoods && result.avoidFoods.length > 0 && (
+                <div className="mt-4 border-t border-green-200 pt-4 dark:border-green-800">
+                  <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
+                    <Ban className="h-4 w-4" />
+                    피하면 좋은 음식
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {result.avoidFoods.map((food, index) => (
+                      <Badge key={index} variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                        {food}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* B 지도 미리보기 (네이버 지도 연동) */}
         <div className="mb-4">
