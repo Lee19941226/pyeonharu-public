@@ -30,8 +30,13 @@ export async function GET(req: NextRequest) {
       productInfo = data.body?.items?.[0] || null;
 
       console.log("✅ 품목제조정보:", productInfo ? "획득" : "없음");
+      if (productInfo) {
+        console.log("   제품명:", productInfo.PRDCT_NM);
+        console.log("   제조사:", productInfo.MNFCTUR);
+        console.log("   원재료:", productInfo.RAWMTRL_NM ? "있음" : "없음"); // ✅ 확인
+      }
     } catch (error) {
-      console.error("⚠️ 품목제조정보 실패:", error);
+      console.error("⚠️ 품목제조정보 실패");
     }
 
     // ==========================================
@@ -62,7 +67,7 @@ export async function GET(req: NextRequest) {
     // ==========================================
     let rawMaterialItems = [];
     try {
-      const url = new URL(`${baseUrl}/getFoodQrProdRawatrl01`);
+      const url = new URL(`${baseUrl}/getFoodQrProdRawmtrl01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", "1");
       url.searchParams.append("numOfRows", "100");
@@ -76,16 +81,23 @@ export async function GET(req: NextRequest) {
       rawMaterialItems = data.body?.items || [];
 
       console.log(`✅ 원재료: ${rawMaterialItems.length}개`);
+
+      if (rawMaterialItems.length > 0) {
+        console.log(
+          "📦 원재료 샘플:",
+          rawMaterialItems[0].PRVW_CN?.substring(0, 100),
+        );
+      }
     } catch (error) {
       console.error("⚠️ 원재료정보 실패:", error);
     }
 
     // ==========================================
-    // API 4: 영양표시정보 (getFoodQrProdNsdi01) ⭐ 핵심!
+    // API 4: 영양표시정보 (getFoodQrProdNsd01)
     // ==========================================
     let nutritionItems = [];
     try {
-      const url = new URL(`${baseUrl}/getFoodQrProdNsdi01`);
+      const url = new URL(`${baseUrl}/getFoodQrProdNsd01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", "1");
       url.searchParams.append("numOfRows", "50");
@@ -100,20 +112,14 @@ export async function GET(req: NextRequest) {
 
       console.log(`✅ 영양정보: ${nutritionItems.length}개`);
 
+      // ✅ 실제 필드 확인
       if (nutritionItems.length > 0) {
-        console.log(
-          "📊 영양성분 예시:",
-          nutritionItems.slice(0, 3).map((item: any) => ({
-            이름: item.NTRCN_NM,
-            함량: item.CNTNT,
-            단위: item.UNIT,
-          })),
-        );
+        console.log("🔍 영양정보 첫 번째 항목:");
+        console.log(JSON.stringify(nutritionItems[0], null, 2));
       }
     } catch (error) {
       console.error("⚠️ 영양표시정보 실패:", error);
     }
-
     // ==========================================
     // API 5: 식품표시정보 주의사항 (getFoodQrIndctAttnInfo01)
     // ==========================================
@@ -151,14 +157,13 @@ export async function GET(req: NextRequest) {
     // 데이터 추출 및 가공
     // ==========================================
 
-    // 제품명
     const productName =
-      productInfo?.PRDCT_NM || allergyItems[0]?.PRDCT_NM || "알 수 없음";
+      productInfo?.PRDCT_NM ||
+      allergyItems[0]?.PRDCT_NM ||
+      rawMaterialItems[0]?.PRDCT_NM || // ✅ 원재료 API에서도 가져오기
+      "알 수 없음";
 
-    // 제조사
     const manufacturer = productInfo?.MNFCTUR || "정보없음";
-
-    // 내용량
     const weight = productInfo?.PRDLST_DCNTS || "정보없음";
 
     // 알레르기 성분 (중복 제거)
@@ -168,10 +173,33 @@ export async function GET(req: NextRequest) {
       ),
     ];
 
-    // 원재료 (배열로)
-    const ingredients = rawMaterialItems
-      .map((item: any) => item.RAWMTRL_NM || "")
-      .filter(Boolean);
+    // ✅ 원재료 추출 (수정)
+    let rawMaterialsText = "";
+
+    // 1순위: 원재료 API (PRVW_CN 필드)
+    if (rawMaterialItems.length > 0) {
+      rawMaterialsText = rawMaterialItems[0].PRVW_CN || "";
+    }
+
+    // 2순위: 품목제조정보 API (백업)
+    if (!rawMaterialsText && productInfo) {
+      rawMaterialsText = productInfo.RAWMTRL_NM || "";
+    }
+
+    console.log("📦 원재료 원본 길이:", rawMaterialsText.length);
+
+    const ingredients: string[] = rawMaterialsText
+      ? rawMaterialsText
+          .split(/[,，]/) // ✅ 쉼표(한글, 영문 모두)로 분리
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0)
+          .slice(0, 30) // ✅ 30개까지 표시
+      : [];
+
+    console.log("📝 파싱된 원재료:", ingredients.length, "개");
+    if (ingredients.length > 0) {
+      console.log("   샘플:", ingredients.slice(0, 3));
+    }
 
     // 알레르기 주의사항
     const allergyWarning = attentionInfo?.PRDLST_ATNT || "";

@@ -22,7 +22,6 @@ interface FoodResult {
   foodName: string;
   manufacturer: string;
   weight: string;
-  expirationInfo?: string;
   allergens: string[];
   allergyWarning?: string;
   crossContamination?: string[];
@@ -38,25 +37,7 @@ interface FoodResult {
     severity: string;
   }>;
   ingredients: string[];
-  nutrition: {
-    servingSize?: string;
-    calories: number;
-    sodium: number;
-    carbs: number;
-    sugar?: number;
-    protein: number;
-    fat: number;
-    transFat?: number;
-    saturatedFat?: number;
-    cholesterol?: number;
-  };
-  nutritionDetails?: Array<{
-    name: string;
-    content: string;
-    unit: string;
-  }>;
   isSafe: boolean;
-  hasNutritionInfo?: boolean;
 }
 
 export default function FoodResultPage() {
@@ -265,21 +246,97 @@ export default function FoodResultPage() {
                 </div>
               </CardContent>
             </Card>
-            {/* 원재료 정보 추가 */}
-            {result.ingredients.length > 0 && (
+            {/* 원재료명 및 함량 */}
+            {result.ingredients.length > 0 ? (
               <Card className="mb-6">
                 <CardContent className="p-6">
                   <h3 className="mb-4 font-semibold">📝 원재료명 및 함량</h3>
                   <div className="space-y-2">
                     {result.ingredients.map((ingredient, idx) => (
-                      <div key={idx} className="rounded bg-muted p-3 text-sm">
-                        {ingredient}
+                      <div
+                        key={idx}
+                        className="flex items-start gap-2 rounded bg-muted p-3 text-sm"
+                      >
+                        <span className="font-medium text-muted-foreground">
+                          {idx + 1}.
+                        </span>
+                        <span>{ingredient}</span>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
+            ) : (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold">📝 원재료명 및 함량</h3>
+                  <p className="text-center text-sm text-muted-foreground">
+                    원재료 정보가 제공되지 않습니다
+                  </p>
+                </CardContent>
+              </Card>
             )}
+            {/* 제품의 알레르기 성분 (모든 사용자에게 표시) */}
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h3 className="mb-4 font-semibold">
+                  🔬 이 제품에 포함된 알레르기 성분
+                </h3>
+                {result.allergens.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {result.allergens.map((allergen, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-full border border-gray-300 bg-gray-100 px-3 py-1 text-sm text-gray-700"
+                      >
+                        {allergen}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    알레르기 성분 정보가 없습니다
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 사용자 알레르기와 일치하는 성분 (알레르기 등록한 사용자에게만) */}
+            {result.userAllergens.length > 0 && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold">
+                    🚨 귀하의 알레르기와 일치하는 성분 (
+                    {result.detectedAllergens.length}개 검출)
+                  </h3>
+                  {result.detectedAllergens.length > 0 ? (
+                    <div className="space-y-3">
+                      {result.detectedAllergens.map((allergen, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg bg-destructive/10 p-4"
+                        >
+                          <p className="font-medium text-destructive">
+                            ⚠️ {allergen.name} ({allergen.amount})
+                          </p>
+                          <p className="text-sm text-destructive/80">
+                            심각도: {allergen.severity} 🔴
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-muted p-8 text-center">
+                      <div className="mb-2 text-4xl">✓</div>
+                      <p className="text-sm text-muted-foreground">
+                        귀하의 알레르기 성분이 검출되지 않았습니다
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* 알레르기 유발물질 표시 */}
             {result.allergyWarning && (
               <Card className="mb-6 border-orange-200 bg-orange-50">
@@ -294,6 +351,31 @@ export default function FoodResultPage() {
               </Card>
             )}
 
+            {/* ✅ 추가: 교차오염 정보 (일반) */}
+            {result.crossContamination &&
+              result.crossContamination.length > 0 && (
+                <Card className="mb-6 border-yellow-200 bg-yellow-50">
+                  <CardContent className="p-6">
+                    <h3 className="mb-4 font-semibold text-yellow-900">
+                      ⚠️ 제조공정 교차오염 가능
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {result.crossContamination.map((item, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded-full border border-yellow-300 bg-yellow-100 px-3 py-1 text-sm text-yellow-900"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-yellow-800">
+                      이 제품은 위 알레르기 유발 식품과 같은 제조시설에서
+                      제조됩니다
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             {/* 교차오염 위험 경고 (사용자 알레르기와 일치하는 경우) */}
             {result.crossContaminationRisks &&
               result.crossContaminationRisks.length > 0 && (
@@ -361,44 +443,30 @@ export default function FoodResultPage() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Nutrition Info */}
-            {result.hasNutritionInfo &&
-            result.nutritionDetails &&
-            result.nutritionDetails.length > 0 ? (
-              <Card>
+            {/* 알레르기 미등록 사용자 안내 */}
+            {result.userAllergens.length === 0 && (
+              <Card className="mb-6 border-blue-200 bg-blue-50">
                 <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">📊 영양 정보</h3>
-
-                  {/* 전체 영양성분 표시 */}
-                  <div className="space-y-2">
-                    {result.nutritionDetails.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between border-b border-muted py-2 last:border-0"
-                      >
-                        <span className="text-muted-foreground">
-                          {item.name}
-                        </span>
-                        <span className="font-medium">
-                          {item.content}
-                          {item.unit}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="flex items-center gap-3">
+                    <Info className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">
+                        알레르기를 등록하시면 자동으로 위험 성분을
+                        확인해드립니다
+                      </p>
+                      <Link href="/food/profile">
+                        <Button
+                          variant="link"
+                          className="h-auto p-0 text-blue-600"
+                        >
+                          알레르기 등록하러 가기 →
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            ) : (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    영양 정보가 제공되지 않습니다
-                  </p>
-                </CardContent>
-              </Card>
             )}
-
             {/* Favorite Button for Safe Foods */}
             {result.isSafe && !isFavorite && (
               <Button onClick={toggleFavorite} className="mt-6 w-full">

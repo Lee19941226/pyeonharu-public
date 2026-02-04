@@ -22,10 +22,10 @@ export interface FoodResult {
   allergens: string[];
   allergyWarning?: string;
   crossContamination?: string[];
+  crossContaminationRisks?: DetectedAllergen[];
   userAllergens: string[];
   detectedAllergens: DetectedAllergen[];
   ingredients: string[];
-  nutrition: NutritionInfo;
   isSafe: boolean;
 }
 
@@ -33,6 +33,7 @@ export interface DetectedAllergen {
   name: string;
   amount: string;
   severity: string;
+  type?: string;
 }
 
 export interface NutritionInfo {
