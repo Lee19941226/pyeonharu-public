@@ -1,155 +1,165 @@
-"use client"
+"use client";
 
-import React, { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { X, Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useAuth } from "@/contexts/auth-context"
-import { createClient } from "@/lib/supabase/client"
+import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { X, Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/auth-context";
+import { createClient } from "@/lib/supabase/client";
 
-type ModalView = "login" | "reset-request" | "reset-sent"
+type ModalView = "login" | "reset-request" | "reset-sent";
 
 export function LoginModal() {
-  const { isLoginModalOpen, closeLoginModal, refreshUser } = useAuth()
-  const router = useRouter()
+  const { isLoginModalOpen, closeLoginModal, refreshUser } = useAuth();
+  const router = useRouter();
 
-  const [view, setView] = useState<ModalView>("login")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [resetEmail, setResetEmail] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<ModalView>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isLoginModalOpen) {
-      setView("login")
-      setEmail("")
-      setPassword("")
-      setResetEmail("")
-      setShowPassword(false)
-      setError(null)
-      setIsLoading(false)
+      setView("login");
+      setEmail("");
+      setPassword("");
+      setResetEmail("");
+      setShowPassword(false);
+      setError(null);
+      setIsLoading(false);
     }
-  }, [isLoginModalOpen])
+  }, [isLoginModalOpen]);
 
   // Auto-clear error after 5 seconds
   useEffect(() => {
     if (error) {
-      const timer = setTimeout(() => setError(null), 5000)
-      return () => clearTimeout(timer)
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
     }
-  }, [error])
+  }, [error]);
 
   // Clear error on input change
   const clearError = useCallback(() => {
-    if (error) setError(null)
-  }, [error])
+    if (error) setError(null);
+  }, [error]);
 
   // ESC key handler
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isLoginModalOpen) {
-        closeLoginModal()
+        closeLoginModal();
       }
-    }
-    document.addEventListener("keydown", handleEsc)
-    return () => document.removeEventListener("keydown", handleEsc)
-  }, [isLoginModalOpen, closeLoginModal])
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [isLoginModalOpen, closeLoginModal]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isLoginModalOpen) {
-      document.body.style.overflow = "hidden"
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = ""
+      document.body.style.overflow = "";
     }
     return () => {
-      document.body.style.overflow = ""
-    }
-  }, [isLoginModalOpen])
+      document.body.style.overflow = "";
+    };
+  }, [isLoginModalOpen]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
-    const supabase = createClient()
+    const supabase = createClient();
     const { error: loginError } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
+    });
 
     if (loginError) {
       if (loginError.message.includes("Email not confirmed")) {
-        setError("이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.")
+        setError("이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.");
       } else {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.")
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
       }
-      setIsLoading(false)
-      return
+      setIsLoading(false);
+      return;
     }
 
-    await refreshUser()
-    setIsLoading(false)
-    closeLoginModal()
-    router.refresh()
-  }
+    await refreshUser();
+    setIsLoading(false);
+    closeLoginModal();
+    router.refresh();
+  };
 
-  const handleOAuthLogin = async (provider: "kakao" | "google" | "google-oidc" | "naver") => {
-    setIsLoading(true)
-    setError(null)
+  const handleOAuthLogin = async (
+    provider: "kakao" | "google" | "google-oidc" | "naver",
+  ) => {
+    setIsLoading(true);
+    setError(null);
 
-    const supabase = createClient()
-    const actualProvider = provider === "google-oidc" ? "google" : provider
-    
+    // 네이버는 커스텀 OAuth로 처리
+    if (provider === "naver") {
+      window.location.href = "/api/auth/naver";
+      return;
+    }
+    const supabase = createClient();
+    const actualProvider = provider === "google-oidc" ? "google" : provider;
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: actualProvider as any,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
-    })
+    });
 
     if (oauthError) {
-      setError("소셜 로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
-      setIsLoading(false)
+      setError("소셜 로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleResetRequest = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
-    const supabase = createClient()
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
+    const supabase = createClient();
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      resetEmail,
+      {
+        redirectTo: `${window.location.origin}/reset-password`,
+      },
+    );
 
     if (resetError) {
-      setError("가입되지 않은 이메일입니다.")
-      setIsLoading(false)
-      return
+      setError("가입되지 않은 이메일입니다.");
+      setIsLoading(false);
+      return;
     }
 
-    setIsLoading(false)
-    setView("reset-sent")
-  }
+    setIsLoading(false);
+    setView("reset-sent");
+  };
 
   const handleResendReset = async () => {
-    setIsLoading(true)
-    const supabase = createClient()
+    setIsLoading(true);
+    const supabase = createClient();
     await supabase.auth.resetPasswordForEmail(resetEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
-    })
-    setIsLoading(false)
-  }
+    });
+    setIsLoading(false);
+  };
 
-  if (!isLoginModalOpen) return null
+  if (!isLoginModalOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -181,7 +191,9 @@ export function LoginModal() {
             {/* Logo & Title */}
             <div className="mb-6 text-center">
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
-                <span className="text-2xl font-bold text-primary-foreground">편</span>
+                <span className="text-2xl font-bold text-primary-foreground">
+                  편
+                </span>
               </div>
               <h2 className="text-xl font-bold">편하루</h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -196,7 +208,11 @@ export function LoginModal() {
                 disabled={isLoading}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 py-3 text-sm font-medium text-[#191919] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
                   <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.76 1.84 5.18 4.6 6.56-.2.76-.74 2.76-.84 3.2-.12.52.2.52.4.38.16-.1 2.56-1.74 3.6-2.44.72.1 1.48.16 2.24.16 5.52 0 10-3.48 10-7.86S17.52 3 12 3z" />
                 </svg>
                 카카오로 로그인
@@ -208,10 +224,22 @@ export function LoginModal() {
                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
                 </svg>
                 Google로 로그인
               </button>
@@ -232,7 +260,9 @@ export function LoginModal() {
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-background px-3 text-muted-foreground">또는</span>
+                <span className="bg-background px-3 text-muted-foreground">
+                  또는
+                </span>
               </div>
             </div>
 
@@ -245,8 +275,8 @@ export function LoginModal() {
                   placeholder="이메일"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value)
-                    clearError()
+                    setEmail(e.target.value);
+                    clearError();
                   }}
                   className="pl-10"
                   required
@@ -260,14 +290,14 @@ export function LoginModal() {
                   placeholder="비밀번호"
                   value={password}
                   onChange={(e) => {
-                    setPassword(e.target.value)
-                    clearError()
+                    setPassword(e.target.value);
+                    clearError();
                   }}
                   className="pl-10 pr-10"
                   required
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      handleEmailLogin(e)
+                      handleEmailLogin(e);
                     }
                   }}
                 />
@@ -276,7 +306,11 @@ export function LoginModal() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
               </div>
 
@@ -303,8 +337,8 @@ export function LoginModal() {
               </p>
               <button
                 onClick={() => {
-                  setView("reset-request")
-                  setError(null)
+                  setView("reset-request");
+                  setError(null);
                 }}
                 className="text-sm text-muted-foreground hover:text-primary"
               >
@@ -319,8 +353,8 @@ export function LoginModal() {
             {/* Back button */}
             <button
               onClick={() => {
-                setView("login")
-                setError(null)
+                setView("login");
+                setError(null);
               }}
               className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
@@ -334,14 +368,17 @@ export function LoginModal() {
               </div>
               <h2 className="text-xl font-bold">비밀번호 재설정</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                가입한 이메일을 입력하면<br />
+                가입한 이메일을 입력하면
+                <br />
                 재설정 링크를 보내드립니다
               </p>
             </div>
 
             <form onSubmit={handleResetRequest} className="space-y-3">
               <div>
-                <Label htmlFor="reset-email" className="sr-only">이메일</Label>
+                <Label htmlFor="reset-email" className="sr-only">
+                  이메일
+                </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -350,8 +387,8 @@ export function LoginModal() {
                     placeholder="가입한 이메일 주소"
                     value={resetEmail}
                     onChange={(e) => {
-                      setResetEmail(e.target.value)
-                      clearError()
+                      setResetEmail(e.target.value);
+                      clearError();
                     }}
                     className="pl-10"
                     required
@@ -359,11 +396,7 @@ export function LoginModal() {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "전송 중..." : "재설정 메일 보내기"}
               </Button>
             </form>
@@ -399,8 +432,8 @@ export function LoginModal() {
               </Button>
               <button
                 onClick={() => {
-                  setView("login")
-                  setError(null)
+                  setView("login");
+                  setError(null);
                 }}
                 className="block w-full text-center text-sm text-muted-foreground hover:text-primary"
               >
@@ -411,5 +444,5 @@ export function LoginModal() {
         )}
       </div>
     </div>
-  )
+  );
 }

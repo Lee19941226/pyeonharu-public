@@ -1,30 +1,192 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import React from "react"
+
+import Link from "next/link"
+import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { user, openLoginModal } = useAuth()
+  const searchParams = useSearchParams()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (user) {
-      // 이미 로그인된 상태면 홈으로
-      router.replace("/")
-    } else {
-      // 로그인 안 된 상태면 홈으로 보내고 모달 열기
-      router.replace("/")
-      // 약간의 딜레이 후 모달 열기 (라우팅 완료 후)
-      setTimeout(() => {
-        openLoginModal()
-      }, 100)
+  // URL 에러 파라미터 처리
+  const urlError = searchParams.get('error')
+  const getErrorMessage = (error: string | null) => {
+    switch (error) {
+      case 'email_exists':
+        return '이미 이메일로 가입된 계정입니다. 이메일로 로그인해주세요.'
+      case 'naver_auth_failed':
+        return '네이버 로그인에 실패했습니다. 다시 시도해주세요.'
+      case 'no_email':
+        return '네이버 계정에서 이메일 정보를 가져올 수 없습니다.'
+      default:
+        return null
     }
-  }, [user, router, openLoginModal])
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      setError("이메일 또는 비밀번호가 올바르지 않습니다.")
+      setIsLoading(false)
+      return
+    }
+
+    router.push("/")
+    router.refresh()
+  }
+
+  const handleNaverLogin = () => {
+    window.location.href = '/api/auth/naver'
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-muted-foreground">리다이렉트 중...</p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 px-4">
+      <Link href="/" className="mb-8 flex items-center gap-2">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+          <span className="text-xl font-bold text-primary-foreground">편</span>
+        </div>
+        <span className="text-2xl font-bold">편하루</span>
+      </Link>
+
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">로그인</CardTitle>
+          <CardDescription>
+            편하루 계정으로 로그인하세요
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            {(error || getErrorMessage(urlError)) && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {error || getErrorMessage(urlError)}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">이메일</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">비밀번호</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-primary"
+                >
+                  비밀번호를 잊으셨나요?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="비밀번호를 입력하세요"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">
+                    {showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "로그인 중..." : "로그인"}
+            </Button>
+          </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">또는</span>
+            </div>
+          </div>
+
+          {/* 네이버 로그인 버튼 */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full bg-[#03C75A] hover:bg-[#02b351] text-white border-0"
+            onClick={handleNaverLogin}
+          >
+            <svg
+              className="mr-2 h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727v12.845z" />
+            </svg>
+            네이버로 로그인
+          </Button>
+        </CardContent>
+        <CardFooter className="flex justify-center">
+          <p className="text-sm text-muted-foreground">
+            계정이 없으신가요?{" "}
+            <Link href="/sign-up" className="font-medium text-primary hover:underline">
+              회원가입
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        로그인 없이도{" "}
+        <Link href="/search" className="text-primary hover:underline">
+          기본 기능
+        </Link>
+        을 이용할 수 있어요.
+      </p>
     </div>
   )
 }
