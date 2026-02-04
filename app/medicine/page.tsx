@@ -8,75 +8,67 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Pill, Search, AlertTriangle, Clock, Ban, Info } from "lucide-react"
+import { Pill, Search, AlertTriangle, Clock, Ban, Info, Loader2, ArrowLeft, Package } from "lucide-react"
+import Image from "next/image"
 
 interface Medicine {
   id: string
   name: string
-  englishName: string
   company: string
-  category: string
+  efficacy: string
   usage: string
-  dosage: string
-  precautions: string[]
-  sideEffects: string[]
-  interactions: string[]
+  warningPrecaution: string
+  precaution: string
+  interaction: string
+  sideEffect: string
+  storage: string
+  image: string
 }
-
-const sampleMedicines: Medicine[] = [
-  {
-    id: "1",
-    name: "타이레놀정 500mg",
-    englishName: "Tylenol 500mg",
-    company: "한국얀센",
-    category: "해열진통제",
-    usage: "두통, 치통, 생리통, 근육통, 관절통, 감기로 인한 발열 및 동통",
-    dosage: "성인 1회 1~2정, 1일 3~4회 복용 (4~6시간 간격). 1일 최대 8정 이하.",
-    precautions: [
-      "간 질환 환자 주의",
-      "알코올 섭취 시 복용 금지",
-      "다른 해열진통제와 병용 주의",
-    ],
-    sideEffects: ["메스꺼움", "구토", "식욕부진", "드물게 알러지 반응"],
-    interactions: ["와파린", "항응고제", "알코올"],
-  },
-  {
-    id: "2",
-    name: "판피린티정",
-    englishName: "Panpyrin T",
-    company: "동아제약",
-    category: "종합감기약",
-    usage: "감기의 제증상(콧물, 코막힘, 재채기, 인후통, 기침, 발열, 두통, 관절통, 근육통) 완화",
-    dosage: "성인 1회 1정, 1일 3회 식후 복용",
-    precautions: [
-      "졸음이 올 수 있어 운전 자제",
-      "녹내장 환자 주의",
-      "전립선 비대증 환자 주의",
-    ],
-    sideEffects: ["졸음", "구갈", "변비", "배뇨곤란"],
-    interactions: ["수면제", "진정제", "MAO 억제제"],
-  },
-]
-
-const recentSearches = ["타이레놀", "판피린", "이지엔6", "아스피린", "게보린"]
 
 export default function MedicinePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<Medicine[]>([])
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim()) return
 
+    setIsSearching(true)
     setHasSearched(true)
-    const results = sampleMedicines.filter(
-      (m) =>
-        m.name.includes(searchQuery) ||
-        m.englishName.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    setSearchResults(results)
+    setError(null)
     setSelectedMedicine(null)
+
+    try {
+      const response = await fetch(`/api/medicine?itemName=${encodeURIComponent(searchQuery)}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "검색 중 오류가 발생했습니다.")
+        setSearchResults([])
+        setTotalCount(0)
+        return
+      }
+
+      setSearchResults(data.items || [])
+      setTotalCount(data.totalCount || 0)
+    } catch (err) {
+      console.error("Search error:", err)
+      setError("네트워크 오류가 발생했습니다.")
+      setSearchResults([])
+      setTotalCount(0)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch()
+    }
   }
 
   return (
@@ -104,51 +96,35 @@ export default function MedicinePage() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      placeholder="약 이름을 입력하세요"
+                      placeholder="약 이름을 입력하세요 (예: 타이레놀, 게보린)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                      onKeyDown={handleKeyDown}
                       className="pl-10"
                     />
                   </div>
-                  <Button onClick={handleSearch}>검색</Button>
+                  <Button onClick={handleSearch} disabled={isSearching}>
+                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}
+                  </Button>
                 </div>
-
-                {/* Recent searches */}
-                {!hasSearched && (
-                  <div className="mt-4">
-                    <p className="mb-2 text-sm text-muted-foreground">최근 검색:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {recentSearches.map((term) => (
-                        <Badge
-                          key={term}
-                          variant="secondary"
-                          className="cursor-pointer"
-                          onClick={() => {
-                            setSearchQuery(term)
-                            setHasSearched(true)
-                            const results = sampleMedicines.filter(
-                              (m) =>
-                                m.name.includes(term) ||
-                                m.englishName.toLowerCase().includes(term.toLowerCase())
-                            )
-                            setSearchResults(results)
-                          }}
-                        >
-                          {term}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
+            {/* Error */}
+            {error && (
+              <Card className="mb-6 border-destructive">
+                <CardContent className="flex items-center gap-2 p-4 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span>{error}</span>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Results */}
-            {hasSearched && !selectedMedicine && (
+            {hasSearched && !selectedMedicine && !isSearching && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  검색 결과 {searchResults.length}건
+                  검색 결과 {totalCount.toLocaleString()}건
                 </p>
                 {searchResults.length === 0 ? (
                   <Card>
@@ -169,17 +145,33 @@ export default function MedicinePage() {
                       onClick={() => setSelectedMedicine(medicine)}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-semibold">{medicine.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {medicine.englishName}
+                        <div className="flex items-start gap-4">
+                          {medicine.image ? (
+                            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                              <Image
+                                src={medicine.image}
+                                alt={medicine.name}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+                              <Package className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold truncate">{medicine.name}</h3>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {medicine.company}
                             </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {medicine.company} | {medicine.category}
-                            </p>
+                            {medicine.efficacy && (
+                              <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                                {medicine.efficacy}
+                              </p>
+                            )}
                           </div>
-                          <Badge>{medicine.category}</Badge>
                         </div>
                       </CardContent>
                     </Card>
@@ -190,98 +182,142 @@ export default function MedicinePage() {
 
             {/* Detail */}
             {selectedMedicine && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{selectedMedicine.name}</CardTitle>
-                      <CardDescription>
-                        {selectedMedicine.englishName} | {selectedMedicine.company}
-                      </CardDescription>
+              <div className="space-y-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => setSelectedMedicine(null)}
+                  className="mb-2"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  목록으로
+                </Button>
+
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-start gap-4">
+                      {selectedMedicine.image ? (
+                        <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                          <Image
+                            src={selectedMedicine.image}
+                            alt={selectedMedicine.name}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <Package className="h-10 w-10 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <CardTitle className="text-lg">{selectedMedicine.name}</CardTitle>
+                        <CardDescription>{selectedMedicine.company}</CardDescription>
+                      </div>
                     </div>
-                    <Badge>{selectedMedicine.category}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="usage">
-                    <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="usage">
-                        <Info className="mr-1 h-4 w-4 md:mr-2" />
-                        <span className="hidden md:inline">용법</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="precautions">
-                        <AlertTriangle className="mr-1 h-4 w-4 md:mr-2" />
-                        <span className="hidden md:inline">주의</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="sideEffects">
-                        <Clock className="mr-1 h-4 w-4 md:mr-2" />
-                        <span className="hidden md:inline">부작용</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="interactions">
-                        <Ban className="mr-1 h-4 w-4 md:mr-2" />
-                        <span className="hidden md:inline">병용금지</span>
-                      </TabsTrigger>
-                    </TabsList>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs defaultValue="efficacy">
+                      <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="efficacy">
+                          <Info className="mr-1 h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">효능</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="usage">
+                          <Clock className="mr-1 h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">용법</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="precaution">
+                          <AlertTriangle className="mr-1 h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">주의</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="sideEffect">
+                          <Ban className="mr-1 h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">부작용</span>
+                        </TabsTrigger>
+                      </TabsList>
 
-                    <TabsContent value="usage" className="mt-4 space-y-4">
-                      <div>
-                        <h4 className="mb-2 font-medium">효능/효과</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedMedicine.usage}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="mb-2 font-medium">용법/용량</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedMedicine.dosage}
-                        </p>
-                      </div>
-                    </TabsContent>
+                      <TabsContent value="efficacy" className="mt-4 space-y-4">
+                        <div>
+                          <h4 className="mb-2 font-medium">효능/효과</h4>
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {selectedMedicine.efficacy || "정보가 없습니다."}
+                          </p>
+                        </div>
+                      </TabsContent>
 
-                    <TabsContent value="precautions" className="mt-4">
-                      <ul className="space-y-2">
-                        {selectedMedicine.precautions.map((p, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
-                            {p}
-                          </li>
-                        ))}
-                      </ul>
-                    </TabsContent>
+                      <TabsContent value="usage" className="mt-4 space-y-4">
+                        <div>
+                          <h4 className="mb-2 font-medium">용법/용량</h4>
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {selectedMedicine.usage || "정보가 없습니다."}
+                          </p>
+                        </div>
+                        {selectedMedicine.storage && (
+                          <div>
+                            <h4 className="mb-2 font-medium">보관법</h4>
+                            <p className="text-sm text-muted-foreground whitespace-pre-line">
+                              {selectedMedicine.storage}
+                            </p>
+                          </div>
+                        )}
+                      </TabsContent>
 
-                    <TabsContent value="sideEffects" className="mt-4">
-                      <div className="flex flex-wrap gap-2">
-                        {selectedMedicine.sideEffects.map((effect) => (
-                          <Badge key={effect} variant="secondary">
-                            {effect}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TabsContent>
+                      <TabsContent value="precaution" className="mt-4 space-y-4">
+                        {selectedMedicine.warningPrecaution && (
+                          <div className="rounded-lg bg-destructive/10 p-3">
+                            <h4 className="mb-2 font-medium text-destructive">⚠️ 경고</h4>
+                            <p className="text-sm text-destructive whitespace-pre-line">
+                              {selectedMedicine.warningPrecaution}
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="mb-2 font-medium">주의사항</h4>
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {selectedMedicine.precaution || "정보가 없습니다."}
+                          </p>
+                        </div>
+                        {selectedMedicine.interaction && (
+                          <div>
+                            <h4 className="mb-2 font-medium">병용 주의 약물/음식</h4>
+                            <p className="text-sm text-muted-foreground whitespace-pre-line">
+                              {selectedMedicine.interaction}
+                            </p>
+                          </div>
+                        )}
+                      </TabsContent>
 
-                    <TabsContent value="interactions" className="mt-4">
-                      <p className="mb-2 text-sm text-muted-foreground">
-                        다음 약물/성분과 함께 복용 시 주의가 필요합니다:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedMedicine.interactions.map((drug) => (
-                          <Badge key={drug} variant="destructive">
-                            {drug}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+                      <TabsContent value="sideEffect" className="mt-4">
+                        <div>
+                          <h4 className="mb-2 font-medium">부작용</h4>
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {selectedMedicine.sideEffect || "정보가 없습니다."}
+                          </p>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
 
-                  <div className="mt-6">
-                    <Button
-                      variant="outline"
-                      className="w-full bg-transparent"
-                      onClick={() => setSelectedMedicine(null)}
-                    >
-                      목록으로 돌아가기
-                    </Button>
-                  </div>
+                    <p className="mt-6 text-xs text-muted-foreground">
+                      * 의약품 정보는 식품의약품안전처 제공 자료입니다.
+                      <br />
+                      * 정확한 복용법은 의사 또는 약사와 상담하세요.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Initial State */}
+            {!hasSearched && (
+              <Card>
+                <CardContent className="flex flex-col items-center py-12">
+                  <Pill className="mb-4 h-16 w-16 text-primary/30" />
+                  <p className="text-center text-muted-foreground">
+                    약 이름을 검색하면
+                    <br />
+                    상세 정보를 확인할 수 있어요
+                  </p>
                 </CardContent>
               </Card>
             )}
