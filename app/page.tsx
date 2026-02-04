@@ -5,13 +5,16 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { 
   Search, Camera, Lock, Menu, X, ChevronRight, ChevronDown, 
-  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw 
+  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw, LogOut, User
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { LoginModal } from "@/components/auth/login-modal"
+import { createClient } from "@/lib/supabase/client"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 const quickSymptoms = [
   { label: "🤒 발열", value: "발열" },
@@ -38,6 +41,11 @@ export default function HomePage() {
   const [foodInput, setFoodInput] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
+  // 로그인 상태
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
+  
   // 감염병 현황 상태
   const [diseases, setDiseases] = useState<DiseaseData[]>([])
   const [regions, setRegions] = useState<RegionData[]>([])
@@ -47,6 +55,34 @@ export default function HomePage() {
   const [isRegionSample, setIsRegionSample] = useState(false)
   const [showCount, setShowCount] = useState(10) // 처음 10개
   const [selectedRegion, setSelectedRegion] = useState<RegionData | null>(null)
+
+  // 로그인 상태 체크
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setAuthLoading(false)
+    }
+    
+    checkUser()
+    
+    // 인증 상태 변화 감지
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // 로그아웃
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setUser(null)
+    router.refresh()
+  }
 
   useEffect(() => {
     fetchDiseaseData()
@@ -122,9 +158,20 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <Button size="sm" asChild className="hidden md:inline-flex">
-              <Link href="/login">로그인</Link>
-            </Button>
+            {authLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : user ? (
+              <div className="hidden items-center gap-2 md:flex">
+                <span className="text-sm text-muted-foreground">{user.email?.split('@')[0]}</span>
+                <Button size="sm" variant="ghost" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" className="hidden md:inline-flex" onClick={() => setLoginModalOpen(true)}>
+                로그인
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -145,13 +192,27 @@ export default function HomePage() {
               <Link href="/can-i-eat" className="py-2 text-sm" onClick={() => setMobileMenuOpen(false)}>
                 이거 먹어도 돼?
               </Link>
-              <Link
-                href="/login"
-                className="mt-2 rounded-md bg-primary py-2 text-center text-sm font-medium text-primary-foreground"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                로그인
-              </Link>
+              {user ? (
+                <>
+                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    {user.email?.split('@')[0]}
+                  </div>
+                  <button
+                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                    className="mt-2 rounded-md border py-2 text-center text-sm font-medium"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => { setMobileMenuOpen(false); setLoginModalOpen(true); }}
+                  className="mt-2 rounded-md bg-primary py-2 text-center text-sm font-medium text-primary-foreground"
+                >
+                  로그인
+                </button>
+              )}
             </nav>
           </div>
         )}
@@ -401,27 +462,27 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* CTA 배너 */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <Lock className="h-5 w-5 text-primary" />
+          {/* CTA 배너 - 비로그인 시만 표시 */}
+          {!user && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <Lock className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">로그인하고 알러지 정보 등록하기</p>
+                    <p className="text-xs text-muted-foreground">
+                      맞춤 서비스를 위해 프로필을 완성해보세요
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">로그인하고 알러지 정보 등록하기</p>
-                  <p className="text-xs text-muted-foreground">
-                    맞춤 서비스를 위해 프로필을 완성해보세요
-                  </p>
-                </div>
-              </div>
-              <Button size="sm" asChild>
-                <Link href="/login">
+                <Button size="sm" onClick={() => setLoginModalOpen(true)}>
                   <ChevronRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
 
@@ -431,6 +492,13 @@ export default function HomePage() {
           © 2026 편하루. All rights reserved.
         </div>
       </footer>
+
+      {/* 로그인 모달 */}
+      <LoginModal 
+        open={loginModalOpen} 
+        onOpenChange={setLoginModalOpen}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   )
 }
