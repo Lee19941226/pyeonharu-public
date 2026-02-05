@@ -5,7 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { 
   Search, Camera, Lock, Menu, X, ChevronRight, ChevronDown, 
-  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw, LogOut, User
+  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw, LogOut, User,
+  Building2, Phone, Cross, ChevronLeft
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoginModal } from "@/components/auth/login-modal"
 import { createClient } from "@/lib/supabase/client"
+import { REGIONS } from "@/lib/region-codes"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface DiseaseData {
@@ -28,7 +30,20 @@ interface RegionData {
   diseases: { name: string; count: number }[]
 }
 
-type SearchMode = "symptom" | "food"
+interface PlaceItem {
+  id: string
+  name: string
+  address: string
+  phone: string
+  clCdNm?: string
+  sgguCdNm?: string
+  emdongNm?: string
+  drTotCnt?: number
+  lat: number
+  lng: number
+}
+
+type SearchMode = "symptom" | "food" | "search"
 
 export default function HomePage() {
   const router = useRouter()
@@ -51,6 +66,16 @@ export default function HomePage() {
   const [isRegionSample, setIsRegionSample] = useState(false)
   const [showCount, setShowCount] = useState(10)
   const [selectedRegion, setSelectedRegion] = useState<RegionData | null>(null)
+
+  // 병원/약국 직접 조회 상태
+  const [placeType, setPlaceType] = useState<"hospital" | "pharmacy">("hospital")
+  const [placeRegion, setPlaceRegion] = useState("seoul")
+  const [placeKeyword, setPlaceKeyword] = useState("")
+  const [allPlaces, setAllPlaces] = useState<PlaceItem[]>([])
+  const [placeTotalCount, setPlaceTotalCount] = useState(0)
+  const [placeLoading, setPlaceLoading] = useState(false)
+  const [placePage, setPlacePage] = useState(1)
+  const PER_PAGE = 20
 
   // 로그인 상태 체크
   useEffect(() => {
@@ -118,6 +143,67 @@ export default function HomePage() {
   const getNaverSearchUrl = (diseaseName: string) => {
     return `https://www.google.com/search?q=${encodeURIComponent(diseaseName + '이 뭐야?')}`
   }
+
+  // 병원/약국 조회 (1000건 미리 로드, 페이지 전환은 클라이언트에서 즉시)
+  const fetchPlaces = async (append = false) => {
+    setPlaceLoading(true)
+    try {
+      const region = REGIONS[placeRegion]
+      if (!region) return
+
+      const nextApiPage = append ? Math.floor(allPlaces.length / 1000) + 1 : 1
+      const endpoint = placeType === "hospital" ? "hospitals" : "pharmacies"
+      const res = await fetch(
+        `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=${nextApiPage}&numOfRows=1000`
+      )
+      const data = await res.json()
+
+      if (data.success) {
+        const items = data.hospitals || data.pharmacies || []
+        if (append) {
+          setAllPlaces(prev => [...prev, ...items])
+        } else {
+          setAllPlaces(items)
+          setPlacePage(1)
+          setPlaceKeyword("")
+        }
+        setPlaceTotalCount(data.totalCount || 0)
+      }
+    } catch (error) {
+      console.error("Failed to fetch places:", error)
+    } finally {
+      setPlaceLoading(false)
+    }
+  }
+
+  // 더 불러올 데이터가 있는지
+  const hasMore = allPlaces.length < placeTotalCount
+
+  // 키워드 필터링 (클라이언트 즉시)
+  const filteredPlaces = placeKeyword.trim()
+    ? allPlaces.filter((item) =>
+        item.name.includes(placeKeyword) || item.address.includes(placeKeyword)
+      )
+    : allPlaces
+
+  // 페이지 슬라이싱 (클라이언트 즉시)
+  const totalPages = Math.ceil(filteredPlaces.length / PER_PAGE)
+  const currentPlaces = filteredPlaces.slice(
+    (placePage - 1) * PER_PAGE,
+    placePage * PER_PAGE
+  )
+
+  // searchMode가 search로 바뀌거나 지역/타입 변경 시 API 호출
+  useEffect(() => {
+    if (searchMode === "search") {
+      fetchPlaces()
+    }
+  }, [searchMode, placeType, placeRegion])
+
+  // 키워드 바뀌면 1페이지로 (API 호출 없음)
+  useEffect(() => {
+    setPlacePage(1)
+  }, [placeKeyword])
 
   const formatTimestamp = (ts: string) => {
     if (!ts) return ''
@@ -240,6 +326,19 @@ export default function HomePage() {
                     🍽 이거 먹어도 돼?
                   </span>
                 </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="searchMode"
+                    value="search"
+                    checked={searchMode === "search"}
+                    onChange={() => setSearchMode("search")}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span className={`text-sm font-medium ${searchMode === "search" ? "text-primary" : "text-muted-foreground"}`}>
+                    🔍 병원/약국 조회
+                  </span>
+                </label>
               </div>
 
               {/* 몸이 아파요 모드 */}
@@ -301,6 +400,164 @@ export default function HomePage() {
                   <p className="text-xs text-muted-foreground">
                     내 알러지 정보를 기반으로 안전 여부를 AI가 분석해드려요
                   </p>
+                </div>
+              )}
+
+              {/* 병원/약국 직접 조회 모드 */}
+              {searchMode === "search" && (
+                <div className="space-y-4">
+                  {/* 병원/약국 탭 */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant={placeType === "hospital" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlaceType("hospital")}
+                    >
+                      <Building2 className="mr-1 h-4 w-4" />
+                      병원
+                    </Button>
+                    <Button
+                      variant={placeType === "pharmacy" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlaceType("pharmacy")}
+                    >
+                      <Cross className="mr-1 h-4 w-4" />
+                      약국
+                    </Button>
+                  </div>
+
+                  {/* 필터: 지역 + 검색어 */}
+                  <div className="flex gap-2">
+                    <select
+                      value={placeRegion}
+                      onChange={(e) => setPlaceRegion(e.target.value)}
+                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                    >
+                      {Object.values(REGIONS).map((r) => (
+                        <option key={r.slug} value={r.slug}>{r.name}</option>
+                      ))}
+                    </select>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="상호명 또는 주소 검색"
+                        value={placeKeyword}
+                        onChange={(e) => setPlaceKeyword(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 결과 */}
+                  <div className="text-sm text-muted-foreground">
+                    {placeKeyword
+                      ? `${filteredPlaces.length}개 검색됨 (전체 ${allPlaces.length}개 중)`
+                      : `${allPlaces.length}개 로드됨 (전체 ${placeTotalCount.toLocaleString()}개)`
+                    }
+                  </div>
+
+                  {placeLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full" />
+                      ))}
+                    </div>
+                  ) : currentPlaces.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Building2 className="mx-auto mb-2 h-8 w-8" />
+                      <p>결과가 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {currentPlaces.map((place) => (
+                        <div
+                          key={place.id}
+                          className="rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{place.name}</span>
+                                {place.clCdNm && (
+                                  <Badge variant="secondary" className="text-[10px]">{place.clCdNm}</Badge>
+                                )}
+                                {place.sgguCdNm && (
+                                  <Badge variant="outline" className="text-[10px]">{place.sgguCdNm}</Badge>
+                                )}
+                              </div>
+                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="h-3 w-3" />{place.address}
+                              </p>
+                              {place.phone && (
+                                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Phone className="h-3 w-3" />{place.phone}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              {place.phone && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <a href={`tel:${place.phone}`}><Phone className="h-4 w-4" /></a>
+                                </Button>
+                              )}
+                              {place.lat > 0 && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <a
+                                    href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`}
+                                    target="_blank"
+                                  >
+                                    <MapPin className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 페이징 (클라이언트 즉시 전환) */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={placePage <= 1}
+                        onClick={() => setPlacePage(placePage - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        이전
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        {placePage} / {totalPages} 페이지
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={placePage >= totalPages}
+                        onClick={() => setPlacePage(placePage + 1)}
+                      >
+                        다음
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 더 불러오기 */}
+                  {hasMore && !placeKeyword && (
+                    <div className="pt-2 text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchPlaces(true)}
+                        disabled={placeLoading}
+                      >
+                        {placeLoading ? "불러오는 중..." : `다음 1000개 불러오기 (${allPlaces.length.toLocaleString()} / ${placeTotalCount.toLocaleString()})`}
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
