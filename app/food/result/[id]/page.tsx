@@ -37,6 +37,13 @@ interface FoodResult {
     severity: string;
   }>;
   ingredients: string[];
+  nutritionDetails?: Array<{
+    name: string;
+    content: string;
+    unit: string;
+    percentage?: string;
+  }>;
+  servingSize?: string;
   isSafe: boolean;
 }
 
@@ -246,36 +253,73 @@ export default function FoodResultPage() {
                 </div>
               </CardContent>
             </Card>
-            {/* 원재료명 및 함량 */}
-            {result.ingredients.length > 0 ? (
-              <Card className="mb-6">
+            {/* 원재료 & 영양정보 (나란히 배치) */}
+            <div className="mb-6 grid gap-6 md:grid-cols-2">
+              {/* 원재료명 및 함량 */}
+              <Card>
                 <CardContent className="p-6">
                   <h3 className="mb-4 font-semibold">📝 원재료명 및 함량</h3>
-                  <div className="space-y-2">
-                    {result.ingredients.map((ingredient, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-2 rounded bg-muted p-3 text-sm"
-                      >
-                        <span className="font-medium text-muted-foreground">
-                          {idx + 1}.
-                        </span>
-                        <span>{ingredient}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {result.ingredients.length > 0 ? (
+                    <div className="max-h-[400px] space-y-1.5 overflow-y-auto pr-2">
+                      {result.ingredients.map((ingredient, idx) => (
+                        <div key={idx} className="flex gap-2 text-sm">
+                          <span className="min-w-[2rem] font-medium text-muted-foreground">
+                            {idx + 1}.
+                          </span>
+                          <span className="flex-1">{ingredient}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-sm text-muted-foreground">
+                      원재료 정보가 제공되지 않습니다
+                    </p>
+                  )}
                 </CardContent>
               </Card>
-            ) : (
-              <Card className="mb-6">
+
+              {/* 영양성분 함량 */}
+              <Card>
                 <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">📝 원재료명 및 함량</h3>
-                  <p className="text-center text-sm text-muted-foreground">
-                    원재료 정보가 제공되지 않습니다
-                  </p>
+                  <h3 className="mb-4 font-semibold">📊 영양성분 함량</h3>
+                  {result.servingSize && (
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      1회 제공량: {result.servingSize}
+                    </p>
+                  )}
+                  {result.nutritionDetails &&
+                  result.nutritionDetails.length > 0 ? (
+                    <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
+                      {result.nutritionDetails.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between border-b border-muted py-2 text-sm last:border-0"
+                        >
+                          <span className="text-muted-foreground">
+                            {item.name}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                              {parseFloat(item.content).toLocaleString()}
+                              {item.unit}
+                            </span>
+                            {item.percentage && (
+                              <span className="text-xs text-muted-foreground">
+                                ({item.percentage}%)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-sm text-muted-foreground">
+                      영양정보가 제공되지 않습니다
+                    </p>
+                  )}
                 </CardContent>
               </Card>
-            )}
+            </div>
             {/* 제품의 알레르기 성분 (모든 사용자에게 표시) */}
             <Card className="mb-6">
               <CardContent className="p-6">

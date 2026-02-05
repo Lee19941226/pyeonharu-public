@@ -112,14 +112,52 @@ export async function GET(req: NextRequest) {
 
       console.log(`✅ 영양정보: ${nutritionItems.length}개`);
 
-      // ✅ 실제 필드 확인
       if (nutritionItems.length > 0) {
-        console.log("🔍 영양정보 첫 번째 항목:");
+        console.log("🔍🔍🔍 영양정보 전체 필드 확인 🔍🔍🔍");
+        console.log("첫 번째 항목:");
         console.log(JSON.stringify(nutritionItems[0], null, 2));
+        console.log("\n두 번째 항목:");
+        console.log(JSON.stringify(nutritionItems[1], null, 2));
+        console.log("\n세 번째 항목:");
+        console.log(JSON.stringify(nutritionItems[2], null, 2));
       }
     } catch (error) {
       console.error("⚠️ 영양표시정보 실패:", error);
     }
+
+    // ==========================================
+    // 영양정보 추출 (데이터 병합 섹션에 추가)
+    // ==========================================
+    // 1회 제공량 정보
+    const servingSize =
+      nutritionItems.length > 0
+        ? `${nutritionItems[0].NTRTN_INDCT_TCT}${nutritionItems[0].NTRTN_INDCT_TCD}`
+        : "";
+
+    console.log("📊 1회 제공량:", servingSize);
+
+    // 영양성분 목록
+    const nutritionDetails = nutritionItems
+      .map((item: any) => {
+        const name = item.NIRWMT_NM || ""; // ✅ 영양성분명 (열량, 나트륨 등)
+        const content = item.CTA || ""; // ✅ 함량 (370.000, 470.000 등)
+        const unit = item.IGRD_UCD || ""; // ✅ 단위 (kcal, mg, g)
+        const percentage = item.NTRTN_RT || ""; // 영양성분 기준치 비율
+
+        return {
+          name: name,
+          content: content,
+          unit: unit,
+          percentage: percentage,
+        };
+      })
+      .filter((item: any) => item.name && item.content);
+
+    console.log("📊 파싱된 영양정보:", nutritionDetails.length, "개");
+    if (nutritionDetails.length > 0) {
+      console.log("   샘플:", nutritionDetails.slice(0, 3));
+    }
+
     // ==========================================
     // API 5: 식품표시정보 주의사항 (getFoodQrIndctAttnInfo01)
     // ==========================================
@@ -160,7 +198,7 @@ export async function GET(req: NextRequest) {
     const productName =
       productInfo?.PRDCT_NM ||
       allergyItems[0]?.PRDCT_NM ||
-      rawMaterialItems[0]?.PRDCT_NM || // ✅ 원재료 API에서도 가져오기
+      rawMaterialItems[0]?.PRDCT_NM ||
       "알 수 없음";
 
     const manufacturer = productInfo?.MNFCTUR || "정보없음";
@@ -188,12 +226,45 @@ export async function GET(req: NextRequest) {
 
     console.log("📦 원재료 원본 길이:", rawMaterialsText.length);
 
+    // ✅ 정교한 원재료 파싱 함수
+    function parseIngredients(text: string): string[] {
+      const ingredients: string[] = [];
+      let current = "";
+      let depth = 0; // 괄호 깊이
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+
+        if (char === "(" || char === "{" || char === "[") {
+          depth++;
+          current += char;
+        } else if (char === ")" || char === "}" || char === "]") {
+          depth--;
+          current += char;
+        } else if ((char === "," || char === "，") && depth === 0) {
+          // 괄호 밖의 쉼표만 분리
+          const trimmed = current.trim();
+          if (trimmed) {
+            ingredients.push(trimmed);
+          }
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+
+      // 마지막 항목
+      const trimmed = current.trim();
+      if (trimmed) {
+        ingredients.push(trimmed);
+      }
+
+      return ingredients;
+    }
+
+    // 원재료 추출 부분 수정
     const ingredients: string[] = rawMaterialsText
-      ? rawMaterialsText
-          .split(/[,，]/) // ✅ 쉼표(한글, 영문 모두)로 분리
-          .map((s: string) => s.trim())
-          .filter((s: string) => s.length > 0)
-          .slice(0, 30) // ✅ 30개까지 표시
+      ? parseIngredients(rawMaterialsText).slice(0, 30)
       : [];
 
     console.log("📝 파싱된 원재료:", ingredients.length, "개");
@@ -232,13 +303,6 @@ export async function GET(req: NextRequest) {
       saturatedFat: getNutritionValue("포화지방"),
       cholesterol: getNutritionValue("콜레스테롤"),
     };
-
-    // 전체 영양성분 목록
-    const nutritionDetails = nutritionItems.map((item: any) => ({
-      name: item.NTRCN_NM || "",
-      content: item.CNTNT || "",
-      unit: item.UNIT || "",
-    }));
 
     // 교차오염 정보
     let crossContamination: string[] = [];
