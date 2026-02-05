@@ -35,9 +35,14 @@ const SIDO_FALLBACK: Record<string, string> = {
   "세종특별자치시": "세종시",
 }
 
-async function fetchPharmacies(serviceKey: string, sidoName: string, pageNo: string, numOfRows: string) {
+async function fetchPharmacies(serviceKey: string, sidoName: string, pageNo: string, numOfRows: string, keyword?: string) {
   const encodedSido = encodeURIComponent(sidoName)
-  const url = `https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire?serviceKey=${serviceKey}&Q0=${encodedSido}&pageNo=${pageNo}&numOfRows=${numOfRows}&ORD=NAME`
+  let url = `https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire?serviceKey=${serviceKey}&Q0=${encodedSido}&pageNo=${pageNo}&numOfRows=${numOfRows}&ORD=NAME`
+
+  // 키워드가 있으면 QN 파라미터로 서버 검색
+  if (keyword && keyword.trim()) {
+    url += `&QN=${encodeURIComponent(keyword.trim())}`
+  }
 
   console.log("[Area Pharmacies API] Fetching:", url.replace(serviceKey, "***"))
 
@@ -86,6 +91,7 @@ export async function GET(req: NextRequest) {
   const sidoCd = searchParams.get("sidoCd")
   const pageNo = searchParams.get("pageNo") || "1"
   const numOfRows = searchParams.get("numOfRows") || "30"
+  const keyword = searchParams.get("keyword") // 약국명 검색
 
   if (!sidoCd) {
     return NextResponse.json({ error: "sidoCd(시도코드)가 필요합니다." }, { status: 400 })
@@ -103,12 +109,12 @@ export async function GET(req: NextRequest) {
     }
 
     // 1차 시도: 정식 명칭으로 검색
-    let result = await fetchPharmacies(serviceKey, sidoName, pageNo, numOfRows)
+    let result = await fetchPharmacies(serviceKey, sidoName, pageNo, numOfRows, keyword || undefined)
 
     // 결과 없고 fallback 명칭이 있으면 재시도
     if (result.totalCount === 0 && SIDO_FALLBACK[sidoName]) {
       console.log("[Area Pharmacies API] No results, trying fallback:", SIDO_FALLBACK[sidoName])
-      result = await fetchPharmacies(serviceKey, SIDO_FALLBACK[sidoName], pageNo, numOfRows)
+      result = await fetchPharmacies(serviceKey, SIDO_FALLBACK[sidoName], pageNo, numOfRows, keyword || undefined)
     }
 
     return NextResponse.json({

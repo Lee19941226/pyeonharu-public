@@ -145,7 +145,7 @@ export default function HomePage() {
   }
 
   // 병원/약국 조회 (1000건 미리 로드, 페이지 전환은 클라이언트에서 즉시)
-  const fetchPlaces = async (append = false) => {
+  const fetchPlaces = async (append = false, keyword?: string) => {
     setPlaceLoading(true)
     try {
       const region = REGIONS[placeRegion]
@@ -153,19 +153,23 @@ export default function HomePage() {
 
       const nextApiPage = append ? Math.floor(allPlaces.length / 1000) + 1 : 1
       const endpoint = placeType === "hospital" ? "hospitals" : "pharmacies"
-      const res = await fetch(
-        `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=${nextApiPage}&numOfRows=1000`
-      )
+      let url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=${nextApiPage}&numOfRows=1000`
+
+      // 키워드가 있으면 서버에서 검색
+      if (keyword && keyword.trim()) {
+        url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=1&numOfRows=1000&keyword=${encodeURIComponent(keyword.trim())}`
+      }
+
+      const res = await fetch(url)
       const data = await res.json()
 
       if (data.success) {
         const items = data.hospitals || data.pharmacies || []
-        if (append) {
+        if (append && !keyword) {
           setAllPlaces(prev => [...prev, ...items])
         } else {
           setAllPlaces(items)
           setPlacePage(1)
-          setPlaceKeyword("")
         }
         setPlaceTotalCount(data.totalCount || 0)
       }
@@ -177,18 +181,11 @@ export default function HomePage() {
   }
 
   // 더 불러올 데이터가 있는지
-  const hasMore = allPlaces.length < placeTotalCount
-
-  // 키워드 필터링 (클라이언트 즉시)
-  const filteredPlaces = placeKeyword.trim()
-    ? allPlaces.filter((item) =>
-        item.name.includes(placeKeyword) || item.address.includes(placeKeyword)
-      )
-    : allPlaces
+  const hasMore = !placeKeyword.trim() && allPlaces.length < placeTotalCount
 
   // 페이지 슬라이싱 (클라이언트 즉시)
-  const totalPages = Math.ceil(filteredPlaces.length / PER_PAGE)
-  const currentPlaces = filteredPlaces.slice(
+  const totalPages = Math.ceil(allPlaces.length / PER_PAGE)
+  const currentPlaces = allPlaces.slice(
     (placePage - 1) * PER_PAGE,
     placePage * PER_PAGE
   )
@@ -196,14 +193,19 @@ export default function HomePage() {
   // searchMode가 search로 바뀌거나 지역/타입 변경 시 API 호출
   useEffect(() => {
     if (searchMode === "search") {
+      setPlaceKeyword("")
       fetchPlaces()
     }
   }, [searchMode, placeType, placeRegion])
 
-  // 키워드 바뀌면 1페이지로 (API 호출 없음)
-  useEffect(() => {
-    setPlacePage(1)
-  }, [placeKeyword])
+  // 검색 버튼 또는 Enter 시 API 호출
+  const handlePlaceSearch = () => {
+    if (placeKeyword.trim()) {
+      fetchPlaces(false, placeKeyword)
+    } else {
+      fetchPlaces()
+    }
+  }
 
   const formatTimestamp = (ts: string) => {
     if (!ts) return ''
@@ -437,22 +439,32 @@ export default function HomePage() {
                         <option key={r.slug} value={r.slug}>{r.name}</option>
                       ))}
                     </select>
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="상호명 또는 주소 검색"
-                        value={placeKeyword}
-                        onChange={(e) => setPlaceKeyword(e.target.value)}
-                        className="pl-10"
-                      />
+                    <div className="relative flex-1 flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="상호명 검색"
+                          value={placeKeyword}
+                          onChange={(e) => setPlaceKeyword(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button
+                        onClick={handlePlaceSearch}
+                        size="default"
+                        className="shrink-0"
+                      >
+                        검색
+                      </Button>
                     </div>
                   </div>
 
                   {/* 결과 */}
                   <div className="text-sm text-muted-foreground">
-                    {placeKeyword
-                      ? `${filteredPlaces.length}개 검색됨 (전체 ${allPlaces.length}개 중)`
-                      : `${allPlaces.length}개 로드됨 (전체 ${placeTotalCount.toLocaleString()}개)`
+                    {placeKeyword.trim()
+                      ? `"${placeKeyword}" 검색결과 ${placeTotalCount.toLocaleString()}개 (${allPlaces.length}개 로드됨)`
+                      : `${allPlaces.length.toLocaleString()}개 로드됨 (전체 ${placeTotalCount.toLocaleString()}개)`
                     }
                   </div>
 

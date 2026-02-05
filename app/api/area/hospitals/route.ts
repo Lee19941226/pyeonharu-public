@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // 지역코드 기반 병원 검색 API
-// GET /api/area/hospitals?sidoCd=110000&pageNo=1&numOfRows=30
+// GET /api/area/hospitals?sidoCd=110000&pageNo=1&numOfRows=30&keyword=삼성
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const sidoCd = searchParams.get("sidoCd")
   const pageNo = searchParams.get("pageNo") || "1"
   const numOfRows = searchParams.get("numOfRows") || "30"
+  const keyword = searchParams.get("keyword") // 병원명 검색
 
   if (!sidoCd) {
     return NextResponse.json({ error: "sidoCd(시도코드)가 필요합니다." }, { status: 400 })
@@ -19,7 +20,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "API 키가 설정되지 않았습니다." }, { status: 500 })
     }
 
-    const url = `http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList?serviceKey=${serviceKey}&pageNo=${pageNo}&numOfRows=${numOfRows}&sidoCd=${sidoCd}`
+    let url = `http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList?serviceKey=${serviceKey}&pageNo=${pageNo}&numOfRows=${numOfRows}&sidoCd=${sidoCd}`
+
+    // 키워드가 있으면 yadmNm 파라미터로 서버 검색
+    if (keyword && keyword.trim()) {
+      url += `&yadmNm=${encodeURIComponent(keyword.trim())}`
+    }
 
     const response = await fetch(url)
     const text = await response.text()
