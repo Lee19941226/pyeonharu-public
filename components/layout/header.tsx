@@ -263,9 +263,10 @@ export function Header() {
             )}
 
             <div className="space-y-1">
-              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
-                병원/약국
-              </p>
+              <div className="mb-2 flex items-center gap-2 px-3">
+                <div className="h-1 w-1 rounded-full bg-primary" />
+                <p className="text-sm font-bold text-foreground">병원/약국</p>
+              </div>
               <Link
                 href="/search"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
@@ -290,43 +291,47 @@ export function Header() {
             </div>
 
             <div className="space-y-1">
-              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
-                오늘 뭐 입지?
-              </p>
+              <div className="mb-2 flex items-center gap-2 px-3">
+                <div className="h-1 w-1 rounded-full bg-primary" />
+                <p className="text-sm font-bold text-foreground">
+                  이거 먹어도 돼?
+                </p>
+              </div>
               <Link
-                href="/today"
+                href="/food"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                오늘의 코디
+                음식 확인
               </Link>
               <Link
-                href="/closet"
+                href="/food/profile"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                내 옷장
+                내 알레르기 정보
               </Link>
               <Link
-                href="/weather"
+                href="/food/history"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                날씨 상세
+                최근 확인 제품
               </Link>
               <Link
-                href="/history"
+                href="/food/favorites"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                코디 기록
+                즐겨찾기
               </Link>
             </div>
 
             <div className="space-y-1">
-              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
-                기타
-              </p>
+              <div className="mb-2 flex items-center gap-2 px-3">
+                <div className="h-1 w-1 rounded-full bg-primary" />
+                <p className="text-sm font-bold text-foreground">기타</p>
+              </div>
               <Link
                 href="/about"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
