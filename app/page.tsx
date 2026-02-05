@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { 
   Search, Camera, Lock, Menu, X, ChevronRight, ChevronDown, 
   AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw, LogOut, User,
-  Building2, Phone, Cross, ChevronLeft
+  Building2, Phone, Cross, ChevronLeft, Stethoscope, UtensilsCrossed, MapPinned
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -298,50 +298,47 @@ export default function HomePage() {
       <main className="flex-1">
         <div className="container mx-auto space-y-4 px-4 py-6">
           {/* 🔍 통합 검색 카드 */}
-          <Card>
-            <CardContent className="p-5">
-              {/* 라디오 버튼 */}
-              <div className="mb-4 flex gap-4">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name="searchMode"
-                    value="symptom"
-                    checked={searchMode === "symptom"}
-                    onChange={() => setSearchMode("symptom")}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className={`text-sm font-medium ${searchMode === "symptom" ? "text-primary" : "text-muted-foreground"}`}>
-                    🏥 몸이 아파요
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name="searchMode"
-                    value="food"
-                    checked={searchMode === "food"}
-                    onChange={() => setSearchMode("food")}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className={`text-sm font-medium ${searchMode === "food" ? "text-primary" : "text-muted-foreground"}`}>
-                    🍽 이거 먹어도 돼?
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name="searchMode"
-                    value="search"
-                    checked={searchMode === "search"}
-                    onChange={() => setSearchMode("search")}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className={`text-sm font-medium ${searchMode === "search" ? "text-primary" : "text-muted-foreground"}`}>
-                    🔍 병원/약국 조회
-                  </span>
-                </label>
+          <Card className="overflow-hidden border-0 shadow-lg">
+            <CardContent className="p-0">
+              {/* 탭 선택 영역 - 1행 3열 */}
+              <div className="flex border-b">
+                <button
+                  onClick={() => setSearchMode("symptom")}
+                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
+                  style={searchMode === "symptom"
+                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+                    : { borderColor: "transparent", color: "#9ca3af" }
+                  }
+                >
+                  <Stethoscope className="h-4 w-4" />
+                  <span>몸이 아파요</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode("food")}
+                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
+                  style={searchMode === "food"
+                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+                    : { borderColor: "transparent", color: "#9ca3af" }
+                  }
+                >
+                  <UtensilsCrossed className="h-4 w-4" />
+                  <span>이거 먹어도 돼?</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode("search")}
+                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
+                  style={searchMode === "search"
+                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+                    : { borderColor: "transparent", color: "#9ca3af" }
+                  }
+                >
+                  <MapPinned className="h-4 w-4" />
+                  <span>병원/약국 조회</span>
+                </button>
               </div>
+
+              {/* 콘텐츠 영역 */}
+              <div className="p-5">
 
               {/* 몸이 아파요 모드 */}
               {searchMode === "symptom" && (
@@ -572,6 +569,7 @@ export default function HomePage() {
                   )}
                 </div>
               )}
+              </div>
             </CardContent>
           </Card>
 
