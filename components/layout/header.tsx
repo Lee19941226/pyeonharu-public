@@ -1,79 +1,97 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Menu, X, User, Bookmark, LogOut, Settings } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Menu, X, User, Bookmark, LogOut, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { createClient } from "@/lib/supabase/client"
+} from "@/components/ui/dropdown-menu";
+import { createClient } from "@/lib/supabase/client";
 
 export function Header() {
-  const router = useRouter()
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [nickname, setNickname] = useState<string | null>(null)
-  const [isLoaded, setIsLoaded] = useState(false)
-
+  const router = useRouter();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [nickname, setNickname] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [foodFavoritesCount, setFoodFavoritesCount] = useState(0);
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient();
 
     // 1) 초기 세션 확인 - auth만 사용 (profiles DB 조회 없음)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const user = session.user
-        setNickname(
-          user.user_metadata?.name ||
-          user.user_metadata?.full_name ||
-          user.email?.split("@")[0] ||
-          "사용자"
-        )
-      }
-      setIsLoaded(true)
-    }).catch(() => {
-      setIsLoaded(true)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          const user = session.user;
+          setNickname(
+            user.user_metadata?.name ||
+              user.user_metadata?.full_name ||
+              user.email?.split("@")[0] ||
+              "사용자",
+          );
+          fetchFoodFavoritesCount(); //즐겨찾기 카운트
+        }
+        setIsLoaded(true);
+      })
+      .catch(() => {
+        setIsLoaded(true);
+      });
 
     // 2) 로그인/로그아웃 실시간 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const user = session.user
+        const user = session.user;
         setNickname(
           user.user_metadata?.name ||
-          user.user_metadata?.full_name ||
-          user.email?.split("@")[0] ||
-          "사용자"
-        )
+            user.user_metadata?.full_name ||
+            user.email?.split("@")[0] ||
+            "사용자",
+        );
       } else {
-        setNickname(null)
+        setNickname(null);
       }
-      setIsLoaded(true)
-    })
+      setIsLoaded(true);
+    });
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    setNickname(null)
-    router.push("/")
-    router.refresh()
-  }
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setNickname(null);
+    router.push("/");
+    router.refresh();
+  };
 
-  const isLoggedIn = isLoaded && nickname !== null
-
+  const isLoggedIn = isLoaded && nickname !== null;
+  const fetchFoodFavoritesCount = async () => {
+    try {
+      const res = await fetch("/api/food/favorites");
+      const data = await res.json();
+      if (data.success) {
+        setFoodFavoritesCount(data.favorites?.length || 0);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">편</span>
+            <span className="text-lg font-bold text-primary-foreground">
+              편
+            </span>
           </div>
           <span className="text-xl font-bold text-foreground">편하루</span>
         </Link>
@@ -82,7 +100,10 @@ export function Header() {
         <nav className="hidden items-center gap-1 md:flex">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 병원/약국
               </Button>
             </DropdownMenuTrigger>
@@ -101,30 +122,41 @@ export function Header() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                오늘 뭐 입지?
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                이거 먹어도 돼?
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center">
               <DropdownMenuItem asChild>
-                <Link href="/today">오늘의 코디</Link>
+                <Link href="/food">음식 확인</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/closet">내 옷장</Link>
+                <Link href="/food/profile">내 알레르기 정보</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/weather">날씨 상세</Link>
+                <Link href="/food/history">최근 확인 제품</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/history">코디 기록</Link>
+                <Link href="/food/favorites">즐겨찾기</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            asChild
+            className="text-muted-foreground hover:text-foreground"
+          >
             <Link href="/about">서비스 소개</Link>
           </Button>
-          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            asChild
+            className="text-muted-foreground hover:text-foreground"
+          >
             <Link href="/faq">FAQ</Link>
           </Button>
         </nav>
@@ -231,7 +263,9 @@ export function Header() {
             )}
 
             <div className="space-y-1">
-              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">병원/약국</p>
+              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
+                병원/약국
+              </p>
               <Link
                 href="/search"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
@@ -256,7 +290,9 @@ export function Header() {
             </div>
 
             <div className="space-y-1">
-              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">오늘 뭐 입지?</p>
+              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
+                오늘 뭐 입지?
+              </p>
               <Link
                 href="/today"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
@@ -288,7 +324,9 @@ export function Header() {
             </div>
 
             <div className="space-y-1">
-              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">기타</p>
+              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
+                기타
+              </p>
               <Link
                 href="/about"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
@@ -310,8 +348,8 @@ export function Header() {
                 variant="outline"
                 className="mt-4 w-full text-destructive hover:text-destructive"
                 onClick={() => {
-                  handleLogout()
-                  setIsMobileMenuOpen(false)
+                  handleLogout();
+                  setIsMobileMenuOpen(false);
                 }}
               >
                 <LogOut className="mr-2 h-4 w-4" />
@@ -328,5 +366,5 @@ export function Header() {
         </div>
       )}
     </header>
-  )
+  );
 }
