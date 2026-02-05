@@ -1,10 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { Building2, Cross, MapPin, Phone, Clock, Navigation, ChevronRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Building2, Cross, MapPin, Phone, Clock, ChevronRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { BookmarkButton } from "@/components/medical/bookmark-button"
+import { cn } from "@/lib/utils"
 import type { Place } from "@/app/search/page"
 
 interface PlaceListProps {
@@ -13,159 +15,115 @@ interface PlaceListProps {
   onSelectPlace: (place: Place | null) => void
 }
 
-// 상세 페이지 URL 생성 함수
-function getDetailUrl(place: Place): string {
-  const params = new URLSearchParams({
-    name: place.name,
-    address: place.address,
-    phone: place.phone,
-    lat: String(place.lat),
-    lng: String(place.lng),
-    distance: place.distance,
-  })
-  
-  if (place.type === "hospital") {
-    if (place.departments && place.departments.length > 0) {
-      params.set("department", place.departments.join(", "))
-    }
-    // clCdNm이 있으면 type으로 사용
-    const hospitalType = (place as Place & { clCdNm?: string }).clCdNm || "병원"
-    params.set("type", hospitalType)
-  }
-  
-  return `/${place.type}/${place.id}?${params.toString()}`
-}
-
 export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListProps) {
-  const handleNavigation = (place: Place) => {
-    window.open(
-      `https://map.naver.com/v5/directions/-/-/-/transit?c=${place.lng},${place.lat},15,0,0,0,dh`,
-      "_blank"
-    )
-  }
-
-  const handleCall = (phone: string) => {
-    window.location.href = `tel:${phone}`
-  }
-
   if (places.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-        <MapPin className="mb-4 h-12 w-12 text-muted-foreground" />
-        <h3 className="mb-2 text-lg font-semibold">검색 결과가 없습니다</h3>
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <MapPin className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <h3 className="mb-2 font-semibold">검색 결과가 없습니다</h3>
         <p className="text-sm text-muted-foreground">
-          필터를 조정하거나 다른 지역을 검색해보세요.
+          필터 조건을 변경해보세요.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="divide-y divide-border">
-      {places.map((place) => {
-        const detailUrl = getDetailUrl(place)
-        
-        return (
-          <div
-            key={place.id}
-            className={`p-4 transition-colors hover:bg-muted/50 ${
-              selectedPlace?.id === place.id ? "bg-muted/50" : ""
-            }`}
-            onClick={() => onSelectPlace(place)}
-          >
-            <div className="mb-3 flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                {place.type === "hospital" ? (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                    <Building2 className="h-4 w-4 text-primary" />
+    <div className="flex flex-col gap-2 p-4">
+      <p className="mb-2 text-sm text-muted-foreground">
+        {places.length}개의 결과
+      </p>
+      {places.map((place) => (
+        <Card
+          key={place.id}
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md",
+            selectedPlace?.id === place.id && "ring-2 ring-primary"
+          )}
+          onClick={() => onSelectPlace(place)}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="mb-2 flex items-center gap-2">
+                  {place.type === "hospital" ? (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                      <Building2 className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-600">
+                      <Cross className="h-4 w-4" />
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-semibold">{place.name}</h3>
+                    <p className="text-xs text-muted-foreground">{place.distance}</p>
                   </div>
-                ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10">
-                    <Cross className="h-4 w-4 text-green-600" />
+                </div>
+
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {place.address}
+                  </p>
+                  <p className="flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    {place.phone}
+                  </p>
+                  <p className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {place.openTime} - {place.closeTime}
+                  </p>
+                </div>
+
+                {place.departments && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {place.departments.slice(0, 3).map((dept) => (
+                      <Badge key={dept} variant="secondary" className="text-xs">
+                        {dept}
+                      </Badge>
+                    ))}
+                    {place.departments.length > 3 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{place.departments.length - 3}
+                      </Badge>
+                    )}
                   </div>
                 )}
-                <div>
-                  <Link
-                    href={detailUrl}
-                    className="font-semibold hover:text-primary hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {place.name}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">{place.distance}</p>
-                </div>
               </div>
-              <Badge variant={place.isOpen ? "default" : "secondary"} className="text-xs">
-                {place.isOpen ? "영업 중" : "영업 종료"}
-              </Badge>
+
+              <div className="flex flex-col items-end gap-2">
+                <Badge variant={place.isOpen ? "default" : "secondary"}>
+                  {place.isOpen ? "영업중" : "영업종료"}
+                </Badge>
+                <BookmarkButton
+                  type={place.type}
+                  id={place.id}
+                  name={place.name}
+                  address={place.address}
+                  phone={place.phone}
+                  category={place.departments?.[0]}
+                  lat={place.lat}
+                  lng={place.lng}
+                />
+              </div>
             </div>
 
-            <div className="mb-3 space-y-1 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="line-clamp-1">{place.address}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3 flex-shrink-0" />
-                <span>
-                  {place.openTime} - {place.closeTime}
-                </span>
-              </div>
-              {place.departments && place.departments.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {place.departments.slice(0, 3).map((dept) => (
-                    <Badge key={dept} variant="outline" className="text-xs">
-                      {dept}
-                    </Badge>
-                  ))}
-                  {place.departments.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{place.departments.length - 3}
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleCall(place.phone)
-                }}
-              >
-                <Phone className="mr-1 h-3 w-3" />
-                전화
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleNavigation(place)
-                }}
-              >
-                <Navigation className="mr-1 h-3 w-3" />
-                길찾기
-              </Button>
-              <Button
-                size="sm"
-                variant="default"
-                asChild
+            <div className="mt-3 border-t border-border pt-3">
+              <Link
+                href={`/${place.type}/${place.id}`}
+                className="flex items-center justify-between text-sm text-primary hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Link href={detailUrl}>
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </Button>
+                상세정보 보기
+                <ChevronRight className="h-4 w-4" />
+              </Link>
             </div>
-          </div>
-        )
-      })}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }

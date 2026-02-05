@@ -18,7 +18,6 @@ import {
   AlertTriangle,
   Phone,
   Navigation,
-  Bookmark,
   Search,
   Check,
   Circle,
@@ -27,6 +26,7 @@ import {
   UtensilsCrossed,
   Ban,
 } from "lucide-react"
+import { BookmarkButton } from "@/components/medical/bookmark-button"
 
 // ─── Types ───
 interface DietaryAdvice {
@@ -592,7 +592,18 @@ function ResultScreen({
                       <Navigation className="mr-1 h-3.5 w-3.5" />길찾기
                     </a>
                   </Button>
-                  <Button variant="outline" size="sm" className="text-xs"><Bookmark className="h-3.5 w-3.5" /></Button>
+                  <BookmarkButton
+                    type="hospital"
+                    id={h.id}
+                    name={h.name}
+                    address={h.address}
+                    phone={h.phone}
+                    category={h.department || h.clCdNm || ""}
+                    lat={h.lat}
+                    lng={h.lng}
+                    size="sm"
+                    className="text-xs"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -678,6 +689,18 @@ function DetailScreen({
               <Navigation className="mr-2 h-5 w-5" />길찾기
             </a>
           </Button>
+          <BookmarkButton
+            type="hospital"
+            id={hospital.id}
+            name={hospital.name}
+            address={hospital.address}
+            phone={hospital.phone}
+            category={hospital.department || hospital.clCdNm || ""}
+            lat={hospital.lat}
+            lng={hospital.lng}
+            size="default"
+            className="rounded-full py-6"
+          />
         </div>
 
         {/* D AI 방문 팁 */}

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Menu, X, User, Heart, LogOut } from "lucide-react"
+import { Menu, X, User, Bookmark, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,60 +17,56 @@ import { createClient } from "@/lib/supabase/client"
 export function Header() {
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [user, setUser] = useState<{ email: string; name: string } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [nickname, setNickname] = useState<string | null>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
 
-  // 로그인 상태 체크
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const supabase = createClient()
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        
-        if (authUser) {
-          setUser({
-            email: authUser.email || "",
-            name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "사용자",
-          })
-        } else {
-          setUser(null)
-        }
-      } catch (error) {
-        console.error("Auth check error:", error)
-        setUser(null)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
-    checkUser()
-
-    // Auth 상태 변경 리스너
     const supabase = createClient()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+    // 1) 초기 세션 확인 - auth만 사용 (profiles DB 조회 없음)
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        setUser({
-          email: session.user.email || "",
-          name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "사용자",
-        })
-      } else {
-        setUser(null)
+        const user = session.user
+        setNickname(
+          user.user_metadata?.name ||
+          user.user_metadata?.full_name ||
+          user.email?.split("@")[0] ||
+          "사용자"
+        )
       }
+      setIsLoaded(true)
+    }).catch(() => {
+      setIsLoaded(true)
     })
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    // 2) 로그인/로그아웃 실시간 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const user = session.user
+        setNickname(
+          user.user_metadata?.name ||
+          user.user_metadata?.full_name ||
+          user.email?.split("@")[0] ||
+          "사용자"
+        )
+      } else {
+        setNickname(null)
+      }
+      setIsLoaded(true)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  // 로그아웃 처리
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    setUser(null)
+    setNickname(null)
     router.push("/")
     router.refresh()
   }
+
+  const isLoggedIn = isLoaded && nickname !== null
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -106,22 +102,6 @@ export function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                이거 먹어도 돼?
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center">
-              <DropdownMenuItem asChild>
-                <Link href="/can-i-eat">알러지 분석</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/mypage">알러지 정보 등록</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 오늘 뭐 입지?
               </Button>
             </DropdownMenuTrigger>
@@ -140,143 +120,175 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/about">서비스 소개</Link>
+          </Button>
+          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/faq">FAQ</Link>
+          </Button>
         </nav>
 
-        {/* Desktop Buttons */}
+        {/* Right Actions - Desktop */}
         <div className="hidden items-center gap-2 md:flex">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/bookmarks">
-              <Heart className="h-5 w-5" />
-              <span className="sr-only">즐겨찾기</span>
-            </Link>
-          </Button>
-          
-          {isLoading ? (
-            <Button variant="ghost" disabled>
-              <span className="h-4 w-16 animate-pulse rounded bg-muted" />
-            </Button>
-          ) : user ? (
+          {isLoggedIn ? (
+            /* 로그인 상태: 닉네임 드롭다운 */
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <User className="h-4 w-4" />
-                  <span className="max-w-[100px] truncate">{user.name}</span>
+                <Button variant="ghost" className="gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="max-w-[100px] truncate text-sm font-medium">
+                    {nickname}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">{nickname}</p>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/mypage" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
+                    <Settings className="h-4 w-4" />
                     마이페이지
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/bookmarks" className="flex items-center gap-2">
-                    <Heart className="h-4 w-4" />
+                    <Bookmark className="h-4 w-4" />
                     즐겨찾기
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 text-destructive">
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-destructive focus:text-destructive"
+                >
                   <LogOut className="h-4 w-4" />
                   로그아웃
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild>
-              <Link href="/login">로그인</Link>
-            </Button>
+            /* 비로그인 상태: 로그인 버튼 */
+            isLoaded && (
+              <Button asChild>
+                <Link href="/login">로그인</Link>
+              </Button>
+            )
           )}
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="flex items-center gap-2 md:hidden">
+        {/* Right Actions - Mobile (hamburger only) */}
+        <div className="flex items-center md:hidden">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            <span className="sr-only">메뉴</span>
+            {isMobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </Button>
         </div>
       </div>
 
-      {/* Mobile Navigation */}
+      {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="border-t border-border bg-background md:hidden">
-          <nav className="container mx-auto flex flex-col gap-1 px-4 py-4">
-            <p className="px-3 py-2 text-xs font-semibold text-muted-foreground">병원/약국</p>
-            <Link
-              href="/search"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              지도로 검색
-            </Link>
-            <Link
-              href="/symptom"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              증상으로 추천
-            </Link>
-            <Link
-              href="/medicine"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              약 정보 검색
-            </Link>
+        <div className="border-t border-border md:hidden">
+          <nav className="container mx-auto space-y-1 px-4 py-4">
+            {/* 로그인 상태 표시 (모바일) */}
+            {isLoggedIn && (
+              <div className="mb-3 flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{nickname}</p>
+                  <div className="mt-1 flex gap-2">
+                    <Link
+                      href="/mypage"
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      마이페이지
+                    </Link>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <Link
+                      href="/bookmarks"
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      즐겨찾기
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">이거 먹어도 돼?</p>
-            <Link
-              href="/can-i-eat"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              알러지 분석
-            </Link>
-            <Link
-              href="/mypage"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              알러지 정보 등록
-            </Link>
+            <div className="space-y-1">
+              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">병원/약국</p>
+              <Link
+                href="/search"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                지도로 검색
+              </Link>
+              <Link
+                href="/symptom"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                증상으로 추천
+              </Link>
+              <Link
+                href="/medicine"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                약 정보 검색
+              </Link>
+            </div>
 
-            <p className="mt-4 px-3 py-2 text-xs font-semibold text-muted-foreground">오늘 뭐 입지?</p>
-            <Link
-              href="/today"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              오늘의 코디
-            </Link>
-            <Link
-              href="/closet"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              내 옷장
-            </Link>
-            <Link
-              href="/weather"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              날씨 상세
-            </Link>
-            <Link
-              href="/history"
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              코디 기록
-            </Link>
+            <div className="space-y-1">
+              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">오늘 뭐 입지?</p>
+              <Link
+                href="/today"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                오늘의 코디
+              </Link>
+              <Link
+                href="/closet"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                내 옷장
+              </Link>
+              <Link
+                href="/weather"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                날씨 상세
+              </Link>
+              <Link
+                href="/history"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                코디 기록
+              </Link>
+            </div>
 
-            <div className="mt-4 border-t border-border pt-4">
+            <div className="space-y-1">
+              <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">기타</p>
               <Link
                 href="/about"
                 className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
@@ -284,38 +296,34 @@ export function Header() {
               >
                 서비스 소개
               </Link>
-              
-              {user ? (
-                <>
-                  <Link
-                    href="/mypage"
-                    className="mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <User className="h-4 w-4" />
-                    {user.name}님
-                  </Link>
-                  <button
-                    onClick={() => {
-                      handleLogout()
-                      setIsMobileMenuOpen(false)
-                    }}
-                    className="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-muted"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    로그아웃
-                  </button>
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  className="mt-2 block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+              <Link
+                href="/faq"
+                className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                FAQ
+              </Link>
+            </div>
+
+            {isLoggedIn ? (
+              <Button
+                variant="outline"
+                className="mt-4 w-full text-destructive hover:text-destructive"
+                onClick={() => {
+                  handleLogout()
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                로그아웃
+              </Button>
+            ) : (
+              <Button asChild className="mt-4 w-full">
+                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                   로그인
                 </Link>
-              )}
-            </div>
+              </Button>
+            )}
           </nav>
         </div>
       )}

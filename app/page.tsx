@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { 
-  Search, Camera, Lock, Menu, X, ChevronRight, ChevronDown, 
-  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw, LogOut, User,
+  Search, Camera, Lock, ChevronRight, ChevronDown, 
+  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw,
   Building2, Phone, Cross, ChevronLeft, Stethoscope, UtensilsCrossed, MapPinned
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Header } from "@/components/layout/header"
 import { LoginModal } from "@/components/auth/login-modal"
+import { BookmarkButton } from "@/components/medical/bookmark-button"
 import { createClient } from "@/lib/supabase/client"
 import { REGIONS } from "@/lib/region-codes"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
@@ -50,11 +52,9 @@ export default function HomePage() {
   const [searchMode, setSearchMode] = useState<SearchMode>("symptom")
   const [symptomInput, setSymptomInput] = useState("")
   const [foodInput, setFoodInput] = useState("")
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
   // 로그인 상태
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
   
   // 감염병 현황 상태
@@ -83,7 +83,6 @@ export default function HomePage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-      setAuthLoading(false)
     }
     
     checkUser()
@@ -95,14 +94,6 @@ export default function HomePage() {
     
     return () => subscription.unsubscribe()
   }, [])
-
-  // 로그아웃
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    setUser(null)
-    router.refresh()
-  }
 
   useEffect(() => {
     fetchDiseaseData()
@@ -216,84 +207,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="font-bold text-primary-foreground">편</span>
-            </div>
-            <span className="font-bold">편하루</span>
-          </Link>
-
-          <nav className="hidden items-center gap-6 md:flex">
-            <Link href="/search" className="text-sm text-muted-foreground hover:text-foreground">
-              병원/약국
-            </Link>
-            <Link href="/can-i-eat" className="text-sm text-muted-foreground hover:text-foreground">
-              이거 먹어도 돼?
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            {authLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : user ? (
-              <div className="hidden items-center gap-2 md:flex">
-                <span className="text-sm text-muted-foreground">{user.email?.split('@')[0]}</span>
-                <Button size="sm" variant="ghost" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <Button size="sm" className="hidden md:inline-flex" onClick={() => setLoginModalOpen(true)}>
-                로그인
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-
-        {mobileMenuOpen && (
-          <div className="border-t bg-background md:hidden">
-            <nav className="container mx-auto flex flex-col px-4 py-3">
-              <Link href="/search" className="py-2 text-sm" onClick={() => setMobileMenuOpen(false)}>
-                병원/약국
-              </Link>
-              <Link href="/can-i-eat" className="py-2 text-sm" onClick={() => setMobileMenuOpen(false)}>
-                이거 먹어도 돼?
-              </Link>
-              {user ? (
-                <>
-                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    {user.email?.split('@')[0]}
-                  </div>
-                  <button
-                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                    className="mt-2 rounded-md border py-2 text-center text-sm font-medium"
-                  >
-                    로그아웃
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => { setMobileMenuOpen(false); setLoginModalOpen(true); }}
-                  className="mt-2 rounded-md bg-primary py-2 text-center text-sm font-medium text-primary-foreground"
-                >
-                  로그인
-                </button>
-              )}
-            </nav>
-          </div>
-        )}
-      </header>
+      <Header />
 
       <main className="flex-1">
         <div className="container mx-auto space-y-4 px-4 py-6">
@@ -504,6 +418,16 @@ export default function HomePage() {
                               )}
                             </div>
                             <div className="flex shrink-0 gap-1">
+                              <BookmarkButton
+                                type={placeType === "pharmacy" ? "pharmacy" : "hospital"}
+                                id={place.id}
+                                name={place.name}
+                                address={place.address}
+                                phone={place.phone}
+                                category={place.clCdNm}
+                                lat={place.lat}
+                                lng={place.lng}
+                              />
                               {place.phone && (
                                 <Button variant="ghost" size="sm" asChild>
                                   <a href={`tel:${place.phone}`}><Phone className="h-4 w-4" /></a>
