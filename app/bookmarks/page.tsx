@@ -1,223 +1,267 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Header } from "@/components/layout/header"
-import { MobileNav } from "@/components/layout/mobile-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Building2,
-  Cross,
-  MapPin,
-  Phone,
-  Clock,
-  Trash2,
-  Heart,
-  ExternalLink,
+  Building2, Cross, MapPin, Phone, Trash2, Heart, ChevronLeft, User, Bookmark,
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { LoginModal } from "@/components/auth/login-modal"
 
-interface BookmarkedPlace {
+interface BookmarkItem {
   id: string
   name: string
-  type: "hospital" | "pharmacy"
   address: string
   phone: string
-  isOpen: boolean
-  openTime: string
-  closeTime: string
+  category?: string
+  lat: number
+  lng: number
+  bookmarkId: string
+  createdAt: string
 }
 
-const sampleHospitals: BookmarkedPlace[] = [
-  {
-    id: "1",
-    name: "서울대학교병원",
-    type: "hospital",
-    address: "서울특별시 종로구 대학로 101",
-    phone: "02-2072-2114",
-    isOpen: true,
-    openTime: "08:30",
-    closeTime: "17:30",
-  },
-  {
-    id: "2",
-    name: "연세세브란스병원",
-    type: "hospital",
-    address: "서울특별시 서대문구 연세로 50-1",
-    phone: "02-2228-1114",
-    isOpen: true,
-    openTime: "08:00",
-    closeTime: "18:00",
-  },
-]
-
-const samplePharmacies: BookmarkedPlace[] = [
-  {
-    id: "3",
-    name: "온누리약국",
-    type: "pharmacy",
-    address: "서울특별시 종로구 대학로 85",
-    phone: "02-745-1234",
-    isOpen: true,
-    openTime: "09:00",
-    closeTime: "21:00",
-  },
-]
-
 export default function BookmarksPage() {
-  const [hospitals, setHospitals] = useState<BookmarkedPlace[]>(sampleHospitals)
-  const [pharmacies, setPharmacies] = useState<BookmarkedPlace[]>(samplePharmacies)
+  const router = useRouter()
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
 
-  const handleRemove = (id: string, type: "hospital" | "pharmacy") => {
-    if (type === "hospital") {
-      setHospitals(hospitals.filter((h) => h.id !== id))
-    } else {
-      setPharmacies(pharmacies.filter((p) => p.id !== id))
+  const [tab, setTab] = useState<"hospital" | "pharmacy">("hospital")
+  const [hospitals, setHospitals] = useState<BookmarkItem[]>([])
+  const [pharmacies, setPharmacies] = useState<BookmarkItem[]>([])
+  const [bookmarkLoading, setBookmarkLoading] = useState(false)
+
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      if (user) fetchBookmarks()
+      setIsLoading(false)
+    }
+    init()
+  }, [])
+
+  const fetchBookmarks = async () => {
+    setBookmarkLoading(true)
+    try {
+      const res = await fetch("/api/bookmarks")
+      const data = await res.json()
+      if (data.success) {
+        setHospitals(data.hospitals || [])
+        setPharmacies(data.pharmacies || [])
+      }
+    } catch (e) {
+      console.error("Failed to fetch bookmarks:", e)
+    } finally {
+      setBookmarkLoading(false)
     }
   }
 
-  const PlaceCard = ({ place }: { place: BookmarkedPlace }) => (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <div className="mb-2 flex items-center gap-2">
-              {place.type === "hospital" ? (
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                  <Building2 className="h-4 w-4" />
-                </div>
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-600">
-                  <Cross className="h-4 w-4" />
-                </div>
-              )}
-              <div>
-                <h3 className="font-semibold">{place.name}</h3>
+  const handleRemove = async (type: "hospital" | "pharmacy", itemId: string) => {
+    const res = await fetch(`/api/bookmarks?type=${type}&id=${itemId}`, { method: "DELETE" })
+    if (res.ok) {
+      if (type === "hospital") {
+        setHospitals((prev) => prev.filter((h) => h.id !== itemId))
+      } else {
+        setPharmacies((prev) => prev.filter((p) => p.id !== itemId))
+      }
+    }
+  }
+
+  // 로딩
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+          <div className="container mx-auto flex h-14 items-center px-4">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <span className="font-bold text-primary-foreground">편</span>
               </div>
-            </div>
-
-            <div className="space-y-1 text-sm text-muted-foreground">
-              <p className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {place.address}
-              </p>
-              <p className="flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                {place.phone}
-              </p>
-              <p className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {place.openTime} - {place.closeTime}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <Badge variant={place.isOpen ? "default" : "secondary"}>
-              {place.isOpen ? "영업중" : "영업종료"}
-            </Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={() => handleRemove(place.id, place.type)}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">즐겨찾기 삭제</span>
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-3 flex gap-2 border-t border-border pt-3">
-          <Button variant="outline" size="sm" className="flex-1 bg-transparent" asChild>
-            <Link href={`/${place.type}/${place.id}`}>
-              상세정보
-              <ExternalLink className="ml-1 h-3 w-3" />
+              <span className="font-bold">편하루</span>
             </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="flex-1 bg-transparent" asChild>
-            <a href={`tel:${place.phone}`}>
-              <Phone className="mr-1 h-3 w-3" />
-              전화
-            </a>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
+          </div>
+        </header>
+        <main className="flex flex-1 items-center justify-center">
+          <Skeleton className="h-8 w-32" />
+        </main>
+      </div>
+    )
+  }
 
-  const EmptyState = ({ type }: { type: string }) => (
-    <div className="flex flex-col items-center py-12 text-center">
-      <Heart className="mb-4 h-12 w-12 text-muted-foreground" />
-      <p className="mb-2 font-medium">즐겨찾기한 {type}이 없습니다</p>
-      <p className="mb-4 text-sm text-muted-foreground">
-        {type} 검색 후 하트 버튼을 눌러 즐겨찾기에 추가하세요
-      </p>
-      <Button asChild>
-        <Link href="/search">검색하러 가기</Link>
-      </Button>
-    </div>
-  )
+  // 비로그인
+  if (!user) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+          <div className="container mx-auto flex h-14 items-center px-4">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <span className="font-bold text-primary-foreground">편</span>
+              </div>
+              <span className="font-bold">편하루</span>
+            </Link>
+          </div>
+        </header>
+        <main className="flex flex-1 flex-col items-center justify-center px-4">
+          <Bookmark className="mb-4 h-16 w-16 text-muted-foreground" />
+          <h1 className="mb-2 text-xl font-bold">로그인이 필요합니다</h1>
+          <p className="mb-6 text-center text-muted-foreground">
+            즐겨찾기를 이용하려면 로그인해주세요
+          </p>
+          <Button onClick={() => setLoginModalOpen(true)}>로그인하기</Button>
+        </main>
+        <LoginModal open={loginModalOpen} onOpenChange={setLoginModalOpen} onSuccess={() => router.refresh()} />
+      </div>
+    )
+  }
+
+  const currentItems = tab === "hospital" ? hospitals : pharmacies
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <Header />
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => router.back()}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-lg font-bold">즐겨찾기</h1>
+          </div>
+          <Link href="/mypage" className="text-sm text-muted-foreground hover:text-foreground">
+            마이페이지
+          </Link>
+        </div>
+      </header>
 
-      <main className="flex-1 pb-16 md:pb-0">
-        <div className="container mx-auto px-4 py-8">
+      <main className="flex-1">
+        <div className="container mx-auto px-4 py-6">
           <div className="mx-auto max-w-2xl">
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold md:text-3xl">즐겨찾기</h1>
-              <p className="mt-1 text-muted-foreground">
-                자주 찾는 병원과 약국을 모아보세요
-              </p>
+
+            {/* 탭 */}
+            <div className="mb-4 flex gap-2">
+              <Button
+                variant={tab === "hospital" ? "default" : "outline"}
+                onClick={() => setTab("hospital")}
+                className="flex-1"
+              >
+                <Building2 className="mr-2 h-4 w-4" />
+                병원 ({hospitals.length})
+              </Button>
+              <Button
+                variant={tab === "pharmacy" ? "default" : "outline"}
+                onClick={() => setTab("pharmacy")}
+                className="flex-1"
+              >
+                <Cross className="mr-2 h-4 w-4" />
+                약국 ({pharmacies.length})
+              </Button>
             </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="hospitals">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="hospitals">
-                  <Building2 className="mr-2 h-4 w-4" />
-                  병원 ({hospitals.length})
-                </TabsTrigger>
-                <TabsTrigger value="pharmacies">
-                  <Cross className="mr-2 h-4 w-4" />
-                  약국 ({pharmacies.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="hospitals" className="mt-6">
-                {hospitals.length === 0 ? (
-                  <EmptyState type="병원" />
-                ) : (
-                  <div className="space-y-4">
-                    {hospitals.map((hospital) => (
-                      <PlaceCard key={hospital.id} place={hospital} />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="pharmacies" className="mt-6">
-                {pharmacies.length === 0 ? (
-                  <EmptyState type="약국" />
-                ) : (
-                  <div className="space-y-4">
-                    {pharmacies.map((pharmacy) => (
-                      <PlaceCard key={pharmacy.id} place={pharmacy} />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            {/* 목록 */}
+            {bookmarkLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : currentItems.length === 0 ? (
+              <div className="flex flex-col items-center py-16 text-center">
+                <Heart className="mb-4 h-12 w-12 text-muted-foreground/40" />
+                <p className="mb-1 font-medium">
+                  즐겨찾기한 {tab === "hospital" ? "병원" : "약국"}이 없습니다
+                </p>
+                <p className="mb-6 text-sm text-muted-foreground">
+                  병원/약국 상세 페이지에서 ♡ 버튼을 눌러 추가하세요
+                </p>
+                <Button asChild>
+                  <Link href="/search">검색하러 가기</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {currentItems.map((item) => (
+                  <Card key={item.id} className="group">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/${tab}/${item.id}`}
+                              className="font-medium hover:text-primary hover:underline"
+                            >
+                              {item.name}
+                            </Link>
+                            {item.category && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {item.category}
+                              </Badge>
+                            )}
+                          </div>
+                          {item.address && (
+                            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              {item.address}
+                            </p>
+                          )}
+                          {item.phone && (
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                              <Phone className="h-3 w-3" />
+                              {item.phone}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {item.phone && (
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                              <a href={`tel:${item.phone}`}>
+                                <Phone className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
+                          {item.lat > 0 && (
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                              <a
+                                href={`nmap://route/public?dlat=${item.lat}&dlng=${item.lng}&dname=${encodeURIComponent(item.name)}`}
+                                target="_blank"
+                              >
+                                <MapPin className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                            onClick={() => handleRemove(tab, item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </main>
 
-      <MobileNav />
+      {/* Footer */}
+      <footer className="border-t py-6">
+        <div className="container mx-auto px-4 text-center text-xs text-muted-foreground">
+          © 2026 편하루. All rights reserved.
+        </div>
+      </footer>
     </div>
   )
 }

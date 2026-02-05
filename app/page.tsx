@@ -4,16 +4,20 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { 
-  Search, Camera, Lock, Menu, X, ChevronRight, ChevronDown, 
-  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw, LogOut, User
+  Search, Camera, Lock, ChevronRight, ChevronDown, 
+  AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw,
+  Building2, Phone, Cross, ChevronLeft, Stethoscope, UtensilsCrossed, MapPinned
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Header } from "@/components/layout/header"
 import { LoginModal } from "@/components/auth/login-modal"
+import { BookmarkButton } from "@/components/medical/bookmark-button"
 import { createClient } from "@/lib/supabase/client"
+import { REGIONS } from "@/lib/region-codes"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface DiseaseData {
@@ -28,18 +32,29 @@ interface RegionData {
   diseases: { name: string; count: number }[]
 }
 
-type SearchMode = "symptom" | "food"
+interface PlaceItem {
+  id: string
+  name: string
+  address: string
+  phone: string
+  clCdNm?: string
+  sgguCdNm?: string
+  emdongNm?: string
+  drTotCnt?: number
+  lat: number
+  lng: number
+}
+
+type SearchMode = "symptom" | "food" | "search"
 
 export default function HomePage() {
   const router = useRouter()
   const [searchMode, setSearchMode] = useState<SearchMode>("symptom")
   const [symptomInput, setSymptomInput] = useState("")
   const [foodInput, setFoodInput] = useState("")
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
   // 로그인 상태
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
   
   // 감염병 현황 상태
@@ -52,13 +67,22 @@ export default function HomePage() {
   const [showCount, setShowCount] = useState(10)
   const [selectedRegion, setSelectedRegion] = useState<RegionData | null>(null)
 
+  // 병원/약국 직접 조회 상태
+  const [placeType, setPlaceType] = useState<"hospital" | "pharmacy">("hospital")
+  const [placeRegion, setPlaceRegion] = useState("seoul")
+  const [placeKeyword, setPlaceKeyword] = useState("")
+  const [allPlaces, setAllPlaces] = useState<PlaceItem[]>([])
+  const [placeTotalCount, setPlaceTotalCount] = useState(0)
+  const [placeLoading, setPlaceLoading] = useState(false)
+  const [placePage, setPlacePage] = useState(1)
+  const PER_PAGE = 20
+
   // 로그인 상태 체크
   useEffect(() => {
     const checkUser = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-      setAuthLoading(false)
     }
     
     checkUser()
@@ -70,14 +94,6 @@ export default function HomePage() {
     
     return () => subscription.unsubscribe()
   }, [])
-
-  // 로그아웃
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    setUser(null)
-    router.refresh()
-  }
 
   useEffect(() => {
     fetchDiseaseData()
@@ -119,6 +135,69 @@ export default function HomePage() {
     return `https://www.google.com/search?q=${encodeURIComponent(diseaseName + '이 뭐야?')}`
   }
 
+  // 병원/약국 조회 (1000건 미리 로드, 페이지 전환은 클라이언트에서 즉시)
+  const fetchPlaces = async (append = false, keyword?: string) => {
+    setPlaceLoading(true)
+    try {
+      const region = REGIONS[placeRegion]
+      if (!region) return
+
+      const nextApiPage = append ? Math.floor(allPlaces.length / 1000) + 1 : 1
+      const endpoint = placeType === "hospital" ? "hospitals" : "pharmacies"
+      let url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=${nextApiPage}&numOfRows=1000`
+
+      // 키워드가 있으면 서버에서 검색
+      if (keyword && keyword.trim()) {
+        url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=1&numOfRows=1000&keyword=${encodeURIComponent(keyword.trim())}`
+      }
+
+      const res = await fetch(url)
+      const data = await res.json()
+
+      if (data.success) {
+        const items = data.hospitals || data.pharmacies || []
+        if (append && !keyword) {
+          setAllPlaces(prev => [...prev, ...items])
+        } else {
+          setAllPlaces(items)
+          setPlacePage(1)
+        }
+        setPlaceTotalCount(data.totalCount || 0)
+      }
+    } catch (error) {
+      console.error("Failed to fetch places:", error)
+    } finally {
+      setPlaceLoading(false)
+    }
+  }
+
+  // 더 불러올 데이터가 있는지
+  const hasMore = !placeKeyword.trim() && allPlaces.length < placeTotalCount
+
+  // 페이지 슬라이싱 (클라이언트 즉시)
+  const totalPages = Math.ceil(allPlaces.length / PER_PAGE)
+  const currentPlaces = allPlaces.slice(
+    (placePage - 1) * PER_PAGE,
+    placePage * PER_PAGE
+  )
+
+  // searchMode가 search로 바뀌거나 지역/타입 변경 시 API 호출
+  useEffect(() => {
+    if (searchMode === "search") {
+      setPlaceKeyword("")
+      fetchPlaces()
+    }
+  }, [searchMode, placeType, placeRegion])
+
+  // 검색 버튼 또는 Enter 시 API 호출
+  const handlePlaceSearch = () => {
+    if (placeKeyword.trim()) {
+      fetchPlaces(false, placeKeyword)
+    } else {
+      fetchPlaces()
+    }
+  }
+
   const formatTimestamp = (ts: string) => {
     if (!ts) return ''
     const date = new Date(ts)
@@ -128,119 +207,52 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="font-bold text-primary-foreground">편</span>
-            </div>
-            <span className="font-bold">편하루</span>
-          </Link>
-
-          <nav className="hidden items-center gap-6 md:flex">
-            <Link href="/search" className="text-sm text-muted-foreground hover:text-foreground">
-              병원/약국
-            </Link>
-            <Link href="/can-i-eat" className="text-sm text-muted-foreground hover:text-foreground">
-              이거 먹어도 돼?
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            {authLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : user ? (
-              <div className="hidden items-center gap-2 md:flex">
-                <span className="text-sm text-muted-foreground">{user.email?.split('@')[0]}</span>
-                <Button size="sm" variant="ghost" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <Button size="sm" className="hidden md:inline-flex" onClick={() => setLoginModalOpen(true)}>
-                로그인
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-
-        {mobileMenuOpen && (
-          <div className="border-t bg-background md:hidden">
-            <nav className="container mx-auto flex flex-col px-4 py-3">
-              <Link href="/search" className="py-2 text-sm" onClick={() => setMobileMenuOpen(false)}>
-                병원/약국
-              </Link>
-              <Link href="/can-i-eat" className="py-2 text-sm" onClick={() => setMobileMenuOpen(false)}>
-                이거 먹어도 돼?
-              </Link>
-              {user ? (
-                <>
-                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    {user.email?.split('@')[0]}
-                  </div>
-                  <button
-                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                    className="mt-2 rounded-md border py-2 text-center text-sm font-medium"
-                  >
-                    로그아웃
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => { setMobileMenuOpen(false); setLoginModalOpen(true); }}
-                  className="mt-2 rounded-md bg-primary py-2 text-center text-sm font-medium text-primary-foreground"
-                >
-                  로그인
-                </button>
-              )}
-            </nav>
-          </div>
-        )}
-      </header>
+      <Header />
 
       <main className="flex-1">
         <div className="container mx-auto space-y-4 px-4 py-6">
           {/* 🔍 통합 검색 카드 */}
-          <Card>
-            <CardContent className="p-5">
-              {/* 라디오 버튼 */}
-              <div className="mb-4 flex gap-4">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name="searchMode"
-                    value="symptom"
-                    checked={searchMode === "symptom"}
-                    onChange={() => setSearchMode("symptom")}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className={`text-sm font-medium ${searchMode === "symptom" ? "text-primary" : "text-muted-foreground"}`}>
-                    🏥 몸이 아파요
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name="searchMode"
-                    value="food"
-                    checked={searchMode === "food"}
-                    onChange={() => setSearchMode("food")}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className={`text-sm font-medium ${searchMode === "food" ? "text-primary" : "text-muted-foreground"}`}>
-                    🍽 이거 먹어도 돼?
-                  </span>
-                </label>
+          <Card className="overflow-hidden border-0 shadow-lg">
+            <CardContent className="p-0">
+              {/* 탭 선택 영역 - 1행 3열 */}
+              <div className="flex border-b">
+                <button
+                  onClick={() => setSearchMode("symptom")}
+                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
+                  style={searchMode === "symptom"
+                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+                    : { borderColor: "transparent", color: "#9ca3af" }
+                  }
+                >
+                  <Stethoscope className="h-4 w-4" />
+                  <span>몸이 아파요</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode("food")}
+                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
+                  style={searchMode === "food"
+                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+                    : { borderColor: "transparent", color: "#9ca3af" }
+                  }
+                >
+                  <UtensilsCrossed className="h-4 w-4" />
+                  <span>이거 먹어도 돼?</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode("search")}
+                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
+                  style={searchMode === "search"
+                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+                    : { borderColor: "transparent", color: "#9ca3af" }
+                  }
+                >
+                  <MapPinned className="h-4 w-4" />
+                  <span>병원/약국 조회</span>
+                </button>
               </div>
+
+              {/* 콘텐츠 영역 */}
+              <div className="p-5">
 
               {/* 몸이 아파요 모드 */}
               {searchMode === "symptom" && (
@@ -303,6 +315,185 @@ export default function HomePage() {
                   </p>
                 </div>
               )}
+
+              {/* 병원/약국 직접 조회 모드 */}
+              {searchMode === "search" && (
+                <div className="space-y-4">
+                  {/* 병원/약국 탭 */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant={placeType === "hospital" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlaceType("hospital")}
+                    >
+                      <Building2 className="mr-1 h-4 w-4" />
+                      병원
+                    </Button>
+                    <Button
+                      variant={placeType === "pharmacy" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlaceType("pharmacy")}
+                    >
+                      <Cross className="mr-1 h-4 w-4" />
+                      약국
+                    </Button>
+                  </div>
+
+                  {/* 필터: 지역 + 검색어 */}
+                  <div className="flex gap-2">
+                    <select
+                      value={placeRegion}
+                      onChange={(e) => setPlaceRegion(e.target.value)}
+                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                    >
+                      {Object.values(REGIONS).map((r) => (
+                        <option key={r.slug} value={r.slug}>{r.name}</option>
+                      ))}
+                    </select>
+                    <div className="relative flex-1 flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="상호명 검색"
+                          value={placeKeyword}
+                          onChange={(e) => setPlaceKeyword(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button
+                        onClick={handlePlaceSearch}
+                        size="default"
+                        className="shrink-0"
+                      >
+                        검색
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 결과 */}
+                  <div className="text-sm text-muted-foreground">
+                    {placeKeyword.trim()
+                      ? `"${placeKeyword}" 검색결과 ${placeTotalCount.toLocaleString()}개 (${allPlaces.length}개 로드됨)`
+                      : `${allPlaces.length.toLocaleString()}개 로드됨 (전체 ${placeTotalCount.toLocaleString()}개)`
+                    }
+                  </div>
+
+                  {placeLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full" />
+                      ))}
+                    </div>
+                  ) : currentPlaces.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Building2 className="mx-auto mb-2 h-8 w-8" />
+                      <p>결과가 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {currentPlaces.map((place) => (
+                        <div
+                          key={place.id}
+                          className="rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{place.name}</span>
+                                {place.clCdNm && (
+                                  <Badge variant="secondary" className="text-[10px]">{place.clCdNm}</Badge>
+                                )}
+                                {place.sgguCdNm && (
+                                  <Badge variant="outline" className="text-[10px]">{place.sgguCdNm}</Badge>
+                                )}
+                              </div>
+                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="h-3 w-3" />{place.address}
+                              </p>
+                              {place.phone && (
+                                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Phone className="h-3 w-3" />{place.phone}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <BookmarkButton
+                                type={placeType === "pharmacy" ? "pharmacy" : "hospital"}
+                                id={place.id}
+                                name={place.name}
+                                address={place.address}
+                                phone={place.phone}
+                                category={place.clCdNm}
+                                lat={place.lat}
+                                lng={place.lng}
+                              />
+                              {place.phone && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <a href={`tel:${place.phone}`}><Phone className="h-4 w-4" /></a>
+                                </Button>
+                              )}
+                              {place.lat > 0 && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <a
+                                    href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`}
+                                    target="_blank"
+                                  >
+                                    <MapPin className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 페이징 (클라이언트 즉시 전환) */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={placePage <= 1}
+                        onClick={() => setPlacePage(placePage - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        이전
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        {placePage} / {totalPages} 페이지
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={placePage >= totalPages}
+                        onClick={() => setPlacePage(placePage + 1)}
+                      >
+                        다음
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 더 불러오기 */}
+                  {hasMore && !placeKeyword && (
+                    <div className="pt-2 text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchPlaces(true)}
+                        disabled={placeLoading}
+                      >
+                        {placeLoading ? "불러오는 중..." : `다음 1000개 불러오기 (${allPlaces.length.toLocaleString()} / ${placeTotalCount.toLocaleString()})`}
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              </div>
             </CardContent>
           </Card>
 
