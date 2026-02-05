@@ -31,7 +31,7 @@ export default function FoodPage() {
       .from("user_allergies")
       .select("allergen_name")
       .eq("user_id", user.id)
-      .limit(3);
+      .limit(8);
 
     if (data) {
       setAllergens(data.map((item) => item.allergen_name));
