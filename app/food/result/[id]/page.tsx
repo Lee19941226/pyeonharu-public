@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 interface FoodResult {
@@ -57,6 +58,7 @@ export default function FoodResultPage() {
 
   useEffect(() => {
     loadFoodResult();
+    checkFavorite();
   }, [params.id]);
 
   const loadFoodResult = async () => {
@@ -71,6 +73,7 @@ export default function FoodResultPage() {
 
       if (data.success) {
         setResult(data.result);
+        saveToHistory(data.result);
         console.log("✅ 결과 설정 완료:", data.result); // 디버깅
       } else {
         setError(data.error || "결과를 불러올 수 없습니다");
@@ -83,31 +86,88 @@ export default function FoodResultPage() {
       setIsLoading(false);
     }
   };
+  // ✅ 히스토리 저장 함수 추가
+  const saveToHistory = (result: FoodResult) => {
+    const historyItem = {
+      foodCode: result.foodCode,
+      foodName: result.foodName,
+      manufacturer: result.manufacturer,
+      checkedAt: new Date().toISOString(),
+      isSafe: result.isSafe,
+    };
 
+    const existing = localStorage.getItem("food_check_history");
+    let history = existing ? JSON.parse(existing) : [];
+
+    // 중복 제거 (같은 바코드는 최신 것만)
+    history = history.filter((item: any) => item.foodCode !== result.foodCode);
+
+    // 최신 항목을 앞에 추가
+    history.unshift(historyItem);
+
+    // 최대 50개까지만 저장
+    if (history.length > 50) {
+      history = history.slice(0, 50);
+    }
+
+    localStorage.setItem("food_check_history", JSON.stringify(history));
+  };
+  // ✅ 즐겨찾기 확인 함수
+  const checkFavorite = async () => {
+    try {
+      const response = await fetch(
+        `/api/food/favorites/check?code=${params.id}`,
+      );
+      const data = await response.json();
+      setIsFavorite(data.favorited);
+    } catch (error) {
+      console.error("즐겨찾기 확인 실패:", error);
+    }
+  };
+
+  // ✅ toggleFavorite 함수 구현
   const toggleFavorite = async () => {
     if (!result) return;
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      if (isFavorite) {
+        // 삭제
+        const response = await fetch(
+          `/api/food/favorites?code=${result.foodCode}`,
+          {
+            method: "DELETE",
+          },
+        );
+        const data = await response.json();
 
-    if (!user) return;
+        if (data.success) {
+          setIsFavorite(false);
+          toast.success("즐겨찾기에서 제거되었습니다");
+        }
+      } else {
+        // 추가
+        const response = await fetch("/api/food/favorites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            foodCode: result.foodCode,
+            foodName: result.foodName,
+            manufacturer: result.manufacturer,
+            isSafe: result.isSafe,
+          }),
+        });
+        const data = await response.json();
 
-    if (isFavorite) {
-      await supabase
-        .from("favorite_foods")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("food_code", result.foodCode);
-      setIsFavorite(false);
-    } else {
-      await supabase.from("favorite_foods").insert({
-        user_id: user.id,
-        food_code: result.foodCode,
-        food_name: result.foodName,
-      });
-      setIsFavorite(true);
+        if (data.success) {
+          setIsFavorite(true);
+          toast.success("즐겨찾기에 추가되었습니다");
+        } else if (response.status === 409) {
+          toast.error("이미 즐겨찾기에 있습니다");
+        }
+      }
+    } catch (error) {
+      console.error("즐겨찾기 처리 실패:", error);
+      toast.error("오류가 발생했습니다");
     }
   };
 
@@ -512,9 +572,13 @@ export default function FoodResultPage() {
               </Card>
             )}
             {/* Favorite Button for Safe Foods */}
-            {result.isSafe && !isFavorite && (
-              <Button onClick={toggleFavorite} className="mt-6 w-full">
-                ♡ 즐겨찾기에 추가
+            {result.isSafe && (
+              <Button
+                onClick={toggleFavorite}
+                className="mt-6 w-full"
+                variant={isFavorite ? "outline" : "default"}
+              >
+                {isFavorite ? "★ 즐겨찾기 제거" : "☆ 즐겨찾기 추가"}
               </Button>
             )}
           </div>

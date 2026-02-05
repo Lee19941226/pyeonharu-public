@@ -5,10 +5,9 @@ import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Search, Edit3 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-
+import { Camera, Search, Clock, Star } from "lucide-react";
 export default function FoodPage() {
   const [allergens, setAllergens] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,20 +142,39 @@ export default function FoodPage() {
               </Card>
             </Link>
 
-            {/* Manual Input */}
-            <Card className="cursor-pointer transition-all hover:shadow-md">
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Edit3 className="h-6 w-6 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">성분표 입력</p>
-                  <p className="text-sm text-muted-foreground">
-                    성분을 직접 입력하기
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* 최근 확인한 제품 */}
+            <Link href="/food/history">
+              <Card className="cursor-pointer transition-all hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                    <Clock className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">최근 확인한 제품</p>
+                    <p className="text-sm text-muted-foreground">
+                      이전에 확인한 제품 다시보기
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* 즐겨찾기 */}
+            <Link href="/food/favorites">
+              <Card className="cursor-pointer transition-all hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                    <Star className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">즐겨찾기</p>
+                    <p className="text-sm text-muted-foreground">
+                      자주 먹는 제품 빠르게 확인
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
       </main>
