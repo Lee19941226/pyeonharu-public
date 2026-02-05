@@ -22,7 +22,7 @@ export default function CanIEatRedirect() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p>리다이렉트 중...</p>
+      <p>잠시만 기다려주세요...</p>
     </div>
   );
 }
