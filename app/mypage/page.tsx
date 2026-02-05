@@ -1,16 +1,22 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Header } from "@/components/layout/header"
-import { MobileNav } from "@/components/layout/mobile-nav"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Header } from "@/components/layout/header";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   User,
   Mail,
@@ -23,81 +29,101 @@ import {
   History,
   Trash2,
   AlertCircle,
-} from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { DeleteAccountDialog } from "@/components/delete-account-dialog"
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface UserProfile {
-  email: string
-  name: string
+  email: string;
+  name: string;
 }
 
 export default function MyPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLogoutLoading, setIsLogoutLoading] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [notifications, setNotifications] = useState({
     weather: true,
     outfit: false,
-  })
-  const [error, setError] = useState<string | null>(null)
+  });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const supabase = createClient()
+        const supabase = createClient();
         const {
           data: { user: authUser },
           error: authError,
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser();
 
         if (authError) {
-          console.error("Auth error:", authError)
-          setError("사용자 정보를 불러올 수 없습니다.")
-          setIsLoading(false)
-          return
+          console.error("Auth error:", authError);
+          setError("사용자 정보를 불러올 수 없습니다.");
+          setIsLoading(false);
+          return;
         }
 
         if (authUser) {
           setUser({
             email: authUser.email || "",
             name: authUser.user_metadata?.name || "사용자",
-          })
+          });
         }
       } catch (err) {
-        console.error("Error checking user:", err)
-        setError("사용자 정보를 불러올 수 없습니다.")
+        console.error("Error checking user:", err);
+        setError("사용자 정보를 불러올 수 없습니다.");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    checkUser()
-  }, [])
+    checkUser();
+  }, []);
 
   const handleLogout = async () => {
-    setIsLogoutLoading(true)
+    setIsLogoutLoading(true);
     try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signOut()
-      
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+
       if (error) {
-        console.error("Logout error:", error)
-        setError("로그아웃 중 오류가 발생했습니다.")
-        setIsLogoutLoading(false)
-        return
+        console.error("Logout error:", error);
+        setError("로그아웃 중 오류가 발생했습니다.");
+        setIsLogoutLoading(false);
+        return;
       }
 
-      router.push("/")
-      router.refresh()
+      router.push("/");
+      router.refresh();
     } catch (err) {
-      console.error("Unexpected logout error:", err)
-      setError("로그아웃 중 오류가 발생했습니다.")
-      setIsLogoutLoading(false)
+      console.error("Unexpected logout error:", err);
+      setError("로그아웃 중 오류가 발생했습니다.");
+      setIsLogoutLoading(false);
     }
-  }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/auth/delete-account", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/");
+        router.refresh();
+      } else {
+        alert(data.message || "회원 탈퇴에 실패했습니다.");
+      }
+    } catch {
+      alert("회원 탈퇴 중 오류가 발생했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -111,7 +137,7 @@ export default function MyPage() {
         </main>
         <MobileNav />
       </div>
-    )
+    );
   }
 
   if (!user) {
@@ -132,7 +158,7 @@ export default function MyPage() {
         </main>
         <MobileNav />
       </div>
-    )
+    );
   }
 
   return (
@@ -146,7 +172,9 @@ export default function MyPage() {
               <div className="rounded-lg bg-destructive/10 p-4 border border-destructive/20 flex gap-3">
                 <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-destructive text-sm">오류 발생</p>
+                  <p className="font-semibold text-destructive text-sm">
+                    오류 발생
+                  </p>
                   <p className="text-destructive/80 text-sm mt-1">{error}</p>
                 </div>
               </div>
@@ -161,7 +189,9 @@ export default function MyPage() {
                   </div>
                   <div className="min-w-0">
                     <CardTitle className="truncate">{user.name}</CardTitle>
-                    <CardDescription className="truncate">{user.email}</CardDescription>
+                    <CardDescription className="truncate">
+                      {user.email}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -227,7 +257,9 @@ export default function MyPage() {
                       className="pl-10 bg-muted"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
+                  <p className="text-xs text-muted-foreground">
+                    이메일은 변경할 수 없습니다.
+                  </p>
                 </div>
                 <Button className="w-full">저장하기</Button>
               </CardContent>
@@ -301,14 +333,43 @@ export default function MyPage() {
                   <LogOut className="mr-2 h-4 w-4 flex-shrink-0" />
                   {isLogoutLoading ? "로그아웃 중..." : "로그아웃"}
                 </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20"
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4 flex-shrink-0" />
-                  회원 탈퇴
-                </Button>
+                <Separator />
+                {!showDeleteConfirm ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground hover:text-destructive"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4 flex-shrink-0" />
+                    회원 탈퇴
+                  </Button>
+                ) : (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-3">
+                    <p className="text-sm text-destructive font-medium">
+                      정말 탈퇴하시겠습니까? 모든 데이터가 삭제되며 복구할 수
+                      없습니다.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? "처리 중..." : "탈퇴하기"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-transparent"
+                        onClick={() => setShowDeleteConfirm(false)}
+                      >
+                        취소
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -316,20 +377,15 @@ export default function MyPage() {
             <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-900">
               <p className="font-medium mb-2">💡 팁</p>
               <p className="text-xs leading-relaxed">
-                개인정보 보호를 위해 비밀번호는 정기적으로 변경하시고, 중요한 정보는 주기적으로 백업해주세요.
+                개인정보 보호를 위해 비밀번호는 정기적으로 변경하시고, 중요한
+                정보는 주기적으로 백업해주세요.
               </p>
             </div>
           </div>
         </div>
       </main>
 
-      <DeleteAccountDialog
-        isOpen={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        userEmail={user.email}
-      />
-
       <MobileNav />
     </div>
-  )
+  );
 }

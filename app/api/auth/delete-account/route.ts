@@ -1,4 +1,5 @@
 ﻿import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -16,13 +17,26 @@ export async function POST(req: NextRequest) {
       );
     }
     console.log(`[DeleteAccount] Starting deletion for user: ${user.id}`);
-    await supabase.from("hospital_bookmarks").delete().eq("user_id", user.id);
-    await supabase.from("pharmacy_bookmarks").delete().eq("user_id", user.id);
-    await supabase.from("clothes").delete().eq("user_id", user.id);
-    await supabase.from("outfit_history").delete().eq("user_id", user.id);
-    await supabase.from("style_preferences").delete().eq("user_id", user.id);
-    await supabase.from("profiles").delete().eq("id", user.id);
-    await supabase.auth.signOut();
+
+    // Admin 클라이언트로 유저 완전 삭제 (CASCADE로 관련 데이터도 자동 삭제)
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
+      user.id,
+    );
+
+    if (deleteError) {
+      console.error("[DeleteAccount] Admin delete error:", deleteError);
+      return NextResponse.json(
+        { success: false, message: "회원 탈퇴 처리 중 오류가 발생했습니다." },
+        { status: 500 },
+      );
+    }
+
     const response = NextResponse.json(
       { success: true, message: "회원 탈퇴가 완료되었습니다." },
       { status: 200 },
