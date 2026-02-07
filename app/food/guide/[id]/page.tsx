@@ -5,8 +5,8 @@ import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Phone, MapPin } from "lucide-react";
-import { useParams } from "next/navigation";
+import { Phone, MapPin, AlertCircle, Loader2 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface GuideData {
@@ -22,36 +22,116 @@ interface GuideData {
 
 export default function EmergencyGuidePage() {
   const params = useParams();
+  const router = useRouter();
   const [guide, setGuide] = useState<GuideData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadGuide();
   }, [params.id]);
 
   const loadGuide = async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      const response = await fetch(`/api/food/guide?code=${params.id}`);
+      console.log("🔍 가이드 로드 시작:", params.id);
+
+      const url = `/api/food/guide?code=${params.id}`;
+      console.log("📡 요청 URL:", url);
+
+      const response = await fetch(url);
+      console.log("📦 응답 상태:", response.status);
+
       const data = await response.json();
+      console.log("📋 응답 데이터:", data);
 
       if (data.success) {
         setGuide(data.guide);
+        console.log("✅ 가이드 설정 완료");
+      } else {
+        console.error("❌ API 에러:", data.error);
+        setError(data.error || "가이드를 불러올 수 없습니다");
       }
     } catch (error) {
-      console.error(error);
+      console.error("💥 가이드 로드 에러:", error);
+      setError("가이드를 불러오는 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading || !guide) {
+  // ✅ 로딩 화면
+  if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>가이드 로딩 중...</p>
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-primary" />
+            <p className="text-lg font-medium">AI 가이드 생성 중...</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              최대 10초 정도 걸릴 수 있습니다
+            </p>
+          </div>
+        </main>
       </div>
     );
   }
 
+  // ✅ 에러 화면
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex flex-1 items-center justify-center">
+          <div className="mx-auto max-w-md px-4 text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive" />
+            <h1 className="mb-2 text-xl font-bold">
+              가이드를 불러올 수 없습니다
+            </h1>
+            <p className="mb-6 text-sm text-muted-foreground">{error}</p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.back()}
+              >
+                돌아가기
+              </Button>
+              <Button className="flex-1" onClick={loadGuide}>
+                다시 시도
+              </Button>
+            </div>
+          </div>
+        </main>
+        <MobileNav />
+      </div>
+    );
+  }
+
+  // ✅ 가이드 없음 (추가 안전장치)
+  if (!guide) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex flex-1 items-center justify-center">
+          <div className="mx-auto max-w-md px-4 text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h1 className="mb-2 text-xl font-bold">가이드 정보 없음</h1>
+            <p className="mb-6 text-sm text-muted-foreground">
+              대응 가이드를 생성할 수 없습니다
+            </p>
+            <Button onClick={() => router.back()}>돌아가기</Button>
+          </div>
+        </main>
+        <MobileNav />
+      </div>
+    );
+  }
+
+  // ✅ 정상 렌더링
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -124,6 +204,23 @@ export default function EmergencyGuidePage() {
                     </Button>
                   </Link>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Hospital Symptoms */}
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h2 className="mb-4 text-lg font-semibold">
+                  🏥 병원 방문이 필요한 증상
+                </h2>
+                <ul className="space-y-2">
+                  {guide.hospitalSymptoms?.map((symptom, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm">
+                      <span className="text-orange-500">▪</span>
+                      <span>{symptom}</span>
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
 
