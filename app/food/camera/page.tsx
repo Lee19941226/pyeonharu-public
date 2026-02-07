@@ -221,7 +221,7 @@ export default function CameraPage() {
     }
   };
 
-  // AI 분석
+  //이미지 분석
   const analyzeImage = async () => {
     if (!capturedImage) return;
     setIsAnalyzing(true);
@@ -238,7 +238,23 @@ export default function CameraPage() {
       const result = await response.json();
 
       if (result.success) {
-        router.push(`/food/result/${result.data.foodCode}`);
+        const { method, foodCode, candidates, detectedIngredients } =
+          result.data;
+
+        if (method === "barcode" || method === "product_name") {
+          // 직접 결과로 이동
+          router.push(`/food/result/${foodCode}`);
+        } else if (method === "multiple_results" || method === "ingredients") {
+          // 선택 화면으로 이동
+          const params = new URLSearchParams({
+            candidates: JSON.stringify(candidates),
+            method: method,
+          });
+          if (detectedIngredients) {
+            params.append("ingredients", JSON.stringify(detectedIngredients));
+          }
+          router.push(`/food/select?${params.toString()}`);
+        }
       } else {
         throw new Error(result.error);
       }
