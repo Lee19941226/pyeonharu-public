@@ -12,11 +12,14 @@ import {
   Heart,
   MapPin,
   Info,
+  AlertCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { getAllergenInfo } from "@/lib/allergen-info";
+import type { AllergenInfo } from "@/lib/allergen-info";
+import { Badge } from "@/components/ui/badge";
 
 interface FoodResult {
   foodCode: string;
@@ -405,7 +408,7 @@ export default function FoodResultPage() {
               </CardContent>
             </Card>
 
-            {/* 사용자 알레르기와 일치하는 성분 (알레르기 등록한 사용자에게만) */}
+            {/* 사용자 알레르기와 일치하는 성분 */}
             {result.userAllergens.length > 0 && (
               <Card className="mb-6">
                 <CardContent className="p-6">
@@ -514,39 +517,141 @@ export default function FoodResultPage() {
                   </CardContent>
                 </Card>
               )}
-            {/* Allergen Info */}
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <h3 className="mb-4 font-semibold">
-                  🔬 알레르기 유발 성분 ({result.detectedAllergens.length}개
-                  검출)
-                </h3>
-                {result.detectedAllergens.length > 0 ? (
-                  <div className="space-y-3">
-                    {result.detectedAllergens.map((allergen, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg bg-destructive/10 p-4"
-                      >
-                        <p className="font-medium text-destructive">
-                          ⚠️ {allergen.name} ({allergen.amount})
-                        </p>
-                        <p className="text-sm text-destructive/80">
-                          귀하의 알레르기: {allergen.severity} 🔴
-                        </p>
-                      </div>
-                    ))}
+            {/* ✅ 알레르기 성분 정보 카드 - 모든 사용자에게 표시 */}
+            {result.allergens && result.allergens.length > 0 && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                    💊 알레르기 성분별 주요 증상
+                  </h3>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    이 제품에 포함된 알레르기 유발 성분과 대표 증상입니다
+                  </p>
+                  <div className="space-y-4">
+                    {result.allergens
+                      .map((allergen) => getAllergenInfo(allergen))
+                      .filter((info): info is AllergenInfo => info !== null)
+                      .map((info, idx) => (
+                        <div
+                          key={idx}
+                          className={`rounded-lg border-l-4 p-4 ${
+                            info.severity === "high"
+                              ? "border-red-500 bg-red-50"
+                              : info.severity === "medium"
+                                ? "border-orange-500 bg-orange-50"
+                                : "border-yellow-500 bg-yellow-50"
+                          }`}
+                        >
+                          <div className="mb-2 flex items-center justify-between">
+                            <h4 className="font-semibold">{info.name}</h4>
+                            <Badge
+                              variant={
+                                info.severity === "high"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {info.severity === "high"
+                                ? "높은 위험"
+                                : info.severity === "medium"
+                                  ? "중간 위험"
+                                  : "낮은 위험"}
+                            </Badge>
+                          </div>
+                          <p className="mb-3 text-sm text-muted-foreground">
+                            {info.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {info.symptoms.map((symptom, sIdx) => (
+                              <span
+                                key={sIdx}
+                                className={`rounded-full px-2.5 py-1 text-xs ${
+                                  info.severity === "high"
+                                    ? "bg-red-100 text-red-700"
+                                    : info.severity === "medium"
+                                      ? "bg-orange-100 text-orange-700"
+                                      : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {symptom}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                   </div>
-                ) : (
-                  <div className="rounded-lg bg-muted p-8 text-center">
-                    <div className="mb-2 text-4xl">✓</div>
-                    <p className="text-sm text-muted-foreground">
-                      검출된 알레르기 성분이 없습니다 (0개)
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
+            {/* Allergen Info - 조건부 표시 */}
+            {result.userAllergens && result.userAllergens.length > 0 ? (
+              // ✅ 알레르기 등록한 사용자: 개인화된 검사 결과
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold">
+                    🔬 알레르기 유발 성분 ({result.detectedAllergens.length}개
+                    검출)
+                  </h3>
+                  {result.detectedAllergens.length > 0 ? (
+                    <div className="space-y-3">
+                      {result.detectedAllergens.map((allergen, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg bg-destructive/10 p-4"
+                        >
+                          <p className="font-medium text-destructive">
+                            ⚠️ {allergen.name} ({allergen.amount})
+                          </p>
+                          <p className="text-sm text-destructive/80">
+                            귀하의 알레르기: {allergen.severity} 🔴
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-green-50 p-8 text-center">
+                      <div className="mb-2 text-4xl">✓</div>
+                      <p className="text-sm font-medium text-green-800">
+                        검출된 알레르기 성분이 없습니다 (0개)
+                      </p>
+                      <p className="mt-1 text-xs text-green-600">
+                        귀하의 알레르기와 일치하는 성분이 없습니다
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              // ⚠️ 미등록 사용자: 전체 알레르기 성분 표시 (개인화 없이)
+              result.allergens &&
+              result.allergens.length > 0 && (
+                <Card className="mb-6">
+                  <CardContent className="p-6">
+                    <h3 className="mb-4 font-semibold">
+                      🔬 알레르기 유발 성분 ({result.allergens.length}개)
+                    </h3>
+                    <div className="space-y-2">
+                      {result.allergens.map((allergen, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 rounded-lg bg-amber-50 p-3"
+                        >
+                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                          <p className="text-sm text-amber-900">{allergen}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 rounded-lg bg-muted p-3">
+                      <p className="text-xs text-muted-foreground">
+                        💡 로그인하고 알레르기를 등록하면 자동으로 위험 성분을
+                        확인해드려요
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            )}
             {/* 알레르기 미등록 사용자 안내 */}
             {result.userAllergens.length === 0 && (
               <Card className="mb-6 border-blue-200 bg-blue-50">
