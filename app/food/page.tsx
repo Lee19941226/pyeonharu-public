@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import {
   History,
   Zap,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -85,6 +85,7 @@ const RECOMMENDED_KEYWORDS = [
 
 export default function FoodMainPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +98,20 @@ export default function FoodMainPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userAllergens, setUserAllergens] = useState<string[]>([]);
 
+  // ✅ 초기 로드 플래그
+  const isInitialMount = useRef(true);
+  // ==========================================
+  // ✅ URL에서 검색어 복원
+  // ==========================================
+  useEffect(() => {
+    const urlQuery = searchParams.get("q");
+    if (urlQuery && isInitialMount.current) {
+      setQuery(urlQuery);
+      setHasSearched(true);
+      handleSearch(urlQuery);
+    }
+    isInitialMount.current = false;
+  }, [searchParams]);
   // ==========================================
   // 초기 데이터 로드
   // ==========================================
@@ -181,10 +196,12 @@ export default function FoodMainPage() {
   };
 
   // ==========================================
-  // 실시간 검색
+  // ✅ 실시간 검색 (debounce)
   // ==========================================
   useEffect(() => {
     if (query.length === 0) {
+      updateURL(""); // ✅ URL만 업데이트
+
       if (hasSearched) {
         setResults([]);
       }
@@ -200,17 +217,67 @@ export default function FoodMainPage() {
     setShowHistory(false);
 
     const timer = setTimeout(() => {
-      handleSearch(query);
+      performSearch(query); // ✅ 검색만 실행
+      updateURL(query); // ✅ URL 업데이트
     }, 500);
 
     return () => clearTimeout(timer);
   }, [query]);
+  // ==========================================
+  // ✅ 순수 검색 함수 (URL 업데이트 없음)
+  // ==========================================
+  const performSearch = async (searchQuery: string) => {
+    if (searchQuery.length < 2) return;
 
+    setIsLoading(true);
+    setHasSearched(true);
+
+    try {
+      const response = await fetch(
+        `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setResults(data.items);
+        setCurrentPage(1);
+        saveSearchHistory(searchQuery);
+      } else {
+        setResults([]);
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // ==========================================
+  // ✅ URL 업데이트 함수 (별도 분리)
+  // ==========================================
+  const updateURL = (searchQuery: string) => {
+    if (searchQuery) {
+      router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
+        scroll: false,
+      });
+    } else {
+      router.push("/food", { scroll: false });
+    }
+  };
+
+  // ==========================================
+  // ✅ 검색 실행 (URL 업데이트 추가)
+  // ==========================================
   const handleSearch = async (searchQuery: string) => {
     if (searchQuery.length < 2) return;
 
     setIsLoading(true);
     setHasSearched(true);
+
+    // ✅ URL 업데이트
+    router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
+      scroll: false, // 스크롤 위치 유지
+    });
 
     try {
       const response = await fetch(
@@ -253,9 +320,16 @@ export default function FoodMainPage() {
   const handleKeywordClick = (keyword: string) => {
     setQuery(keyword);
     setShowHistory(false);
-    handleSearch(keyword);
   };
-
+  // ==========================================
+  // ✅ 검색창 초기화
+  // ==========================================
+  const handleClearSearch = () => {
+    setQuery("");
+    setResults([]);
+    setShowHistory(true);
+    setHasSearched(false);
+  };
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -290,12 +364,7 @@ export default function FoodMainPage() {
                       variant="ghost"
                       size="icon"
                       className="absolute right-2 top-1/2 h-10 w-10 -translate-y-1/2"
-                      onClick={() => {
-                        setQuery("");
-                        setResults([]);
-                        setShowHistory(true);
-                        setHasSearched(false);
-                      }}
+                      onClick={handleClearSearch}
                     >
                       <X className="h-5 w-5" />
                     </Button>
@@ -494,7 +563,7 @@ export default function FoodMainPage() {
                                       variant="destructive"
                                       className="text-xs"
                                     >
-                                      내 알레르기 포함
+                                      ⚠️ 내 알레르기 포함
                                     </Badge>
                                   )}
                                 </div>
