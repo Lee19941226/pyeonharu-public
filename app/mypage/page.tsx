@@ -25,10 +25,9 @@ import {
   LogOut,
   ChevronRight,
   Heart,
-  Shirt,
-  History,
   Trash2,
   AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,7 +45,6 @@ export default function MyPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [notifications, setNotifications] = useState({
     weather: true,
-    outfit: false,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +58,6 @@ export default function MyPage() {
         } = await supabase.auth.getUser();
 
         if (authError) {
-          console.error("Auth error:", authError);
           setError("사용자 정보를 불러올 수 없습니다.");
           setIsLoading(false);
           return;
@@ -73,7 +70,6 @@ export default function MyPage() {
           });
         }
       } catch (err) {
-        console.error("Error checking user:", err);
         setError("사용자 정보를 불러올 수 없습니다.");
       } finally {
         setIsLoading(false);
@@ -90,7 +86,6 @@ export default function MyPage() {
       const { error } = await supabase.auth.signOut();
 
       if (error) {
-        console.error("Logout error:", error);
         setError("로그아웃 중 오류가 발생했습니다.");
         setIsLogoutLoading(false);
         return;
@@ -99,7 +94,6 @@ export default function MyPage() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      console.error("Unexpected logout error:", err);
       setError("로그아웃 중 오류가 발생했습니다.");
       setIsLogoutLoading(false);
     }
@@ -213,6 +207,16 @@ export default function MyPage() {
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 </Link>
+                <Link
+                  href="/food/profile"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">내 알레르기 정보</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                </Link>
               </CardContent>
             </Card>
 
@@ -267,22 +271,6 @@ export default function MyPage() {
                       setNotifications({ ...notifications, weather: checked })
                     }
                     aria-label="날씨 알림"
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">코디 추천 알림</p>
-                    <p className="text-xs text-muted-foreground">
-                      매일 아침 추천 코디를 알려드려요
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.outfit}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, outfit: checked })
-                    }
-                    aria-label="코디 추천 알림"
                   />
                 </div>
               </CardContent>

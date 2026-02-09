@@ -65,32 +65,27 @@ export default function FoodResultPage() {
   }, [params.id]);
 
   const loadFoodResult = async () => {
-    console.log("🔍 페이지에서 로딩 시작, ID:", params.id); // 디버깅
-
     try {
       const response = await fetch(`/api/food/result?code=${params.id}`);
-      console.log("📡 API 응답 상태:", response.status); // 디버깅
-
       const data = await response.json();
-      console.log("📦 API 응답 데이터:", data); // 디버깅
 
       if (data.success) {
         setResult(data.result);
         saveToHistory(data.result);
-        console.log("✅ 결과 설정 완료:", data.result); // 디버깅
       } else {
         setError(data.error || "결과를 불러올 수 없습니다");
-        console.error("❌ API 에러:", data.error); // 디버깅
       }
     } catch (error) {
-      console.error("💥 로딩 에러:", error); // 디버깅
       setError("결과를 불러오는 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }
   };
-  // ✅ 히스토리 저장 함수 추가
+
+  // [Phase 0] SSR 가드 추가
   const saveToHistory = (result: FoodResult) => {
+    if (typeof window === "undefined") return;
+
     const historyItem = {
       foodCode: result.foodCode,
       foodName: result.foodName,
@@ -115,7 +110,7 @@ export default function FoodResultPage() {
 
     localStorage.setItem("food_check_history", JSON.stringify(history));
   };
-  // ✅ 즐겨찾기 확인 함수
+
   const checkFavorite = async () => {
     try {
       const response = await fetch(
@@ -124,17 +119,15 @@ export default function FoodResultPage() {
       const data = await response.json();
       setIsFavorite(data.favorited);
     } catch (error) {
-      console.error("즐겨찾기 확인 실패:", error);
+      // 에러 무시
     }
   };
 
-  // ✅ toggleFavorite 함수 구현
   const toggleFavorite = async () => {
     if (!result) return;
 
     try {
       if (isFavorite) {
-        // 삭제
         const response = await fetch(
           `/api/food/favorites?code=${result.foodCode}`,
           {
@@ -148,7 +141,6 @@ export default function FoodResultPage() {
           toast.success("즐겨찾기에서 제거되었습니다");
         }
       } else {
-        // 추가
         const response = await fetch("/api/food/favorites", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -169,7 +161,6 @@ export default function FoodResultPage() {
         }
       }
     } catch (error) {
-      console.error("즐겨찾기 처리 실패:", error);
       toast.error("오류가 발생했습니다");
     }
   };
@@ -190,18 +181,24 @@ export default function FoodResultPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
         <div className="text-center">
-          <div className="mb-4 text-4xl">❌</div>
-          <p className="mb-2 text-lg font-medium">
-            {error || "결과를 불러올 수 없습니다"}
+          <div className="mb-4 text-4xl">😥</div>
+          <p className="text-lg font-medium">
+            {error || "결과를 찾을 수 없습니다"}
           </p>
-          <p className="mb-4 text-sm text-muted-foreground">
-            식품 정보를 찾을 수 없거나 오류가 발생했습니다
-          </p>
-          <Button onClick={() => router.back()}>돌아가기</Button>
+          <Button className="mt-4" onClick={() => router.push("/food")}>
+            다시 검색하기
+          </Button>
         </div>
       </div>
     );
   }
+
+  // 알레르기 정보 가져오기
+  const allergenInfoMap: Record<string, AllergenInfo> = {};
+  result.detectedAllergens.forEach((da) => {
+    const info = getAllergenInfo(da.name);
+    if (info) allergenInfoMap[da.name] = info;
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -209,483 +206,275 @@ export default function FoodResultPage() {
 
       <main className="flex-1 pb-16 md:pb-0">
         <div className="container mx-auto px-4 py-8">
-          <div className="mx-auto max-w-2xl">
-            {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-              <h1 className="text-2xl font-bold">{result.foodName}</h1>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="icon">
-                  <Share2 className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleFavorite}
-                  disabled={!result.isSafe}
-                >
-                  <Heart
-                    className={`h-5 w-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
-                  />
-                </Button>
-              </div>
-            </div>
+          <div className="mx-auto max-w-2xl space-y-6">
+            {/* 안전 판정 배너 */}
+            <Card
+              className={
+                result.isSafe
+                  ? "border-green-200 bg-green-50"
+                  : "border-red-200 bg-red-50"
+              }
+            >
+              <CardContent className="flex items-center gap-4 p-6">
+                {result.isSafe ? (
+                  <CheckCircle className="h-12 w-12 text-green-600 flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-12 w-12 text-red-600 flex-shrink-0" />
+                )}
+                <div>
+                  <h1 className="text-xl font-bold">
+                    {result.isSafe ? "안전합니다 ✅" : "주의가 필요합니다 ⚠️"}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {result.isSafe
+                      ? "등록된 알레르기 성분이 검출되지 않았습니다"
+                      : `${result.detectedAllergens.length}개의 알레르기 성분이 감지되었습니다`}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Alert Box - Danger */}
-            {!result.isSafe && (
-              <Card className="mb-6 border-destructive bg-destructive/10">
-                <CardContent className="p-6">
-                  <div className="mb-4 flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/20">
-                      <AlertTriangle className="h-6 w-6 text-destructive" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-destructive">
-                        주의! 알레르기 위험
-                      </h2>
-                      <p className="text-sm text-destructive/80">
-                        {result.detectedAllergens.map((a) => a.name).join(", ")}{" "}
-                        함유
-                      </p>
-                      <p className="text-sm text-destructive/80">
-                        귀하의 알레르기와 일치합니다
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Link href="/search" className="flex-1">
-                      <Button className="w-full" variant="destructive">
-                        <MapPin className="mr-2 h-4 w-4" />
-                        병원 찾기
-                      </Button>
-                    </Link>
-                    <Link href={`/food/guide/${params.id}`} className="flex-1">
-                      <Button className="w-full" variant="outline">
-                        💊 대처법
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Alert Box - Safe */}
-            {result.isSafe && (
-              <Card className="mb-6 border-green-600 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-green-900">
-                        안전합니다!
-                      </h2>
-                      <p className="text-sm text-green-700">
-                        귀하의 알레르기 성분이 포함되지 않았습니다
-                      </p>
-                      <p className="text-sm text-green-700">
-                        안심하고 드셔도 좋습니다
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Product Info */}
-            <Card className="mb-6">
+            {/* 제품 정보 */}
+            <Card>
               <CardContent className="p-6">
-                <h3 className="mb-4 flex items-center gap-2 font-semibold">
-                  <Info className="h-5 w-5" />
-                  상품 정보
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">제품명</span>
-                    <span className="font-medium">{result.foodName}</span>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold">{result.foodName}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {result.manufacturer}
+                    </p>
+                    {result.weight && result.weight !== "정보없음" && (
+                      <p className="text-sm text-muted-foreground">
+                        {result.weight}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">제조사</span>
-                    <span className="font-medium">{result.manufacturer}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">중량/용량</span>
-                    <span>{result.weight}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleFavorite}
+                    >
+                      <Heart
+                        className={`h-5 w-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
+                      />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (navigator.share) {
+                          navigator.share({
+                            title: `${result.foodName} 알레르기 확인`,
+                            text: result.isSafe
+                              ? "안전한 식품입니다"
+                              : "알레르기 주의!",
+                            url: window.location.href,
+                          });
+                        } else {
+                          navigator.clipboard.writeText(window.location.href);
+                          toast.success("링크가 복사되었습니다");
+                        }
+                      }}
+                    >
+                      <Share2 className="h-5 w-5" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            {/* 원재료 & 영양정보 (나란히 배치) */}
-            <div className="mb-6 grid gap-6 md:grid-cols-2">
-              {/* 원재료명 및 함량 */}
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">📝 원재료명 및 함량</h3>
-                  {result.ingredients.length > 0 ? (
-                    <div className="max-h-[400px] space-y-1.5 overflow-y-auto pr-2">
-                      {result.ingredients.map((ingredient, idx) => (
-                        <div key={idx} className="flex gap-2 text-sm">
-                          <span className="min-w-[2rem] font-medium text-muted-foreground">
-                            {idx + 1}.
-                          </span>
-                          <span className="flex-1">{ingredient}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-sm text-muted-foreground">
-                      원재료 정보가 제공되지 않습니다
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
 
-              {/* 영양성분 함량 */}
-              <Card>
+            {/* 감지된 알레르기 */}
+            {result.detectedAllergens.length > 0 && (
+              <Card className="border-red-200">
                 <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">📊 영양성분 함량</h3>
-                  {result.servingSize && (
-                    <p className="mb-4 text-sm text-muted-foreground">
-                      1회 제공량: {result.servingSize}
-                    </p>
-                  )}
-                  {result.nutritionDetails &&
-                  result.nutritionDetails.length > 0 ? (
-                    <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
-                      {result.nutritionDetails.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between border-b border-muted py-2 text-sm last:border-0"
-                        >
-                          <span className="text-muted-foreground">
-                            {item.name}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">
-                              {parseFloat(item.content).toLocaleString()}
-                              {item.unit}
-                            </span>
-                            {item.percentage && (
-                              <span className="text-xs text-muted-foreground">
-                                ({item.percentage}%)
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-sm text-muted-foreground">
-                      영양정보가 제공되지 않습니다
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-            {/* 제품의 알레르기 성분 (모든 사용자에게 표시) */}
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <h3 className="mb-4 font-semibold">
-                  🔬 이 제품에 포함된 알레르기 성분
-                </h3>
-                {result.allergens.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {result.allergens.map((allergen, idx) => (
-                      <span
-                        key={idx}
-                        className="rounded-full border border-gray-300 bg-gray-100 px-3 py-1 text-sm text-gray-700"
-                      >
-                        {allergen}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    알레르기 성분 정보가 없습니다
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 사용자 알레르기와 일치하는 성분 */}
-            {result.userAllergens.length > 0 && (
-              <Card className="mb-6">
-                <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">
-                    🚨 귀하의 알레르기와 일치하는 성분 (
-                    {result.detectedAllergens.length}개 검출)
+                  <h3 className="mb-4 flex items-center gap-2 font-bold text-red-700">
+                    <AlertTriangle className="h-5 w-5" />
+                    감지된 알레르기 성분
                   </h3>
-                  {result.detectedAllergens.length > 0 ? (
-                    <div className="space-y-3">
-                      {result.detectedAllergens.map((allergen, idx) => (
+                  <div className="space-y-3">
+                    {result.detectedAllergens.map((allergen, idx) => {
+                      const info = allergenInfoMap[allergen.name];
+                      return (
                         <div
                           key={idx}
-                          className="rounded-lg bg-destructive/10 p-4"
+                          className="rounded-lg border border-red-100 bg-red-50 p-3"
                         >
-                          <p className="font-medium text-destructive">
-                            ⚠️ {allergen.name} ({allergen.amount})
-                          </p>
-                          <p className="text-sm text-destructive/80">
-                            심각도: {allergen.severity} 🔴
-                          </p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">
+                                {info?.emoji || "⚠️"}
+                              </span>
+                              <span className="font-medium">
+                                {allergen.name}
+                              </span>
+                            </div>
+                            <Badge
+                              variant={
+                                allergen.severity === "high"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
+                              {allergen.severity === "high"
+                                ? "심각"
+                                : allergen.severity === "medium"
+                                  ? "보통"
+                                  : "경미"}
+                            </Badge>
+                          </div>
+                          {info?.symptoms && (
+                            <p className="mt-1 text-xs text-red-600">
+                              증상: {info.symptoms.join(", ")}
+                            </p>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg bg-muted p-8 text-center">
-                      <div className="mb-2 text-4xl">✓</div>
-                      <p className="text-sm text-muted-foreground">
-                        귀하의 알레르기 성분이 검출되지 않았습니다
-                      </p>
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* 알레르기 유발물질 표시 */}
+            {/* 교차오염 위험 */}
+            {result.crossContaminationRisks &&
+              result.crossContaminationRisks.length > 0 && (
+                <Card className="border-amber-200">
+                  <CardContent className="p-6">
+                    <h3 className="mb-4 flex items-center gap-2 font-bold text-amber-700">
+                      <Info className="h-5 w-5" />
+                      교차오염 위험
+                    </h3>
+                    <div className="space-y-2">
+                      {result.crossContaminationRisks.map((risk, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 p-3"
+                        >
+                          <span className="text-sm font-medium">
+                            {risk.name}
+                          </span>
+                          <Badge variant="outline" className="text-amber-700">
+                            교차오염
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      * 같은 제조시설에서 해당 성분을 포함한 식품을 생산합니다
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+            {/* 알레르기 주의사항 */}
             {result.allergyWarning && (
-              <Card className="mb-6 border-orange-200 bg-orange-50">
+              <Card className="border-amber-200">
                 <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold text-orange-900">
-                    ⚠️ 알레르기 유발물질 표시
+                  <h3 className="mb-2 flex items-center gap-2 font-bold text-amber-700">
+                    <AlertCircle className="h-5 w-5" />
+                    제조사 주의사항
                   </h3>
-                  <p className="text-sm text-orange-800 leading-relaxed">
+                  <p className="text-sm text-amber-800">
                     {result.allergyWarning}
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            {/* ✅ 추가: 교차오염 정보 (일반) */}
-            {result.crossContamination &&
-              result.crossContamination.length > 0 && (
-                <Card className="mb-6 border-yellow-200 bg-yellow-50">
-                  <CardContent className="p-6">
-                    <h3 className="mb-4 font-semibold text-yellow-900">
-                      ⚠️ 제조공정 교차오염 가능
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {result.crossContamination.map((item, idx) => (
-                        <span
-                          key={idx}
-                          className="rounded-full border border-yellow-300 bg-yellow-100 px-3 py-1 text-sm text-yellow-900"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-3 text-xs text-yellow-800">
-                      이 제품은 위 알레르기 유발 식품과 같은 제조시설에서
-                      제조됩니다
+            {/* 전체 알레르기 성분 */}
+            {result.allergens.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="mb-3 font-bold">포함된 알레르기 유발 성분</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {result.allergens.map((allergen, idx) => (
+                      <Badge key={idx} variant="secondary">
+                        {allergen}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 영양 정보 */}
+            {result.nutritionDetails && result.nutritionDetails.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="mb-3 font-bold">영양 정보</h3>
+                  {result.servingSize && (
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      1회 제공량: {result.servingSize}
                     </p>
-                  </CardContent>
-                </Card>
-              )}
-            {/* 교차오염 위험 경고 (사용자 알레르기와 일치하는 경우) */}
-            {result.crossContaminationRisks &&
-              result.crossContaminationRisks.length > 0 && (
-                <Card className="mb-6 border-orange-500 bg-orange-50">
-                  <CardContent className="p-6">
-                    <div className="mb-4 flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
-                        <AlertTriangle className="h-6 w-6 text-orange-600" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-orange-900">
-                          교차오염 주의!
-                        </h2>
-                        <p className="text-sm text-orange-800">
-                          제조시설에서 귀하의 알레르기 성분을 취급합니다
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {result.crossContaminationRisks.map((risk, idx) => (
-                        <div key={idx} className="rounded-lg bg-orange-100 p-3">
-                          <p className="font-medium text-orange-900">
-                            ⚠️ {risk.name} (심각도: {risk.severity})
-                          </p>
-                          <p className="text-sm text-orange-800">
-                            같은 제조시설에서 {risk.name}를 사용한 제품을
-                            제조합니다
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            {/* ✅ 알레르기 성분 정보 카드 - 모든 사용자에게 표시 */}
-            {result.allergens && result.allergens.length > 0 && (
-              <Card className="mb-6">
-                <CardContent className="p-6">
-                  <h3 className="mb-4 flex items-center gap-2 font-semibold">
-                    💊 알레르기 성분별 주요 증상
-                  </h3>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    이 제품에 포함된 알레르기 유발 성분과 대표 증상입니다
-                  </p>
-                  <div className="space-y-4">
-                    {result.allergens
-                      .map((allergen) => getAllergenInfo(allergen))
-                      .filter((info): info is AllergenInfo => info !== null)
-                      .map((info, idx) => (
-                        <div
-                          key={idx}
-                          className={`rounded-lg border-l-4 p-4 ${
-                            info.severity === "high"
-                              ? "border-red-500 bg-red-50"
-                              : info.severity === "medium"
-                                ? "border-orange-500 bg-orange-50"
-                                : "border-yellow-500 bg-yellow-50"
-                          }`}
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <h4 className="font-semibold">{info.name}</h4>
-                            <Badge
-                              variant={
-                                info.severity === "high"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {info.severity === "high"
-                                ? "높은 위험"
-                                : info.severity === "medium"
-                                  ? "중간 위험"
-                                  : "낮은 위험"}
-                            </Badge>
-                          </div>
-                          <p className="mb-3 text-sm text-muted-foreground">
-                            {info.description}
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {info.symptoms.map((symptom, sIdx) => (
-                              <span
-                                key={sIdx}
-                                className={`rounded-full px-2.5 py-1 text-xs ${
-                                  info.severity === "high"
-                                    ? "bg-red-100 text-red-700"
-                                    : info.severity === "medium"
-                                      ? "bg-orange-100 text-orange-700"
-                                      : "bg-yellow-100 text-yellow-700"
-                                }`}
-                              >
-                                {symptom}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {/* Allergen Info - 조건부 표시 */}
-            {result.userAllergens && result.userAllergens.length > 0 ? (
-              // ✅ 알레르기 등록한 사용자: 개인화된 검사 결과
-              <Card className="mb-6">
-                <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">
-                    🔬 알레르기 유발 성분 ({result.detectedAllergens.length}개
-                    검출)
-                  </h3>
-                  {result.detectedAllergens.length > 0 ? (
-                    <div className="space-y-3">
-                      {result.detectedAllergens.map((allergen, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg bg-destructive/10 p-4"
-                        >
-                          <p className="font-medium text-destructive">
-                            ⚠️ {allergen.name} ({allergen.amount})
-                          </p>
-                          <p className="text-sm text-destructive/80">
-                            귀하의 알레르기: {allergen.severity} 🔴
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg bg-green-50 p-8 text-center">
-                      <div className="mb-2 text-4xl">✓</div>
-                      <p className="text-sm font-medium text-green-800">
-                        검출된 알레르기 성분이 없습니다 (0개)
-                      </p>
-                      <p className="mt-1 text-xs text-green-600">
-                        귀하의 알레르기와 일치하는 성분이 없습니다
-                      </p>
-                    </div>
                   )}
-                </CardContent>
-              </Card>
-            ) : (
-              // ⚠️ 미등록 사용자: 전체 알레르기 성분 표시 (개인화 없이)
-              result.allergens &&
-              result.allergens.length > 0 && (
-                <Card className="mb-6">
-                  <CardContent className="p-6">
-                    <h3 className="mb-4 font-semibold">
-                      🔬 알레르기 유발 성분 ({result.allergens.length}개)
-                    </h3>
-                    <div className="space-y-2">
-                      {result.allergens.map((allergen, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 rounded-lg bg-amber-50 p-3"
-                        >
-                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                          <p className="text-sm text-amber-900">{allergen}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 rounded-lg bg-muted p-3">
-                      <p className="text-xs text-muted-foreground">
-                        💡 로그인하고 알레르기를 등록하면 자동으로 위험 성분을
-                        확인해드려요
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            )}
-            {/* 알레르기 미등록 사용자 안내 */}
-            {result.userAllergens.length === 0 && (
-              <Card className="mb-6 border-blue-200 bg-blue-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3">
-                    <Info className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">
-                        알레르기를 등록하시면 자동으로 위험 성분을
-                        확인해드립니다
-                      </p>
-                      <Link href="/food/profile">
-                        <Button
-                          variant="link"
-                          className="h-auto p-0 text-blue-600"
-                        >
-                          알레르기 등록하러 가기 →
-                        </Button>
-                      </Link>
-                    </div>
+                  <div className="space-y-2">
+                    {result.nutritionDetails.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between border-b border-border/50 py-1 last:border-0"
+                      >
+                        <span className="text-sm">{item.name}</span>
+                        <span className="text-sm font-medium">
+                          {item.content}
+                          {item.unit}
+                          {item.percentage && (
+                            <span className="ml-1 text-muted-foreground">
+                              ({item.percentage}%)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
             )}
-            {/* Favorite Button for Safe Foods */}
-            {result.isSafe && (
-              <Button
-                onClick={toggleFavorite}
-                className="mt-6 w-full"
-                variant={isFavorite ? "outline" : "default"}
-              >
-                {isFavorite ? "★ 즐겨찾기 제거" : "☆ 즐겨찾기 추가"}
-              </Button>
+
+            {/* 원재료 */}
+            {result.ingredients.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="mb-3 font-bold">원재료</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.ingredients.map((ingredient, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-md bg-muted px-2 py-1 text-xs"
+                      >
+                        {ingredient}
+                      </span>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
+
+            {/* 위험 시 가이드 + 병원 찾기 */}
+            {!result.isSafe && (
+              <div className="space-y-3">
+                <Link href={`/food/guide/${result.foodCode}`}>
+                  <Button className="w-full" size="lg">
+                    🆘 대응 가이드 보기
+                  </Button>
+                </Link>
+                <Link href="/search">
+                  <Button variant="outline" className="w-full gap-2" size="lg">
+                    <MapPin className="h-4 w-4" />
+                    주변 병원 찾기
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            {/* 돌아가기 */}
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => router.push("/food")}
+            >
+              다른 식품 확인하기
+            </Button>
           </div>
         </div>
       </main>

@@ -16,11 +16,11 @@ const faqs = [
     questions: [
       {
         q: "편하루는 무료인가요?",
-        a: "네, 편하루의 모든 기본 기능은 무료로 이용하실 수 있습니다. 회원가입 없이도 병원/약국 검색, 증상 분석, 코디 추천 등의 기능을 이용할 수 있어요.",
+        a: "네, 편하루의 모든 기본 기능은 무료로 이용하실 수 있습니다. 회원가입 없이도 병원/약국 검색, 증상 분석, 식품 알레르기 확인 등의 기능을 이용할 수 있어요.",
       },
       {
         q: "회원가입을 하면 어떤 기능을 더 이용할 수 있나요?",
-        a: "로그인하시면 즐겨찾기 저장, 내 옷장 관리, 코디 기록 저장, 알림 설정 등의 개인화 기능을 이용하실 수 있습니다.",
+        a: "로그인하시면 즐겨찾기 저장, 알레르기 프로필 관리, 식품 확인 기록 저장, 알림 설정 등의 개인화 기능을 이용하실 수 있습니다.",
       },
       {
         q: "개인정보는 어떻게 보호되나요?",
@@ -46,19 +46,19 @@ const faqs = [
     ],
   },
   {
-    category: "옷차림 추천",
+    category: "식품 알레르기",
     questions: [
       {
-        q: "날씨 정보는 어디서 가져오나요?",
-        a: "기상청 공공 API를 활용하여 실시간 날씨 정보를 제공합니다. 현재 위치 기반으로 가장 가까운 관측소의 데이터를 사용합니다.",
+        q: "식품 알레르기 정보는 어디서 가져오나요?",
+        a: "식품의약품안전처 공공 API를 활용하여 바코드별 알레르기 성분, 원재료, 영양정보를 제공합니다.",
       },
       {
-        q: "내 옷장에 등록한 옷이 코디 추천에 반영되나요?",
-        a: "네, 옷장에 등록된 옷을 바탕으로 더 개인화된 코디를 추천해드립니다. 색상, 계절 태그 등을 잘 입력하시면 더 정확한 추천을 받으실 수 있어요.",
+        q: "바코드가 인식되지 않으면 어떻게 하나요?",
+        a: "바코드가 인식되지 않는 경우 제품명으로 직접 검색하실 수 있습니다. 사진 촬영 기능으로 라벨을 촬영해 AI 분석을 받을 수도 있어요.",
       },
       {
-        q: "옷 사진을 올리면 자동으로 분류되나요?",
-        a: "현재는 수동으로 카테고리와 색상을 선택하셔야 합니다. AI 자동 분류 기능은 추후 업데이트 예정입니다.",
+        q: "알레르기 프로필을 등록하면 뭐가 달라지나요?",
+        a: "알레르기 프로필을 등록하면 식품 확인 시 내 알레르기와 자동 대조하여 위험 여부를 즉시 알려드립니다. 가족 구성원별 프로필도 관리할 수 있습니다.",
       },
     ],
   },
@@ -98,42 +98,43 @@ export default function FAQPage() {
           {/* FAQ List */}
           <div className="mx-auto max-w-3xl space-y-8">
             {faqs.map((section) => (
-              <div key={section.category}>
-                <h2 className="mb-4 text-lg font-semibold">{section.category}</h2>
-                <Accordion type="single" collapsible className="w-full">
-                  {section.questions.map((faq, index) => (
-                    <AccordionItem key={index} value={`${section.category}-${index}`}>
-                      <AccordionTrigger className="text-left">
-                        {faq.q}
-                      </AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
-                        {faq.a}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
+              <Card key={section.category}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{section.category}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Accordion type="single" collapsible>
+                    {section.questions.map((faq, idx) => (
+                      <AccordionItem key={idx} value={`${section.category}-${idx}`}>
+                        <AccordionTrigger className="text-left text-sm font-medium">
+                          {faq.q}
+                        </AccordionTrigger>
+                        <AccordionContent className="text-sm text-muted-foreground">
+                          {faq.a}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
           {/* Contact */}
-          <Card className="mx-auto mt-12 max-w-xl">
-            <CardHeader className="text-center">
-              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <MessageCircle className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle>원하는 답을 찾지 못하셨나요?</CardTitle>
-              <CardDescription>
-                편하루 팀에 직접 문의해주세요
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="font-medium text-primary">contact@pyeonharu.com</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                평일 09:00 - 18:00 (주말/공휴일 제외)
-              </p>
-            </CardContent>
-          </Card>
+          <div className="mx-auto mt-12 max-w-3xl text-center">
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
+                <MessageCircle className="mx-auto mb-4 h-8 w-8 text-primary" />
+                <CardTitle className="mb-2 text-lg">원하는 답을 못 찾으셨나요?</CardTitle>
+                <CardDescription>
+                  아래 이메일로 문의해주시면 빠르게 답변 드리겠습니다.
+                </CardDescription>
+                <p className="mt-4 text-sm font-medium text-primary">
+                  support@pyeonharu.com
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
 
