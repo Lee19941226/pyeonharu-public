@@ -22,55 +22,126 @@ import { BookmarkButton } from "@/components/medical/bookmark-button"
 import { createClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
-// ─── 드롭다운 전용 미니맵 ───
-function MiniMap({
-  lat, lng, label, userLat, userLng,
+// ─── 드롭다운 전용 미니맵 (naver-map.tsx와 동일한 스크립트 로딩) ───
+function MiniNaverMap({
+  lat, lng, name, userLocation,
 }: {
-  lat: number; lng: number; label: string
-  userLat?: number; userLng?: number
+  lat: number; lng: number; name: string
+  userLocation?: { lat: number; lng: number } | null
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // layout.tsx에서 이미 스크립트 로드됨 → window.naver 대기
-    if (window.naver?.maps) { setReady(true); return }
-    const timer = setInterval(() => {
-      if (window.naver?.maps) { setReady(true); clearInterval(timer) }
-    }, 200)
-    return () => clearInterval(timer)
+    const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "4q5sd2kb26"
+
+    if (window.naver?.maps) {
+      setReady(true)
+      return
+    }
+
+    const existing = document.querySelector('script[src*="maps.js"]')
+    if (existing) {
+      const timer = setInterval(() => {
+        if (window.naver?.maps) { setReady(true); clearInterval(timer) }
+      }, 200)
+      return () => clearInterval(timer)
+    }
+
+    const script = document.createElement("script")
+    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${NAVER_CLIENT_ID}`
+    script.async = true
+    script.onload = () => setReady(true)
+    script.onerror = () => console.error("네이버 지도 로드 실패")
+    document.head.appendChild(script)
   }, [])
 
   useEffect(() => {
     if (!ready || !mapRef.current) return
-    const pos = new window.naver.maps.LatLng(lat, lng)
-    const map = new window.naver.maps.Map(mapRef.current, {
-      center: pos, zoom: 16,
+    const N = window.naver.maps
+    const placePos = new N.LatLng(lat, lng)
+
+    const map = new N.Map(mapRef.current, {
+      center: placePos,
+      zoom: 16,
       zoomControl: false,
       mapDataControl: false,
       scaleControl: false,
     })
-    // 병원 마커
-    new window.naver.maps.Marker({
-      position: pos, map,
+
+    // 병원 마커 (빨간 핀 + 이름)
+    const shortName = name.length > 10 ? name.slice(0, 10) + "…" : name
+    new N.Marker({
+      position: placePos, map,
       icon: {
-        content: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:#22c55e;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        </div>`,
-        anchor: new window.naver.maps.Point(16, 32),
+        content: `
+          <div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="padding:3px 8px;background:#dc2626;color:white;font-size:11px;font-weight:600;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.25);white-space:nowrap;">
+              📍 ${shortName}
+            </div>
+            <div style="width:2px;height:8px;background:#dc2626;"></div>
+            <div style="width:8px;height:8px;background:#dc2626;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>
+          </div>`,
+        anchor: new N.Point(60, 48),
       },
     })
+
     // 내 위치 마커
-    if (userLat && userLng) {
-      new window.naver.maps.Marker({
-        position: new window.naver.maps.LatLng(userLat, userLng), map,
+    if (userLocation) {
+      const userPos = new N.LatLng(userLocation.lat, userLocation.lng)
+      new N.Marker({
+        position: userPos, map,
         icon: {
-          content: `<div style="width:14px;height:14px;background:#f97316;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
-          anchor: new window.naver.maps.Point(7, 7),
+          content: `
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="padding:2px 6px;background:#2563eb;color:white;font-size:10px;font-weight:500;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.2);">내 위치</div>
+              <div style="margin-top:2px;width:12px;height:12px;background:#3b82f6;border-radius:50%;border:2.5px solid white;box-shadow:0 0 0 2px rgba(59,130,246,.3),0 2px 6px rgba(0,0,0,.3);"></div>
+            </div>`,
+          anchor: new N.Point(24, 32),
+        },
+      })
+
+      // 두 지점 모두 보이도록 fitBounds
+      const bounds = new N.LatLngBounds(
+        new N.LatLng(
+          Math.min(lat, userLocation.lat) - 0.002,
+          Math.min(lng, userLocation.lng) - 0.002
+        ),
+        new N.LatLng(
+          Math.max(lat, userLocation.lat) + 0.002,
+          Math.max(lng, userLocation.lng) + 0.002
+        )
+      )
+      map.fitBounds(bounds)
+
+      // 직선 점선 경로
+      new N.Polyline({
+        map,
+        path: [userPos, placePos],
+        strokeColor: "#6366f1",
+        strokeWeight: 2,
+        strokeStyle: "shortdash",
+        strokeOpacity: 0.6,
+      })
+
+      // 경로 중간에 거리 라벨
+      const R = 6371
+      const dLat = (lat - userLocation.lat) * Math.PI / 180
+      const dLng = (lng - userLocation.lng) * Math.PI / 180
+      const a = Math.sin(dLat/2)**2 + Math.cos(userLocation.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLng/2)**2
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+      const distText = dist < 1 ? `${Math.round(dist*1000)}m` : `${dist.toFixed(1)}km`
+      const midLat = (lat + userLocation.lat) / 2
+      const midLng = (lng + userLocation.lng) / 2
+      new N.Marker({
+        position: new N.LatLng(midLat, midLng), map,
+        icon: {
+          content: `<div style="padding:2px 8px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:10px;font-weight:600;color:#6366f1;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap;">🚶 ${distText}</div>`,
+          anchor: new N.Point(30, 10),
         },
       })
     }
-  }, [ready, lat, lng, userLat, userLng])
+  }, [ready, lat, lng, name, userLocation])
 
   if (!ready) {
     return (
@@ -454,18 +525,24 @@ export default function HomePage() {
                               {/* 상세 드롭다운 — 지도 + 정보 + 액션 */}
                               {isSelected && (
                                 <div className="border-t">
-                                  {/* 인터랙티브 미니맵 */}
-                                  {place.lat > 0 && place.lng > 0 && (
-                                    <div className="h-48">
-                                      <MiniMap
+                                  {/* 지도 영역 */}
+                                  <div style={{ height: "208px", minHeight: "208px" }} className="bg-muted relative">
+                                    {place.lat > 0 && place.lng > 0 ? (
+                                      <MiniNaverMap
                                         lat={place.lat}
                                         lng={place.lng}
-                                        label={place.name}
-                                        userLat={userLocation?.lat}
-                                        userLng={userLocation?.lng}
+                                        name={place.name}
+                                        userLocation={userLocation}
                                       />
-                                    </div>
-                                  )}
+                                    ) : (
+                                      <iframe
+                                        src={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}?c=15,0,0,0,dh`}
+                                        className="h-full w-full border-0"
+                                        loading="lazy"
+                                        title={`${place.name} 지도`}
+                                      />
+                                    )}
+                                  </div>
 
                                   {/* 병원 정보 */}
                                   <div className="px-3 py-3 space-y-2 bg-muted/20">
@@ -493,7 +570,17 @@ export default function HomePage() {
                                       {place.phone ? <a href={`tel:${place.phone}`}><Phone className="h-3.5 w-3.5" />전화</a> : <span className="text-muted-foreground">전화 정보 없음</span>}
                                     </Button>
                                     <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
-                                      <a href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`} target="_blank">
+                                      <a
+                                        href={`https://map.naver.com/index.nhn?slng=${userLocation?.lng || ""}&slat=${userLocation?.lat || ""}&stext=${encodeURIComponent("내 위치")}&elng=${place.lng}&elat=${place.lat}&etext=${encodeURIComponent(place.name)}&menu=route&pathType=1`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => {
+                                          if (/iPhone|iPad|Android/i.test(navigator.userAgent)) {
+                                            e.preventDefault()
+                                            window.location.href = `nmap://route/walk?slat=${userLocation?.lat || ""}&slng=${userLocation?.lng || ""}&sname=${encodeURIComponent("내 위치")}&dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}&appname=pyeonharu`
+                                          }
+                                        }}
+                                      >
                                         <MapPin className="h-3.5 w-3.5" />길찾기
                                       </a>
                                     </Button>
