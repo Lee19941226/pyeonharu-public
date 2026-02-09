@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  Search, Camera, Lock, ChevronRight, ChevronDown,
+  Search, Camera, Lock, ChevronRight,
   Stethoscope, UtensilsCrossed, MapPinned, Pill,
   Loader2, Users, CheckCircle, XCircle, ShieldCheck,
-  Building2, Phone, MapPin, Cross, ChevronLeft,
+  Building2, Phone, MapPin, Cross, ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,19 +20,78 @@ import { MobileNav } from "@/components/layout/mobile-nav"
 import { LoginModal } from "@/components/auth/login-modal"
 import { BookmarkButton } from "@/components/medical/bookmark-button"
 import { createClient } from "@/lib/supabase/client"
-import { REGIONS } from "@/lib/region-codes"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
+// ─── 드롭다운 전용 미니맵 ───
+function MiniMap({
+  lat, lng, label, userLat, userLng,
+}: {
+  lat: number; lng: number; label: string
+  userLat?: number; userLng?: number
+}) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    // layout.tsx에서 이미 스크립트 로드됨 → window.naver 대기
+    if (window.naver?.maps) { setReady(true); return }
+    const timer = setInterval(() => {
+      if (window.naver?.maps) { setReady(true); clearInterval(timer) }
+    }, 200)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !mapRef.current) return
+    const pos = new window.naver.maps.LatLng(lat, lng)
+    const map = new window.naver.maps.Map(mapRef.current, {
+      center: pos, zoom: 16,
+      zoomControl: false,
+      mapDataControl: false,
+      scaleControl: false,
+    })
+    // 병원 마커
+    new window.naver.maps.Marker({
+      position: pos, map,
+      icon: {
+        content: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:#22c55e;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>`,
+        anchor: new window.naver.maps.Point(16, 32),
+      },
+    })
+    // 내 위치 마커
+    if (userLat && userLng) {
+      new window.naver.maps.Marker({
+        position: new window.naver.maps.LatLng(userLat, userLng), map,
+        icon: {
+          content: `<div style="width:14px;height:14px;background:#f97316;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
+          anchor: new window.naver.maps.Point(7, 7),
+        },
+      })
+    }
+  }, [ready, lat, lng, userLat, userLng])
+
+  if (!ready) {
+    return (
+      <div className="flex h-full items-center justify-center bg-muted">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  return <div ref={mapRef} className="h-full w-full" />
+}
+
 // ─── Types ───
-interface PlaceItem {
+interface NearbyPlace {
   id: string
   name: string
   address: string
   phone: string
   clCdNm?: string
-  sgguCdNm?: string
-  emdongNm?: string
-  drTotCnt?: number
+  distance: string
+  distanceNum: number
   lat: number
   lng: number
 }
@@ -58,15 +117,14 @@ export default function HomePage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
 
-  // 병원/약국 조회
+  // 병원/약국 조회 (위치 기반)
   const [placeType, setPlaceType] = useState<"hospital" | "pharmacy">("hospital")
-  const [placeRegion, setPlaceRegion] = useState("seoul")
-  const [placeKeyword, setPlaceKeyword] = useState("")
-  const [allPlaces, setAllPlaces] = useState<PlaceItem[]>([])
-  const [placeTotalCount, setPlaceTotalCount] = useState(0)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [locationStatus, setLocationStatus] = useState<"loading" | "granted" | "denied">("loading")
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([])
   const [placeLoading, setPlaceLoading] = useState(false)
-  const [placePage, setPlacePage] = useState(1)
-  const PER_PAGE = 20
+  const [radiusKm, setRadiusKm] = useState(3)
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
 
   // 약 검색
   const [medicineQuery, setMedicineQuery] = useState("")
@@ -105,12 +163,60 @@ export default function HomePage() {
     } catch { /* 무시 */ }
   }, [])
 
+  // 위치 가져오기 (searchMode가 search로 전환 시)
   useEffect(() => {
-    if (searchMode === "search") {
-      setPlaceKeyword("")
-      fetchPlaces()
+    if (searchMode !== "search") return
+    if (userLocation) { fetchNearbyPlaces(); return }
+
+    setLocationStatus("loading")
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+          setLocationStatus("granted")
+        },
+        () => {
+          setUserLocation({ lat: 37.3595, lng: 126.9354 })
+          setLocationStatus("denied")
+        }
+      )
+    } else {
+      setUserLocation({ lat: 37.3595, lng: 126.9354 })
+      setLocationStatus("denied")
     }
-  }, [searchMode, placeType, placeRegion])
+  }, [searchMode])
+
+  useEffect(() => {
+    if (searchMode === "search" && userLocation) {
+      setSelectedPlaceId(null)
+      fetchNearbyPlaces()
+    }
+  }, [userLocation, placeType, radiusKm])
+
+  const fetchNearbyPlaces = async () => {
+    if (!userLocation) return
+    setPlaceLoading(true)
+    try {
+      const radiusM = radiusKm * 1000
+      if (placeType === "hospital") {
+        const res = await fetch(`/api/hospitals?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=${radiusM}&numOfRows=1000`)
+        const data = await res.json()
+        setNearbyPlaces(data.success && data.hospitals ? data.hospitals.map((h: any) => ({
+          id: h.id, name: h.name, address: h.address, phone: h.phone,
+          clCdNm: h.clCdNm, distance: h.distance, distanceNum: h.distanceNum || 0,
+          lat: h.lat, lng: h.lng,
+        })) : [])
+      } else {
+        const res = await fetch(`/api/pharmacies?lat=${userLocation.lat}&lng=${userLocation.lng}`)
+        const data = await res.json()
+        setNearbyPlaces(data.pharmacies ? data.pharmacies.map((p: any) => ({
+          id: p.hpid || String(Math.random()), name: p.dutyName, address: p.dutyAddr,
+          phone: p.dutyTel1, clCdNm: "약국", distance: p.distance || "",
+          distanceNum: parseFloat(p.distance) || 0, lat: p.wgs84Lat, lng: p.wgs84Lon,
+        })).sort((a: NearbyPlace, b: NearbyPlace) => a.distanceNum - b.distanceNum) : [])
+      }
+    } catch { setNearbyPlaces([]) } finally { setPlaceLoading(false) }
+  }
 
   const handleSymptomSearch = () => {
     if (symptomInput.trim()) router.push(`/symptom?q=${encodeURIComponent(symptomInput)}`)
@@ -136,36 +242,6 @@ export default function HomePage() {
       }
     } catch { setMedicineResults([]) } finally { setMedicineLoading(false) }
   }
-
-  const fetchPlaces = async (append = false, keyword?: string) => {
-    setPlaceLoading(true)
-    try {
-      const region = REGIONS[placeRegion]
-      if (!region) return
-      const nextApiPage = append ? Math.floor(allPlaces.length / 1000) + 1 : 1
-      const endpoint = placeType === "hospital" ? "hospitals" : "pharmacies"
-      let url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=${nextApiPage}&numOfRows=1000`
-      if (keyword?.trim()) {
-        url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=1&numOfRows=1000&keyword=${encodeURIComponent(keyword.trim())}`
-      }
-      const res = await fetch(url)
-      const data = await res.json()
-      if (data.success) {
-        const items = data.hospitals || data.pharmacies || []
-        if (append && !keyword) { setAllPlaces(prev => [...prev, ...items]) }
-        else { setAllPlaces(items); setPlacePage(1) }
-        setPlaceTotalCount(data.totalCount || 0)
-      }
-    } catch { /* 무시 */ } finally { setPlaceLoading(false) }
-  }
-
-  const handlePlaceSearch = () => {
-    placeKeyword.trim() ? fetchPlaces(false, placeKeyword) : fetchPlaces()
-  }
-
-  const hasMore = !placeKeyword.trim() && allPlaces.length < placeTotalCount
-  const totalPages = Math.ceil(allPlaces.length / PER_PAGE)
-  const currentPlaces = allPlaces.slice((placePage - 1) * PER_PAGE, placePage * PER_PAGE)
 
   const tabStyle = (mode: SearchMode) =>
     searchMode === mode
@@ -308,71 +384,149 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* ── 병원/약국 조회 ── */}
+                {/* ── 병원/약국 조회 (위치 기반) ── */}
                 {searchMode === "search" && (
                   <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <Button variant={placeType === "hospital" ? "default" : "outline"} size="sm" onClick={() => setPlaceType("hospital")}>
-                        <Building2 className="mr-1 h-4 w-4" />병원
-                      </Button>
-                      <Button variant={placeType === "pharmacy" ? "default" : "outline"} size="sm" onClick={() => setPlaceType("pharmacy")}>
-                        <Cross className="mr-1 h-4 w-4" />약국
-                      </Button>
-                    </div>
-                    <div className="flex gap-2">
-                      <select value={placeRegion} onChange={(e) => setPlaceRegion(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-                        {Object.entries(REGIONS).map(([key, region]) => (
-                          <option key={key} value={key}>{region.name}</option>
-                        ))}
-                      </select>
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="병원/약국명 검색" value={placeKeyword} onChange={(e) => setPlaceKeyword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()} className="h-10 pl-10" />
+                    {/* 타입 + 반경 선택 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-2">
+                        <Button variant={placeType === "hospital" ? "default" : "outline"} size="sm" onClick={() => setPlaceType("hospital")}>
+                          <Building2 className="mr-1 h-4 w-4" />병원
+                        </Button>
+                        <Button variant={placeType === "pharmacy" ? "default" : "outline"} size="sm" onClick={() => setPlaceType("pharmacy")}>
+                          <Cross className="mr-1 h-4 w-4" />약국
+                        </Button>
                       </div>
-                      <Button onClick={handlePlaceSearch}>검색</Button>
+                      <select
+                        value={radiusKm}
+                        onChange={(e) => setRadiusKm(Number(e.target.value))}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value={1}>반경 1km</option>
+                        <option value={3}>반경 3km</option>
+                        <option value={5}>반경 5km</option>
+                        <option value={10}>반경 10km</option>
+                      </select>
                     </div>
 
+                    {/* 위치 상태 표시 */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {locationStatus === "loading" && "위치 확인 중..."}
+                      {locationStatus === "granted" && `현재 위치 기준 반경 ${radiusKm}km 이내`}
+                      {locationStatus === "denied" && "위치 권한이 없어 기본 위치(군포)로 검색합니다"}
+                    </div>
+
+                    {/* 결과 */}
                     {placeLoading ? (
                       <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
-                    ) : currentPlaces.length > 0 ? (
+                    ) : nearbyPlaces.length > 0 ? (
                       <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">총 {placeTotalCount.toLocaleString()}건 중 {allPlaces.length.toLocaleString()}건 로드됨</p>
-                        {currentPlaces.map((place) => (
-                          <div key={place.id} className="flex items-start justify-between rounded-lg border p-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-sm truncate">{place.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{place.address}</p>
-                              {place.clCdNm && <Badge variant="outline" className="mt-1 text-[10px]">{place.clCdNm}</Badge>}
+                        <p className="text-xs text-muted-foreground">
+                          가까운 순 · {nearbyPlaces.length}개 {placeType === "hospital" ? "병원" : "약국"}
+                        </p>
+                        {nearbyPlaces.slice(0, 20).map((place) => {
+                          const isSelected = selectedPlaceId === place.id
+                          return (
+                            <div key={place.id} className="rounded-lg border overflow-hidden transition-all">
+                              {/* 병원 카드 — 클릭 시 상세 토글 */}
+                              <button
+                                onClick={() => setSelectedPlaceId(isSelected ? null : place.id)}
+                                className={`flex w-full items-start justify-between p-3 text-left transition-colors ${
+                                  isSelected ? "bg-primary/5" : "hover:bg-muted/50"
+                                }`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-sm truncate">{place.name}</p>
+                                    {place.distance && (
+                                      <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+                                        {place.distance}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                                  {place.clCdNm && <Badge variant="outline" className="mt-1 text-[10px]">{place.clCdNm}</Badge>}
+                                </div>
+                                <ChevronDown className={`h-4 w-4 mt-1 transition-transform text-muted-foreground flex-shrink-0 ${isSelected ? "rotate-180" : ""}`} />
+                              </button>
+
+                              {/* 상세 드롭다운 — 지도 + 정보 + 액션 */}
+                              {isSelected && (
+                                <div className="border-t">
+                                  {/* 인터랙티브 미니맵 */}
+                                  {place.lat > 0 && place.lng > 0 && (
+                                    <div className="h-48">
+                                      <MiniMap
+                                        lat={place.lat}
+                                        lng={place.lng}
+                                        label={place.name}
+                                        userLat={userLocation?.lat}
+                                        userLng={userLocation?.lng}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* 병원 정보 */}
+                                  <div className="px-3 py-3 space-y-2 bg-muted/20">
+                                    <div className="flex items-start gap-2">
+                                      <MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
+                                      <p className="text-xs text-foreground">{place.address}</p>
+                                    </div>
+                                    {place.phone && (
+                                      <div className="flex items-center gap-2">
+                                        <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                        <a href={`tel:${place.phone}`} className="text-xs text-primary hover:underline">{place.phone}</a>
+                                      </div>
+                                    )}
+                                    {place.clCdNm && (
+                                      <div className="flex items-center gap-2">
+                                        <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                        <p className="text-xs text-foreground">{place.clCdNm}</p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* 액션 버튼 */}
+                                  <div className="flex items-center border-t px-2 py-2 gap-1">
+                                    <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
+                                      {place.phone ? <a href={`tel:${place.phone}`}><Phone className="h-3.5 w-3.5" />전화</a> : <span className="text-muted-foreground">전화 정보 없음</span>}
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
+                                      <a href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`} target="_blank">
+                                        <MapPin className="h-3.5 w-3.5" />길찾기
+                                      </a>
+                                    </Button>
+                                    <BookmarkButton type={placeType === "pharmacy" ? "pharmacy" : "hospital"} id={place.id} name={place.name} address={place.address} phone={place.phone} category={place.clCdNm} lat={place.lat} lng={place.lng} />
+                                  </div>
+
+                                  {/* 네이버 지도에서 상세보기 */}
+                                  <a
+                                    href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-1.5 border-t px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
+                                  >
+                                    네이버 지도에서 상세보기
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  </a>
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                              <BookmarkButton type={placeType === "pharmacy" ? "pharmacy" : "hospital"} id={place.id} name={place.name} address={place.address} phone={place.phone} category={place.clCdNm} lat={place.lat} lng={place.lng} />
-                              {place.phone && <Button variant="ghost" size="sm" asChild><a href={`tel:${place.phone}`}><Phone className="h-4 w-4" /></a></Button>}
-                              {place.lat > 0 && <Button variant="ghost" size="sm" asChild><a href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`} target="_blank"><MapPin className="h-4 w-4" /></a></Button>}
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        })}
+                        {nearbyPlaces.length > 20 && (
+                          <Button variant="outline" size="sm" className="w-full" onClick={() => router.push("/search")}>
+                            지도에서 전체 보기<ChevronRight className="ml-1 h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     ) : (
-                      <p className="text-center text-sm text-muted-foreground py-8">검색 결과가 없습니다</p>
-                    )}
-
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-center gap-2 pt-2">
-                        <Button variant="outline" size="sm" disabled={placePage <= 1} onClick={() => setPlacePage(placePage - 1)}>
-                          <ChevronLeft className="h-4 w-4" />이전
-                        </Button>
-                        <span className="text-sm text-muted-foreground">{placePage} / {totalPages}</span>
-                        <Button variant="outline" size="sm" disabled={placePage >= totalPages} onClick={() => setPlacePage(placePage + 1)}>
-                          다음<ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-
-                    {hasMore && !placeKeyword && (
-                      <div className="pt-2 text-center">
-                        <Button variant="outline" size="sm" onClick={() => fetchPlaces(true)} disabled={placeLoading}>
-                          {placeLoading ? "불러오는 중..." : `다음 1000개 불러오기 (${allPlaces.length.toLocaleString()} / ${placeTotalCount.toLocaleString()})`}
-                          <ChevronDown className="ml-1 h-4 w-4" />
+                      <div className="text-center py-8">
+                        <MapPin className="mx-auto mb-2 h-10 w-10 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">반경 {radiusKm}km 이내에 {placeType === "hospital" ? "병원" : "약국"}이 없습니다</p>
+                        <Button variant="outline" size="sm" className="mt-3" onClick={() => setRadiusKm(Math.min(radiusKm + 2, 10))}>
+                          범위 넓히기
                         </Button>
                       </div>
                     )}
