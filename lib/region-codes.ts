@@ -1,5 +1,6 @@
 // 건강보험심사평가원 시도코드 기준 (HIRA 실제 API 응답 검증 완료)
 // 2025-02-05 실제 API 호출로 sidoCd ↔ sidoCdNm 매핑 확인
+// [Phase 0] 세종시 코드 수정: 410000 → 360000 (공공 API 기준)
 
 export interface Region {
   code: string
@@ -25,7 +26,7 @@ export const REGIONS: Record<string, Region> = {
   "gyeongbuk":{ code: "370000", name: "경상북도",         slug: "gyeongbuk" },
   "gyeongnam":{ code: "380000", name: "경상남도",         slug: "gyeongnam" },
   "jeju":     { code: "390000", name: "제주특별자치도",   slug: "jeju" },
-  "sejong":   { code: "410000", name: "세종특별자치시",   slug: "sejong" },
+  "sejong":   { code: "360000", name: "세종특별자치시",   slug: "sejong" },
 }
 
 // slug로 지역 정보 가져오기

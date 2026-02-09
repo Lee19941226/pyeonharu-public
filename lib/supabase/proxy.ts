@@ -33,8 +33,8 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // 보호된 경로에 비로그인 사용자가 접근하면 로그인 페이지로 리디렉션
-  const protectedPaths = ['/mypage', '/bookmarks', '/closet', '/style']
+  // [Phase 0] 보호된 경로: /closet, /style 제거
+  const protectedPaths = ['/mypage', '/bookmarks']
   const isProtectedPath = protectedPaths.some(path => 
     request.nextUrl.pathname.startsWith(path)
   )

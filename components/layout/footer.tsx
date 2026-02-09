@@ -4,7 +4,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid gap-8 md:grid-cols-5">
+        <div className="grid gap-8 md:grid-cols-4">
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center gap-2">
@@ -14,7 +14,7 @@ export function Footer() {
               <span className="text-xl font-bold">편하루</span>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
-              의식주를 편하게 만드는 생활 플랫폼
+              우리 가족 식품 안전을 지키는 생활 플랫폼
             </p>
           </div>
 
@@ -40,40 +40,18 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* 먹어도 돼? */}
+          {/* 식품 안전 */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold">먹어도 돼?</h3>
+            <h3 className="mb-4 text-sm font-semibold">식품 안전</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/can-i-eat" className="hover:text-foreground">
-                  음식 알러지 확인
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* 오늘 뭐 입지? */}
-          <div>
-            <h3 className="mb-4 text-sm font-semibold">오늘 뭐 입지?</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/today" className="hover:text-foreground">
-                  오늘의 코디
+                <Link href="/food" className="hover:text-foreground">
+                  식품 알레르기 확인
                 </Link>
               </li>
               <li>
-                <Link href="/closet" className="hover:text-foreground">
-                  내 옷장
-                </Link>
-              </li>
-              <li>
-                <Link href="/weather" className="hover:text-foreground">
-                  날씨 상세
-                </Link>
-              </li>
-              <li>
-                <Link href="/history" className="hover:text-foreground">
-                  코디 기록
+                <Link href="/food/profile" className="hover:text-foreground">
+                  내 알레르기 정보
                 </Link>
               </li>
             </ul>

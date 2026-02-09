@@ -8,23 +8,23 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "편하루 - 의식주를 편하게",
+  title: "편하루 - 우리 가족 식품 안전",
   description:
-    "내 주변 병원/약국 찾기, AI 증상 분석, 날씨 기반 옷차림 추천까지. 편하루와 함께 일상을 더 편하게 만들어보세요.",
+    "바코드 한 번으로 식품 알레르기 확인. 내 주변 병원/약국 찾기, AI 증상 분석까지. 편하루와 함께 일상을 더 편하게 만들어보세요.",
   generator: "v0.app",
   keywords: [
+    "식품 알레르기",
+    "바코드 알레르기",
     "병원 찾기",
     "약국 찾기",
     "증상 분석",
-    "옷차림 추천",
-    "날씨 코디",
-    "의식주",
+    "급식 알레르기",
   ],
   authors: [{ name: "편하루" }],
   openGraph: {
-    title: "편하루 - 의식주를 편하게",
+    title: "편하루 - 우리 가족 식품 안전",
     description:
-      "내 주변 병원/약국 찾기, AI 증상 분석, 날씨 기반 옷차림 추천까지.",
+      "바코드 한 번으로 식품 알레르기 확인. 내 주변 병원/약국 찾기, AI 증상 분석까지.",
     type: "website",
     locale: "ko_KR",
   },
