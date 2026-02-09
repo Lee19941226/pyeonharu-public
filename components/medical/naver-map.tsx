@@ -114,12 +114,10 @@ export function NaverMap({
   useEffect(() => {
     if (!mapInstanceRef.current || !window.naver || !isMapLoaded || !userLocation) return
 
-    // 기존 사용자 마커 제거
     if (userMarkerRef.current) {
       userMarkerRef.current.setMap(null)
     }
 
-    // 사용자 위치 마커 (주황색)
     userMarkerRef.current = new window.naver.maps.Marker({
       position: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
       map: mapInstanceRef.current,
@@ -139,15 +137,13 @@ export function NaverMap({
     })
   }, [userLocation, isMapLoaded])
 
-  // 마커 업데이트 (markers prop 사용 - symptom 페이지용)
+  // 마커 업데이트
   useEffect(() => {
     if (!mapInstanceRef.current || !window.naver || !isMapLoaded) return
 
-    // 기존 마커 제거
     markersRef.current.forEach((marker) => marker.setMap(null))
     markersRef.current = []
 
-    // markers가 있으면 사용 (symptom 페이지)
     const markerData = markers.length > 0 ? markers : places.map(p => ({
       id: p.id,
       lat: p.lat,
@@ -170,7 +166,6 @@ export function NaverMap({
       const position = new window.naver.maps.LatLng(item.lat, item.lng)
       bounds.extend(position)
 
-      // 마커 색상 결정
       const isRecommended = 'isAiRecommended' in item && item.isAiRecommended
       const isPharmacy = 'type' in item && item.type === 'pharmacy'
       const bgColor = isRecommended ? "#22c55e" : isPharmacy ? "#3b82f6" : "#22c55e"
@@ -223,7 +218,6 @@ export function NaverMap({
         },
       })
 
-      // 마커 클릭 이벤트
       window.naver.maps.Event.addListener(marker, "click", () => {
         if (onMarkerClick) {
           onMarkerClick(item.id)
@@ -238,9 +232,7 @@ export function NaverMap({
       markersRef.current.push(marker)
     })
 
-    // fitBounds가 true이고 마커가 있으면 모든 마커가 보이도록 조정
     if (fitBounds && markerData.length > 0) {
-      // 사용자 위치도 bounds에 포함
       if (userLocation) {
         bounds.extend(new window.naver.maps.LatLng(userLocation.lat, userLocation.lng))
       }
