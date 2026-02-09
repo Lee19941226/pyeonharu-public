@@ -120,30 +120,12 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                이거 먹어도 돼?
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center">
-              <DropdownMenuItem asChild>
-                <Link href="/food">음식 확인</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/food/profile">내 알레르기 정보</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/food/history">최근 확인 제품</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/food/favorites">즐겨찾기</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Link
+            href="/food"
+            className="text-sm font-medium text-foreground/60 transition-colors hover:text-foreground"
+          >
+            이거 먹어도 돼?
+          </Link>
 
           <Button
             variant="ghost"
