@@ -18,31 +18,9 @@ export function Footer() {
             </p>
           </div>
 
-          {/* 병원/약국 */}
+          {/* 알레르기 */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold">병원/약국</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/search" className="hover:text-foreground">
-                  지도로 검색
-                </Link>
-              </li>
-              <li>
-                <Link href="/symptom" className="hover:text-foreground">
-                  증상으로 추천
-                </Link>
-              </li>
-              <li>
-                <Link href="/medicine" className="hover:text-foreground">
-                  약 정보 검색
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* 식품 안전 */}
-          <div>
-            <h3 className="mb-4 text-sm font-semibold">식품 안전</h3>
+            <h3 className="mb-4 text-sm font-semibold">알레르기</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link href="/food" className="hover:text-foreground">
@@ -50,8 +28,40 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/food/camera" className="hover:text-foreground">
+                  바코드 스캔
+                </Link>
+              </li>
+              <li>
                 <Link href="/food/profile" className="hover:text-foreground">
                   내 알레르기 정보
+                </Link>
+              </li>
+              <li>
+                <Link href="/food/history" className="hover:text-foreground">
+                  확인 기록
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* 건강 */}
+          <div>
+            <h3 className="mb-4 text-sm font-semibold">건강</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <Link href="/search" className="hover:text-foreground">
+                  병원/약국 찾기
+                </Link>
+              </li>
+              <li>
+                <Link href="/symptom" className="hover:text-foreground">
+                  AI 증상 분석
+                </Link>
+              </li>
+              <li>
+                <Link href="/medicine" className="hover:text-foreground">
+                  약 정보 검색
                 </Link>
               </li>
             </ul>

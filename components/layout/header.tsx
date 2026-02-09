@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Menu, X, User, Bookmark, LogOut, Settings } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import {
+  Menu,
+  X,
+  User,
+  Bookmark,
+  LogOut,
+  Settings,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,15 +24,14 @@ import { createClient } from "@/lib/supabase/client";
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [foodFavoritesCount, setFoodFavoritesCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
 
-    // [Phase 0] getSession() → getUser() 변경 (서버 검증)
     supabase.auth
       .getUser()
       .then(({ data: { user } }) => {
@@ -35,7 +42,6 @@ export function Header() {
               user.email?.split("@")[0] ||
               "사용자",
           );
-          fetchFoodFavoritesCount();
         }
         setIsLoaded(true);
       })
@@ -43,7 +49,6 @@ export function Header() {
         setIsLoaded(true);
       });
 
-    // 로그인/로그아웃 실시간 감지 (유지)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -64,6 +69,37 @@ export function Header() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 모바일 메뉴 스크롤 잠금 + ESC 닫기
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
+  const handleEsc = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    },
+    [isMobileMenuOpen],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [handleEsc]);
+
+  // 경로 변경 시 메뉴 닫기
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -74,21 +110,10 @@ export function Header() {
 
   const isLoggedIn = isLoaded && nickname !== null;
 
-  const fetchFoodFavoritesCount = async () => {
-    try {
-      const res = await fetch("/api/food/favorites");
-      const data = await res.json();
-      if (data.success) {
-        setFoodFavoritesCount(data.favorites?.length || 0);
-      }
-    } catch (e) {
-      // 에러 무시 (추후 Sentry 연동)
-    }
-  };
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <span className="text-lg font-bold text-primary-foreground">
@@ -98,12 +123,7 @@ export function Header() {
           <span className="text-xl font-bold text-foreground">편하루</span>
         </Link>
 
-        {/* Desktop Navigation — 핵심 네비 제거, 로고+로그인만 */}
-        <nav className="hidden items-center gap-1 md:flex">
-          {/* 추후 푸터로 이동 완료 후 필요시 네비 추가 */}
-        </nav>
-
-        {/* Right Actions - Desktop */}
+        {/* Desktop — 네비 탭 없음 (로고 + 로그인만) */}
         <div className="hidden items-center gap-2 md:flex">
           {isLoggedIn ? (
             <DropdownMenu>
@@ -134,6 +154,15 @@ export function Header() {
                     즐겨찾기
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/food/profile"
+                    className="flex items-center gap-2"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    내 알레르기 정보
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
@@ -153,12 +182,13 @@ export function Header() {
           )}
         </div>
 
-        {/* Right Actions - Mobile (hamburger only) */}
+        {/* Mobile hamburger */}
         <div className="flex items-center md:hidden">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label={isMobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
           >
             {isMobileMenuOpen ? (
               <X className="h-5 w-5" />
@@ -169,12 +199,12 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile Menu — 간소화 */}
+      {/* Mobile Menu — full overlay, 스크롤 잠금 */}
       {isMobileMenuOpen && (
-        <div className="border-t bg-background md:hidden">
+        <div className="fixed inset-x-0 top-16 bottom-0 z-40 border-t bg-background md:hidden overflow-y-auto">
           <nav className="container mx-auto space-y-1 px-4 py-4">
             {isLoggedIn ? (
-              <>
+              <div className="space-y-1">
                 <div className="mb-3 flex items-center gap-3 rounded-lg bg-muted p-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                     <User className="h-4 w-4 text-primary" />
@@ -183,47 +213,40 @@ export function Header() {
                 </div>
                 <Link
                   href="/mypage"
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm hover:bg-muted"
                 >
+                  <Settings className="h-5 w-5 text-muted-foreground" />
                   마이페이지
                 </Link>
                 <Link
                   href="/bookmarks"
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm hover:bg-muted"
                 >
+                  <Bookmark className="h-5 w-5 text-muted-foreground" />
                   즐겨찾기
                 </Link>
                 <Link
                   href="/food/profile"
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm hover:bg-muted"
                 >
+                  <ShieldCheck className="h-5 w-5 text-muted-foreground" />
                   내 알레르기 정보
-                </Link>
-                <Link
-                  href="/food/history"
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  확인 기록
                 </Link>
                 <button
                   onClick={() => {
                     handleLogout();
                     setIsMobileMenuOpen(false);
                   }}
-                  className="block w-full rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm text-destructive hover:bg-muted"
                 >
+                  <LogOut className="h-5 w-5" />
                   로그아웃
                 </button>
-              </>
+              </div>
             ) : (
               <Link
                 href="/login"
-                className="block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
-                onClick={() => setIsMobileMenuOpen(false)}
+                className="block rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-primary-foreground"
               >
                 로그인
               </Link>
