@@ -199,7 +199,7 @@ async function searchFoodByName(productName: string) {
 }
 
 // ==========================================
-// 헬퍼 함수: 재료명으로 검색
+// 헬퍼 함수: 재료명으로 검색 (✅ 관련성 필터링 추가)
 // ==========================================
 async function searchByIngredients(ingredients: string[]) {
   const serviceKey = process.env.FOOD_API_KEY || "";
@@ -208,15 +208,41 @@ async function searchByIngredients(ingredients: string[]) {
   try {
     // 주요 재료 (첫 3개)만 사용
     const mainIngredients = ingredients.slice(0, 3);
+    console.log("🔍 재료로 검색:", mainIngredients);
+
+    // ✅ 관련성 점수 계산 함수
+    const calculateRelevance = (
+      foodName: string,
+      ingredient: string,
+    ): number | null => {
+      const lowerName = foodName.toLowerCase();
+      const lowerIngredient = ingredient.toLowerCase();
+
+      // 1. 제품명에 재료명이 포함 (80점) - 가장 관련성 높음
+      if (lowerName.includes(lowerIngredient)) {
+        return 80;
+      }
+
+      // 2. 제품명이 재료로 시작 (90점)
+      if (lowerName.startsWith(lowerIngredient)) {
+        return 90;
+      }
+
+      // 3. 원재료에만 포함 (50점) - 관련성 낮음
+      return 50;
+    };
 
     // 각 재료로 검색
-    const allResults = new Map();
+    const productScores = new Map<
+      string,
+      { foodName: string; score: number; ingredient: string }
+    >();
 
     for (const ingredient of mainIngredients) {
       const url = new URL(`${baseUrl}/getFoodQrProdRawmtrl01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", "1");
-      url.searchParams.append("numOfRows", "20");
+      url.searchParams.append("numOfRows", "30");
       url.searchParams.append("type", "json");
       url.searchParams.append("prvw_cn", ingredient);
 
@@ -224,19 +250,66 @@ async function searchByIngredients(ingredients: string[]) {
       const data = await response.json();
       const items = data.body?.items || [];
 
+      console.log(`  "${ingredient}" 검색 결과: ${items.length}개`);
+
       items.forEach((item: any) => {
         const code = item.BRCD_NO;
-        if (!allResults.has(code)) {
-          allResults.set(code, {
-            foodCode: code,
-            foodName: item.PRDCT_NM,
-            matchedIngredient: ingredient,
-          });
+        const foodName = item.PRDCT_NM;
+
+        if (!code || !foodName) return;
+
+        // ✅ 관련성 점수 계산
+        const score = calculateRelevance(foodName, ingredient);
+
+        if (!score) return;
+
+        // 이미 있는 제품이면 더 높은 점수로 업데이트
+        if (productScores.has(code)) {
+          const existing = productScores.get(code)!;
+          if (score > existing.score) {
+            productScores.set(code, { foodName, score, ingredient });
+          }
+        } else {
+          productScores.set(code, { foodName, score, ingredient });
         }
       });
     }
 
-    return Array.from(allResults.values()).slice(0, 10); // 최대 10개
+    // ✅ 60점 이상만 필터링 (제품명 포함 이상)
+    const MINIMUM_SCORE = 60;
+
+    const filteredResults = Array.from(productScores.entries())
+      .filter(([_, data]) => data.score >= MINIMUM_SCORE)
+      .sort((a, b) => {
+        // 점수 높은 순
+        if (b[1].score !== a[1].score) {
+          return b[1].score - a[1].score;
+        }
+        // 제품명 가나다순
+        return a[1].foodName.localeCompare(b[1].foodName, "ko");
+      })
+      .slice(0, 10) // 최대 10개
+      .map(([code, data]) => ({
+        foodCode: code,
+        foodName: data.foodName,
+        matchedIngredient: data.ingredient,
+        relevanceScore: data.score,
+      }));
+
+    console.log(`✅ 필터링 후 결과: ${filteredResults.length}개`);
+    if (filteredResults.length > 0) {
+      console.log(
+        "  상위 3개:",
+        filteredResults
+          .slice(0, 3)
+          .map(
+            (r) =>
+              `${r.foodName} (${r.relevanceScore}점 - ${r.matchedIngredient})`,
+          ),
+      );
+    }
+
+    return filteredResults;
   } catch (error) {
     console.error("재료명 검색 실패:", error);
     return [];
