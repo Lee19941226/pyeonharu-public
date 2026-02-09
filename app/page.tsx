@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation"
 import { 
   Search, Camera, Lock, ChevronRight, ChevronDown, 
   AlertTriangle, ExternalLink, MapPin, Clock, RefreshCw,
-  Building2, Phone, Cross, ChevronLeft, Stethoscope, UtensilsCrossed, MapPinned
+  Building2, Phone, Cross, ChevronLeft, Stethoscope, UtensilsCrossed, MapPinned,
+  Pill, Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,11 +46,19 @@ interface PlaceItem {
   lng: number
 }
 
-type SearchMode = "symptom" | "food" | "search"
+interface MedicineItem {
+  id: string
+  name: string
+  company: string
+  efficacy: string
+  image: string
+}
+
+type SearchMode = "food" | "symptom" | "search" | "medicine"
 
 export default function HomePage() {
   const router = useRouter()
-  const [searchMode, setSearchMode] = useState<SearchMode>("symptom")
+  const [searchMode, setSearchMode] = useState<SearchMode>("food")
   const [symptomInput, setSymptomInput] = useState("")
   const [foodInput, setFoodInput] = useState("")
   
@@ -76,6 +85,13 @@ export default function HomePage() {
   const [placeLoading, setPlaceLoading] = useState(false)
   const [placePage, setPlacePage] = useState(1)
   const PER_PAGE = 20
+
+  // 약 정보 검색 상태
+  const [medicineQuery, setMedicineQuery] = useState("")
+  const [medicineResults, setMedicineResults] = useState<MedicineItem[]>([])
+  const [medicineLoading, setMedicineLoading] = useState(false)
+  const [medicineSearched, setMedicineSearched] = useState(false)
+  const [medicineTotalCount, setMedicineTotalCount] = useState(0)
 
   // 로그인 상태 체크
   useEffect(() => {
@@ -113,7 +129,7 @@ export default function HomePage() {
         setIsRegionSample(result.data.isRegionSample || false)
       }
     } catch (error) {
-      console.error('Failed to fetch disease data:', error)
+      // 에러 무시
     } finally {
       setLoading(false)
     }
@@ -131,11 +147,32 @@ export default function HomePage() {
     }
   }
 
+  const handleMedicineSearch = async () => {
+    if (!medicineQuery.trim()) return
+    setMedicineLoading(true)
+    setMedicineSearched(true)
+    try {
+      const response = await fetch(`/api/medicine?itemName=${encodeURIComponent(medicineQuery)}`)
+      const data = await response.json()
+      if (response.ok) {
+        setMedicineResults((data.items || []).slice(0, 5))
+        setMedicineTotalCount(data.totalCount || 0)
+      } else {
+        setMedicineResults([])
+        setMedicineTotalCount(0)
+      }
+    } catch {
+      setMedicineResults([])
+    } finally {
+      setMedicineLoading(false)
+    }
+  }
+
   const getNaverSearchUrl = (diseaseName: string) => {
     return `https://www.google.com/search?q=${encodeURIComponent(diseaseName + '이 뭐야?')}`
   }
 
-  // 병원/약국 조회 (1000건 미리 로드, 페이지 전환은 클라이언트에서 즉시)
+  // 병원/약국 조회
   const fetchPlaces = async (append = false, keyword?: string) => {
     setPlaceLoading(true)
     try {
@@ -146,7 +183,6 @@ export default function HomePage() {
       const endpoint = placeType === "hospital" ? "hospitals" : "pharmacies"
       let url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=${nextApiPage}&numOfRows=1000`
 
-      // 키워드가 있으면 서버에서 검색
       if (keyword && keyword.trim()) {
         url = `/api/area/${endpoint}?sidoCd=${region.code}&pageNo=1&numOfRows=1000&keyword=${encodeURIComponent(keyword.trim())}`
       }
@@ -165,23 +201,19 @@ export default function HomePage() {
         setPlaceTotalCount(data.totalCount || 0)
       }
     } catch (error) {
-      console.error("Failed to fetch places:", error)
+      // 에러 무시
     } finally {
       setPlaceLoading(false)
     }
   }
 
-  // 더 불러올 데이터가 있는지
   const hasMore = !placeKeyword.trim() && allPlaces.length < placeTotalCount
-
-  // 페이지 슬라이싱 (클라이언트 즉시)
   const totalPages = Math.ceil(allPlaces.length / PER_PAGE)
   const currentPlaces = allPlaces.slice(
     (placePage - 1) * PER_PAGE,
     placePage * PER_PAGE
   )
 
-  // searchMode가 search로 바뀌거나 지역/타입 변경 시 API 호출
   useEffect(() => {
     if (searchMode === "search") {
       setPlaceKeyword("")
@@ -189,7 +221,6 @@ export default function HomePage() {
     }
   }, [searchMode, placeType, placeRegion])
 
-  // 검색 버튼 또는 Enter 시 API 호출
   const handlePlaceSearch = () => {
     if (placeKeyword.trim()) {
       fetchPlaces(false, placeKeyword)
@@ -204,9 +235,14 @@ export default function HomePage() {
     return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
   }
 
+  // 탭 스타일 헬퍼
+  const tabStyle = (mode: SearchMode) => 
+    searchMode === mode
+      ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
+      : { borderColor: "transparent", color: "#9ca3af" }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
       <Header />
 
       <main className="flex-1">
@@ -214,72 +250,44 @@ export default function HomePage() {
           {/* 🔍 통합 검색 카드 */}
           <Card className="overflow-hidden border-0 shadow-lg">
             <CardContent className="p-0">
-              {/* 탭 선택 영역 - 1행 3열 */}
-              <div className="flex border-b">
-                <button
-                  onClick={() => setSearchMode("symptom")}
-                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
-                  style={searchMode === "symptom"
-                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
-                    : { borderColor: "transparent", color: "#9ca3af" }
-                  }
-                >
-                  <Stethoscope className="h-4 w-4" />
-                  <span>몸이 아파요</span>
-                </button>
+              {/* 탭 선택 영역 - 1행 4열 */}
+              <div className="flex border-b overflow-x-auto">
                 <button
                   onClick={() => setSearchMode("food")}
-                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
-                  style={searchMode === "food"
-                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
-                    : { borderColor: "transparent", color: "#9ca3af" }
-                  }
+                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
+                  style={tabStyle("food")}
                 >
-                  <UtensilsCrossed className="h-4 w-4" />
-                  <span>이거 먹어도 돼?</span>
+                  <UtensilsCrossed className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">이거 먹어도 돼?</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode("symptom")}
+                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
+                  style={tabStyle("symptom")}
+                >
+                  <Stethoscope className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">몸이 아파요</span>
                 </button>
                 <button
                   onClick={() => setSearchMode("search")}
-                  className="flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-all"
-                  style={searchMode === "search"
-                    ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
-                    : { borderColor: "transparent", color: "#9ca3af" }
-                  }
+                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
+                  style={tabStyle("search")}
                 >
-                  <MapPinned className="h-4 w-4" />
-                  <span>병원/약국 조회</span>
+                  <MapPinned className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">병원/약국 조회</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode("medicine")}
+                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
+                  style={tabStyle("medicine")}
+                >
+                  <Pill className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">약 정보 검색</span>
                 </button>
               </div>
 
               {/* 콘텐츠 영역 */}
               <div className="p-5">
-
-              {/* 몸이 아파요 모드 */}
-              {searchMode === "symptom" && (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    증상을 알려주세요, 주변 병원을 찾아드릴게요
-                  </p>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="어디가 아프세요? (예: 두통, 배가 아파요)"
-                        value={symptomInput}
-                        onChange={(e) => setSymptomInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSymptomSearch()}
-                        className="pl-10"
-                      />
-                    </div>
-                    <Button onClick={handleSymptomSearch}>
-                      검색
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    AI가 증상을 분석하고 적합한 진료과와 주변 병원을 추천해드려요
-                  </p>
-                </div>
-              )}
 
               {/* 이거 먹어도 돼? 모드 */}
               {searchMode === "food" && (
@@ -316,6 +324,33 @@ export default function HomePage() {
                 </div>
               )}
 
+              {/* 몸이 아파요 모드 */}
+              {searchMode === "symptom" && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    증상을 알려주세요, 주변 병원을 찾아드릴게요
+                  </p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="어디가 아프세요? (예: 두통, 배가 아파요)"
+                        value={symptomInput}
+                        onChange={(e) => setSymptomInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSymptomSearch()}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button onClick={handleSymptomSearch}>
+                      검색
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    AI가 증상을 분석하고 적합한 진료과와 주변 병원을 추천해드려요
+                  </p>
+                </div>
+              )}
+
               {/* 병원/약국 직접 조회 모드 */}
               {searchMode === "search" && (
                 <div className="space-y-4">
@@ -339,118 +374,86 @@ export default function HomePage() {
                     </Button>
                   </div>
 
-                  {/* 필터: 지역 + 검색어 */}
+                  {/* 지역 선택 + 키워드 검색 */}
                   <div className="flex gap-2">
                     <select
                       value={placeRegion}
                       onChange={(e) => setPlaceRegion(e.target.value)}
-                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                     >
-                      {Object.values(REGIONS).map((r) => (
-                        <option key={r.slug} value={r.slug}>{r.name}</option>
+                      {Object.entries(REGIONS).map(([key, region]) => (
+                        <option key={key} value={key}>{region.name}</option>
                       ))}
                     </select>
-                    <div className="relative flex-1 flex gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="상호명 검색"
-                          value={placeKeyword}
-                          onChange={(e) => setPlaceKeyword(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()}
-                          className="pl-10"
-                        />
-                      </div>
-                      <Button
-                        onClick={handlePlaceSearch}
-                        size="default"
-                        className="shrink-0"
-                      >
-                        검색
-                      </Button>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="병원/약국명 검색"
+                        value={placeKeyword}
+                        onChange={(e) => setPlaceKeyword(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()}
+                        className="h-10 pl-10"
+                      />
                     </div>
+                    <Button onClick={handlePlaceSearch}>검색</Button>
                   </div>
 
                   {/* 결과 */}
-                  <div className="text-sm text-muted-foreground">
-                    {placeKeyword.trim()
-                      ? `"${placeKeyword}" 검색결과 ${placeTotalCount.toLocaleString()}개 (${allPlaces.length}개 로드됨)`
-                      : `${allPlaces.length.toLocaleString()}개 로드됨 (전체 ${placeTotalCount.toLocaleString()}개)`
-                    }
-                  </div>
-
                   {placeLoading ? (
                     <div className="space-y-2">
-                      {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-20 w-full" />
-                      ))}
+                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
                     </div>
-                  ) : currentPlaces.length === 0 ? (
-                    <div className="py-8 text-center text-muted-foreground">
-                      <Building2 className="mx-auto mb-2 h-8 w-8" />
-                      <p>결과가 없습니다</p>
-                    </div>
-                  ) : (
+                  ) : currentPlaces.length > 0 ? (
                     <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        총 {placeTotalCount.toLocaleString()}건 중 {allPlaces.length.toLocaleString()}건 로드됨
+                      </p>
                       {currentPlaces.map((place) => (
-                        <div
-                          key={place.id}
-                          className="rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{place.name}</span>
-                                {place.clCdNm && (
-                                  <Badge variant="secondary" className="text-[10px]">{place.clCdNm}</Badge>
-                                )}
-                                {place.sgguCdNm && (
-                                  <Badge variant="outline" className="text-[10px]">{place.sgguCdNm}</Badge>
-                                )}
-                              </div>
-                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                <MapPin className="h-3 w-3" />{place.address}
-                              </p>
-                              {place.phone && (
-                                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Phone className="h-3 w-3" />{place.phone}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex shrink-0 gap-1">
-                              <BookmarkButton
-                                type={placeType === "pharmacy" ? "pharmacy" : "hospital"}
-                                id={place.id}
-                                name={place.name}
-                                address={place.address}
-                                phone={place.phone}
-                                category={place.clCdNm}
-                                lat={place.lat}
-                                lng={place.lng}
-                              />
-                              {place.phone && (
-                                <Button variant="ghost" size="sm" asChild>
-                                  <a href={`tel:${place.phone}`}><Phone className="h-4 w-4" /></a>
-                                </Button>
-                              )}
-                              {place.lat > 0 && (
-                                <Button variant="ghost" size="sm" asChild>
-                                  <a
-                                    href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`}
-                                    target="_blank"
-                                  >
-                                    <MapPin className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
+                        <div key={place.id} className="flex items-start justify-between rounded-lg border p-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{place.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                            {place.clCdNm && (
+                              <Badge variant="outline" className="mt-1 text-[10px]">{place.clCdNm}</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                            <BookmarkButton
+                              type={placeType === "pharmacy" ? "pharmacy" : "hospital"}
+                              id={place.id}
+                              name={place.name}
+                              address={place.address}
+                              phone={place.phone}
+                              category={place.clCdNm}
+                              lat={place.lat}
+                              lng={place.lng}
+                            />
+                            {place.phone && (
+                              <Button variant="ghost" size="sm" asChild>
+                                <a href={`tel:${place.phone}`}><Phone className="h-4 w-4" /></a>
+                              </Button>
+                            )}
+                            {place.lat > 0 && (
+                              <Button variant="ghost" size="sm" asChild>
+                                <a
+                                  href={`nmap://route/public?dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}`}
+                                  target="_blank"
+                                >
+                                  <MapPin className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <p className="text-center text-sm text-muted-foreground py-8">
+                      검색 결과가 없습니다
+                    </p>
                   )}
 
-                  {/* 페이징 (클라이언트 즉시 전환) */}
+                  {/* 페이징 */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-center gap-2 pt-2">
                       <Button
@@ -493,6 +496,98 @@ export default function HomePage() {
                   )}
                 </div>
               )}
+
+              {/* 약 정보 검색 모드 */}
+              {searchMode === "medicine" && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    약 이름으로 복용법, 주의사항, 부작용을 확인하세요
+                  </p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="약 이름 (예: 타이레놀, 아스피린)"
+                        value={medicineQuery}
+                        onChange={(e) => setMedicineQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleMedicineSearch()}
+                        className="h-10 pl-10"
+                      />
+                    </div>
+                    <Button onClick={handleMedicineSearch} disabled={medicineLoading}>
+                      {medicineLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}
+                    </Button>
+                  </div>
+
+                  {/* 검색 결과 */}
+                  {medicineLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                    </div>
+                  ) : medicineResults.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        총 {medicineTotalCount}건 중 상위 5건
+                      </p>
+                      {medicineResults.map((med) => (
+                        <div
+                          key={med.id}
+                          className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:border-primary transition-colors"
+                          onClick={() => router.push(`/medicine?q=${encodeURIComponent(med.name)}`)}
+                        >
+                          {med.image ? (
+                            <img
+                              src={med.image}
+                              alt={med.name}
+                              className="h-12 w-12 rounded-md object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 flex-shrink-0">
+                              <Pill className="h-6 w-6 text-primary" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{med.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{med.company}</p>
+                            {med.efficacy && (
+                              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                                {med.efficacy.slice(0, 60)}...
+                              </p>
+                            )}
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        </div>
+                      ))}
+                      {medicineTotalCount > 5 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => router.push(`/medicine?q=${encodeURIComponent(medicineQuery)}`)}
+                        >
+                          전체 {medicineTotalCount}건 보기
+                          <ChevronRight className="ml-1 h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : medicineSearched ? (
+                    <p className="text-center text-sm text-muted-foreground py-8">
+                      검색 결과가 없습니다
+                    </p>
+                  ) : (
+                    <div className="text-center py-6">
+                      <Pill className="mx-auto mb-2 h-10 w-10 text-primary/30" />
+                      <p className="text-sm text-muted-foreground">
+                        약 이름을 검색하면 상세 정보를 확인할 수 있어요
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        * 식품의약품안전처 제공 데이터 기준
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               </div>
             </CardContent>
           </Card>
