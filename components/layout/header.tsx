@@ -23,19 +23,18 @@ export function Header() {
   useEffect(() => {
     const supabase = createClient();
 
-    // 1) 초기 세션 확인 - auth만 사용 (profiles DB 조회 없음)
+    // [Phase 0] getSession() → getUser() 변경 (서버 검증)
     supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        if (session?.user) {
-          const user = session.user;
+      .getUser()
+      .then(({ data: { user } }) => {
+        if (user) {
           setNickname(
             user.user_metadata?.name ||
               user.user_metadata?.full_name ||
               user.email?.split("@")[0] ||
               "사용자",
           );
-          fetchFoodFavoritesCount(); //즐겨찾기 카운트
+          fetchFoodFavoritesCount();
         }
         setIsLoaded(true);
       })
@@ -43,7 +42,7 @@ export function Header() {
         setIsLoaded(true);
       });
 
-    // 2) 로그인/로그아웃 실시간 감지
+    // 2) 로그인/로그아웃 실시간 감지 (유지)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -73,6 +72,8 @@ export function Header() {
   };
 
   const isLoggedIn = isLoaded && nickname !== null;
+
+  // [Phase 0] console.error 제거
   const fetchFoodFavoritesCount = async () => {
     try {
       const res = await fetch("/api/food/favorites");
@@ -81,7 +82,7 @@ export function Header() {
         setFoodFavoritesCount(data.favorites?.length || 0);
       }
     } catch (e) {
-      console.error(e);
+      // 에러 무시 (추후 Sentry 연동)
     }
   };
   return (
@@ -203,9 +204,9 @@ export function Header() {
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
+              <X className="h-5 w-5" />
             ) : (
-              <Menu className="h-6 w-6" />
+              <Menu className="h-5 w-5" />
             )}
           </Button>
         </div>
@@ -213,37 +214,8 @@ export function Header() {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="border-t border-border md:hidden">
+        <div className="border-t bg-background md:hidden">
           <nav className="container mx-auto space-y-1 px-4 py-4">
-            {/* 로그인 상태 표시 (모바일) */}
-            {isLoggedIn && (
-              <div className="mb-3 flex items-center gap-3 rounded-lg bg-muted/50 p-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{nickname}</p>
-                  <div className="mt-1 flex gap-2">
-                    <Link
-                      href="/mypage"
-                      className="text-xs text-primary hover:underline"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      마이페이지
-                    </Link>
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <Link
-                      href="/bookmarks"
-                      className="text-xs text-primary hover:underline"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      즐겨찾기
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-1">
               <div className="mb-2 flex items-center gap-2 px-3">
                 <div className="h-1 w-1 rounded-full bg-primary" />
@@ -276,7 +248,7 @@ export function Header() {
               <div className="mb-2 flex items-center gap-2 px-3">
                 <div className="h-1 w-1 rounded-full bg-primary" />
                 <p className="text-sm font-bold text-foreground">
-                  이거 먹어도 돼?
+                  음식 알레르기
                 </p>
               </div>
               <Link

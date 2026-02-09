@@ -213,26 +213,6 @@ export default function MyPage() {
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 </Link>
-                <Link
-                  href="/closet"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Shirt className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <span className="truncate">내 옷장</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                </Link>
-                <Link
-                  href="/history"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <History className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <span className="truncate">코디 기록</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                </Link>
               </CardContent>
             </Card>
 

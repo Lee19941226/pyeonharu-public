@@ -2,7 +2,7 @@ import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Card, CardContent } from "@/components/ui/card"
-import { MapPin, Stethoscope, Pill, Shirt, CloudSun, Sparkles, Heart, Users } from "lucide-react"
+import { MapPin, Stethoscope, Pill, ShieldCheck, Heart, Users, Sparkles } from "lucide-react"
 
 const features = [
   {
@@ -21,27 +21,17 @@ const features = [
     description: "약 이름으로 복용법, 주의사항, 부작용, 병용금지 약물 정보를 확인하세요.",
   },
   {
-    icon: CloudSun,
-    title: "날씨 기반 코디 추천",
-    description: "오늘 날씨를 분석해서 기온에 맞는 최적의 옷차림을 추천해드려요.",
-  },
-  {
-    icon: Shirt,
-    title: "내 옷장 관리",
-    description: "옷을 등록하면 AI가 내 옷장을 바탕으로 더 정확한 코디를 추천해드려요.",
-  },
-  {
-    icon: Sparkles,
-    title: "스마트한 기록",
-    description: "코디 기록을 저장하고 평가하면 나만의 스타일을 분석할 수 있어요.",
+    icon: ShieldCheck,
+    title: "식품 알레르기 확인",
+    description: "바코드 스캔 한 번으로 우리 가족이 먹어도 되는 식품인지 3초 만에 확인하세요.",
   },
 ]
 
 const values = [
   {
     icon: Heart,
-    title: "편리함",
-    description: "일상의 불편함을 기술로 해결합니다.",
+    title: "안전",
+    description: "우리 가족의 식품 안전을 최우선으로 지킵니다.",
   },
   {
     icon: Users,
@@ -68,29 +58,33 @@ export default function AboutPage() {
               <span className="text-4xl font-bold text-primary-foreground">편</span>
             </div>
             <h1 className="text-pretty text-3xl font-bold md:text-4xl lg:text-5xl">
-              의식주를 편하게 만드는<br />
-              생활 플랫폼, 편하루
+              우리 가족 <span className="text-primary">식품 안전</span>을<br />
+              편하게 지키는 플랫폼, 편하루
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-              아플 때 병원 찾기, 매일 아침 옷 고르기.
+              바코드 한 번으로 알레르기 확인, 아플 때 병원 찾기.
               일상의 작은 불편함들을 편하루가 해결해드립니다.
             </p>
           </div>
         </section>
 
         {/* Features */}
-        <section className="container mx-auto px-4 py-16">
-          <h2 className="mb-12 text-center text-2xl font-bold md:text-3xl">
-            편하루가 제공하는 기능
-          </h2>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <section className="container mx-auto px-4 py-16 md:py-24">
+          <div className="mb-12 text-center">
+            <h2 className="text-2xl font-bold md:text-3xl">주요 기능</h2>
+            <p className="mt-4 text-muted-foreground">
+              편하루가 제공하는 핵심 서비스들을 소개합니다.
+            </p>
+          </div>
+
+          <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
             {features.map((feature) => (
-              <Card key={feature.title}>
-                <CardContent className="p-6">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                    <feature.icon className="h-6 w-6 text-primary" />
+              <Card key={feature.title} className="text-center">
+                <CardContent className="pt-6">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <feature.icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
+                  <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
                 </CardContent>
               </Card>
@@ -98,41 +92,23 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Vision */}
-        <section className="border-y border-border bg-muted/30 py-16">
+        {/* Values */}
+        <section className="bg-muted/30 py-16 md:py-24">
           <div className="container mx-auto px-4">
-            <h2 className="mb-12 text-center text-2xl font-bold md:text-3xl">
-              편하루의 비전
-            </h2>
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="text-lg text-muted-foreground">
-                의식주는 삶의 가장 기본적인 요소입니다.
-                편하루는 이 기본적인 것들을 더 편하게 만들어
-                모두가 일상에서 행복을 느낄 수 있도록 돕고자 합니다.
-              </p>
+            <div className="mb-12 text-center">
+              <h2 className="text-2xl font-bold md:text-3xl">편하루의 가치</h2>
             </div>
-            <div className="mt-12 grid gap-8 md:grid-cols-3">
+            <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-3">
               {values.map((value) => (
                 <div key={value.title} className="text-center">
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                    <value.icon className="h-7 w-7 text-primary" />
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <value.icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mb-2 text-lg font-semibold">{value.title}</h3>
+                  <h3 className="mb-2 font-semibold">{value.title}</h3>
                   <p className="text-sm text-muted-foreground">{value.description}</p>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* Contact */}
-        <section className="container mx-auto px-4 py-16">
-          <div className="mx-auto max-w-xl text-center">
-            <h2 className="mb-4 text-2xl font-bold">문의하기</h2>
-            <p className="mb-6 text-muted-foreground">
-              서비스 이용 중 궁금한 점이나 제안사항이 있으시면 언제든 연락해주세요.
-            </p>
-            <p className="text-lg font-medium text-primary">contact@pyeonharu.com</p>
           </div>
         </section>
       </main>
