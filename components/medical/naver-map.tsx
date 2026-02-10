@@ -56,9 +56,9 @@ export function NaverMap({
   height = "100%",
 }: NaverMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<naver.maps.Map | null>(null);
-  const markersRef = useRef<naver.maps.Marker[]>([]);
-  const userMarkerRef = useRef<naver.maps.Marker | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const userMarkerRef = useRef<any>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -97,7 +97,7 @@ export function NaverMap({
 
     const mapCenter = new window.naver.maps.LatLng(centerLat, centerLng);
 
-    const mapOptions: naver.maps.MapOptions = {
+    const mapOptions: any = {
       center: mapCenter,
       zoom: zoom,
       minZoom: 10,
