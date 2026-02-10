@@ -85,9 +85,9 @@ export async function GET(request: Request) {
       }
 
       // 비밀번호 업데이트 (매번 동일한 값이지만 확실하게)
-      await supabaseAdmin.auth.admin.updateUser(existingUser.id, {
+      await (supabaseAdmin.auth.admin as any).updateUser(existingUser.id, {
         password: naverPassword,
-      } as any);
+      });
     } else {
       // 새 사용자 생성
       const { data: newUser, error: createError } =
