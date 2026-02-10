@@ -12,6 +12,3 @@ npm install nodemailer
 npm install -D @types/nodemailer
 npm install -g pnpm
 pnpm install
-git add .
-git commit -m "fix: pnpm-lock.yaml 업데이트"
-git push
