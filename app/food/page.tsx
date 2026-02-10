@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,7 @@ const RECOMMENDED_KEYWORDS = [
   "김치",
 ];
 
-export default function FoodMainPage() {
+function FoodMainContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
@@ -97,12 +97,8 @@ export default function FoodMainPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userAllergens, setUserAllergens] = useState<string[]>([]);
-
-  // ✅ 초기 로드 플래그
   const isInitialMount = useRef(true);
-  // ==========================================
-  // ✅ URL에서 검색어 복원
-  // ==========================================
+
   useEffect(() => {
     const urlQuery = searchParams.get("q");
     if (urlQuery && isInitialMount.current) {
@@ -112,9 +108,7 @@ export default function FoodMainPage() {
     }
     isInitialMount.current = false;
   }, [searchParams]);
-  // ==========================================
-  // 초기 데이터 로드
-  // ==========================================
+
   useEffect(() => {
     loadSearchHistory();
     loadRecentProducts();
@@ -126,7 +120,6 @@ export default function FoodMainPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (user) {
       setIsLoggedIn(true);
       loadFavorites();
@@ -139,42 +132,29 @@ export default function FoodMainPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) return;
-
     const { data } = await supabase
       .from("user_allergies")
       .select("allergen_name")
       .eq("user_id", user.id);
-
-    if (data) {
-      setUserAllergens(data.map((item) => item.allergen_name));
-    }
+    if (data) setUserAllergens(data.map((item) => item.allergen_name));
   };
 
   const loadSearchHistory = () => {
     const saved = localStorage.getItem("food_search_history");
-    if (saved) {
-      setSearchHistory(JSON.parse(saved));
-    }
+    if (saved) setSearchHistory(JSON.parse(saved));
   };
 
   const loadRecentProducts = () => {
     const saved = localStorage.getItem("food_check_history");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setRecentProducts(parsed.slice(0, 5));
-    }
+    if (saved) setRecentProducts(JSON.parse(saved).slice(0, 5));
   };
 
   const loadFavorites = async () => {
     try {
       const response = await fetch("/api/food/favorites");
       const data = await response.json();
-
-      if (data.success) {
-        setFavorites(data.favorites.slice(0, 5));
-      }
+      if (data.success) setFavorites(data.favorites.slice(0, 5));
     } catch (error) {
       console.error("Failed to load favorites:", error);
     }
@@ -185,7 +165,6 @@ export default function FoodMainPage() {
       { query: searchQuery, timestamp: Date.now() },
       ...searchHistory.filter((h) => h.query !== searchQuery),
     ].slice(0, 10);
-
     setSearchHistory(newHistory);
     localStorage.setItem("food_search_history", JSON.stringify(newHistory));
   };
@@ -195,49 +174,32 @@ export default function FoodMainPage() {
     localStorage.removeItem("food_search_history");
   };
 
-  // ==========================================
-  // ✅ 실시간 검색 (debounce)
-  // ==========================================
   useEffect(() => {
     if (query.length === 0) {
-      updateURL(""); // ✅ URL만 업데이트
-
-      if (hasSearched) {
-        setResults([]);
-      }
+      updateURL("");
+      if (hasSearched) setResults([]);
       setShowHistory(true);
       setCurrentPage(1);
       return;
     }
-
-    if (query.length < 2) {
-      return;
-    }
-
+    if (query.length < 2) return;
     setShowHistory(false);
-
     const timer = setTimeout(() => {
-      performSearch(query); // ✅ 검색만 실행
-      updateURL(query); // ✅ URL 업데이트
+      performSearch(query);
+      updateURL(query);
     }, 500);
-
     return () => clearTimeout(timer);
   }, [query]);
-  // ==========================================
-  // ✅ 순수 검색 함수 (URL 업데이트 없음)
-  // ==========================================
+
   const performSearch = async (searchQuery: string) => {
     if (searchQuery.length < 2) return;
-
     setIsLoading(true);
     setHasSearched(true);
-
     try {
       const response = await fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
       );
       const data = await response.json();
-
       if (data.success) {
         setResults(data.items);
         setCurrentPage(1);
@@ -252,9 +214,7 @@ export default function FoodMainPage() {
       setIsLoading(false);
     }
   };
-  // ==========================================
-  // ✅ URL 업데이트 함수 (별도 분리)
-  // ==========================================
+
   const updateURL = (searchQuery: string) => {
     if (searchQuery) {
       router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
@@ -265,26 +225,18 @@ export default function FoodMainPage() {
     }
   };
 
-  // ==========================================
-  // ✅ 검색 실행 (URL 업데이트 추가)
-  // ==========================================
   const handleSearch = async (searchQuery: string) => {
     if (searchQuery.length < 2) return;
-
     setIsLoading(true);
     setHasSearched(true);
-
-    // ✅ URL 업데이트
     router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
-      scroll: false, // 스크롤 위치 유지
+      scroll: false,
     });
-
     try {
       const response = await fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
       );
       const data = await response.json();
-
       if (data.success) {
         setResults(data.items);
         setCurrentPage(1);
@@ -300,55 +252,39 @@ export default function FoodMainPage() {
     }
   };
 
-  // ==========================================
-  // 페이징
-  // ==========================================
   const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
   const currentResults = results.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleProductClick = (foodCode: string) => {
+  const handlePageChange = (page: number) => setCurrentPage(page);
+  const handleProductClick = (foodCode: string) =>
     router.push(`/food/result/${foodCode}`);
-  };
-
   const handleKeywordClick = (keyword: string) => {
     setQuery(keyword);
     setShowHistory(false);
   };
-  // ==========================================
-  // ✅ 검색창 초기화
-  // ==========================================
   const handleClearSearch = () => {
     setQuery("");
     setResults([]);
     setShowHistory(true);
     setHasSearched(false);
   };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-
       <main className="flex-1 pb-16 md:pb-0">
         <div className="container mx-auto px-4 py-8">
           <div className="mx-auto max-w-6xl">
-            {/* 헤더 */}
             <div className="mb-8 text-center">
               <h1 className="mb-2 text-4xl font-bold">이거 먹어도 돼?</h1>
               <p className="text-lg text-muted-foreground">
                 내 알레르기 정보를 기반으로 안전하게 확인하세요
               </p>
             </div>
-
             <div className="grid gap-6 lg:grid-cols-3">
-              {/* 왼쪽: 검색 & 결과 */}
               <div className="lg:col-span-2">
-                {/* 검색창 */}
                 <div className="relative mb-6">
                   <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -370,8 +306,6 @@ export default function FoodMainPage() {
                     </Button>
                   )}
                 </div>
-
-                {/* 빠른 액션 버튼 */}
                 <div className="mb-6 grid grid-cols-2 gap-3">
                   <Link href="/food/camera">
                     <Card className="cursor-pointer transition-all hover:border-primary hover:shadow-md">
@@ -388,7 +322,6 @@ export default function FoodMainPage() {
                       </CardContent>
                     </Card>
                   </Link>
-
                   <Link href="/food/profile">
                     <Card className="cursor-pointer transition-all hover:border-primary hover:shadow-md">
                       <CardContent className="flex items-center gap-3 p-4">
@@ -405,8 +338,6 @@ export default function FoodMainPage() {
                     </Card>
                   </Link>
                 </div>
-
-                {/* 로딩 */}
                 {isLoading && (
                   <Card>
                     <CardContent className="flex flex-col items-center py-12">
@@ -417,8 +348,6 @@ export default function FoodMainPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* 검색 기록 */}
                 {showHistory && searchHistory.length > 0 && !isLoading && (
                   <Card className="mb-6">
                     <CardContent className="p-4">
@@ -453,8 +382,6 @@ export default function FoodMainPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* 인기 & 추천 검색어 */}
                 {showHistory && !isLoading && (
                   <>
                     <Card className="mb-4">
@@ -481,7 +408,6 @@ export default function FoodMainPage() {
                         </div>
                       </CardContent>
                     </Card>
-
                     <Card className="mb-4">
                       <CardContent className="p-4">
                         <h3 className="mb-3 flex items-center gap-2 font-medium">
@@ -502,7 +428,6 @@ export default function FoodMainPage() {
                         </div>
                       </CardContent>
                     </Card>
-
                     <Card className="border-blue-200 bg-blue-50">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
@@ -510,8 +435,12 @@ export default function FoodMainPage() {
                           <div className="text-sm text-blue-900">
                             <p className="mb-2 font-medium">💡 검색 팁</p>
                             <ul className="space-y-1 text-xs">
-                              <li>• 제품명: "새우깡", "칸쵸"</li>
-                              <li>• 원재료: "계란", "우유"</li>
+                              <li>
+                                • 제품명: &quot;새우깡&quot;, &quot;칸쵸&quot;
+                              </li>
+                              <li>
+                                • 원재료: &quot;계란&quot;, &quot;우유&quot;
+                              </li>
                               <li>• 교차오염 제품까지 검색</li>
                             </ul>
                           </div>
@@ -520,8 +449,6 @@ export default function FoodMainPage() {
                     </Card>
                   </>
                 )}
-
-                {/* 검색 결과 */}
                 {!isLoading && hasSearched && results.length > 0 && (
                   <>
                     <div className="mb-4 flex items-center justify-between">
@@ -535,7 +462,6 @@ export default function FoodMainPage() {
                         {currentPage} / {totalPages} 페이지
                       </p>
                     </div>
-
                     <div className="space-y-3">
                       {currentResults.map((item) => (
                         <Card
@@ -592,8 +518,6 @@ export default function FoodMainPage() {
                         </Card>
                       ))}
                     </div>
-
-                    {/* 페이징 */}
                     {results.length > ITEMS_PER_PAGE && (
                       <div className="mt-6 flex items-center justify-center gap-2">
                         <Button
@@ -604,21 +528,15 @@ export default function FoodMainPage() {
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </Button>
-
                         {Array.from(
                           { length: Math.min(totalPages, 5) },
                           (_, i) => {
                             let pageNum;
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (currentPage >= totalPages - 2) {
+                            if (totalPages <= 5) pageNum = i + 1;
+                            else if (currentPage <= 3) pageNum = i + 1;
+                            else if (currentPage >= totalPages - 2)
                               pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = currentPage - 2 + i;
-                            }
-
+                            else pageNum = currentPage - 2 + i;
                             return (
                               <Button
                                 key={i}
@@ -635,7 +553,6 @@ export default function FoodMainPage() {
                             );
                           },
                         )}
-
                         <Button
                           variant="outline"
                           size="icon"
@@ -648,8 +565,6 @@ export default function FoodMainPage() {
                     )}
                   </>
                 )}
-
-                {/* 검색 결과 없음 */}
                 {!isLoading &&
                   hasSearched &&
                   query.length >= 2 &&
@@ -661,7 +576,7 @@ export default function FoodMainPage() {
                           검색 결과가 없습니다
                         </h3>
                         <p className="mb-6 text-center text-sm text-muted-foreground">
-                          "{query}"에 대한 제품을 찾을 수 없어요
+                          &quot;{query}&quot;에 대한 제품을 찾을 수 없어요
                         </p>
                         <div className="flex flex-wrap justify-center gap-2">
                           {POPULAR_KEYWORDS.slice(0, 5).map((keyword, idx) => (
@@ -679,10 +594,7 @@ export default function FoodMainPage() {
                     </Card>
                   )}
               </div>
-
-              {/* 오른쪽: 사이드바 */}
               <div className="space-y-6">
-                {/* 최근 확인 제품 */}
                 {recentProducts.length > 0 && (
                   <Card>
                     <CardContent className="p-4">
@@ -709,11 +621,7 @@ export default function FoodMainPage() {
                             onClick={() => handleProductClick(product.foodCode)}
                           >
                             <div
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                product.isSafe
-                                  ? "bg-green-100 text-green-600"
-                                  : "bg-red-100 text-red-600"
-                              }`}
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${product.isSafe ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
                             >
                               {product.isSafe ? (
                                 <CheckCircle className="h-4 w-4" />
@@ -737,8 +645,6 @@ export default function FoodMainPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* 즐겨찾기 */}
                 {isLoggedIn && favorites.length > 0 && (
                   <Card>
                     <CardContent className="p-4">
@@ -767,11 +673,7 @@ export default function FoodMainPage() {
                             }
                           >
                             <div
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                favorite.isSafe
-                                  ? "bg-green-100 text-green-600"
-                                  : "bg-red-100 text-red-600"
-                              }`}
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${favorite.isSafe ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
                             >
                               {favorite.isSafe ? (
                                 <CheckCircle className="h-4 w-4" />
@@ -788,8 +690,6 @@ export default function FoodMainPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* 내 알레르기 */}
                 {isLoggedIn && userAllergens.length > 0 && (
                   <Card className="border-amber-200 bg-amber-50">
                     <CardContent className="p-4">
@@ -829,8 +729,6 @@ export default function FoodMainPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* 빠른 도움말 */}
                 <Card className="border-blue-200 bg-blue-50">
                   <CardContent className="p-4">
                     <h3 className="mb-3 font-medium text-blue-900">
@@ -857,8 +755,21 @@ export default function FoodMainPage() {
           </div>
         </div>
       </main>
-
       <MobileNav />
     </div>
+  );
+}
+
+export default function FoodMainPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p>로딩 중...</p>
+        </div>
+      }
+    >
+      <FoodMainContent />
+    </Suspense>
   );
 }
