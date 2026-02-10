@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import { AuthProvider } from "@/contexts/auth-context";
-import { LoginModal } from "@/components/auth/login-modal";
+
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -61,7 +61,6 @@ export default function RootLayout({
           src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
         />
         <AuthProvider>
-          <LoginModal />
           {children}
           <Toaster />
         </AuthProvider>
