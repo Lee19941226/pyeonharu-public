@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 
 // 나이스 알레르기 번호 → 알레르기명 매핑
 // https://open.neis.go.kr 급식식단정보 기준
+// ※ 1번: 나이스 공식은 "난류"이나, 사용자 프로필과 일치시키기 위해 "계란"으로 매핑
 const NEIS_ALLERGEN_MAP: Record<string, string> = {
-  "1": "난류",
+  "1": "계란",
   "2": "우유",
   "3": "메밀",
   "4": "땅콩",

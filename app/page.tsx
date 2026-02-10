@@ -228,20 +228,20 @@ function SchoolMealCard({
   const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`
 
   return (
-    <Card className={`border-2 ${hasDanger ? "border-red-200 bg-red-50/30" : "border-green-200 bg-green-50/30"}`}>
+    <Card className={`border shadow-none ${hasDanger ? "border-red-200" : "border-green-200"}`}>
       <CardContent className="p-4">
         {/* 학교명 + 안전/위험 요약 */}
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${hasDanger ? "bg-red-100" : "bg-green-100"}`}>
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${hasDanger ? "bg-red-100" : "bg-green-100"}`}>
               {hasDanger ? (
-                <ShieldAlert className="h-5 w-5 text-red-500" />
+                <ShieldAlert className="h-4 w-4 text-red-500" />
               ) : (
-                <ShieldCheck className="h-5 w-5 text-green-500" />
+                <ShieldCheck className="h-4 w-4 text-green-500" />
               )}
             </div>
             <div>
-              <p className="font-medium">{entry.school.school_name} 오늘 급식</p>
+              <p className="text-sm font-medium">{entry.school.school_name} 오늘 급식</p>
               <p className={`text-xs ${hasDanger ? "text-red-600" : "text-green-600"}`}>
                 {hasDanger
                   ? `⚠️ 주의 메뉴 ${dangerItems.length}개 — ${[...new Set(dangerItems.flatMap(d => d.matchedAllergens))].join(", ")}`
@@ -258,12 +258,12 @@ function SchoolMealCard({
         {entry.meals.map((meal, mi) => (
           <div key={mi} className={mi > 0 ? "mt-2 border-t pt-2" : ""}>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">{meal.mealTypeName} {meal.calInfo && `· ${meal.calInfo}`}</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {meal.menu.map((item, j) => (
                 <Badge
                   key={j}
                   variant={item.status === "danger" ? "destructive" : "secondary"}
-                  className={`text-xs ${item.status === "danger" ? "" : "bg-muted text-muted-foreground"}`}
+                  className={`text-xs font-normal ${item.status === "danger" ? "" : "bg-muted text-muted-foreground"}`}
                 >
                   {item.status === "danger" && "⚠️ "}{item.name}
                 </Badge>
@@ -451,6 +451,12 @@ export default function HomePage() {
   const [placeLoading, setPlaceLoading] = useState(false)
   const [radiusKm, setRadiusKm] = useState(3)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
+  const [placeSearchQuery, setPlaceSearchQuery] = useState("")
+  const [placeSearchResults, setPlaceSearchResults] = useState<NearbyPlace[]>([])
+  const [placeSearchLoading, setPlaceSearchLoading] = useState(false)
+  const [placeSearched, setPlaceSearched] = useState(false)
+  const [placePage, setPlacePage] = useState(1)
+  const PLACES_PER_PAGE = 5
 
   // 약 검색
   const [medicineQuery, setMedicineQuery] = useState("")
@@ -625,6 +631,78 @@ export default function HomePage() {
     } catch { setMedicineResults([]) } finally { setMedicineLoading(false) }
   }
 
+  // 시도코드 계산 헬퍼
+  const getSidoCdFromLocation = (lat: number, lng: number): string => {
+    const centers: Record<string, { lat: number; lng: number; code: string }> = {
+      서울: { lat: 37.5665, lng: 126.978, code: "110000" },
+      부산: { lat: 35.1796, lng: 129.0756, code: "210000" },
+      대구: { lat: 35.8714, lng: 128.6014, code: "220000" },
+      인천: { lat: 37.4563, lng: 126.7052, code: "230000" },
+      광주: { lat: 35.1595, lng: 126.8526, code: "240000" },
+      대전: { lat: 36.3504, lng: 127.3845, code: "250000" },
+      울산: { lat: 35.5384, lng: 129.3114, code: "260000" },
+      세종: { lat: 36.48, lng: 127.259, code: "290000" },
+      경기: { lat: 37.275, lng: 127.0094, code: "310000" },
+      강원: { lat: 37.8228, lng: 128.1555, code: "320000" },
+      충북: { lat: 36.6357, lng: 127.4913, code: "330000" },
+      충남: { lat: 36.6588, lng: 126.6728, code: "340000" },
+      전북: { lat: 35.8203, lng: 127.1088, code: "350000" },
+      전남: { lat: 34.8161, lng: 126.4629, code: "360000" },
+      경북: { lat: 36.576, lng: 128.506, code: "370000" },
+      경남: { lat: 35.2384, lng: 128.6924, code: "380000" },
+      제주: { lat: 33.4996, lng: 126.5312, code: "390000" },
+    }
+    let closest = "310000"
+    let minDist = Infinity
+    for (const c of Object.values(centers)) {
+      const d = Math.sqrt((lat - c.lat) ** 2 + (lng - c.lng) ** 2)
+      if (d < minDist) { minDist = d; closest = c.code }
+    }
+    return closest
+  }
+
+  // 병원/약국 이름 검색 (전체 API 호출)
+  const handlePlaceSearch = async () => {
+    if (!placeSearchQuery.trim()) {
+      setPlaceSearched(false)
+      setPlaceSearchResults([])
+      return
+    }
+    if (!userLocation) return
+
+    setPlaceSearchLoading(true)
+    setPlaceSearched(true)
+    setPlacePage(1)
+    setSelectedPlaceId(null)
+
+    try {
+      const sidoCd = getSidoCdFromLocation(userLocation.lat, userLocation.lng)
+
+      if (placeType === "hospital") {
+        const res = await fetch(`/api/area/hospitals?sidoCd=${sidoCd}&keyword=${encodeURIComponent(placeSearchQuery)}&numOfRows=50`)
+        const data = await res.json()
+        const hospitals = (data.hospitals || []).map((h: any) => ({
+          id: h.id, name: h.name, address: h.address, phone: h.phone,
+          clCdNm: h.clCdNm, distance: "", distanceNum: 0, lat: h.lat, lng: h.lng,
+        }))
+        setPlaceSearchResults(hospitals)
+      } else {
+        const sidoCd = getSidoCdFromLocation(userLocation.lat, userLocation.lng)
+        const res = await fetch(`/api/area/pharmacies?sidoCd=${sidoCd}&keyword=${encodeURIComponent(placeSearchQuery)}&numOfRows=50`)
+        const data = await res.json()
+        const pharmacies = (data.pharmacies || []).map((p: any) => ({
+          id: p.id || String(Math.random()), name: p.name, address: p.address, phone: p.phone,
+          clCdNm: "약국", distance: "", distanceNum: 0, lat: p.lat, lng: p.lng,
+        }))
+        setPlaceSearchResults(pharmacies)
+      }
+    } catch {
+      setPlaceSearchResults([])
+    } finally {
+      setPlaceSearchLoading(false)
+    }
+  }
+
   const tabStyle = (mode: SearchMode) =>
     searchMode === mode
       ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
@@ -636,44 +714,14 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 pb-16 md:pb-0">
-        <div className="container mx-auto space-y-4 px-4 py-6">
+        <div className="container mx-auto space-y-3 px-4 py-4">
 
           {/* ═══════════════════════════════════════
-              0. 바코드 스캔 히어로
+              1. 4탭 통합 검색 (핵심 기능 — 최상단)
           ═══════════════════════════════════════ */}
-          <Card className="overflow-hidden border-0 bg-gradient-to-r from-primary/10 via-primary/5 to-background shadow-md">
-            <CardContent className="flex items-center gap-4 p-4 md:p-6">
-              <button
-                onClick={() => router.push("/food/camera")}
-                className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-primary shadow-lg transition-transform hover:scale-105 active:scale-95"
-                aria-label="바코드 스캔"
-              >
-                <Camera className="h-6 w-6 text-primary-foreground" />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-base md:text-lg">바코드 한 번이면 3초 만에 확인</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  우리 가족이 먹어도 되는 식품인지 바로 확인하세요
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:flex gap-1.5"
-                onClick={() => router.push("/food/camera")}
-              >
-                <Camera className="h-4 w-4" />
-                스캔하기
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* ═══════════════════════════════════════
-              1. 4탭 통합 검색 카드
-          ═══════════════════════════════════════ */}
-          <Card className="overflow-hidden border-0 shadow-lg">
+          <Card className="overflow-hidden border shadow-none">
             <CardContent className="p-0">
-              {/* 탭 선택 — 1행 4열 */}
+              {/* 탭 선택 */}
               <div className="flex border-b overflow-x-auto">
                 <button
                   onClick={() => setSearchMode("food")}
@@ -710,16 +758,20 @@ export default function HomePage() {
               </div>
 
               {/* 콘텐츠 */}
-              <div className="p-5">
+              <div className="p-4">
 
                 {/* ── 이거 먹어도 돼? ── */}
                 {searchMode === "food" && (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      음식 사진이나 이름으로 알레르기를 확인하세요
-                    </p>
+                    <p className="text-sm text-muted-foreground">음식 사진이나 이름으로 알레르기를 확인하세요</p>
+
+                    {/* 바코드 + 검색 통합 */}
                     <div className="flex gap-2">
-                      <Button variant="outline" className="h-10 gap-2" onClick={() => router.push("/food/camera")}>
+                      <Button
+                        variant="outline"
+                        className="gap-1.5 shrink-0"
+                        onClick={() => router.push("/food/camera")}
+                      >
                         <Camera className="h-4 w-4" />
                         사진 업로드
                       </Button>
@@ -735,208 +787,278 @@ export default function HomePage() {
                       </div>
                       <Button onClick={handleFoodSearch}>검색</Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요
-                    </p>
+
+                    <p className="text-xs text-muted-foreground">내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요</p>
+
+                    {/* 최근 확인 기록 (로그인 시 인라인) */}
+                    {user && recentChecks.length > 0 && (
+                      <div className="border-t pt-3 -mx-4 px-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-muted-foreground">최근 확인</p>
+                          <button onClick={() => router.push("/food/history")} className="text-xs text-muted-foreground hover:text-primary">전체보기 →</button>
+                        </div>
+                        <div className="flex gap-1.5 overflow-x-auto pb-1">
+                          {recentChecks.map((item, i) => (
+                            <div key={i} className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs shrink-0 text-muted-foreground">
+                              {item.isSafe ? <CheckCircle className="h-3 w-3 text-green-500" /> : <XCircle className="h-3 w-3 text-red-500" />}
+                              <span className="max-w-[100px] truncate">{item.foodName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* ── 몸이 아파요 ── */}
                 {searchMode === "symptom" && (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      증상을 알려주세요, 주변 병원을 찾아드릴게요
-                    </p>
+                    <p className="text-sm text-muted-foreground">증상을 입력하면 AI가 적합한 진료과를 추천해드려요</p>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                          placeholder="어디가 아프세요? (예: 두통, 배가 아파요)"
+                          placeholder="증상 입력 (예: 목이 아프고 열이 나요)"
                           value={symptomInput}
                           onChange={(e) => setSymptomInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleSymptomSearch()}
-                          className="pl-10"
+                          className="h-10 pl-10"
                         />
                       </div>
-                      <Button onClick={handleSymptomSearch}>검색</Button>
+                      <Button onClick={handleSymptomSearch}>분석</Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      AI가 증상을 분석하고 적합한 진료과와 주변 병원을 추천해드려요
-                    </p>
+                    <p className="text-xs text-muted-foreground">※ AI 분석 결과는 참고용이며, 정확한 진단은 의료진과 상담하세요</p>
                   </div>
                 )}
 
-                {/* ── 병원/약국 조회 (위치 기반) ── */}
+                {/* ── 병원/약국 조회 ── */}
                 {searchMode === "search" && (
-                  <div className="space-y-4">
-                    {/* 타입 + 반경 선택 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-2">
-                        <Button variant={placeType === "hospital" ? "default" : "outline"} size="sm" onClick={() => setPlaceType("hospital")}>
-                          <Building2 className="mr-1 h-4 w-4" />병원
-                        </Button>
-                        <Button variant={placeType === "pharmacy" ? "default" : "outline"} size="sm" onClick={() => setPlaceType("pharmacy")}>
-                          <Cross className="mr-1 h-4 w-4" />약국
-                        </Button>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">현재 위치 기반으로 가까운 병원/약국을 찾아드려요</p>
+
+                    {/* 병원/약국 토글 + 반경 */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex rounded-lg border overflow-hidden flex-1">
+                        <button
+                          onClick={() => { setPlaceType("hospital"); setPlacePage(1); setPlaceSearchQuery(""); setSelectedPlaceId(null) }}
+                          className={`flex-1 py-2 text-sm font-medium transition-colors ${placeType === "hospital" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                        >병원</button>
+                        <button
+                          onClick={() => { setPlaceType("pharmacy"); setPlacePage(1); setPlaceSearchQuery(""); setSelectedPlaceId(null) }}
+                          className={`flex-1 py-2 text-sm font-medium transition-colors ${placeType === "pharmacy" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                        >약국</button>
                       </div>
                       <select
                         value={radiusKm}
-                        onChange={(e) => setRadiusKm(Number(e.target.value))}
-                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        onChange={(e) => { setRadiusKm(Number(e.target.value)); setPlacePage(1) }}
+                        className="rounded-lg border px-3 py-2 text-sm"
                       >
-                        <option value={1}>반경 1km</option>
-                        <option value={3}>반경 3km</option>
-                        <option value={5}>반경 5km</option>
-                        <option value={10}>반경 10km</option>
+                        {[1, 3, 5, 10].map(km => (
+                          <option key={km} value={km}>반경 {km}km</option>
+                        ))}
                       </select>
                     </div>
 
-                    {/* 위치 상태 표시 */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {locationStatus === "loading" && "위치 확인 중..."}
-                      {locationStatus === "granted" && `현재 위치 기준 반경 ${radiusKm}km 이내`}
-                      {locationStatus === "denied" && "위치 권한이 없어 기본 위치(군포)로 검색합니다"}
-                    </div>
-
-                    {/* 결과 */}
-                    {placeLoading ? (
-                      <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
-                    ) : nearbyPlaces.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">
-                          가까운 순 · {nearbyPlaces.length}개 {placeType === "hospital" ? "병원" : "약국"}
-                        </p>
-                        {nearbyPlaces.slice(0, 20).map((place) => {
-                          const isSelected = selectedPlaceId === place.id
-                          return (
-                            <div key={place.id} className="rounded-lg border overflow-hidden transition-all">
-                              {/* 병원 카드 — 클릭 시 상세 토글 */}
-                              <button
-                                onClick={() => setSelectedPlaceId(isSelected ? null : place.id)}
-                                className={`flex w-full items-start justify-between p-3 text-left transition-colors ${
-                                  isSelected ? "bg-primary/5" : "hover:bg-muted/50"
-                                }`}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium text-sm truncate">{place.name}</p>
-                                    {place.distance && (
-                                      <Badge variant="secondary" className="text-[10px] flex-shrink-0">
-                                        {place.distance}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground truncate">{place.address}</p>
-                                  {place.clCdNm && <Badge variant="outline" className="mt-1 text-[10px]">{place.clCdNm}</Badge>}
-                                </div>
-                                <ChevronDown className={`h-4 w-4 mt-1 transition-transform text-muted-foreground flex-shrink-0 ${isSelected ? "rotate-180" : ""}`} />
-                              </button>
-
-                              {/* 상세 드롭다운 — 지도 + 정보 + 액션 */}
-                              {isSelected && (
-                                <div className="border-t">
-                                  {/* 지도 영역 */}
-                                  <div style={{ height: "208px", minHeight: "208px" }} className="bg-muted relative">
-                                    {place.lat > 0 && place.lng > 0 ? (
-                                      <MiniNaverMap
-                                        lat={place.lat}
-                                        lng={place.lng}
-                                        name={place.name}
-                                        userLocation={userLocation}
-                                      />
-                                    ) : (
-                                      <iframe
-                                        src={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}?c=15,0,0,0,dh`}
-                                        className="h-full w-full border-0"
-                                        loading="lazy"
-                                        title={`${place.name} 지도`}
-                                      />
-                                    )}
-                                  </div>
-
-                                  {/* 병원 정보 */}
-                                  <div className="px-3 py-3 space-y-2 bg-muted/20">
-                                    <div className="flex items-start gap-2">
-                                      <MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
-                                      <p className="text-xs text-foreground">{place.address}</p>
-                                    </div>
-                                    {place.phone && (
-                                      <div className="flex items-center gap-2">
-                                        <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                        <a href={`tel:${place.phone}`} className="text-xs text-primary hover:underline">{place.phone}</a>
-                                      </div>
-                                    )}
-                                    {place.clCdNm && (
-                                      <div className="flex items-center gap-2">
-                                        <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                        <p className="text-xs text-foreground">{place.clCdNm}</p>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* 액션 버튼 */}
-                                  <div className="flex items-center border-t px-2 py-2 gap-1">
-                                    <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
-                                      {place.phone ? <a href={`tel:${place.phone}`}><Phone className="h-3.5 w-3.5" />전화</a> : <span className="text-muted-foreground">전화 정보 없음</span>}
-                                    </Button>
-                                    <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
-                                      <a
-                                        href={`https://map.naver.com/index.nhn?slng=${userLocation?.lng || ""}&slat=${userLocation?.lat || ""}&stext=${encodeURIComponent("내 위치")}&elng=${place.lng}&elat=${place.lat}&etext=${encodeURIComponent(place.name)}&menu=route&pathType=1`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => {
-                                          if (/iPhone|iPad|Android/i.test(navigator.userAgent)) {
-                                            e.preventDefault()
-                                            window.location.href = `nmap://route/walk?slat=${userLocation?.lat || ""}&slng=${userLocation?.lng || ""}&sname=${encodeURIComponent("내 위치")}&dlat=${place.lat}&dlng=${place.lng}&dname=${encodeURIComponent(place.name)}&appname=pyeonharu`
-                                          }
-                                        }}
-                                      >
-                                        <MapPin className="h-3.5 w-3.5" />길찾기
-                                      </a>
-                                    </Button>
-                                    <BookmarkButton type={placeType === "pharmacy" ? "pharmacy" : "hospital"} id={place.id} name={place.name} address={place.address} phone={place.phone} category={place.clCdNm} lat={place.lat} lng={place.lng} />
-                                  </div>
-
-                                  {/* 네이버 지도에서 상세보기 */}
-                                  <a
-                                    href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center justify-center gap-1.5 border-t px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
-                                  >
-                                    네이버 지도에서 상세보기
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                        {nearbyPlaces.length > 20 && (
-                          <Button variant="outline" size="sm" className="w-full" onClick={() => router.push("/search")}>
-                            지도에서 전체 보기<ChevronRight className="ml-1 h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <MapPin className="mx-auto mb-2 h-10 w-10 text-muted-foreground/30" />
-                        <p className="text-sm text-muted-foreground">반경 {radiusKm}km 이내에 {placeType === "hospital" ? "병원" : "약국"}이 없습니다</p>
-                        <Button variant="outline" size="sm" className="mt-3" onClick={() => setRadiusKm(Math.min(radiusKm + 2, 10))}>
-                          범위 넓히기
+                    {/* 이름 검색 */}
+                    {locationStatus === "granted" && (
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            placeholder={`${placeType === "hospital" ? "병원" : "약국"} 이름 검색 (예: ${placeType === "hospital" ? "삼성병원" : "온누리약국"})`}
+                            value={placeSearchQuery}
+                            onChange={(e) => { if (!e.target.value.trim()) { setPlaceSearched(false); setPlaceSearchResults([]) }; setPlaceSearchQuery(e.target.value) }}
+                            onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()}
+                            className="h-9 pl-10 text-sm"
+                          />
+                        </div>
+                        <Button size="sm" onClick={handlePlaceSearch} disabled={placeSearchLoading}>
+                          {placeSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}
                         </Button>
                       </div>
                     )}
+
+                    {/* 위치 상태 + 결과 */}
+                    {locationStatus === "loading" && (
+                      <div className="flex items-center justify-center py-6 gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">위치 정보를 가져오는 중...</span>
+                      </div>
+                    )}
+                    {locationStatus === "denied" && (
+                      <div className="text-center py-6">
+                        <MapPin className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">위치 접근 권한이 필요합니다</p>
+                        <Button size="sm" variant="outline" className="mt-2" onClick={() => router.push("/search")}>
+                          직접 검색하기
+                        </Button>
+                      </div>
+                    )}
+                    {locationStatus === "granted" && (() => {
+                      // 검색 결과 vs 위치 기반 리스트
+                      const displayPlaces = placeSearched ? placeSearchResults : nearbyPlaces
+                      const isSearchMode = placeSearched
+
+                      const totalPages = Math.ceil(displayPlaces.length / PLACES_PER_PAGE)
+                      const paged = displayPlaces.slice((placePage - 1) * PLACES_PER_PAGE, placePage * PLACES_PER_PAGE)
+
+                      const loading = isSearchMode ? placeSearchLoading : placeLoading
+
+                      return (
+                        <div>
+                          {loading ? (
+                            <div className="space-y-2">
+                              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+                            </div>
+                          ) : displayPlaces.length > 0 ? (
+                            <div className="space-y-1">
+                              {/* 결과 수 */}
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {isSearchMode ? `"${placeSearchQuery}" 검색 결과 ${displayPlaces.length}개` : `내 주변 ${displayPlaces.length}개`}
+                                {totalPages > 1 && ` · ${placePage}/${totalPages} 페이지`}
+                              </p>
+
+                              {paged.map((place) => {
+                                const isSelected = selectedPlaceId === place.id
+                                return (
+                                  <div key={place.id} className="border rounded-lg overflow-hidden">
+                                    <button
+                                      onClick={() => setSelectedPlaceId(isSelected ? null : place.id)}
+                                      className={`flex w-full items-start justify-between p-3 text-left transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/50"}`}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-medium text-sm truncate">{place.name}</p>
+                                          {place.distance && <Badge variant="secondary" className="text-[10px] flex-shrink-0">{place.distance}</Badge>}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                                        {place.clCdNm && <Badge variant="outline" className="mt-1 text-[10px]">{place.clCdNm}</Badge>}
+                                      </div>
+                                      <ChevronDown className={`h-4 w-4 mt-1 transition-transform text-muted-foreground flex-shrink-0 ${isSelected ? "rotate-180" : ""}`} />
+                                    </button>
+
+                                    {isSelected && (
+                                      <div className="border-t">
+                                        <div style={{ height: "208px", minHeight: "208px" }} className="bg-muted relative">
+                                          {place.lat > 0 && place.lng > 0 ? (
+                                            <MiniNaverMap lat={place.lat} lng={place.lng} name={place.name} userLocation={userLocation} />
+                                          ) : (
+                                            <iframe src={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}?c=15,0,0,0,dh`} className="h-full w-full border-0" loading="lazy" title={`${place.name} 지도`} />
+                                          )}
+                                        </div>
+                                        <div className="px-3 py-3 space-y-2 bg-muted/20">
+                                          <div className="flex items-start gap-2">
+                                            <MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
+                                            <p className="text-xs">{place.address}</p>
+                                          </div>
+                                          {place.phone && (
+                                            <div className="flex items-center gap-2">
+                                              <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                              <a href={`tel:${place.phone}`} className="text-xs text-primary hover:underline">{place.phone}</a>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center border-t px-2 py-2 gap-1">
+                                          <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
+                                            {place.phone ? <a href={`tel:${place.phone}`}><Phone className="h-3 w-3" />전화</a> : <span className="text-muted-foreground">전화번호 없음</span>}
+                                          </Button>
+                                          <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
+                                            <a
+                                              href={place.lat > 0 ? `https://map.naver.com/v5/directions/-/${place.lng},${place.lat},${encodeURIComponent(place.name)}/-/transit?c=${place.lng},${place.lat},15,0,0,0,dh` : `https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                            >
+                                              <MapPin className="h-3 w-3" />길찾기
+                                            </a>
+                                          </Button>
+                                          <BookmarkButton type={placeType === "pharmacy" ? "pharmacy" : "hospital"} id={place.id} name={place.name} address={place.address} phone={place.phone} category={place.clCdNm} lat={place.lat} lng={place.lng} />
+                                        </div>
+                                        <a
+                                          href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center justify-center gap-1.5 border-t px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
+                                        >
+                                          네이버 지도에서 상세보기
+                                          <ChevronRight className="h-3.5 w-3.5" />
+                                        </a>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              {/* 페이징 */}
+                              {totalPages > 1 && (
+                                <div className="flex items-center justify-center gap-1 pt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    disabled={placePage <= 1}
+                                    onClick={() => { setPlacePage(p => p - 1); setSelectedPlaceId(null) }}
+                                  >
+                                    ‹
+                                  </Button>
+                                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                    // 5개 페이지 버튼 표시 (현재 페이지 중심)
+                                    let pageNum: number
+                                    if (totalPages <= 5) {
+                                      pageNum = i + 1
+                                    } else if (placePage <= 3) {
+                                      pageNum = i + 1
+                                    } else if (placePage >= totalPages - 2) {
+                                      pageNum = totalPages - 4 + i
+                                    } else {
+                                      pageNum = placePage - 2 + i
+                                    }
+                                    return (
+                                      <Button
+                                        key={pageNum}
+                                        variant={placePage === pageNum ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 w-8 p-0 text-xs"
+                                        onClick={() => { setPlacePage(pageNum); setSelectedPlaceId(null) }}
+                                      >
+                                        {pageNum}
+                                      </Button>
+                                    )
+                                  })}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    disabled={placePage >= totalPages}
+                                    onClick={() => { setPlacePage(p => p + 1); setSelectedPlaceId(null) }}
+                                  >
+                                    ›
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6">
+                              <MapPin className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                              <p className="text-sm text-muted-foreground">
+                                {isSearchMode ? `"${placeSearchQuery}" 검색 결과가 없습니다` : `반경 ${radiusKm}km 이내에 ${placeType === "hospital" ? "병원" : "약국"}이 없습니다`}
+                              </p>
+                              {isSearchMode ? (
+                                <Button variant="outline" size="sm" className="mt-2" onClick={() => { setPlaceSearchQuery(""); setPlaceSearched(false); setPlaceSearchResults([]) }}>검색 초기화</Button>
+                              ) : (
+                                <Button variant="outline" size="sm" className="mt-2" onClick={() => setRadiusKm(Math.min(radiusKm + 2, 10))}>범위 넓히기</Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
 
                 {/* ── 약 정보 검색 ── */}
                 {searchMode === "medicine" && (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      약 이름으로 복용법, 주의사항, 부작용을 확인하세요
-                    </p>
+                    <p className="text-sm text-muted-foreground">약 이름으로 복용법, 주의사항, 부작용을 확인하세요</p>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -947,40 +1069,26 @@ export default function HomePage() {
                       </Button>
                     </div>
 
-                    {medicineLoading ? (
-                      <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
-                    ) : medicineResults.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">총 {medicineTotalCount}건 중 상위 5건</p>
-                        {medicineResults.map((med) => (
-                          <div key={med.id} className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:border-primary transition-colors" onClick={() => router.push(`/medicine?q=${encodeURIComponent(med.name)}`)}>
-                            {med.image ? (
-                              <img src={med.image} alt={med.name} className="h-12 w-12 rounded-md object-cover flex-shrink-0" />
-                            ) : (
-                              <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 flex-shrink-0"><Pill className="h-6 w-6 text-primary" /></div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-sm truncate">{med.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{med.company}</p>
-                              {med.efficacy && <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{med.efficacy.slice(0, 60)}...</p>}
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          </div>
-                        ))}
-                        {medicineTotalCount > 5 && (
-                          <Button variant="outline" size="sm" className="w-full" onClick={() => router.push(`/medicine?q=${encodeURIComponent(medicineQuery)}`)}>
-                            전체 {medicineTotalCount}건 보기<ChevronRight className="ml-1 h-4 w-4" />
+                    {medicineSearched && (
+                      medicineResults.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">{medicineTotalCount}개 결과</p>
+                          {medicineResults.map((med) => (
+                            <button key={med.id} onClick={() => router.push(`/medicine?q=${encodeURIComponent(med.name)}`)} className="flex w-full items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors">
+                              <Pill className="h-5 w-5 text-primary shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{med.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{med.company}</p>
+                              </div>
+                            </button>
+                          ))}
+                          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => router.push(`/medicine?q=${encodeURIComponent(medicineQuery)}`)}>
+                            전체 결과 보기 <ChevronRight className="ml-1 h-3 w-3" />
                           </Button>
-                        )}
-                      </div>
-                    ) : medicineSearched ? (
-                      <p className="text-center text-sm text-muted-foreground py-8">검색 결과가 없습니다</p>
-                    ) : (
-                      <div className="text-center py-6">
-                        <Pill className="mx-auto mb-2 h-10 w-10 text-primary/30" />
-                        <p className="text-sm text-muted-foreground">약 이름을 검색하면 상세 정보를 확인할 수 있어요</p>
-                        <p className="text-xs text-muted-foreground mt-1">* 식품의약품안전처 제공 데이터 기준</p>
-                      </div>
+                        </div>
+                      ) : (
+                        <p className="text-center text-sm text-muted-foreground py-4">검색 결과가 없습니다</p>
+                      )
                     )}
                   </div>
                 )}
@@ -990,137 +1098,34 @@ export default function HomePage() {
           </Card>
 
           {/* ═══════════════════════════════════════
-              2. 가족 안전 요약 (로그인 시)
+              2. 급식 알레르기 (학교 등록 시)
           ═══════════════════════════════════════ */}
-          {user && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Users className="h-4 w-4 text-primary" />
-                  가족 안전 요약
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {recentChecks.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">최근 확인 기록</p>
-                    {recentChecks.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg bg-muted/50 p-2.5">
-                        <div className="flex items-center gap-2">
-                          {item.isSafe ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
-                          <span className="text-sm font-medium">{item.foodName}</span>
-                        </div>
-                        <Badge variant={item.isSafe ? "secondary" : "destructive"} className="text-[10px]">
-                          {item.isSafe ? "안전" : "위험"}
-                        </Badge>
-                      </div>
-                    ))}
-                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" onClick={() => router.push("/food/history")}>
-                      전체 기록 보기<ChevronRight className="ml-1 h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center py-6 text-center">
-                    <ShieldCheck className="mb-2 h-10 w-10 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">아직 확인한 식품이 없어요</p>
-                    <Button size="sm" variant="outline" className="mt-3" onClick={() => router.push("/food/camera")}>
-                      첫 번째 식품 확인하기
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {mealStatus === "loaded" && allSchoolMeals.length > 0 && (
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-sm font-medium text-muted-foreground">🍱 오늘의 급식</p>
+              <button onClick={() => router.push("/school")} className="text-xs text-muted-foreground hover:text-primary">학교 수정 →</button>
+            </div>
           )}
-
-
-
-          {/* ═══════════════════════════════════════
-              4. CTA — 비로그인: 알레르기 등록
-          ═══════════════════════════════════════ */}
-          {!user && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <Lock className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">로그인하고 알레르기 정보 등록하기</p>
-                    <p className="text-xs text-muted-foreground">맞춤 서비스를 위해 프로필을 완성해보세요</p>
-                  </div>
-                </div>
-                <Button size="sm" onClick={() => setLoginModalOpen(true)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* ═══════════════════════════════════════
-              5. CTA — 급식 알레르기 체크
-          ═══════════════════════════════════════ */}
-          {/* 비로그인 */}
-          {mealStatus === "no-login" && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <MealIcon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">로그인하고 급식 정보 확인하기</p>
-                    <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 체크해드려요</p>
-                  </div>
-                </div>
-                <Button size="sm" onClick={() => setLoginModalOpen(true)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 로그인 + 학교 미등록 */}
-          {mealStatus === "no-school" && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <GraduationCap className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">학교 등록하고 급식 알레르기 확인하기</p>
-                    <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 자동 체크해드려요</p>
-                  </div>
-                </div>
-                <Button size="sm" onClick={() => router.push("/school")}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 급식 — 모든 학교 표시 */}
           {mealStatus === "loaded" && allSchoolMeals.map((entry, si) => {
             const hasMeals = entry.meals.length > 0
             const allMenuItems = entry.meals.flatMap(m => m.menu)
             const dangerItems = allMenuItems.filter(m => m.status === "danger")
             const hasDanger = dangerItems.length > 0
 
-            // 급식 없는 학교
             if (!hasMeals) {
               return (
-                <Card key={si} className="border-primary/20 bg-primary/5">
+                <Card key={si} className="border shadow-none">
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                        <MealIcon className="h-5 w-5 text-primary" />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+                        <MealIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="font-medium">{entry.school.school_name}</p>
+                        <p className="text-sm font-medium">{entry.school.school_name}</p>
                         <p className="text-xs text-muted-foreground">오늘은 급식 정보가 없습니다 (방학/휴일)</p>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}>
+                    <Button size="sm" variant="ghost" onClick={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </CardContent>
@@ -1128,7 +1133,6 @@ export default function HomePage() {
               )
             }
 
-            // 급식 있는 학교
             return (
               <SchoolMealCard
                 key={si}
@@ -1139,6 +1143,66 @@ export default function HomePage() {
               />
             )
           })}
+
+          {/* ═══════════════════════════════════════
+              3. CTA — 안내 카드 (비로그인 / 미등록)
+          ═══════════════════════════════════════ */}
+          {!user && (
+            <Card className="border shadow-none bg-muted/30">
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                    <Lock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">로그인하고 알레르기 정보 등록하기</p>
+                    <p className="text-xs text-muted-foreground">맞춤 서비스를 위해 프로필을 완성해보세요</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setLoginModalOpen(true)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {mealStatus === "no-login" && (
+            <Card className="border shadow-none bg-muted/30">
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                    <MealIcon className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">로그인하고 급식 정보 확인하기</p>
+                    <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 체크해드려요</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setLoginModalOpen(true)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {mealStatus === "no-school" && (
+            <Card className="border shadow-none bg-muted/30">
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                    <GraduationCap className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">학교 등록하고 급식 알레르기 확인하기</p>
+                    <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 자동 체크해드려요</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => router.push("/school")}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
         </div>
       </main>
