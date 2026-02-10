@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function CanIEatRedirect() {
+function CanIEatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -24,5 +24,19 @@ export default function CanIEatRedirect() {
     <div className="flex min-h-screen items-center justify-center">
       <p>잠시만 기다려주세요...</p>
     </div>
+  );
+}
+
+export default function CanIEatRedirect() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p>잠시만 기다려주세요...</p>
+        </div>
+      }
+    >
+      <CanIEatContent />
+    </Suspense>
   );
 }
