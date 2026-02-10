@@ -6,3 +6,7 @@ npm install @radix-ui/react-dropdown-menu
 
 2026-02-09 15:52 이용재
 npm install html5-qrcode
+
+2026-02-11 02:14 이진원
+npm install nodemailer
+npm install -D @types/nodemailer
