@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -115,7 +115,7 @@ function incrementUsage(): number {
 // ═══════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════
-export default function SymptomPage() {
+function SymptomContent() {
   const searchParams = useSearchParams();
   const [screen, setScreen] = useState<ScreenState>("input");
   const [symptom, setSymptom] = useState("");
@@ -933,5 +933,18 @@ function InfoRow({
         <p className="text-sm">{value}</p>
       </div>
     </div>
+  );
+}
+export default function SymptomPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p>로딩 중...</p>
+        </div>
+      }
+    >
+      <SymptomContent />
+    </Suspense>
   );
 }
