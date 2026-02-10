@@ -1,10 +1,24 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { AlertTriangle, TrendingUp, TrendingDown, Minus, Activity, MapPin, BarChart3 } from "lucide-react"
+import { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Activity,
+  MapPin,
+  BarChart3,
+} from "lucide-react";
 import {
   LineChart,
   Line,
@@ -15,104 +29,110 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-} from "recharts"
+} from "recharts";
 
 interface DiseaseData {
-  name: string
-  count: number
-  trend: "up" | "down" | "stable"
-  trendPercent: number
+  name: string;
+  count: number;
+  trend: "up" | "down" | "stable";
+  trendPercent: number;
 }
 
 interface WeeklyData {
-  week: string
-  count: number
+  week: string;
+  count: number;
 }
 
 interface RegionData {
-  region: string
-  count: number
+  region: string;
+  count: number;
 }
 
 export function DiseaseStatsSection() {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [topDiseases, setTopDiseases] = useState<DiseaseData[]>([])
-  const [weeklyTrend, setWeeklyTrend] = useState<WeeklyData[]>([])
-  const [regionStats, setRegionStats] = useState<RegionData[]>([])
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [topDiseases, setTopDiseases] = useState<DiseaseData[]>([]);
+  const [weeklyTrend, setWeeklyTrend] = useState<WeeklyData[]>([]);
+  const [regionStats, setRegionStats] = useState<RegionData[]>([]);
 
   useEffect(() => {
-    fetchDiseaseStats()
-  }, [])
+    fetchDiseaseStats();
+  }, []);
 
   const fetchDiseaseStats = async () => {
     try {
-      setLoading(true)
-      const response = await fetch('/api/disease-stats')
-      const result = await response.json()
+      setLoading(true);
+      const response = await fetch("/api/disease-stats");
+      const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error)
+        throw new Error(result.error);
       }
 
       // 데이터 파싱 및 가공
-      processData(result.data)
+      processData(result.data);
     } catch (err) {
-      console.error('Failed to fetch disease stats:', err)
-      setError('감염병 현황을 불러오는데 실패했습니다.')
+      console.error("Failed to fetch disease stats:", err);
+      setError("감염병 현황을 불러오는데 실패했습니다.");
       // 샘플 데이터로 대체
-      setMockData()
+      setMockData();
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const processData = (data: any) => {
     try {
       // 감염병별 데이터 처리 (실제 API 응답 구조에 맞게)
-      const diseaseItems = data.disease?.response?.body?.items?.item
+      const diseaseItems = data.disease?.response?.body?.items?.item;
       if (diseaseItems && Array.isArray(diseaseItems)) {
         // resultVal이 0이 아닌 것만 필터링하고, 숫자로 변환 후 정렬
         const filteredDiseases = diseaseItems
           .filter((item: any) => {
-            const val = item.resultVal?.toString().replace(/,/g, '')
-            return val && val !== '0' && val !== '-'
+            const val = item.resultVal?.toString().replace(/,/g, "");
+            return val && val !== "0" && val !== "-";
           })
           .map((item: any) => ({
-            name: item.icdNm?.replace('@', '') || '알 수 없음',
-            count: parseInt(item.resultVal?.toString().replace(/,/g, '') || '0'),
-            trend: Math.random() > 0.5 ? 'up' : Math.random() > 0.5 ? 'down' : 'stable' as const,
+            name: item.icdNm?.replace("@", "") || "알 수 없음",
+            count: parseInt(
+              item.resultVal?.toString().replace(/,/g, "") || "0",
+            ),
+            trend:
+              Math.random() > 0.5
+                ? "up"
+                : Math.random() > 0.5
+                  ? "down"
+                  : ("stable" as const),
             trendPercent: Math.floor(Math.random() * 15) + 1,
           }))
           .sort((a: any, b: any) => b.count - a.count)
-          .slice(0, 5)
-        
+          .slice(0, 5);
+
         if (filteredDiseases.length > 0) {
-          setTopDiseases(filteredDiseases)
+          setTopDiseases(filteredDiseases as any);
         } else {
-          setMockDiseases()
+          setMockDiseases();
         }
       } else {
-        setMockDiseases()
+        setMockDiseases();
       }
 
       // 주간 트렌드 - 현재 API에서 지원 안 함, 샘플 데이터 사용
-      setMockWeekly()
+      setMockWeekly();
 
       // 지역별 - 현재 API에서 파라미터 에러, 샘플 데이터 사용
-      setMockRegions()
-      
+      setMockRegions();
     } catch (e) {
-      console.error('Data processing error:', e)
-      setMockData()
+      console.error("Data processing error:", e);
+      setMockData();
     }
-  }
+  };
 
   const setMockData = () => {
-    setMockDiseases()
-    setMockWeekly()
-    setMockRegions()
-  }
+    setMockDiseases();
+    setMockWeekly();
+    setMockRegions();
+  };
 
   const setMockDiseases = () => {
     setTopDiseases([
@@ -121,8 +141,8 @@ export function DiseaseStatsSection() {
       { name: "수두", count: 2341, trend: "down", trendPercent: 3 },
       { name: "결핵", count: 1823, trend: "stable", trendPercent: 1 },
       { name: "유행성이하선염", count: 1245, trend: "up", trendPercent: 5 },
-    ])
-  }
+    ]);
+  };
 
   const setMockWeekly = () => {
     setWeeklyTrend([
@@ -134,8 +154,8 @@ export function DiseaseStatsSection() {
       { week: "6주차", count: 7200 },
       { week: "7주차", count: 6900 },
       { week: "8주차", count: 7500 },
-    ])
-  }
+    ]);
+  };
 
   const setMockRegions = () => {
     setRegionStats([
@@ -145,30 +165,30 @@ export function DiseaseStatsSection() {
       { region: "대구", count: 1245 },
       { region: "인천", count: 1876 },
       { region: "광주", count: 892 },
-    ])
-  }
+    ]);
+  };
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case "up":
-        return <TrendingUp className="h-4 w-4 text-red-500" />
+        return <TrendingUp className="h-4 w-4 text-red-500" />;
       case "down":
-        return <TrendingDown className="h-4 w-4 text-green-500" />
+        return <TrendingDown className="h-4 w-4 text-green-500" />;
       default:
-        return <Minus className="h-4 w-4 text-gray-500" />
+        return <Minus className="h-4 w-4 text-gray-500" />;
     }
-  }
+  };
 
   const getTrendColor = (trend: string) => {
     switch (trend) {
       case "up":
-        return "text-red-500"
+        return "text-red-500";
       case "down":
-        return "text-green-500"
+        return "text-green-500";
       default:
-        return "text-gray-500"
+        return "text-gray-500";
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -183,7 +203,7 @@ export function DiseaseStatsSection() {
           <Skeleton className="h-[300px]" />
         </div>
       </section>
-    )
+    );
   }
 
   return (
@@ -205,7 +225,9 @@ export function DiseaseStatsSection() {
       {error && (
         <div className="mb-6 rounded-lg bg-yellow-50 border border-yellow-200 p-4 text-center">
           <AlertTriangle className="inline-block h-5 w-5 text-yellow-600 mr-2" />
-          <span className="text-yellow-800">{error} (샘플 데이터를 표시합니다)</span>
+          <span className="text-yellow-800">
+            {error} (샘플 데이터를 표시합니다)
+          </span>
         </div>
       )}
 
@@ -236,7 +258,9 @@ export function DiseaseStatsSection() {
                     <span className="text-sm text-muted-foreground">
                       {disease.count.toLocaleString()}건
                     </span>
-                    <div className={`flex items-center gap-1 ${getTrendColor(disease.trend)}`}>
+                    <div
+                      className={`flex items-center gap-1 ${getTrendColor(disease.trend)}`}
+                    >
                       {getTrendIcon(disease.trend)}
                       <span className="text-xs">{disease.trendPercent}%</span>
                     </div>
@@ -261,22 +285,25 @@ export function DiseaseStatsSection() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={weeklyTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="week" 
+                  <XAxis
+                    dataKey="week"
                     tick={{ fontSize: 12 }}
                     stroke="#9ca3af"
                   />
-                  <YAxis 
+                  <YAxis
                     tick={{ fontSize: 12 }}
                     stroke="#9ca3af"
                     tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`}
                   />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value.toLocaleString()}건`, '발생 건수']}
+                  <Tooltip
+                    formatter={(value: number) => [
+                      `${value.toLocaleString()}건`,
+                      "발생 건수",
+                    ]}
                     contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
+                      backgroundColor: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
                     }}
                   />
                   <Line
@@ -284,7 +311,7 @@ export function DiseaseStatsSection() {
                     dataKey="count"
                     stroke="#22c55e"
                     strokeWidth={3}
-                    dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                    dot={{ fill: "#22c55e", strokeWidth: 2, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
@@ -307,31 +334,30 @@ export function DiseaseStatsSection() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={regionStats} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    type="number" 
+                  <XAxis
+                    type="number"
                     tick={{ fontSize: 12 }}
                     stroke="#9ca3af"
                   />
-                  <YAxis 
-                    type="category" 
-                    dataKey="region" 
+                  <YAxis
+                    type="category"
+                    dataKey="region"
                     tick={{ fontSize: 12 }}
                     stroke="#9ca3af"
                     width={50}
                   />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value.toLocaleString()}건`, '발생 건수']}
+                  <Tooltip
+                    formatter={(value: number) => [
+                      `${value.toLocaleString()}건`,
+                      "발생 건수",
+                    ]}
                     contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
+                      backgroundColor: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
                     }}
                   />
-                  <Bar 
-                    dataKey="count" 
-                    fill="#3b82f6" 
-                    radius={[0, 4, 4, 0]}
-                  />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -341,8 +367,9 @@ export function DiseaseStatsSection() {
 
       {/* 안내 문구 */}
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        * 데이터 출처: 질병관리청 감염병포털 · 통계는 참고용이며 실제 현황과 다를 수 있습니다
+        * 데이터 출처: 질병관리청 감염병포털 · 통계는 참고용이며 실제 현황과
+        다를 수 있습니다
       </p>
     </section>
-  )
+  );
 }
