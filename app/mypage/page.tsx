@@ -28,6 +28,7 @@ import {
   Trash2,
   AlertCircle,
   ShieldCheck,
+  GraduationCap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -214,6 +215,16 @@ export default function MyPage() {
                   <div className="flex items-center gap-3">
                     <ShieldCheck className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                     <span className="truncate">내 알레르기 정보</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                </Link>
+                <Link
+                  href="/school"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <GraduationCap className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">학교 급식 관리</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 </Link>
