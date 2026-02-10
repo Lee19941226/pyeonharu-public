@@ -1,65 +1,72 @@
-"use client"
+"use client";
 
-import React from "react"
-import Link from "next/link"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { createClient } from "@/lib/supabase/client"
+import React from "react";
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isOAuthLoading, setIsOAuthLoading] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
-    const supabase = createClient()
+    const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
+    });
 
     if (error) {
-      setError("이메일 또는 비밀번호가 올바르지 않습니다.")
-      setIsLoading(false)
-      return
+      setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      setIsLoading(false);
+      return;
     }
 
-    router.push("/")
-    router.refresh()
-  }
+    router.push("/");
+    router.refresh();
+  };
 
   const handleOAuthLogin = async (provider: "google" | "kakao" | "naver") => {
-    setIsOAuthLoading(provider)
-    setError(null)
+    setIsOAuthLoading(provider);
+    setError(null);
 
-    const supabase = createClient()
-    
+    const supabase = createClient();
+
     const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: provider as any,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
-    })
+    });
 
     if (error) {
-      setError(`${provider} 로그인에 실패했습니다. 다시 시도해주세요.`)
-      setIsOAuthLoading(null)
+      setError(`${provider} 로그인에 실패했습니다. 다시 시도해주세요.`);
+      setIsOAuthLoading(null);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -68,7 +75,9 @@ export default function LoginPage() {
         <div className="container mx-auto flex h-16 items-center px-4">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <span className="text-lg font-bold text-primary-foreground">편</span>
+              <span className="text-lg font-bold text-primary-foreground">
+                편
+              </span>
             </div>
             <span className="text-xl font-bold">편하루</span>
           </Link>
@@ -255,8 +264,8 @@ export default function LoginPage() {
           로그인하면{" "}
           <Link href="/terms" className="underline hover:text-foreground">
             이용약관
-          </Link>
-          {" "}및{" "}
+          </Link>{" "}
+          및{" "}
           <Link href="/privacy" className="underline hover:text-foreground">
             개인정보처리방침
           </Link>
@@ -264,5 +273,5 @@ export default function LoginPage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
