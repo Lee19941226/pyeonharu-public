@@ -79,9 +79,8 @@ export default function FoodResultPage() {
         return;
       }
 
-      // AI 결과인지 확인 (이미지 분석 or 텍스트 분석)
       if (id.startsWith("ai-")) {
-        console.log("🤖 AI 분석 결과 로드");
+        console.log("🤖 결과 로드");
         const aiData = sessionStorage.getItem(id);
 
         if (!aiData) {
@@ -321,14 +320,7 @@ export default function FoodResultPage() {
             {/* 헤더 */}
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-3xl font-bold">{result.foodName}</h1>
-              {/* ✅ 데이터 출처 표시 */}
-              {result.dataSource && (
-                <Badge variant="outline" className="mt-2">
-                  {result.dataSource === "openapi"
-                    ? "📊 식약처 공식 데이터"
-                    : "🤖 AI 분석 결과"}
-                </Badge>
-              )}
+
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon">
                   <Share2 className="h-5 w-5" />
@@ -408,31 +400,15 @@ export default function FoodResultPage() {
                 </CardContent>
               </Card>
             )}
-            {/* AI가 감지한 재료 */}
-            {result.detectedIngredients &&
-              result.detectedIngredients.length > 0 && (
-                <Card className="mb-6">
-                  <CardContent className="p-6">
-                    <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                      🤖 AI가 감지한 원재료
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {result.detectedIngredients.map((ingredient, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {ingredient}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            {/* 원재료명 및 함량 */}
+            {/* 원재료 통합 섹션 */}
             <Card className="mb-6">
               <CardContent className="p-6">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
                   📝 원재료명 및 함량
                 </h3>
-                {result.ingredients.length > 0 ? (
+
+                {result.ingredients && result.ingredients.length > 0 ? (
+                  // ✅ Open API 원재료 (상세) - 번호 매긴 리스트
                   <div className="max-h-[600px] space-y-2 overflow-y-auto pr-2">
                     {result.ingredients.map((ingredient, idx) => (
                       <div key={idx} className="flex gap-3 text-sm">
@@ -445,7 +421,23 @@ export default function FoodResultPage() {
                       </div>
                     ))}
                   </div>
+                ) : result.detectedIngredients &&
+                  result.detectedIngredients.length > 0 ? (
+                  // ✅ AI 감지 재료 - 배지 형태
+                  <div>
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      ✔ 주요 원재료
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {result.detectedIngredients.map((ingredient, idx) => (
+                        <Badge key={idx} variant="secondary">
+                          {ingredient}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
+                  // ✅ 원재료 정보 없음
                   <div className="rounded-lg bg-muted p-8 text-center">
                     <p className="text-sm text-muted-foreground">
                       원재료 정보가 제공되지 않습니다

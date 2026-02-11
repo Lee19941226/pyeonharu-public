@@ -1,237 +1,279 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import OpenAI from "openai";
 
 interface ProductScore {
   foodCode: string;
   foodName: string;
+  manufacturer?: string;
   allergens: string[];
   hasAllergen: boolean;
   score: number;
   matchReason: string;
+  dataSource: "db" | "openapi" | "ai";
 }
 
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const query = searchParams.get("q") || "";
-
-    if (!query) {
-      return NextResponse.json({
-        success: true,
-        items: [],
-        totalCount: 0,
-      });
-    }
-
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY, // 환경변수에 키 저장 권장
+    });
+    if (!query || query.length < 2) {
+      return NextResponse.json({ success: true, items: [], totalCount: 0 });
+    }
+
+    const supabase = await createClient();
     const normalizedQuery = query.toLowerCase().trim();
 
-    // ==========================================
-    // API 1: 제품명으로 검색
-    // ==========================================
-    const allergyApiUrl = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
-    allergyApiUrl.searchParams.append("serviceKey", serviceKey);
-    allergyApiUrl.searchParams.append("pageNo", "1");
-    allergyApiUrl.searchParams.append("numOfRows", "100");
-    allergyApiUrl.searchParams.append("type", "json");
-    allergyApiUrl.searchParams.append("prdct_nm", query);
-
-    console.log("📡 제품명 검색 API:", query);
-
-    const allergyResponse = await fetch(allergyApiUrl.toString());
-    const allergyData = await allergyResponse.json();
-    const allergyItems = allergyData.body?.items || [];
-
-    console.log(`✅ 제품명 검색: ${allergyItems.length}개`);
-
-    // ==========================================
-    // 사용자 알레르기 정보 조회
-    // ==========================================
-    const supabase = await createClient();
+    // 사용자 알레르기 정보
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     let userAllergens: string[] = [];
     if (user) {
       const { data: allergyData } = await supabase
         .from("user_allergies")
         .select("allergen_name")
         .eq("user_id", user.id);
-
       if (allergyData) {
         userAllergens = allergyData.map((item) => item.allergen_name);
       }
     }
 
-    console.log("👤 사용자 알레르기:", userAllergens);
-
     // ==========================================
-    // ✅ 관련성 점수 계산
+    // 3개 소스 병렬 실행: DB + OpenAPI + AI
     // ==========================================
-    const calculateMatch = (
-      foodName: string,
-      searchQuery: string,
-      allergen?: string,
-    ): { score: number; reason: string } | null => {
-      const lowerName = foodName.toLowerCase();
-      const lowerQuery = searchQuery.toLowerCase();
-
-      if (!lowerName.includes(lowerQuery)) {
-        if (allergen && allergen.toLowerCase().includes(lowerQuery)) {
-          return { score: 70, reason: `알레르기 성분: ${allergen}` };
+    const [dbItems, openApiItems, aiItems] = await Promise.all([
+      // ── Source 1: DB 캐시 ──
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from("food_search_cache")
+            .select("*")
+            .ilike("food_name", `%${query}%`)
+            .limit(50);
+          return data || [];
+        } catch {
+          return [];
         }
-        return null;
-      }
+      })(),
 
-      if (lowerName === lowerQuery) {
-        return { score: 100, reason: `제품명 일치` };
-      }
+      // ── Source 2: Open API (알레르기 정보) ──
+      (async () => {
+        try {
+          const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
+          url.searchParams.append("serviceKey", serviceKey);
+          url.searchParams.append("pageNo", "1");
+          url.searchParams.append("numOfRows", "100");
+          url.searchParams.append("type", "json");
+          url.searchParams.append("prdct_nm", query);
 
-      if (lowerName.startsWith(lowerQuery)) {
-        return { score: 90, reason: `제품명에 '${searchQuery}' 포함` };
-      }
+          const res = await fetch(url.toString());
+          const data = await res.json();
+          return data.body?.items || [];
+        } catch {
+          return [];
+        }
+      })(),
 
-      return { score: 80, reason: `제품명에 '${searchQuery}' 포함` };
-    };
+      // ── Source 3: AI 분석 (항상 실행) ──
+      (async () => {
+        try {
+          const aiResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "user",
+                content: `한국에서 실제로 판매되거나 흔히 먹는 식품 중 "${query}"가 포함되거나 관련된 제품/음식을 최대 15개 알려주세요.
+가공식품, 음료, 과자, 일반 음식 모두 포함하세요.
+
+JSON 배열만 반환:
+[
+  {
+    "foodName": "실제 제품명 또는 음식명",
+    "manufacturer": "제조사 (가공식품인 경우)",
+    "allergens": ["알레르기 유발물질"],
+    "category": "과자|음료|유제품|빵|면류|소스|과일|음식|기타"
+  }
+]
+
+한국 식약처 지정 22가지 알레르기 기준으로 분석:
+계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류`,
+              },
+            ],
+            max_tokens: 1500,
+          });
+
+          const aiText = aiResponse.choices[0].message.content || "[]";
+          const clean = aiText
+            .replace(/```json\n?/g, "")
+            .replace(/```\n?/g, "")
+            .trim();
+          return JSON.parse(clean);
+        } catch (e) {
+          console.error("AI 분석 실패:", e);
+          return [];
+        }
+      })(),
+    ]);
+
+    console.log(
+      `📊 검색 결과 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}, AI: ${aiItems.length}`,
+    );
 
     // ==========================================
-    // 결과 그룹화
+    // 통합 결과 생성 (우선순위 점수 포함)
     // ==========================================
-    const productMap = new Map<string, ProductScore>();
+    const allResults: ProductScore[] = [];
 
-    allergyItems.forEach((item: any) => {
+    // ── 1순위: DB 캐시 (기본 점수 + 200) ──
+    dbItems.forEach((item: any) => {
+      const hasAllergen = (item.allergens || []).some((a: string) =>
+        userAllergens.some((ua) => a.includes(ua) || ua.includes(a)),
+      );
+      const nameScore = item.food_name.toLowerCase().startsWith(normalizedQuery)
+        ? 95
+        : 85;
+
+      allResults.push({
+        foodCode: item.food_code,
+        foodName: item.food_name,
+        manufacturer: item.manufacturer || "",
+        allergens: item.allergens || [],
+        hasAllergen,
+        score: nameScore + 200, // DB 우선
+        matchReason: "DB",
+        dataSource: "db",
+      });
+    });
+
+    // ── 2순위: Open API (기본 점수 + 100) ──
+    const openApiMap = new Map<string, ProductScore>();
+
+    openApiItems.forEach((item: any) => {
       const foodCode = item.BRCD_NO;
       const foodName = item.PRDCT_NM;
       const allergen = item.ALG_CSG_MTR_NM;
-
       if (!foodCode || !foodName) return;
 
-      const match = calculateMatch(foodName, normalizedQuery, allergen);
+      const lowerName = foodName.toLowerCase();
+      let score = 0;
 
-      if (!match) {
-        return;
-      }
+      if (lowerName === normalizedQuery) score = 100;
+      else if (lowerName.startsWith(normalizedQuery)) score = 90;
+      else if (lowerName.includes(normalizedQuery)) score = 80;
+      else if (allergen?.toLowerCase().includes(normalizedQuery)) score = 70;
 
-      if (!productMap.has(foodCode)) {
-        productMap.set(foodCode, {
+      if (score < 70) return;
+
+      if (!openApiMap.has(foodCode)) {
+        openApiMap.set(foodCode, {
           foodCode,
           foodName,
           allergens: [],
           hasAllergen: false,
-          score: match.score,
-          matchReason: match.reason,
+          score: score + 100, // OpenAPI 우선
+          matchReason: "식약처",
+          dataSource: "openapi",
         });
       }
 
-      const product = productMap.get(foodCode)!;
-
-      if (match.score > product.score) {
-        product.score = match.score;
-        product.matchReason = match.reason;
-      }
-
+      const product = openApiMap.get(foodCode)!;
       if (allergen && !product.allergens.includes(allergen)) {
         product.allergens.push(allergen);
-
-        const matched = userAllergens.some(
-          (ua) => allergen.includes(ua) || ua.includes(allergen),
-        );
-        if (matched) {
+        if (
+          userAllergens.some(
+            (ua) => allergen.includes(ua) || ua.includes(allergen),
+          )
+        ) {
           product.hasAllergen = true;
         }
       }
     });
 
+    allResults.push(...Array.from(openApiMap.values()));
+
+    // ── 3순위: AI 결과 (기본 점수 60) ──
+    if (Array.isArray(aiItems)) {
+      aiItems.forEach((item: any, index: number) => {
+        if (!item.foodName) return;
+
+        const aiCode = `ai-${Buffer.from(item.foodName).toString("base64url").slice(0, 20)}-${index}`;
+        const hasAllergen = (item.allergens || []).some((a: string) =>
+          userAllergens.some((ua) => a.includes(ua) || ua.includes(a)),
+        );
+
+        allResults.push({
+          foodCode: aiCode,
+          foodName: item.foodName,
+          manufacturer: item.manufacturer || "",
+          allergens: item.allergens || [],
+          hasAllergen,
+          score: 60,
+          matchReason: `AI (${item.category || "식품"})`,
+          dataSource: "ai",
+        });
+      });
+    }
+
     // ==========================================
-    // ✅ 제조사 정보 가져오기 (배치 처리)
+    // 중복 제거 (이름 유사도 기준)
     // ==========================================
-    const MINIMUM_SCORE = 70;
-    const filteredProducts = Array.from(productMap.values()).filter(
-      (product) => product.score >= MINIMUM_SCORE,
-    );
+    const deduped: ProductScore[] = [];
+    const seenNames: string[] = [];
 
-    console.log(`🏭 제조사 정보 조회 시작: ${filteredProducts.length}개`);
+    // 점수 높은 순 정렬 (DB > OpenAPI > AI)
+    allResults.sort((a, b) => b.score - a.score);
 
-    // ✅ 모든 제품의 제조사 정보를 병렬로 조회
-    const manufacturerPromises = filteredProducts.map(async (product) => {
-      try {
-        const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
-        url.searchParams.append("serviceKey", serviceKey);
-        url.searchParams.append("pageNo", "1");
-        url.searchParams.append("numOfRows", "1");
-        url.searchParams.append("type", "json");
-        url.searchParams.append("brcd_no", product.foodCode);
+    allResults.forEach((item) => {
+      const name = item.foodName.toLowerCase().replace(/\s/g, "");
+      // 이미 있는 이름과 70% 이상 겹치면 중복으로 판단
+      const isDuplicate = seenNames.some(
+        (seen) => name.includes(seen) || seen.includes(name),
+      );
 
-        const response = await fetch(url.toString());
-        const data = await response.json();
-        const info = data.body?.items?.[0];
-
-        return {
-          foodCode: product.foodCode,
-          manufacturer: info?.MNFCTUR || "정보없음",
-        };
-      } catch (error) {
-        console.error(`제조사 조회 실패: ${product.foodCode}`);
-        return {
-          foodCode: product.foodCode,
-          manufacturer: "정보없음",
-        };
+      if (!isDuplicate) {
+        deduped.push(item);
+        seenNames.push(name);
       }
     });
 
-    const manufacturerResults = await Promise.all(manufacturerPromises);
-
-    // ✅ 제조사 정보를 Map으로 변환
-    const manufacturerMap = new Map(
-      manufacturerResults.map((r) => [r.foodCode, r.manufacturer]),
-    );
-
-    console.log(`✅ 제조사 정보 조회 완료`);
-
     // ==========================================
-    // 최종 결과
+    // AI 결과 중 신규 → DB 캐시 저장 (비동기)
     // ==========================================
-    const items = filteredProducts
-      .sort((a, b) => {
-        if (b.score !== a.score) {
-          return b.score - a.score;
-        }
-        if (a.hasAllergen !== b.hasAllergen) {
-          return a.hasAllergen ? -1 : 1;
-        }
-        return a.foodName.localeCompare(b.foodName, "ko");
-      })
-      .map((product) => ({
-        foodCode: product.foodCode,
-        foodName: product.foodName,
-        allergens: product.allergens,
-        hasAllergen: product.hasAllergen,
-        matchReason: product.matchReason,
-        relevanceScore: product.score,
-      }));
-
-    console.log(`✅ 최종 검색 결과: ${items.length}개 제품`);
-    if (items.length > 0) {
-      console.log(
-        "  상위 3개:",
-        items.slice(0, 3).map((i) => `${i.foodName}`),
-      );
+    const aiToCache = deduped.filter((r) => r.dataSource === "ai");
+    if (aiToCache.length > 0) {
+      supabase
+        .from("food_search_cache")
+        .upsert(
+          aiToCache.map((item) => ({
+            food_code: item.foodCode,
+            food_name: item.foodName,
+            manufacturer: item.manufacturer || null,
+            allergens: item.allergens,
+            data_source: "ai",
+          })),
+          { onConflict: "food_code" },
+        )
+        .then(() => console.log("✅ AI 결과 DB 캐시 저장 완료"));
     }
 
+    // ==========================================
+    // 반환
+    // ==========================================
     return NextResponse.json({
       success: true,
-      items,
-      totalCount: items.length,
+      items: deduped,
+      totalCount: deduped.length,
     });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "검색 실패",
-      },
+      { success: false, error: "검색 중 오류가 발생했습니다" },
       { status: 500 },
     );
   }

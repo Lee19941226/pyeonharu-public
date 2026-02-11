@@ -30,6 +30,7 @@ interface SearchResult {
   allergens: string[];
   hasAllergen: boolean;
   searchType?: string;
+  dataSource?: string;
 }
 
 interface SearchHistory {
@@ -75,7 +76,7 @@ export default function FoodSearchPage() {
   const [searchHistory, setSearchHistory] = useState<SearchHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasSearched, setHasSearched] = useState(false); // ✅ 검색 여부 추적
+  const [hasSearched, setHasSearched] = useState(false);
 
   // ==========================================
   // 검색 기록 불러오기
@@ -409,6 +410,14 @@ export default function FoodSearchPage() {
                           <h3 className="mb-2 font-medium leading-tight">
                             {item.foodName}
                           </h3>
+                          {item.dataSource === "ai" && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 text-[10px] text-purple-600 border-purple-300"
+                            >
+                              AI 추천
+                            </Badge>
+                          )}
                           <div className="mb-2 flex flex-wrap gap-2">
                             {item.searchType && (
                               <Badge variant="secondary" className="text-xs">
