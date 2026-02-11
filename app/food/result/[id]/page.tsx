@@ -105,6 +105,18 @@ export default function FoodResultPage() {
     }
 
     localStorage.setItem("food_check_history", JSON.stringify(history));
+    // DB에도 스캔 기록 저장 (주간 리포트용)
+    fetch("/api/food/scan-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        foodCode: result.foodCode,
+        foodName: result.foodName,
+        manufacturer: result.manufacturer,
+        isSafe: result.isSafe,
+        detectedAllergens: result.detectedAllergens?.map((a) => a.name) || [],
+      }),
+    }).catch(() => {});
   };
 
   const checkFavorite = async () => {

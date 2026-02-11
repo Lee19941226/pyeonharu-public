@@ -29,6 +29,7 @@ import {
   GraduationCap,
   Loader2,
   Check,
+  BarChart3,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -201,6 +202,13 @@ export default function MyPage() {
                 <CardTitle className="text-lg">내 활동</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 p-4 pt-0">
+                <Link href="/reports" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    <span>주간 안전 리포트</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </Link>
                 <Link href="/bookmarks" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
                   <div className="flex items-center gap-3">
                     <Heart className="h-5 w-5 text-muted-foreground" />
