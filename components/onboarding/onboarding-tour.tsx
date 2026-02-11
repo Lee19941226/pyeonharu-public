@@ -1,41 +1,39 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
-import { X, ChevronRight, ChevronLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState, useEffect, useCallback, useRef } from "react"
+import { createPortal } from "react-dom"
+import { X, ChevronRight, ChevronLeft } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // ─── 투어 스텝 정의 ───
 // selector: 하이라이트할 요소의 CSS 선택자
 // 없으면 전체 화면 소개 (딤드만)
 export interface TourStep {
   /** 하이라이트할 DOM 요소 CSS 선택자 (없으면 전체화면 인트로) */
-  selector?: string;
+  selector?: string
   /** 설명 제목 */
-  title: string;
+  title: string
   /** 설명 본문 */
-  description: string;
+  description: string
   /** 말풍선 위치 */
-  position?: "top" | "bottom" | "left" | "right" | "center";
+  position?: "top" | "bottom" | "left" | "right" | "center"
   /** 이모지 아이콘 */
-  emoji?: string;
+  emoji?: string
 }
 
 const TOUR_STEPS: TourStep[] = [
-  // ── 0. 전체 인트로 (selector 없음 → 센터 팝업) ──
+  // ── 0. 전체 인트로 ──
   {
-    title: "편하루에 오신 것을 환영해요!",
-    description:
-      "음식을 드시기 전 알레르기가 불안하신가요?\n바코드만 찍으면 먹어도 되는지 5초 안에 알려드려요.",
+    title: "음식을 드시기 전 알레르기가 불안하신가요?",
+    description: "바코드만 찍으면 먹어도 되는지 5초 안에 알려드려요.\n편하루가 안전한 식사를 도와드릴게요.",
     position: "center",
     emoji: "🛡️",
   },
   // ── 1. 4탭 통합 검색 카드 ──
   {
     selector: "[data-tour='search-tabs']",
-    title: "핵심 기능 4가지",
-    description:
-      "식품 안전 확인, 증상 분석, 병원 찾기, 약 검색까지\n이 카드 하나로 모든 걸 할 수 있어요.",
+    title: "여기서 모든 걸 할 수 있어요",
+    description: "식품 안전 확인, 증상 분석, 병원 찾기, 약 검색까지\n4가지 핵심 기능이 이 카드에 모여 있어요.",
     position: "bottom",
     emoji: "🔍",
   },
@@ -43,8 +41,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     selector: "[data-tour='tab-food']",
     title: "이거 먹어도 돼?",
-    description:
-      "음식 이름을 검색하거나 바코드 사진을 찍으면\n내 알레르기 기준으로 안전 여부를 알려줘요.",
+    description: "음식 이름이나 바코드 사진으로 검색하면\n내 알레르기 기준으로 안전 여부를 알려줘요.",
     position: "bottom",
     emoji: "🍽️",
   },
@@ -52,182 +49,190 @@ const TOUR_STEPS: TourStep[] = [
   {
     selector: "[data-tour='btn-camera']",
     title: "바코드 스캔",
-    description:
-      "과자나 식품 뒷면의 바코드를 찍으면\n식약처 데이터로 알레르기 성분을 바로 확인해요.",
+    description: "과자나 식품 뒷면의 바코드를 찍으면\n식약처 데이터로 알레르기 성분을 바로 확인해요.",
     position: "bottom",
     emoji: "📸",
   },
-  // ── 4. 급식 영역 또는 학교 등록 CTA ──
+  // ── 4. 몸이 아파요 탭 ──
+  {
+    selector: "[data-tour='tab-symptom']",
+    title: "몸이 아파요",
+    description: "증상을 입력하면 AI가 어떤 진료과를 가야 하는지\n추천해드려요. 응급 상황 판단에도 도움이 돼요.",
+    position: "bottom",
+    emoji: "🩺",
+  },
+  // ── 5. 병원/약국 조회 탭 ──
+  {
+    selector: "[data-tour='tab-search']",
+    title: "병원/약국 조회",
+    description: "현재 위치를 기반으로 가까운 병원과 약국을\n찾아주고, 전화·길찾기까지 바로 할 수 있어요.",
+    position: "bottom",
+    emoji: "🏥",
+  },
+  // ── 6. 약 정보 검색 탭 ──
+  {
+    selector: "[data-tour='tab-medicine']",
+    title: "약 정보 검색",
+    description: "약 이름을 검색하면 복용법, 주의사항,\n부작용 정보를 한눈에 확인할 수 있어요.",
+    position: "bottom",
+    emoji: "💊",
+  },
+  // ── 7. 급식 영역 ──
   {
     selector: "[data-tour='meal-section']",
     title: "학교 급식 알레르기 체크",
-    description:
-      "학교를 등록하면 매일 급식 메뉴에서\n위험한 알레르기 식품을 자동으로 표시해줘요.",
+    description: "학교를 등록하면 매일 급식 메뉴에서\n위험한 알레르기 식품을 자동으로 표시해줘요.",
     position: "top",
     emoji: "🍱",
   },
-  // ── 5. 하단 네비게이션 ──
+  // ── 8. 하단 네비게이션 ──
   {
     selector: "[data-tour='bottom-nav']",
     title: "빠른 이동",
-    description:
-      "홈, 안전식품, 바코드 스캔, 알림, 마이페이지로\n한 번에 이동할 수 있어요.",
+    description: "홈, 안전식품, 바코드 스캔, 알림, 마이페이지로\n한 번에 이동할 수 있어요.",
     position: "top",
     emoji: "📱",
   },
-  // ── 6. 마무리 ──
+  // ── 9. 마무리 ──
   {
     title: "준비 완료!",
-    description:
-      "이제 편하루를 자유롭게 사용해보세요.\n알레르기 정보를 등록하면 더 정확한 결과를 받을 수 있어요.",
+    description: "이제 편하루를 자유롭게 사용해보세요.\n알레르기 정보를 등록하면 더 정확한 결과를 받을 수 있어요.",
     position: "center",
     emoji: "🎉",
   },
-];
+]
 
 interface OnboardingTourProps {
-  active: boolean;
-  onFinish: () => void;
+  active: boolean
+  onFinish: () => void
 }
 
 export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
-  const [step, setStep] = useState(0);
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [step, setStep] = useState(0)
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
+  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({})
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const tooltipRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    setMounted(true)
+  }, [])
 
   // 현재 스텝의 타겟 요소 위치 계산
   const updatePosition = useCallback(() => {
-    const currentStep = TOUR_STEPS[step];
+    const currentStep = TOUR_STEPS[step]
     if (!currentStep?.selector) {
-      setTargetRect(null);
-      setTooltipStyle({});
-      return;
+      setTargetRect(null)
+      setTooltipStyle({})
+      return
     }
 
-    const el = document.querySelector(currentStep.selector);
+    const el = document.querySelector(currentStep.selector)
     if (!el) {
-      setTargetRect(null);
-      setTooltipStyle({});
-      return;
+      setTargetRect(null)
+      setTooltipStyle({})
+      return
     }
 
-    const rect = el.getBoundingClientRect();
-    setTargetRect(rect);
+    const rect = el.getBoundingClientRect()
+    setTargetRect(rect)
 
     // 요소가 뷰포트에 보이도록 스크롤
-    const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+    const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight
     if (!isVisible) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
       // 스크롤 후 위치 재계산
       setTimeout(() => {
-        const newRect = el.getBoundingClientRect();
-        setTargetRect(newRect);
-        calculateTooltipPosition(newRect, currentStep.position || "bottom");
-      }, 400);
-      return;
+        const newRect = el.getBoundingClientRect()
+        setTargetRect(newRect)
+        calculateTooltipPosition(newRect, currentStep.position || "bottom")
+      }, 400)
+      return
     }
 
-    calculateTooltipPosition(rect, currentStep.position || "bottom");
-  }, [step]);
+    calculateTooltipPosition(rect, currentStep.position || "bottom")
+  }, [step])
 
   const calculateTooltipPosition = (rect: DOMRect, position: string) => {
-    const pad = 16;
-    const tooltipW = Math.min(320, window.innerWidth - 32);
+    const pad = 16
+    const tooltipW = Math.min(320, window.innerWidth - 32)
 
-    let top = 0;
-    let left = 0;
+    let top = 0
+    let left = 0
 
     switch (position) {
       case "bottom":
-        top = rect.bottom + pad;
-        left = Math.max(
-          pad,
-          Math.min(
-            rect.left + rect.width / 2 - tooltipW / 2,
-            window.innerWidth - tooltipW - pad,
-          ),
-        );
-        break;
+        top = rect.bottom + pad
+        left = Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - pad))
+        break
       case "top":
-        top = rect.top - pad - 160; // 대략적인 툴팁 높이
-        left = Math.max(
-          pad,
-          Math.min(
-            rect.left + rect.width / 2 - tooltipW / 2,
-            window.innerWidth - tooltipW - pad,
-          ),
-        );
-        if (top < pad) top = rect.bottom + pad; // 위에 공간 없으면 아래로
-        break;
+        top = rect.top - pad - 160 // 대략적인 툴팁 높이
+        left = Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - pad))
+        if (top < pad) top = rect.bottom + pad // 위에 공간 없으면 아래로
+        break
       case "left":
-        top = rect.top + rect.height / 2 - 80;
-        left = Math.max(pad, rect.left - tooltipW - pad);
-        break;
+        top = rect.top + rect.height / 2 - 80
+        left = Math.max(pad, rect.left - tooltipW - pad)
+        break
       case "right":
-        top = rect.top + rect.height / 2 - 80;
-        left = Math.min(rect.right + pad, window.innerWidth - tooltipW - pad);
-        break;
+        top = rect.top + rect.height / 2 - 80
+        left = Math.min(rect.right + pad, window.innerWidth - tooltipW - pad)
+        break
     }
 
-    setTooltipStyle({ position: "fixed", top, left, width: tooltipW });
-  };
+    setTooltipStyle({ position: "fixed", top, left, width: tooltipW })
+  }
 
   useEffect(() => {
-    if (!active) return;
-    setIsAnimating(true);
+    if (!active) return
+    setIsAnimating(true)
     const timer = setTimeout(() => {
-      updatePosition();
-      setIsAnimating(false);
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [active, step, updatePosition]);
+      updatePosition()
+      setIsAnimating(false)
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [active, step, updatePosition])
 
   // 리사이즈/스크롤 시 재계산
   useEffect(() => {
-    if (!active) return;
-    const handler = () => updatePosition();
-    window.addEventListener("resize", handler);
-    window.addEventListener("scroll", handler, true);
+    if (!active) return
+    const handler = () => updatePosition()
+    window.addEventListener("resize", handler)
+    window.addEventListener("scroll", handler, true)
     return () => {
-      window.removeEventListener("resize", handler);
-      window.removeEventListener("scroll", handler, true);
-    };
-  }, [active, updatePosition]);
+      window.removeEventListener("resize", handler)
+      window.removeEventListener("scroll", handler, true)
+    }
+  }, [active, updatePosition])
 
   const goNext = () => {
     if (step >= TOUR_STEPS.length - 1) {
-      onFinish();
+      onFinish()
     } else {
-      setStep((s) => s + 1);
+      setStep((s) => s + 1)
     }
-  };
+  }
 
   const goPrev = () => {
-    if (step > 0) setStep((s) => s - 1);
-  };
+    if (step > 0) setStep((s) => s - 1)
+  }
 
   const handleSkip = () => {
-    onFinish();
-  };
+    onFinish()
+  }
 
-  if (!active || !mounted) return null;
+  if (!active || !mounted) return null
 
-  const currentStep = TOUR_STEPS[step];
-  const isCenter = !currentStep.selector || currentStep.position === "center";
-  const isLast = step === TOUR_STEPS.length - 1;
-  const isFirst = step === 0;
+  const currentStep = TOUR_STEPS[step]
+  const isCenter = !currentStep.selector || currentStep.position === "center"
+  const isLast = step === TOUR_STEPS.length - 1
+  const isFirst = step === 0
 
   // SVG 마스크로 하이라이트 영역만 투명하게 구멍 뚫기
   const renderOverlay = () => {
-    const p = 8; // 하이라이트 영역 패딩
-    const r = 12; // border-radius
+    const p = 8 // 하이라이트 영역 패딩
+    const r = 12 // border-radius
 
     return (
       <svg
@@ -260,13 +265,13 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
           mask="url(#tour-mask)"
         />
       </svg>
-    );
-  };
+    )
+  }
 
   // 점선 하이라이트 보더
   const renderHighlight = () => {
-    if (!targetRect || isCenter) return null;
-    const p = 8;
+    if (!targetRect || isCenter) return null
+    const p = 8
     return (
       <div
         className="pointer-events-none fixed z-[9999] rounded-xl border-2 border-dashed border-white/80"
@@ -275,13 +280,12 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
           top: targetRect.top - p,
           width: targetRect.width + p * 2,
           height: targetRect.height + p * 2,
-          boxShadow:
-            "0 0 0 4px rgba(255,255,255,0.15), 0 0 20px rgba(255,255,255,0.1)",
+          boxShadow: "0 0 0 4px rgba(255,255,255,0.15), 0 0 20px rgba(255,255,255,0.1)",
           transition: "all 0.3s ease-in-out",
         }}
       />
-    );
-  };
+    )
+  }
 
   // 설명 툴팁
   const renderTooltip = () => {
@@ -371,15 +375,18 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
           </div>
         </div>
       </div>
-    );
+    )
 
-    return content;
-  };
+    return content
+  }
 
   return createPortal(
     <>
       {/* 클릭으로 다음 진행 (딤드 영역 클릭) */}
-      <div className="fixed inset-0 z-[9997] cursor-pointer" onClick={goNext} />
+      <div
+        className="fixed inset-0 z-[9997] cursor-pointer"
+        onClick={goNext}
+      />
 
       {/* SVG 오버레이 (딤드 + 하이라이트 구멍) */}
       {renderOverlay()}
@@ -400,5 +407,5 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
       {renderTooltip()}
     </>,
     document.body,
-  );
+  )
 }

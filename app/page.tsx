@@ -549,13 +549,13 @@ export default function HomePage() {
                 <button onClick={() => setSearchMode("food")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("food")} data-tour="tab-food">
                   <UtensilsCrossed className="h-4 w-4 flex-shrink-0" /><span className="truncate">이거 먹어도 돼?</span>
                 </button>
-                <button onClick={() => setSearchMode("symptom")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("symptom")}>
+                <button onClick={() => setSearchMode("symptom")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("symptom")} data-tour="tab-symptom">
                   <Stethoscope className="h-4 w-4 flex-shrink-0" /><span className="truncate">몸이 아파요</span>
                 </button>
-                <button onClick={() => setSearchMode("search")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("search")}>
+                <button onClick={() => setSearchMode("search")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("search")} data-tour="tab-search">
                   <MapPinned className="h-4 w-4 flex-shrink-0" /><span className="truncate">병원/약국 조회</span>
                 </button>
-                <button onClick={() => setSearchMode("medicine")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("medicine")}>
+                <button onClick={() => setSearchMode("medicine")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("medicine")} data-tour="tab-medicine">
                   <Pill className="h-4 w-4 flex-shrink-0" /><span className="truncate">약 정보 검색</span>
                 </button>
               </div>
