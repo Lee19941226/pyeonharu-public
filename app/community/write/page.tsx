@@ -1,6 +1,5 @@
 "use client";
 
-import { Suspense } from "react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -23,7 +22,7 @@ interface UserSchool {
   is_primary: boolean;
 }
 
-function CommunityWriteContent() {
+export default function CommunityWritePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
@@ -252,18 +251,5 @@ function CommunityWriteContent() {
       </main>
       <MobileNav />
     </div>
-  );
-}
-export default function CommunityWritePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      }
-    >
-      <CommunityWriteContent />
-    </Suspense>
   );
 }
