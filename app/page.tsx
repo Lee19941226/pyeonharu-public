@@ -9,6 +9,7 @@ import {
   Loader2, Users, CheckCircle, XCircle, ShieldCheck,
   Building2, Phone, MapPin, Cross, ChevronDown,
   UtensilsCrossed as MealIcon, ShieldAlert, GraduationCap, LogIn, CalendarDays,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -168,6 +169,11 @@ function SchoolMealCard({
   const [monthlyData, setMonthlyData] = useState<{ date: string; meals: MealData[] }[]>([])
   const [monthlyLoading, setMonthlyLoading] = useState(false)
 
+  // caution 아이템 계산
+  const allMenuItems = entry.meals.flatMap(m => m.menu)
+  const cautionItems = allMenuItems.filter(m => m.status === "caution")
+  const hasCaution = cautionItems.length > 0
+
   const loadMonthlyMeals = async () => {
     if (monthlyData.length > 0) {
       setShowMonthly(!showMonthly)
@@ -227,31 +233,47 @@ function SchoolMealCard({
   const now = new Date()
   const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`
 
+  // 카드 상태별 스타일
+  const cardStyle = hasDanger
+    ? "border-red-200 hover:bg-red-50/50 active:bg-red-50"
+    : hasCaution
+      ? "border-yellow-200 hover:bg-yellow-50/50 active:bg-yellow-50"
+      : "border-green-200 hover:bg-green-50/50 active:bg-green-50"
+
   return (
-    <Card className={`border shadow-none ${hasDanger ? "border-red-200" : "border-green-200"}`}>
+    <Card
+      className={`border shadow-none cursor-pointer transition-colors ${cardStyle}`}
+      onClick={onNavigate}
+    >
       <CardContent className="p-4">
         {/* 학교명 + 안전/위험 요약 */}
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${hasDanger ? "bg-red-100" : "bg-green-100"}`}>
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+              hasDanger ? "bg-red-100" : hasCaution ? "bg-yellow-100" : "bg-green-100"
+            }`}>
               {hasDanger ? (
                 <ShieldAlert className="h-4 w-4 text-red-500" />
+              ) : hasCaution ? (
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
               ) : (
                 <ShieldCheck className="h-4 w-4 text-green-500" />
               )}
             </div>
             <div>
               <p className="text-sm font-medium">{entry.school.school_name} 오늘 급식</p>
-              <p className={`text-xs ${hasDanger ? "text-red-600" : "text-green-600"}`}>
+              <p className={`text-xs ${
+                hasDanger ? "text-red-600" : hasCaution ? "text-yellow-600" : "text-green-600"
+              }`}>
                 {hasDanger
                   ? `⚠️ 주의 메뉴 ${dangerItems.length}개 — ${[...new Set(dangerItems.flatMap(d => d.matchedAllergens))].join(", ")}`
-                  : "✅ 오늘 급식은 안전해요!"}
+                  : hasCaution
+                    ? `⚠️ 교차오염 주의 ${cautionItems.length}개`
+                    : "✅ 오늘 급식은 안전해요!"}
               </p>
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={onNavigate}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         </div>
 
         {/* 오늘 메뉴 리스트 — 알레르기 번호 제거, 이름만 표시 */}
@@ -263,9 +285,17 @@ function SchoolMealCard({
                 <Badge
                   key={j}
                   variant={item.status === "danger" ? "destructive" : "secondary"}
-                  className={`text-xs font-normal ${item.status === "danger" ? "" : "bg-muted text-muted-foreground"}`}
+                  className={`text-xs font-normal ${
+                    item.status === "danger"
+                      ? ""
+                      : item.status === "caution"
+                        ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                        : "bg-muted text-muted-foreground"
+                  }`}
                 >
-                  {item.status === "danger" && "⚠️ "}{item.name}
+                  {item.status === "danger" && "⚠️ "}
+                  {item.status === "caution" && "⚠️ "}
+                  {item.name}
                 </Badge>
               ))}
             </div>
@@ -274,7 +304,7 @@ function SchoolMealCard({
 
         {/* 월간 급식표 보기 버튼 */}
         <button
-          onClick={loadMonthlyMeals}
+          onClick={(e) => { e.stopPropagation(); loadMonthlyMeals() }}
           className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         >
           <CalendarDays className="h-3.5 w-3.5" />
@@ -284,7 +314,7 @@ function SchoolMealCard({
 
         {/* 월간 급식표 — 달력 그리드 */}
         {showMonthly && (
-          <div className="mt-3">
+          <div className="mt-3" onClick={(e) => e.stopPropagation()}>
             {monthlyLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -358,11 +388,17 @@ function SchoolMealCard({
                                 <p
                                   key={j}
                                   className={`truncate text-[9px] leading-tight ${
-                                    item.status === "danger" ? "text-red-600 font-semibold" : "text-gray-500"
+                                    item.status === "danger"
+                                      ? "text-red-600 font-semibold"
+                                      : item.status === "caution"
+                                        ? "text-yellow-600 font-medium"
+                                        : "text-gray-500"
                                   }`}
                                   title={item.name}
                                 >
-                                  {item.status === "danger" && "⚠️"}{item.name}
+                                  {item.status === "danger" && "⚠️"}
+                                  {item.status === "caution" && "⚠️"}
+                                  {item.name}
                                 </p>
                               ))}
                             </div>
@@ -377,6 +413,7 @@ function SchoolMealCard({
                   {/* 범례 */}
                   <div className="mt-2 flex items-center justify-end gap-3 text-[10px] text-muted-foreground">
                     <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-red-500" /> 알레르기 주의</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-yellow-500" /> 교차오염</span>
                     <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm ring-2 ring-primary" /> 오늘</span>
                   </div>
                 </div>
@@ -415,8 +452,9 @@ type SearchMode = "food" | "symptom" | "search" | "medicine"
 interface MealMenuItem {
   name: string
   allergenNames: string[]
-  status: "safe" | "danger" | "unknown"
+  status: "safe" | "danger" | "caution" | "unknown"
   matchedAllergens: string[]
+  crossAllergens?: string[]
 }
 
 interface MealData {
@@ -1114,7 +1152,11 @@ export default function HomePage() {
 
             if (!hasMeals) {
               return (
-                <Card key={si} className="border shadow-none">
+                <Card
+                  key={si}
+                  className="border shadow-none cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+                  onClick={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}
+                >
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
@@ -1125,9 +1167,7 @@ export default function HomePage() {
                         <p className="text-xs text-muted-foreground">오늘은 급식 정보가 없습니다 (방학/휴일)</p>
                       </div>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </CardContent>
                 </Card>
               )
@@ -1148,7 +1188,10 @@ export default function HomePage() {
               3. CTA — 안내 카드 (비로그인 / 미등록)
           ═══════════════════════════════════════ */}
           {!user && (
-            <Card className="border shadow-none bg-muted/30">
+            <Card
+              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+              onClick={() => setLoginModalOpen(true)}
+            >
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
@@ -1159,15 +1202,16 @@ export default function HomePage() {
                     <p className="text-xs text-muted-foreground">맞춤 서비스를 위해 프로필을 완성해보세요</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setLoginModalOpen(true)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </CardContent>
             </Card>
           )}
 
           {mealStatus === "no-login" && (
-            <Card className="border shadow-none bg-muted/30">
+            <Card
+              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+              onClick={() => setLoginModalOpen(true)}
+            >
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
@@ -1178,15 +1222,16 @@ export default function HomePage() {
                     <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 체크해드려요</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setLoginModalOpen(true)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </CardContent>
             </Card>
           )}
 
           {mealStatus === "no-school" && (
-            <Card className="border shadow-none bg-muted/30">
+            <Card
+              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+              onClick={() => router.push("/school")}
+            >
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
@@ -1197,9 +1242,7 @@ export default function HomePage() {
                     <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 자동 체크해드려요</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => router.push("/school")}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </CardContent>
             </Card>
           )}
