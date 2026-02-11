@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Camera, User } from "lucide-react";
+import { Home, MapPin, Camera, MessageSquare, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
+
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/" && pathname.startsWith(href));
 
   return (
     <nav
@@ -19,7 +22,7 @@ export function MobileNav() {
         <Link
           href="/"
           className={cn(
-            "flex flex-col items-center gap-1 px-6 py-2 text-xs transition-colors",
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
             pathname === "/"
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
@@ -27,6 +30,20 @@ export function MobileNav() {
         >
           <Home className="h-5 w-5" />
           <span>홈</span>
+        </Link>
+
+        {/* 위치 (병원/약국) */}
+        <Link
+          href="/search"
+          className={cn(
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
+            isActive("/search")
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <MapPin className="h-5 w-5" />
+          <span>위치</span>
         </Link>
 
         {/* 중앙 FAB — 바코드 스캔 */}
@@ -38,12 +55,26 @@ export function MobileNav() {
           <Camera className="h-6 w-6" />
         </button>
 
+        {/* 커뮤니티 */}
+        <Link
+          href="/community"
+          className={cn(
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
+            isActive("/community")
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span>커뮤니티</span>
+        </Link>
+
         {/* 마이페이지 */}
         <Link
           href="/mypage"
           className={cn(
-            "flex flex-col items-center gap-1 px-6 py-2 text-xs transition-colors",
-            pathname === "/mypage" || pathname.startsWith("/mypage")
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
+            isActive("/mypage")
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
