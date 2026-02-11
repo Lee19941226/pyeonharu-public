@@ -1,0 +1,27 @@
+{
+  "name": "편하루 - 식품 알레르기 안전",
+  "short_name": "편하루",
+  "description": "바코드 스캔으로 식품 알레르기 확인, 급식 알레르기 체크, AI 증상 분석",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4A7C59",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "ko",
+  "categories": ["health", "food", "education"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
