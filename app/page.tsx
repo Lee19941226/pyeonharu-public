@@ -20,6 +20,7 @@ import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { LoginModal } from "@/components/auth/login-modal"
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour"
 import { BookmarkButton } from "@/components/medical/bookmark-button"
 import { createClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
@@ -71,7 +72,6 @@ function MiniNaverMap({
       scaleControl: false,
     })
 
-    // 병원 마커 (빨간 핀 + 이름)
     const shortName = name.length > 10 ? name.slice(0, 10) + "…" : name
     new N.Marker({
       position: placePos, map,
@@ -88,7 +88,6 @@ function MiniNaverMap({
       },
     })
 
-    // 내 위치 마커
     if (userLocation) {
       const userPos = new N.LatLng(userLocation.lat, userLocation.lng)
       new N.Marker({
@@ -103,30 +102,17 @@ function MiniNaverMap({
         },
       })
 
-      // 두 지점 모두 보이도록 fitBounds
       const bounds = new N.LatLngBounds(
-        new N.LatLng(
-          Math.min(lat, userLocation.lat) - 0.002,
-          Math.min(lng, userLocation.lng) - 0.002
-        ),
-        new N.LatLng(
-          Math.max(lat, userLocation.lat) + 0.002,
-          Math.max(lng, userLocation.lng) + 0.002
-        )
+        new N.LatLng(Math.min(lat, userLocation.lat) - 0.002, Math.min(lng, userLocation.lng) - 0.002),
+        new N.LatLng(Math.max(lat, userLocation.lat) + 0.002, Math.max(lng, userLocation.lng) + 0.002)
       )
       map.fitBounds(bounds)
 
-      // 직선 점선 경로
       new N.Polyline({
-        map,
-        path: [userPos, placePos],
-        strokeColor: "#6366f1",
-        strokeWeight: 2,
-        strokeStyle: "shortdash",
-        strokeOpacity: 0.6,
+        map, path: [userPos, placePos],
+        strokeColor: "#6366f1", strokeWeight: 2, strokeStyle: "shortdash", strokeOpacity: 0.6,
       })
 
-      // 경로 중간에 거리 라벨
       const R = 6371
       const dLat = (lat - userLocation.lat) * Math.PI / 180
       const dLng = (lng - userLocation.lng) * Math.PI / 180
@@ -169,71 +155,36 @@ function SchoolMealCard({
   const [monthlyData, setMonthlyData] = useState<{ date: string; meals: MealData[] }[]>([])
   const [monthlyLoading, setMonthlyLoading] = useState(false)
 
-  // caution 아이템 계산
   const allMenuItems = entry.meals.flatMap(m => m.menu)
   const cautionItems = allMenuItems.filter(m => m.status === "caution")
   const hasCaution = cautionItems.length > 0
 
   const loadMonthlyMeals = async () => {
-    if (monthlyData.length > 0) {
-      setShowMonthly(!showMonthly)
-      return
-    }
-
+    if (monthlyData.length > 0) { setShowMonthly(!showMonthly); return }
     setShowMonthly(true)
     setMonthlyLoading(true)
-
     try {
       const now = new Date()
       const year = now.getFullYear()
       const month = now.getMonth() + 1
-
-      // 이번 달의 모든 날짜
       const daysInMonth = new Date(year, month, 0).getDate()
       const results: { date: string; meals: MealData[] }[] = []
-
-      // 한번에 가져오기: 나이스 API는 기간 조회 지원
-      // 1일~말일까지 개별 호출 대신, 날짜별로 가져오기
-      const dateFrom = `${year}${String(month).padStart(2, "0")}01`
-      const dateTo = `${year}${String(month).padStart(2, "0")}${String(daysInMonth).padStart(2, "0")}`
-
-      // 각 날짜별로 급식 fetch (캐시되므로 빠름)
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}${String(month).padStart(2, "0")}${String(d).padStart(2, "0")}`
         try {
-          const res = await fetch(
-            `/api/school/meals?schoolCode=${entry.school.school_code}&officeCode=${entry.school.office_code}&date=${dateStr}`
-          )
+          const res = await fetch(`/api/school/meals?schoolCode=${entry.school.school_code}&officeCode=${entry.school.office_code}&date=${dateStr}`)
           const data = await res.json()
-          if (data.meals && data.meals.length > 0) {
-            results.push({ date: dateStr, meals: data.meals })
-          }
+          if (data.meals && data.meals.length > 0) results.push({ date: dateStr, meals: data.meals })
         } catch { /* skip */ }
       }
-
       setMonthlyData(results)
-    } catch (e) {
-      console.error("월간 급식 로드 실패:", e)
-    } finally {
-      setMonthlyLoading(false)
-    }
-  }
-
-  const formatShortDate = (dateStr: string) => {
-    const d = Number(dateStr.slice(6, 8))
-    const dayOfWeek = new Date(
-      Number(dateStr.slice(0, 4)),
-      Number(dateStr.slice(4, 6)) - 1,
-      d
-    ).getDay()
-    const days = ["일", "월", "화", "수", "목", "금", "토"]
-    return `${d}일(${days[dayOfWeek]})`
+    } catch (e) { console.error("월간 급식 로드 실패:", e) }
+    finally { setMonthlyLoading(false) }
   }
 
   const now = new Date()
   const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`
 
-  // 카드 상태별 스타일
   const cardStyle = hasDanger
     ? "border-red-200 hover:bg-red-50/50 active:bg-red-50"
     : hasCaution
@@ -241,78 +192,42 @@ function SchoolMealCard({
       : "border-green-200 hover:bg-green-50/50 active:bg-green-50"
 
   return (
-    <Card
-      className={`border shadow-none cursor-pointer transition-colors ${cardStyle}`}
-      onClick={onNavigate}
-    >
+    <Card className={`border shadow-none cursor-pointer transition-colors ${cardStyle}`} onClick={onNavigate}>
       <CardContent className="p-4">
-        {/* 학교명 + 안전/위험 요약 */}
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-              hasDanger ? "bg-red-100" : hasCaution ? "bg-yellow-100" : "bg-green-100"
-            }`}>
-              {hasDanger ? (
-                <ShieldAlert className="h-4 w-4 text-red-500" />
-              ) : hasCaution ? (
-                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              ) : (
-                <ShieldCheck className="h-4 w-4 text-green-500" />
-              )}
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${hasDanger ? "bg-red-100" : hasCaution ? "bg-yellow-100" : "bg-green-100"}`}>
+              {hasDanger ? <ShieldAlert className="h-4 w-4 text-red-500" /> : hasCaution ? <AlertTriangle className="h-4 w-4 text-yellow-500" /> : <ShieldCheck className="h-4 w-4 text-green-500" />}
             </div>
             <div>
               <p className="text-sm font-medium">{entry.school.school_name} 오늘 급식</p>
-              <p className={`text-xs ${
-                hasDanger ? "text-red-600" : hasCaution ? "text-yellow-600" : "text-green-600"
-              }`}>
-                {hasDanger
-                  ? `⚠️ 주의 메뉴 ${dangerItems.length}개 — ${[...new Set(dangerItems.flatMap(d => d.matchedAllergens))].join(", ")}`
-                  : hasCaution
-                    ? `⚠️ 교차오염 주의 ${cautionItems.length}개`
-                    : "✅ 오늘 급식은 안전해요!"}
+              <p className={`text-xs ${hasDanger ? "text-red-600" : hasCaution ? "text-yellow-600" : "text-green-600"}`}>
+                {hasDanger ? `⚠️ 주의 메뉴 ${dangerItems.length}개 — ${[...new Set(dangerItems.flatMap(d => d.matchedAllergens))].join(", ")}` : hasCaution ? `⚠️ 교차오염 주의 ${cautionItems.length}개` : "✅ 오늘 급식은 안전해요!"}
               </p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         </div>
 
-        {/* 오늘 메뉴 리스트 — 알레르기 번호 제거, 이름만 표시 */}
         {entry.meals.map((meal, mi) => (
           <div key={mi} className={mi > 0 ? "mt-2 border-t pt-2" : ""}>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">{meal.mealTypeName} {meal.calInfo && `· ${meal.calInfo}`}</p>
             <div className="flex flex-wrap gap-1">
               {meal.menu.map((item, j) => (
-                <Badge
-                  key={j}
-                  variant={item.status === "danger" ? "destructive" : "secondary"}
-                  className={`text-xs font-normal ${
-                    item.status === "danger"
-                      ? ""
-                      : item.status === "caution"
-                        ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-                        : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {item.status === "danger" && "⚠️ "}
-                  {item.status === "caution" && "⚠️ "}
-                  {item.name}
+                <Badge key={j} variant={item.status === "danger" ? "destructive" : "secondary"} className={`text-xs font-normal ${item.status === "danger" ? "" : item.status === "caution" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200" : "bg-muted text-muted-foreground"}`}>
+                  {(item.status === "danger" || item.status === "caution") && "⚠️ "}{item.name}
                 </Badge>
               ))}
             </div>
           </div>
         ))}
 
-        {/* 월간 급식표 보기 버튼 */}
-        <button
-          onClick={(e) => { e.stopPropagation(); loadMonthlyMeals() }}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        >
+        <button onClick={(e) => { e.stopPropagation(); loadMonthlyMeals() }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground">
           <CalendarDays className="h-3.5 w-3.5" />
           {showMonthly ? `${monthLabel} 급식표 접기` : `${monthLabel} 급식표 보기`}
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMonthly ? "rotate-180" : ""}`} />
         </button>
 
-        {/* 월간 급식표 — 달력 그리드 */}
         {showMonthly && (
           <div className="mt-3" onClick={(e) => e.stopPropagation()}>
             {monthlyLoading ? (
@@ -323,94 +238,46 @@ function SchoolMealCard({
             ) : monthlyData.length === 0 ? (
               <p className="py-4 text-center text-xs text-muted-foreground">이번 달 급식 정보가 없습니다</p>
             ) : (() => {
-              // 달력 그리드 생성
               const now = new Date()
               const year = now.getFullYear()
               const month = now.getMonth()
-              const firstDay = new Date(year, month, 1).getDay() // 0=일 ~ 6=토
+              const firstDay = new Date(year, month, 1).getDay()
               const daysInMonth = new Date(year, month + 1, 0).getDate()
               const today = now.getDate()
-
-              // 날짜별 급식 데이터 매핑
               const mealsByDay: Record<number, MealData[]> = {}
-              monthlyData.forEach(d => {
-                const day = Number(d.date.slice(6, 8))
-                mealsByDay[day] = d.meals
-              })
-
-              // 달력 배열 (빈 칸 포함)
+              monthlyData.forEach(d => { mealsByDay[Number(d.date.slice(6, 8))] = d.meals })
               const cells: (number | null)[] = []
               for (let i = 0; i < firstDay; i++) cells.push(null)
               for (let d = 1; d <= daysInMonth; d++) cells.push(d)
               while (cells.length % 7 !== 0) cells.push(null)
-
               const dayNames = ["일", "월", "화", "수", "목", "금", "토"]
-
               return (
                 <div className="overflow-x-auto">
-                  {/* 요일 헤더 */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px" }} className="mb-px">
-                    {dayNames.map((d, i) => (
-                      <div key={d} className={`py-1 text-center text-[10px] font-semibold ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-muted-foreground"}`}>
-                        {d}
-                      </div>
-                    ))}
+                    {dayNames.map((d, i) => (<div key={d} className={`py-1 text-center text-[10px] font-semibold ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-muted-foreground"}`}>{d}</div>))}
                   </div>
-
-                  {/* 날짜 그리드 */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px" }} className="rounded-lg border bg-border overflow-hidden">
                     {cells.map((day, i) => {
-                      if (day === null) {
-                        return <div key={i} className="min-h-[80px] bg-muted/30" />
-                      }
-
+                      if (day === null) return <div key={i} className="min-h-[80px] bg-muted/30" />
                       const meals = mealsByDay[day]
                       const isToday = day === today
                       const dayOfWeek = (firstDay + day - 1) % 7
-                      const hasMealDanger = meals?.some(m => m.menu.some(item => item.status === "danger"))
-
                       return (
-                        <div
-                          key={i}
-                          className={`min-h-[80px] p-1 bg-white ${isToday ? "ring-2 ring-inset ring-primary" : ""}`}
-                        >
-                          {/* 날짜 */}
-                          <p className={`text-[10px] font-bold mb-0.5 ${
-                            isToday ? "text-primary" : dayOfWeek === 0 ? "text-red-400" : dayOfWeek === 6 ? "text-blue-400" : "text-foreground"
-                          }`}>
-                            {day}
-                          </p>
-
-                          {/* 메뉴 */}
+                        <div key={i} className={`min-h-[80px] p-1 bg-white ${isToday ? "ring-2 ring-inset ring-primary" : ""}`}>
+                          <p className={`text-[10px] font-bold mb-0.5 ${isToday ? "text-primary" : dayOfWeek === 0 ? "text-red-400" : dayOfWeek === 6 ? "text-blue-400" : "text-foreground"}`}>{day}</p>
                           {meals ? (
                             <div className="space-y-px">
                               {meals.flatMap(m => m.menu).map((item, j) => (
-                                <p
-                                  key={j}
-                                  className={`truncate text-[9px] leading-tight ${
-                                    item.status === "danger"
-                                      ? "text-red-600 font-semibold"
-                                      : item.status === "caution"
-                                        ? "text-yellow-600 font-medium"
-                                        : "text-gray-500"
-                                  }`}
-                                  title={item.name}
-                                >
-                                  {item.status === "danger" && "⚠️"}
-                                  {item.status === "caution" && "⚠️"}
-                                  {item.name}
+                                <p key={j} className={`truncate text-[9px] leading-tight ${item.status === "danger" ? "text-red-600 font-semibold" : item.status === "caution" ? "text-yellow-600 font-medium" : "text-gray-500"}`} title={item.name}>
+                                  {(item.status === "danger" || item.status === "caution") && "⚠️"}{item.name}
                                 </p>
                               ))}
                             </div>
-                          ) : (
-                            <p className="text-[9px] text-muted-foreground/40">-</p>
-                          )}
+                          ) : (<p className="text-[9px] text-muted-foreground/40">-</p>)}
                         </div>
                       )
                     })}
                   </div>
-
-                  {/* 범례 */}
                   <div className="mt-2 flex items-center justify-end gap-3 text-[10px] text-muted-foreground">
                     <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-red-500" /> 알레르기 주의</span>
                     <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-yellow-500" /> 교차오염</span>
@@ -427,48 +294,12 @@ function SchoolMealCard({
 }
 
 // ─── Types ───
-interface NearbyPlace {
-  id: string
-  name: string
-  address: string
-  phone: string
-  clCdNm?: string
-  distance: string
-  distanceNum: number
-  lat: number
-  lng: number
-}
-
-interface MedicineItem {
-  id: string
-  name: string
-  company: string
-  efficacy: string
-  image: string
-}
-
+interface NearbyPlace { id: string; name: string; address: string; phone: string; clCdNm?: string; distance: string; distanceNum: number; lat: number; lng: number }
+interface MedicineItem { id: string; name: string; company: string; efficacy: string; image: string }
 type SearchMode = "food" | "symptom" | "search" | "medicine"
-
-interface MealMenuItem {
-  name: string
-  allergenNames: string[]
-  status: "safe" | "danger" | "caution" | "unknown"
-  matchedAllergens: string[]
-  crossAllergens?: string[]
-}
-
-interface MealData {
-  mealTypeName: string
-  menu: MealMenuItem[]
-  calInfo: string
-}
-
-interface MySchool {
-  id: string
-  school_code: string
-  office_code: string
-  school_name: string
-}
+interface MealMenuItem { name: string; allergenNames: string[]; status: "safe" | "danger" | "caution" | "unknown"; matchedAllergens: string[]; crossAllergens?: string[] }
+interface MealData { mealTypeName: string; menu: MealMenuItem[]; calInfo: string }
+interface MySchool { id: string; school_code: string; office_code: string; school_name: string }
 
 // ─── Component ───
 export default function HomePage() {
@@ -477,11 +308,9 @@ export default function HomePage() {
   const [symptomInput, setSymptomInput] = useState("")
   const [foodInput, setFoodInput] = useState("")
 
-  // 로그인
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
 
-  // 병원/약국 조회 (위치 기반)
   const [placeType, setPlaceType] = useState<"hospital" | "pharmacy">("hospital")
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationStatus, setLocationStatus] = useState<"loading" | "granted" | "denied">("loading")
@@ -496,29 +325,27 @@ export default function HomePage() {
   const [placePage, setPlacePage] = useState(1)
   const PLACES_PER_PAGE = 5
 
-  // 약 검색
   const [medicineQuery, setMedicineQuery] = useState("")
   const [medicineResults, setMedicineResults] = useState<MedicineItem[]>([])
   const [medicineLoading, setMedicineLoading] = useState(false)
   const [medicineSearched, setMedicineSearched] = useState(false)
   const [medicineTotalCount, setMedicineTotalCount] = useState(0)
 
-  // 최근 확인 기록
-  const [recentChecks, setRecentChecks] = useState<
-    { foodName: string; isSafe: boolean; checkedAt: string }[]
-  >([])
+  const [recentChecks, setRecentChecks] = useState<{ foodName: string; isSafe: boolean; checkedAt: string }[]>([])
 
-  // 급식 관련
   const [mySchools, setMySchools] = useState<MySchool[]>([])
   const [allSchoolMeals, setAllSchoolMeals] = useState<{ school: MySchool; meals: MealData[] }[]>([])
   const [mealLoading, setMealLoading] = useState(false)
   const [mealStatus, setMealStatus] = useState<"loading" | "no-login" | "no-school" | "no-meal" | "loaded">("loading")
 
-  // 커뮤니티 — 내 학교 최신글 + 인기글
   const [communityPosts, setCommunityPosts] = useState<any[]>([])
   const [popularLikes, setPopularLikes] = useState<any[]>([])
   const [popularViews, setPopularViews] = useState<any[]>([])
   const [communityLoading, setCommunityLoading] = useState(true)
+
+  // ★ 투어 가이드
+  const [tourActive, setTourActive] = useState(false)
+
   // ─── Effects ───
   useEffect(() => {
     const supabase = createClient()
@@ -535,42 +362,59 @@ export default function HomePage() {
       const saved = localStorage.getItem("food_check_history")
       if (saved) {
         const parsed = JSON.parse(saved)
-        setRecentChecks(
-          parsed
-            .sort((a: any, b: any) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime())
-            .slice(0, 3)
-        )
+        setRecentChecks(parsed.sort((a: any, b: any) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime()).slice(0, 3))
       }
     } catch { /* 무시 */ }
   }, [])
 
-  // 급식 데이터 로드
+  // ★ 투어 가이드 트리거
   useEffect(() => {
-    loadMealData()
+    if (user === undefined) return
+    // 페이지 로드 후 약간의 딜레이 (UI 렌더링 대기)
+    const timer = setTimeout(() => {
+      if (user) {
+        const completed = user.user_metadata?.onboarding_completed === true
+        if (!completed) setTourActive(true)
+      } else {
+        if (typeof window !== "undefined") {
+          const visited = localStorage.getItem("pyeonharu_tour_done")
+          if (!visited) setTourActive(true)
+        }
+      }
+    }, 800)
+    return () => clearTimeout(timer)
   }, [user])
 
-  // 커뮤니티 인기글 로드
-  useEffect(() => {
-    loadCommunityPosts()
-  }, [])
+  const handleTourFinish = async () => {
+    setTourActive(false)
+    // 완료 기록
+    if (user) {
+      try {
+        const supabase = createClient()
+        await supabase.auth.updateUser({ data: { onboarding_completed: true } })
+      } catch { /* 무시 */ }
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pyeonharu_tour_done", "true")
+    }
+  }
+
+  // 급식 데이터 로드
+  useEffect(() => { loadMealData() }, [user])
+  useEffect(() => { loadCommunityPosts() }, [])
 
   const loadCommunityPosts = async () => {
     setCommunityLoading(true)
     try {
-      // 1) 내 학교 목록
       const schoolRes = await fetch("/api/school/register")
       const schoolData = await schoolRes.json()
       const schools = schoolData.schools || []
-
-      // 2) 내 학교 최신글 (복수 학교 코드, 최신순, 10개)
       if (schools.length > 0) {
         const codes = schools.map((s: any) => s.school_code).join(",")
         const res = await fetch(`/api/community?schoolCodes=${codes}&sort=latest&limit=10`)
         const data = await res.json()
         setCommunityPosts(data.posts || [])
       }
-
-      // 3) 인기글 (전체 학교, 좋아요 TOP5 + 조회수 TOP5)
       const popRes = await fetch("/api/community?mode=popular")
       const popData = await popRes.json()
       setPopularLikes(popData.topLikes || [])
@@ -580,11 +424,7 @@ export default function HomePage() {
   }
 
   const loadMealData = async () => {
-    if (!user) {
-      setMealStatus("no-login")
-      return
-    }
-
+    if (!user) { setMealStatus("no-login"); return }
     setMealLoading(true)
     try {
       const res = await fetch("/api/school/register")
@@ -592,67 +432,36 @@ export default function HomePage() {
       const data = await res.json()
       const schools: MySchool[] = data.schools || []
       setMySchools(schools)
-
-      if (schools.length === 0) {
-        setMealStatus("no-school")
-        setMealLoading(false)
-        return
-      }
-
-      // 모든 학교 급식 가져오기
+      if (schools.length === 0) { setMealStatus("no-school"); setMealLoading(false); return }
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "")
       const results: { school: MySchool; meals: MealData[] }[] = []
-
       for (const school of schools) {
         try {
-          const mealRes = await fetch(
-            `/api/school/meals?schoolCode=${school.school_code}&officeCode=${school.office_code}&date=${today}`
-          )
+          const mealRes = await fetch(`/api/school/meals?schoolCode=${school.school_code}&officeCode=${school.office_code}&date=${today}`)
           const mealData = await mealRes.json()
           results.push({ school, meals: mealData.meals || [] })
-        } catch {
-          results.push({ school, meals: [] })
-        }
+        } catch { results.push({ school, meals: [] }) }
       }
-
       setAllSchoolMeals(results)
       setMealStatus("loaded")
-    } catch (e) {
-      console.error("급식 로드 실패:", e)
-      setMealStatus("no-school")
-    } finally {
-      setMealLoading(false)
-    }
+    } catch (e) { console.error("급식 로드 실패:", e); setMealStatus("no-school") }
+    finally { setMealLoading(false) }
   }
 
-  // 위치 가져오기 (searchMode가 search로 전환 시)
   useEffect(() => {
     if (searchMode !== "search") return
     if (userLocation) { fetchNearbyPlaces(); return }
-
     setLocationStatus("loading")
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-          setLocationStatus("granted")
-        },
-        () => {
-          setUserLocation({ lat: 37.3595, lng: 126.9354 })
-          setLocationStatus("denied")
-        }
+        (pos) => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocationStatus("granted") },
+        () => { setUserLocation({ lat: 37.3595, lng: 126.9354 }); setLocationStatus("denied") }
       )
-    } else {
-      setUserLocation({ lat: 37.3595, lng: 126.9354 })
-      setLocationStatus("denied")
-    }
+    } else { setUserLocation({ lat: 37.3595, lng: 126.9354 }); setLocationStatus("denied") }
   }, [searchMode])
 
   useEffect(() => {
-    if (searchMode === "search" && userLocation) {
-      setSelectedPlaceId(null)
-      fetchNearbyPlaces()
-    }
+    if (searchMode === "search" && userLocation) { setSelectedPlaceId(null); fetchNearbyPlaces() }
   }, [userLocation, placeType, radiusKm])
 
   const fetchNearbyPlaces = async () => {
@@ -663,118 +472,61 @@ export default function HomePage() {
       if (placeType === "hospital") {
         const res = await fetch(`/api/hospitals?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=${radiusM}&numOfRows=1000`)
         const data = await res.json()
-        setNearbyPlaces(data.success && data.hospitals ? data.hospitals.map((h: any) => ({
-          id: h.id, name: h.name, address: h.address, phone: h.phone,
-          clCdNm: h.clCdNm, distance: h.distance, distanceNum: h.distanceNum || 0,
-          lat: h.lat, lng: h.lng,
-        })) : [])
+        setNearbyPlaces(data.success && data.hospitals ? data.hospitals.map((h: any) => ({ id: h.id, name: h.name, address: h.address, phone: h.phone, clCdNm: h.clCdNm, distance: h.distance, distanceNum: h.distanceNum || 0, lat: h.lat, lng: h.lng })) : [])
       } else {
         const res = await fetch(`/api/pharmacies?lat=${userLocation.lat}&lng=${userLocation.lng}`)
         const data = await res.json()
-        setNearbyPlaces(data.pharmacies ? data.pharmacies.map((p: any) => ({
-          id: p.hpid || String(Math.random()), name: p.dutyName, address: p.dutyAddr,
-          phone: p.dutyTel1, clCdNm: "약국", distance: p.distance || "",
-          distanceNum: parseFloat(p.distance) || 0, lat: p.wgs84Lat, lng: p.wgs84Lon,
-        })).sort((a: NearbyPlace, b: NearbyPlace) => a.distanceNum - b.distanceNum) : [])
+        setNearbyPlaces(data.pharmacies ? data.pharmacies.map((p: any) => ({ id: p.hpid || String(Math.random()), name: p.dutyName, address: p.dutyAddr, phone: p.dutyTel1, clCdNm: "약국", distance: p.distance || "", distanceNum: parseFloat(p.distance) || 0, lat: p.wgs84Lat, lng: p.wgs84Lon })).sort((a: NearbyPlace, b: NearbyPlace) => a.distanceNum - b.distanceNum) : [])
       }
     } catch { setNearbyPlaces([]) } finally { setPlaceLoading(false) }
   }
 
-  const handleSymptomSearch = () => {
-    if (symptomInput.trim()) router.push(`/symptom?q=${encodeURIComponent(symptomInput)}`)
-  }
-
-  const handleFoodSearch = () => {
-    if (foodInput.trim()) router.push(`/can-i-eat?q=${encodeURIComponent(foodInput)}`)
-  }
-
+  const handleSymptomSearch = () => { if (symptomInput.trim()) router.push(`/symptom?q=${encodeURIComponent(symptomInput)}`) }
+  const handleFoodSearch = () => { if (foodInput.trim()) router.push(`/can-i-eat?q=${encodeURIComponent(foodInput)}`) }
   const handleMedicineSearch = async () => {
     if (!medicineQuery.trim()) return
-    setMedicineLoading(true)
-    setMedicineSearched(true)
+    setMedicineLoading(true); setMedicineSearched(true)
     try {
       const response = await fetch(`/api/medicine?itemName=${encodeURIComponent(medicineQuery)}`)
       const data = await response.json()
-      if (response.ok) {
-        setMedicineResults((data.items || []).slice(0, 5))
-        setMedicineTotalCount(data.totalCount || 0)
-      } else {
-        setMedicineResults([])
-        setMedicineTotalCount(0)
-      }
+      if (response.ok) { setMedicineResults((data.items || []).slice(0, 5)); setMedicineTotalCount(data.totalCount || 0) }
+      else { setMedicineResults([]); setMedicineTotalCount(0) }
     } catch { setMedicineResults([]) } finally { setMedicineLoading(false) }
   }
 
-  // 시도코드 계산 헬퍼
   const getSidoCdFromLocation = (lat: number, lng: number): string => {
     const centers: Record<string, { lat: number; lng: number; code: string }> = {
-      서울: { lat: 37.5665, lng: 126.978, code: "110000" },
-      부산: { lat: 35.1796, lng: 129.0756, code: "210000" },
-      대구: { lat: 35.8714, lng: 128.6014, code: "220000" },
-      인천: { lat: 37.4563, lng: 126.7052, code: "230000" },
-      광주: { lat: 35.1595, lng: 126.8526, code: "240000" },
-      대전: { lat: 36.3504, lng: 127.3845, code: "250000" },
-      울산: { lat: 35.5384, lng: 129.3114, code: "260000" },
-      세종: { lat: 36.48, lng: 127.259, code: "290000" },
-      경기: { lat: 37.275, lng: 127.0094, code: "310000" },
-      강원: { lat: 37.8228, lng: 128.1555, code: "320000" },
-      충북: { lat: 36.6357, lng: 127.4913, code: "330000" },
-      충남: { lat: 36.6588, lng: 126.6728, code: "340000" },
-      전북: { lat: 35.8203, lng: 127.1088, code: "350000" },
-      전남: { lat: 34.8161, lng: 126.4629, code: "360000" },
-      경북: { lat: 36.576, lng: 128.506, code: "370000" },
-      경남: { lat: 35.2384, lng: 128.6924, code: "380000" },
+      서울: { lat: 37.5665, lng: 126.978, code: "110000" }, 부산: { lat: 35.1796, lng: 129.0756, code: "210000" },
+      대구: { lat: 35.8714, lng: 128.6014, code: "220000" }, 인천: { lat: 37.4563, lng: 126.7052, code: "230000" },
+      광주: { lat: 35.1595, lng: 126.8526, code: "240000" }, 대전: { lat: 36.3504, lng: 127.3845, code: "250000" },
+      울산: { lat: 35.5384, lng: 129.3114, code: "260000" }, 세종: { lat: 36.48, lng: 127.259, code: "290000" },
+      경기: { lat: 37.275, lng: 127.0094, code: "310000" }, 강원: { lat: 37.8228, lng: 128.1555, code: "320000" },
+      충북: { lat: 36.6357, lng: 127.4913, code: "330000" }, 충남: { lat: 36.6588, lng: 126.6728, code: "340000" },
+      전북: { lat: 35.8203, lng: 127.1088, code: "350000" }, 전남: { lat: 34.8161, lng: 126.4629, code: "360000" },
+      경북: { lat: 36.576, lng: 128.506, code: "370000" }, 경남: { lat: 35.2384, lng: 128.6924, code: "380000" },
       제주: { lat: 33.4996, lng: 126.5312, code: "390000" },
     }
-    let closest = "310000"
-    let minDist = Infinity
-    for (const c of Object.values(centers)) {
-      const d = Math.sqrt((lat - c.lat) ** 2 + (lng - c.lng) ** 2)
-      if (d < minDist) { minDist = d; closest = c.code }
-    }
+    let closest = "310000"; let minDist = Infinity
+    for (const c of Object.values(centers)) { const d = Math.sqrt((lat - c.lat) ** 2 + (lng - c.lng) ** 2); if (d < minDist) { minDist = d; closest = c.code } }
     return closest
   }
 
-  // 병원/약국 이름 검색 (전체 API 호출)
   const handlePlaceSearch = async () => {
-    if (!placeSearchQuery.trim()) {
-      setPlaceSearched(false)
-      setPlaceSearchResults([])
-      return
-    }
+    if (!placeSearchQuery.trim()) { setPlaceSearched(false); setPlaceSearchResults([]); return }
     if (!userLocation) return
-
-    setPlaceSearchLoading(true)
-    setPlaceSearched(true)
-    setPlacePage(1)
-    setSelectedPlaceId(null)
-
+    setPlaceSearchLoading(true); setPlaceSearched(true); setPlacePage(1); setSelectedPlaceId(null)
     try {
       const sidoCd = getSidoCdFromLocation(userLocation.lat, userLocation.lng)
-
       if (placeType === "hospital") {
         const res = await fetch(`/api/area/hospitals?sidoCd=${sidoCd}&keyword=${encodeURIComponent(placeSearchQuery)}&numOfRows=50`)
         const data = await res.json()
-        const hospitals = (data.hospitals || []).map((h: any) => ({
-          id: h.id, name: h.name, address: h.address, phone: h.phone,
-          clCdNm: h.clCdNm, distance: "", distanceNum: 0, lat: h.lat, lng: h.lng,
-        }))
-        setPlaceSearchResults(hospitals)
+        setPlaceSearchResults((data.hospitals || []).map((h: any) => ({ id: h.id, name: h.name, address: h.address, phone: h.phone, clCdNm: h.clCdNm, distance: "", distanceNum: 0, lat: h.lat, lng: h.lng })))
       } else {
-        const sidoCd = getSidoCdFromLocation(userLocation.lat, userLocation.lng)
         const res = await fetch(`/api/area/pharmacies?sidoCd=${sidoCd}&keyword=${encodeURIComponent(placeSearchQuery)}&numOfRows=50`)
         const data = await res.json()
-        const pharmacies = (data.pharmacies || []).map((p: any) => ({
-          id: p.id || String(Math.random()), name: p.name, address: p.address, phone: p.phone,
-          clCdNm: "약국", distance: "", distanceNum: 0, lat: p.lat, lng: p.lng,
-        }))
-        setPlaceSearchResults(pharmacies)
+        setPlaceSearchResults((data.pharmacies || []).map((p: any) => ({ id: p.id || String(Math.random()), name: p.name, address: p.address, phone: p.phone, clCdNm: "약국", distance: "", distanceNum: 0, lat: p.lat, lng: p.lng })))
       }
-    } catch {
-      setPlaceSearchResults([])
-    } finally {
-      setPlaceSearchLoading(false)
-    }
+    } catch { setPlaceSearchResults([]) } finally { setPlaceSearchLoading(false) }
   }
 
   const tabStyle = (mode: SearchMode) =>
@@ -790,81 +542,39 @@ export default function HomePage() {
       <main className="flex-1 pb-16 md:pb-0">
         <div className="container mx-auto space-y-3 px-4 py-4">
 
-          {/* ═══════════════════════════════════════
-              1. 4탭 통합 검색 (핵심 기능 — 최상단)
-          ═══════════════════════════════════════ */}
-          <Card className="overflow-hidden border shadow-none">
+          {/* ═══ 1. 4탭 통합 검색 ═══ */}
+          <Card className="overflow-hidden border shadow-none" data-tour="search-tabs">
             <CardContent className="p-0">
-              {/* 탭 선택 */}
               <div className="flex border-b overflow-x-auto">
-                <button
-                  onClick={() => setSearchMode("food")}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
-                  style={tabStyle("food")}
-                >
-                  <UtensilsCrossed className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">이거 먹어도 돼?</span>
+                <button onClick={() => setSearchMode("food")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("food")} data-tour="tab-food">
+                  <UtensilsCrossed className="h-4 w-4 flex-shrink-0" /><span className="truncate">이거 먹어도 돼?</span>
                 </button>
-                <button
-                  onClick={() => setSearchMode("symptom")}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
-                  style={tabStyle("symptom")}
-                >
-                  <Stethoscope className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">몸이 아파요</span>
+                <button onClick={() => setSearchMode("symptom")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("symptom")} data-tour="tab-symptom">
+                  <Stethoscope className="h-4 w-4 flex-shrink-0" /><span className="truncate">몸이 아파요</span>
                 </button>
-                <button
-                  onClick={() => setSearchMode("search")}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
-                  style={tabStyle("search")}
-                >
-                  <MapPinned className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">병원/약국 조회</span>
+                <button onClick={() => setSearchMode("search")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("search")} data-tour="tab-search">
+                  <MapPinned className="h-4 w-4 flex-shrink-0" /><span className="truncate">병원/약국 조회</span>
                 </button>
-                <button
-                  onClick={() => setSearchMode("medicine")}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap"
-                  style={tabStyle("medicine")}
-                >
-                  <Pill className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">약 정보 검색</span>
+                <button onClick={() => setSearchMode("medicine")} className="flex flex-1 min-w-0 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap" style={tabStyle("medicine")} data-tour="tab-medicine">
+                  <Pill className="h-4 w-4 flex-shrink-0" /><span className="truncate">약 정보 검색</span>
                 </button>
               </div>
 
-              {/* 콘텐츠 */}
               <div className="p-4">
-
-                {/* ── 이거 먹어도 돼? ── */}
                 {searchMode === "food" && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">음식 사진이나 이름으로 알레르기를 확인하세요</p>
-
-                    {/* 바코드 + 검색 통합 */}
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="gap-1.5 shrink-0"
-                        onClick={() => router.push("/food/camera")}
-                      >
-                        <Camera className="h-4 w-4" />
-                        사진 업로드
+                      <Button variant="outline" className="gap-1.5 shrink-0" onClick={() => router.push("/food/camera")} data-tour="btn-camera">
+                        <Camera className="h-4 w-4" />사진 업로드
                       </Button>
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="음식 이름 (예: 새우튀김, 땅콩버터)"
-                          value={foodInput}
-                          onChange={(e) => setFoodInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleFoodSearch()}
-                          className="h-10 pl-10"
-                        />
+                        <Input placeholder="음식 이름 (예: 새우튀김, 땅콩버터)" value={foodInput} onChange={(e) => setFoodInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleFoodSearch()} className="h-10 pl-10" />
                       </div>
                       <Button onClick={handleFoodSearch}>검색</Button>
                     </div>
-
                     <p className="text-xs text-muted-foreground">내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요</p>
-
-                    {/* 최근 확인 기록 (로그인 시 인라인) */}
                     {user && recentChecks.length > 0 && (
                       <div className="border-t pt-3 -mx-4 px-4">
                         <div className="flex items-center justify-between mb-2">
@@ -883,244 +593,102 @@ export default function HomePage() {
                     )}
                   </div>
                 )}
-
-                {/* ── 몸이 아파요 ── */}
                 {searchMode === "symptom" && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">증상을 입력하면 AI가 적합한 진료과를 추천해드려요</p>
                     <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="증상 입력 (예: 목이 아프고 열이 나요)"
-                          value={symptomInput}
-                          onChange={(e) => setSymptomInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleSymptomSearch()}
-                          className="h-10 pl-10"
-                        />
-                      </div>
+                      <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="증상 입력 (예: 목이 아프고 열이 나요)" value={symptomInput} onChange={(e) => setSymptomInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSymptomSearch()} className="h-10 pl-10" /></div>
                       <Button onClick={handleSymptomSearch}>분석</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">※ AI 분석 결과는 참고용이며, 정확한 진단은 의료진과 상담하세요</p>
                   </div>
                 )}
-
-                {/* ── 병원/약국 조회 ── */}
                 {searchMode === "search" && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">현재 위치 기반으로 가까운 병원/약국을 찾아드려요</p>
-
-                    {/* 병원/약국 토글 + 반경 */}
                     <div className="flex items-center gap-2">
                       <div className="flex rounded-lg border overflow-hidden flex-1">
-                        <button
-                          onClick={() => { setPlaceType("hospital"); setPlacePage(1); setPlaceSearchQuery(""); setSelectedPlaceId(null) }}
-                          className={`flex-1 py-2 text-sm font-medium transition-colors ${placeType === "hospital" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-                        >병원</button>
-                        <button
-                          onClick={() => { setPlaceType("pharmacy"); setPlacePage(1); setPlaceSearchQuery(""); setSelectedPlaceId(null) }}
-                          className={`flex-1 py-2 text-sm font-medium transition-colors ${placeType === "pharmacy" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-                        >약국</button>
+                        <button onClick={() => { setPlaceType("hospital"); setPlacePage(1); setPlaceSearchQuery(""); setSelectedPlaceId(null) }} className={`flex-1 py-2 text-sm font-medium transition-colors ${placeType === "hospital" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>병원</button>
+                        <button onClick={() => { setPlaceType("pharmacy"); setPlacePage(1); setPlaceSearchQuery(""); setSelectedPlaceId(null) }} className={`flex-1 py-2 text-sm font-medium transition-colors ${placeType === "pharmacy" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>약국</button>
                       </div>
-                      <select
-                        value={radiusKm}
-                        onChange={(e) => { setRadiusKm(Number(e.target.value)); setPlacePage(1) }}
-                        className="rounded-lg border px-3 py-2 text-sm"
-                      >
-                        {[1, 3, 5, 10].map(km => (
-                          <option key={km} value={km}>반경 {km}km</option>
-                        ))}
+                      <select value={radiusKm} onChange={(e) => { setRadiusKm(Number(e.target.value)); setPlacePage(1) }} className="rounded-lg border px-3 py-2 text-sm">
+                        {[1, 3, 5, 10].map(km => (<option key={km} value={km}>반경 {km}km</option>))}
                       </select>
                     </div>
-
-                    {/* 이름 검색 */}
                     {locationStatus === "granted" && (
                       <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            placeholder={`${placeType === "hospital" ? "병원" : "약국"} 이름 검색 (예: ${placeType === "hospital" ? "삼성병원" : "온누리약국"})`}
-                            value={placeSearchQuery}
-                            onChange={(e) => { if (!e.target.value.trim()) { setPlaceSearched(false); setPlaceSearchResults([]) }; setPlaceSearchQuery(e.target.value) }}
-                            onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()}
-                            className="h-9 pl-10 text-sm"
-                          />
-                        </div>
-                        <Button size="sm" onClick={handlePlaceSearch} disabled={placeSearchLoading}>
-                          {placeSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}
-                        </Button>
+                        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder={`${placeType === "hospital" ? "병원" : "약국"} 이름 검색`} value={placeSearchQuery} onChange={(e) => { if (!e.target.value.trim()) { setPlaceSearched(false); setPlaceSearchResults([]) }; setPlaceSearchQuery(e.target.value) }} onKeyDown={(e) => e.key === "Enter" && handlePlaceSearch()} className="h-9 pl-10 text-sm" /></div>
+                        <Button size="sm" onClick={handlePlaceSearch} disabled={placeSearchLoading}>{placeSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}</Button>
                       </div>
                     )}
-
-                    {/* 위치 상태 + 결과 */}
-                    {locationStatus === "loading" && (
-                      <div className="flex items-center justify-center py-6 gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">위치 정보를 가져오는 중...</span>
-                      </div>
-                    )}
-                    {locationStatus === "denied" && (
-                      <div className="text-center py-6">
-                        <MapPin className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                        <p className="text-sm text-muted-foreground">위치 접근 권한이 필요합니다</p>
-                        <Button size="sm" variant="outline" className="mt-2" onClick={() => router.push("/search")}>
-                          직접 검색하기
-                        </Button>
-                      </div>
-                    )}
+                    {locationStatus === "loading" && (<div className="flex items-center justify-center py-6 gap-2"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /><span className="text-sm text-muted-foreground">위치 정보를 가져오는 중...</span></div>)}
+                    {locationStatus === "denied" && (<div className="text-center py-6"><MapPin className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" /><p className="text-sm text-muted-foreground">위치 접근 권한이 필요합니다</p><Button size="sm" variant="outline" className="mt-2" onClick={() => router.push("/search")}>직접 검색하기</Button></div>)}
                     {locationStatus === "granted" && (() => {
-                      // 검색 결과 vs 위치 기반 리스트
                       const displayPlaces = placeSearched ? placeSearchResults : nearbyPlaces
                       const isSearchMode = placeSearched
-
                       const totalPages = Math.ceil(displayPlaces.length / PLACES_PER_PAGE)
                       const paged = displayPlaces.slice((placePage - 1) * PLACES_PER_PAGE, placePage * PLACES_PER_PAGE)
-
                       const loading = isSearchMode ? placeSearchLoading : placeLoading
-
                       return (
                         <div>
-                          {loading ? (
-                            <div className="space-y-2">
-                              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
-                            </div>
+                          {loading ? (<div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}</div>
                           ) : displayPlaces.length > 0 ? (
                             <div className="space-y-1">
-                              {/* 결과 수 */}
-                              <p className="text-xs text-muted-foreground mb-1">
-                                {isSearchMode ? `"${placeSearchQuery}" 검색 결과 ${displayPlaces.length}개` : `내 주변 ${displayPlaces.length}개`}
-                                {totalPages > 1 && ` · ${placePage}/${totalPages} 페이지`}
-                              </p>
-
+                              <p className="text-xs text-muted-foreground mb-1">{isSearchMode ? `"${placeSearchQuery}" 검색 결과 ${displayPlaces.length}개` : `내 주변 ${displayPlaces.length}개`}{totalPages > 1 && ` · ${placePage}/${totalPages} 페이지`}</p>
                               {paged.map((place) => {
                                 const isSelected = selectedPlaceId === place.id
                                 return (
                                   <div key={place.id} className="border rounded-lg overflow-hidden">
-                                    <button
-                                      onClick={() => setSelectedPlaceId(isSelected ? null : place.id)}
-                                      className={`flex w-full items-start justify-between p-3 text-left transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/50"}`}
-                                    >
+                                    <button onClick={() => setSelectedPlaceId(isSelected ? null : place.id)} className={`flex w-full items-start justify-between p-3 text-left transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/50"}`}>
                                       <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <p className="font-medium text-sm truncate">{place.name}</p>
-                                          {place.distance && <Badge variant="secondary" className="text-[10px] flex-shrink-0">{place.distance}</Badge>}
-                                        </div>
+                                        <div className="flex items-center gap-2"><p className="font-medium text-sm truncate">{place.name}</p>{place.distance && <Badge variant="secondary" className="text-[10px] flex-shrink-0">{place.distance}</Badge>}</div>
                                         <p className="text-xs text-muted-foreground truncate">{place.address}</p>
                                         {place.clCdNm && <Badge variant="outline" className="mt-1 text-[10px]">{place.clCdNm}</Badge>}
                                       </div>
                                       <ChevronDown className={`h-4 w-4 mt-1 transition-transform text-muted-foreground flex-shrink-0 ${isSelected ? "rotate-180" : ""}`} />
                                     </button>
-
                                     {isSelected && (
                                       <div className="border-t">
                                         <div style={{ height: "208px", minHeight: "208px" }} className="bg-muted relative">
-                                          {place.lat > 0 && place.lng > 0 ? (
-                                            <MiniNaverMap lat={place.lat} lng={place.lng} name={place.name} userLocation={userLocation} />
-                                          ) : (
-                                            <iframe src={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}?c=15,0,0,0,dh`} className="h-full w-full border-0" loading="lazy" title={`${place.name} 지도`} />
-                                          )}
+                                          {place.lat > 0 && place.lng > 0 ? <MiniNaverMap lat={place.lat} lng={place.lng} name={place.name} userLocation={userLocation} /> : <iframe src={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}?c=15,0,0,0,dh`} className="h-full w-full border-0" loading="lazy" title={`${place.name} 지도`} />}
                                         </div>
                                         <div className="px-3 py-3 space-y-2 bg-muted/20">
-                                          <div className="flex items-start gap-2">
-                                            <MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
-                                            <p className="text-xs">{place.address}</p>
-                                          </div>
-                                          {place.phone && (
-                                            <div className="flex items-center gap-2">
-                                              <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                              <a href={`tel:${place.phone}`} className="text-xs text-primary hover:underline">{place.phone}</a>
-                                            </div>
-                                          )}
+                                          <div className="flex items-start gap-2"><MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground flex-shrink-0" /><p className="text-xs">{place.address}</p></div>
+                                          {place.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /><a href={`tel:${place.phone}`} className="text-xs text-primary hover:underline">{place.phone}</a></div>}
                                         </div>
                                         <div className="flex items-center border-t px-2 py-2 gap-1">
+                                          <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>{place.phone ? <a href={`tel:${place.phone}`}><Phone className="h-3 w-3" />전화</a> : <span className="text-muted-foreground">전화번호 없음</span>}</Button>
                                           <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
-                                            {place.phone ? <a href={`tel:${place.phone}`}><Phone className="h-3 w-3" />전화</a> : <span className="text-muted-foreground">전화번호 없음</span>}
-                                          </Button>
-                                          <Button variant="ghost" size="sm" className="flex-1 gap-1.5 text-xs h-8" asChild>
-                                            <a
-                                              href={place.lat > 0 ? `https://map.naver.com/v5/directions/-/${place.lng},${place.lat},${encodeURIComponent(place.name)}/-/transit?c=${place.lng},${place.lat},15,0,0,0,dh` : `https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                            >
-                                              <MapPin className="h-3 w-3" />길찾기
-                                            </a>
+                                            <a href={place.lat > 0 ? `https://map.naver.com/v5/directions/-/${place.lng},${place.lat},${encodeURIComponent(place.name)}/-/transit?c=${place.lng},${place.lat},15,0,0,0,dh` : `https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" />길찾기</a>
                                           </Button>
                                           <BookmarkButton type={placeType === "pharmacy" ? "pharmacy" : "hospital"} id={place.id} name={place.name} address={place.address} phone={place.phone} category={place.clCdNm} lat={place.lat} lng={place.lng} />
                                         </div>
-                                        <a
-                                          href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center justify-center gap-1.5 border-t px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
-                                        >
-                                          네이버 지도에서 상세보기
-                                          <ChevronRight className="h-3.5 w-3.5" />
-                                        </a>
+                                        <a href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name + " " + place.address)}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 border-t px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors">네이버 지도에서 상세보기<ChevronRight className="h-3.5 w-3.5" /></a>
                                       </div>
                                     )}
                                   </div>
                                 )
                               })}
-
-                              {/* 페이징 */}
                               {totalPages > 1 && (
                                 <div className="flex items-center justify-center gap-1 pt-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    disabled={placePage <= 1}
-                                    onClick={() => { setPlacePage(p => p - 1); setSelectedPlaceId(null) }}
-                                  >
-                                    ‹
-                                  </Button>
+                                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={placePage <= 1} onClick={() => { setPlacePage(p => p - 1); setSelectedPlaceId(null) }}>‹</Button>
                                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                                    // 5개 페이지 버튼 표시 (현재 페이지 중심)
                                     let pageNum: number
-                                    if (totalPages <= 5) {
-                                      pageNum = i + 1
-                                    } else if (placePage <= 3) {
-                                      pageNum = i + 1
-                                    } else if (placePage >= totalPages - 2) {
-                                      pageNum = totalPages - 4 + i
-                                    } else {
-                                      pageNum = placePage - 2 + i
-                                    }
-                                    return (
-                                      <Button
-                                        key={pageNum}
-                                        variant={placePage === pageNum ? "default" : "outline"}
-                                        size="sm"
-                                        className="h-8 w-8 p-0 text-xs"
-                                        onClick={() => { setPlacePage(pageNum); setSelectedPlaceId(null) }}
-                                      >
-                                        {pageNum}
-                                      </Button>
-                                    )
+                                    if (totalPages <= 5) pageNum = i + 1
+                                    else if (placePage <= 3) pageNum = i + 1
+                                    else if (placePage >= totalPages - 2) pageNum = totalPages - 4 + i
+                                    else pageNum = placePage - 2 + i
+                                    return <Button key={pageNum} variant={placePage === pageNum ? "default" : "outline"} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => { setPlacePage(pageNum); setSelectedPlaceId(null) }}>{pageNum}</Button>
                                   })}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    disabled={placePage >= totalPages}
-                                    onClick={() => { setPlacePage(p => p + 1); setSelectedPlaceId(null) }}
-                                  >
-                                    ›
-                                  </Button>
+                                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={placePage >= totalPages} onClick={() => { setPlacePage(p => p + 1); setSelectedPlaceId(null) }}>›</Button>
                                 </div>
                               )}
                             </div>
                           ) : (
                             <div className="text-center py-6">
                               <MapPin className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                              <p className="text-sm text-muted-foreground">
-                                {isSearchMode ? `"${placeSearchQuery}" 검색 결과가 없습니다` : `반경 ${radiusKm}km 이내에 ${placeType === "hospital" ? "병원" : "약국"}이 없습니다`}
-                              </p>
-                              {isSearchMode ? (
-                                <Button variant="outline" size="sm" className="mt-2" onClick={() => { setPlaceSearchQuery(""); setPlaceSearched(false); setPlaceSearchResults([]) }}>검색 초기화</Button>
-                              ) : (
-                                <Button variant="outline" size="sm" className="mt-2" onClick={() => setRadiusKm(Math.min(radiusKm + 2, 10))}>범위 넓히기</Button>
-                              )}
+                              <p className="text-sm text-muted-foreground">{isSearchMode ? `"${placeSearchQuery}" 검색 결과가 없습니다` : `반경 ${radiusKm}km 이내에 ${placeType === "hospital" ? "병원" : "약국"}이 없습니다`}</p>
+                              {isSearchMode ? <Button variant="outline" size="sm" className="mt-2" onClick={() => { setPlaceSearchQuery(""); setPlaceSearched(false); setPlaceSearchResults([]) }}>검색 초기화</Button> : <Button variant="outline" size="sm" className="mt-2" onClick={() => setRadiusKm(Math.min(radiusKm + 2, 10))}>범위 넓히기</Button>}
                             </div>
                           )}
                         </div>
@@ -1128,253 +696,123 @@ export default function HomePage() {
                     })()}
                   </div>
                 )}
-
-                {/* ── 약 정보 검색 ── */}
                 {searchMode === "medicine" && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">약 이름으로 복용법, 주의사항, 부작용을 확인하세요</p>
                     <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="약 이름 (예: 타이레놀, 아스피린)" value={medicineQuery} onChange={(e) => setMedicineQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleMedicineSearch()} className="h-10 pl-10" />
-                      </div>
-                      <Button onClick={handleMedicineSearch} disabled={medicineLoading}>
-                        {medicineLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}
-                      </Button>
+                      <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="약 이름 (예: 타이레놀, 아스피린)" value={medicineQuery} onChange={(e) => setMedicineQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleMedicineSearch()} className="h-10 pl-10" /></div>
+                      <Button onClick={handleMedicineSearch} disabled={medicineLoading}>{medicineLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}</Button>
                     </div>
-
-                    {medicineSearched && (
-                      medicineResults.length > 0 ? (
-                        <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">{medicineTotalCount}개 결과</p>
-                          {medicineResults.map((med) => (
-                            <button key={med.id} onClick={() => router.push(`/medicine?q=${encodeURIComponent(med.name)}`)} className="flex w-full items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors">
-                              <Pill className="h-5 w-5 text-primary shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{med.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{med.company}</p>
-                              </div>
-                            </button>
-                          ))}
-                          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => router.push(`/medicine?q=${encodeURIComponent(medicineQuery)}`)}>
-                            전체 결과 보기 <ChevronRight className="ml-1 h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <p className="text-center text-sm text-muted-foreground py-4">검색 결과가 없습니다</p>
-                      )
-                    )}
+                    {medicineSearched && (medicineResults.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">{medicineTotalCount}개 결과</p>
+                        {medicineResults.map((med) => (<button key={med.id} onClick={() => router.push(`/medicine?q=${encodeURIComponent(med.name)}`)} className="flex w-full items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"><Pill className="h-5 w-5 text-primary shrink-0" /><div className="min-w-0"><p className="text-sm font-medium truncate">{med.name}</p><p className="text-xs text-muted-foreground truncate">{med.company}</p></div></button>))}
+                        <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => router.push(`/medicine?q=${encodeURIComponent(medicineQuery)}`)}>전체 결과 보기 <ChevronRight className="ml-1 h-3 w-3" /></Button>
+                      </div>
+                    ) : (<p className="text-center text-sm text-muted-foreground py-4">검색 결과가 없습니다</p>))}
                   </div>
                 )}
-
               </div>
             </CardContent>
           </Card>
 
-          {/* ═══════════════════════════════════════
-              2. 급식 알레르기 (학교 등록 시)
-          ═══════════════════════════════════════ */}
-          {mealStatus === "loaded" && allSchoolMeals.length > 0 && (
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-sm font-medium text-muted-foreground">🍱 오늘의 급식</p>
-              <button onClick={() => router.push("/school")} className="text-xs text-muted-foreground hover:text-primary">학교 수정 →</button>
-            </div>
-          )}
-          {mealStatus === "loaded" && allSchoolMeals.map((entry, si) => {
-            const hasMeals = entry.meals.length > 0
-            const allMenuItems = entry.meals.flatMap(m => m.menu)
-            const dangerItems = allMenuItems.filter(m => m.status === "danger")
-            const hasDanger = dangerItems.length > 0
-
-            if (!hasMeals) {
-              return (
-                <Card
-                  key={si}
-                  className="border shadow-none cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
-                  onClick={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}
-                >
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
-                        <MealIcon className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{entry.school.school_name}</p>
-                        <p className="text-xs text-muted-foreground">오늘은 급식 정보가 없습니다 (방학/휴일)</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </CardContent>
-                </Card>
-              )
-            }
-
-            return (
-              <SchoolMealCard
-                key={si}
-                entry={entry}
-                hasDanger={hasDanger}
-                dangerItems={dangerItems}
-                onNavigate={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}
-              />
-            )
-          })}
-
-          {/* ═══════════════════════════════════════
-              3. CTA — 안내 카드 (비로그인 / 미등록)
-          ═══════════════════════════════════════ */}
-          {!user && (
-            <Card
-              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
-              onClick={() => setLoginModalOpen(true)}
-            >
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                    <Lock className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">로그인하고 알레르기 정보 등록하기</p>
-                    <p className="text-xs text-muted-foreground">맞춤 서비스를 위해 프로필을 완성해보세요</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </CardContent>
-            </Card>
-          )}
-
-          {mealStatus === "no-login" && (
-            <Card
-              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
-              onClick={() => setLoginModalOpen(true)}
-            >
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                    <MealIcon className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">로그인하고 급식 정보 확인하기</p>
-                    <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 체크해드려요</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </CardContent>
-            </Card>
-          )}
-
-          {mealStatus === "no-school" && (
-            <Card
-              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
-              onClick={() => router.push("/school")}
-            >
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                    <GraduationCap className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">학교 등록하고 급식 알레르기 확인하기</p>
-                    <p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 자동 체크해드려요</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* ═══════════════════════════════════════
-              4. 커뮤니티
-          ═══════════════════════════════════════ */}
-          <div className="pt-1 space-y-4">
-
-            {/* ── 내 학교 최신글 ── */}
-            <div>
-              <div className="mb-2">
-                <p className="text-sm font-medium text-muted-foreground">💬 내 학교 최신글</p>
+          {/* ═══ 2. 급식 알레르기 ═══ */}
+          <div data-tour="meal-section">
+            {mealStatus === "loaded" && allSchoolMeals.length > 0 && (
+              <div className="flex items-center justify-between pt-1 mb-3">
+                <p className="text-sm font-medium text-muted-foreground">🍱 오늘의 급식</p>
+                <button onClick={() => router.push("/school")} className="text-xs text-muted-foreground hover:text-primary">학교 수정 →</button>
               </div>
+            )}
+            {mealStatus === "loaded" && allSchoolMeals.map((entry, si) => {
+              const hasMeals = entry.meals.length > 0
+              const allMenuItems = entry.meals.flatMap(m => m.menu)
+              const dangerItems = allMenuItems.filter(m => m.status === "danger")
+              const hasDanger = dangerItems.length > 0
+              if (!hasMeals) {
+                return (
+                  <Card key={si} className="border shadow-none cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70" onClick={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)}>
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted"><MealIcon className="h-4 w-4 text-muted-foreground" /></div>
+                        <div><p className="text-sm font-medium">{entry.school.school_name}</p><p className="text-xs text-muted-foreground">오늘은 급식 정보가 없습니다 (방학/휴일)</p></div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </CardContent>
+                  </Card>
+                )
+              }
+              return <SchoolMealCard key={si} entry={entry} hasDanger={hasDanger} dangerItems={dangerItems} onNavigate={() => router.push(`/school/${entry.school.office_code}-${entry.school.school_code}`)} />
+            })}
 
-              {communityLoading ? (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
-                </div>
+            {/* CTA 카드들 */}
+            {!user && (
+              <Card className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70" onClick={() => setLoginModalOpen(true)}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10"><Lock className="h-4 w-4 text-primary" /></div><div><p className="text-sm font-medium">로그인하고 알레르기 정보 등록하기</p><p className="text-xs text-muted-foreground">맞춤 서비스를 위해 프로필을 완성해보세요</p></div></div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </CardContent>
+              </Card>
+            )}
+            {mealStatus === "no-login" && (
+              <Card className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70" onClick={() => setLoginModalOpen(true)}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10"><MealIcon className="h-4 w-4 text-primary" /></div><div><p className="text-sm font-medium">로그인하고 급식 정보 확인하기</p><p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 체크해드려요</p></div></div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </CardContent>
+              </Card>
+            )}
+            {mealStatus === "no-school" && (
+              <Card className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70" onClick={() => router.push("/school")}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10"><GraduationCap className="h-4 w-4 text-primary" /></div><div><p className="text-sm font-medium">학교 등록하고 급식 알레르기 확인하기</p><p className="text-xs text-muted-foreground">학교를 등록하면 매일 급식 알레르기를 자동 체크해드려요</p></div></div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* ═══ 3. 커뮤니티 ═══ */}
+          <div className="pt-1 space-y-4">
+            <div>
+              <div className="mb-2"><p className="text-sm font-medium text-muted-foreground">💬 내 학교 최신글</p></div>
+              {communityLoading ? (<div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}</div>
               ) : communityPosts.length === 0 ? (
                 <Card className="border shadow-none border-dashed cursor-pointer transition-colors hover:bg-muted/50" onClick={() => router.push("/community")}>
                   <CardContent className="flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                        <MessageCircle className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">커뮤니티에 첫 글을 작성해보세요</p>
-                        <p className="text-xs text-muted-foreground">학교를 등록하면 커뮤니티에 참여할 수 있어요</p>
-                      </div>
-                    </div>
+                    <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10"><MessageCircle className="h-4 w-4 text-primary" /></div><div><p className="text-sm font-medium">커뮤니티에 첫 글을 작성해보세요</p><p className="text-xs text-muted-foreground">학교를 등록하면 커뮤니티에 참여할 수 있어요</p></div></div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </CardContent>
                 </Card>
               ) : (
                 <Card className="border shadow-none overflow-hidden">
                   <CardContent className="p-0">
-                    {user && (
-                      <button onClick={() => router.push("/community/write")} className="flex w-full items-center justify-center gap-1.5 border-b py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors">
-                        <PenLine className="h-3 w-3" /> 글쓰기
-                      </button>
-                    )}
+                    {user && (<button onClick={() => router.push("/community/write")} className="flex w-full items-center justify-center gap-1.5 border-b py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"><PenLine className="h-3 w-3" /> 글쓰기</button>)}
                     {communityPosts.map((post, i) => (
                       <div key={post.id} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70 ${i > 0 ? "border-t" : ""}`}>
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{post.schoolName}</span>
-                          <p className="text-sm truncate">{post.title}</p>
-                        </div>
-                        <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground shrink-0 ml-3">
-                          <span className="flex items-center gap-0.5"><Heart className="h-3 w-3" />{post.like_count}</span>
-                          <span className="flex items-center gap-0.5"><MessageCircle className="h-3 w-3" />{post.comment_count}</span>
-                        </div>
+                        <div className="flex items-center gap-2 min-w-0 flex-1"><span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{post.schoolName}</span><p className="text-sm truncate">{post.title}</p></div>
+                        <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground shrink-0 ml-3"><span className="flex items-center gap-0.5"><Heart className="h-3 w-3" />{post.like_count}</span><span className="flex items-center gap-0.5"><MessageCircle className="h-3 w-3" />{post.comment_count}</span></div>
                       </div>
                     ))}
-                    <button onClick={() => router.push("/community")} className="flex w-full items-center justify-center border-t py-2.5 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors">
-                      더보기
-                    </button>
+                    <button onClick={() => router.push("/community")} className="flex w-full items-center justify-center border-t py-2.5 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors">더보기</button>
                   </CardContent>
                 </Card>
               )}
             </div>
-
-            {/* ── 인기 게시글 (2열 그리드) ── */}
             {!communityLoading && (popularLikes.length > 0 || popularViews.length > 0) && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">🔥 인기 게시글</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {/* 좋아요 TOP 5 */}
                   <Card className="border shadow-none overflow-hidden">
                     <CardContent className="p-0">
                       <div className="px-3 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground">❤️ 좋아요 TOP</div>
-                      {popularLikes.slice(0, 5).map((post, i) => (
-                        <div key={post.id} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 ${i > 0 ? "border-t" : ""}`}>
-                          <span className="shrink-0 text-[11px] font-bold text-primary/60 w-3">{i + 1}</span>
-                          <p className="text-xs truncate flex-1">{post.title}</p>
-                          <span className="flex items-center gap-0.5 text-[10px] text-red-400 shrink-0">
-                            <Heart className="h-2.5 w-2.5 fill-red-400" />{post.like_count}
-                          </span>
-                        </div>
-                      ))}
+                      {popularLikes.slice(0, 5).map((post, i) => (<div key={post.id} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 ${i > 0 ? "border-t" : ""}`}><span className="shrink-0 text-[11px] font-bold text-primary/60 w-3">{i + 1}</span><p className="text-xs truncate flex-1">{post.title}</p><span className="flex items-center gap-0.5 text-[10px] text-red-400 shrink-0"><Heart className="h-2.5 w-2.5 fill-red-400" />{post.like_count}</span></div>))}
                     </CardContent>
                   </Card>
-
-                  {/* 조회수 TOP 5 */}
                   <Card className="border shadow-none overflow-hidden">
                     <CardContent className="p-0">
                       <div className="px-3 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground">👀 조회수 TOP</div>
-                      {popularViews.slice(0, 5).map((post, i) => (
-                        <div key={`v-${post.id}`} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 ${i > 0 ? "border-t" : ""}`}>
-                          <span className="shrink-0 text-[11px] font-bold text-primary/60 w-3">{i + 1}</span>
-                          <p className="text-xs truncate flex-1">{post.title}</p>
-                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
-                            <Eye className="h-2.5 w-2.5" />{post.view_count}
-                          </span>
-                        </div>
-                      ))}
+                      {popularViews.slice(0, 5).map((post, i) => (<div key={`v-${post.id}`} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 ${i > 0 ? "border-t" : ""}`}><span className="shrink-0 text-[11px] font-bold text-primary/60 w-3">{i + 1}</span><p className="text-xs truncate flex-1">{post.title}</p><span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0"><Eye className="h-2.5 w-2.5" />{post.view_count}</span></div>))}
                     </CardContent>
                   </Card>
                 </div>
@@ -1385,14 +823,17 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Footer — 데스크톱 */}
-      <div className="hidden md:block">
-        <Footer />
+      <div className="hidden md:block"><Footer /></div>
+
+      {/* ★ data-tour 속성 추가 */}
+      <div data-tour="bottom-nav">
+        <MobileNav />
       </div>
 
-      <MobileNav />
-
       <LoginModal open={loginModalOpen} onOpenChange={setLoginModalOpen} onSuccess={() => router.refresh()} />
+
+      {/* ★ 투어 가이드 */}
+      <OnboardingTour active={tourActive} onFinish={handleTourFinish} />
     </div>
   )
 }

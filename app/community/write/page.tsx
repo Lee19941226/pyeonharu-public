@@ -1,135 +1,162 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import dynamic from "next/dynamic"
-import { Header } from "@/components/layout/header"
-import { MobileNav } from "@/components/layout/mobile-nav"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  ArrowLeft, Loader2, Send, GraduationCap, Star,
-} from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { toast } from "sonner"
-import type { RichEditorRef } from "@/components/editor/rich-editor"
+import { Suspense } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { Header } from "@/components/layout/header";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Loader2, Send, GraduationCap, Star } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import type { RichEditorRef } from "@/components/editor/rich-editor";
 
-const RichEditor = dynamic(() => import("@/components/editor/rich-editor"), { ssr: false })
+const RichEditor = dynamic(() => import("@/components/editor/rich-editor"), {
+  ssr: false,
+});
 
 interface UserSchool {
-  school_code: string
-  school_name: string
-  is_primary: boolean
+  school_code: string;
+  school_name: string;
+  is_primary: boolean;
 }
 
-export default function CommunityWritePage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const editId = searchParams.get("edit")
-  const isEdit = !!editId
+function CommunityWriteContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const isEdit = !!editId;
 
-  const [mySchools, setMySchools] = useState<UserSchool[]>([])
-  const [selectedSchool, setSelectedSchool] = useState("")
-  const [title, setTitle] = useState("")
-  const [initialContent, setInitialContent] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [mySchools, setMySchools] = useState<UserSchool[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [title, setTitle] = useState("");
+  const [initialContent, setInitialContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const editorRef = useRef<RichEditorRef>(null)
+  const editorRef = useRef<RichEditorRef>(null);
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { toast.error("로그인이 필요합니다"); router.push("/login"); return }
-      loadMySchools()
-    })
+      if (!user) {
+        toast.error("로그인이 필요합니다");
+        router.push("/login");
+        return;
+      }
+      loadMySchools();
+    });
 
-    if (isEdit) loadPost()
-    else setIsLoading(false)
-  }, [])
+    if (isEdit) loadPost();
+    else setIsLoading(false);
+  }, []);
 
   const loadMySchools = async () => {
     try {
-      const res = await fetch("/api/school/register")
-      const data = await res.json()
-      const schools: UserSchool[] = data.schools || []
-      setMySchools(schools)
+      const res = await fetch("/api/school/register");
+      const data = await res.json();
+      const schools: UserSchool[] = data.schools || [];
+      setMySchools(schools);
 
       if (!isEdit) {
-        const primary = schools.find(s => s.is_primary)
-        setSelectedSchool(primary?.school_code || schools[0]?.school_code || "")
+        const primary = schools.find((s) => s.is_primary);
+        setSelectedSchool(
+          primary?.school_code || schools[0]?.school_code || "",
+        );
       }
-    } catch { /* ignore */ }
-  }
+    } catch {
+      /* ignore */
+    }
+  };
 
   const loadPost = async () => {
     try {
-      const res = await fetch(`/api/community/${editId}`)
-      const data = await res.json()
+      const res = await fetch(`/api/community/${editId}`);
+      const data = await res.json();
       if (data.post) {
-        setSelectedSchool(data.post.school_code)
-        setTitle(data.post.title)
-        setInitialContent(data.post.content)
+        setSelectedSchool(data.post.school_code);
+        setTitle(data.post.title);
+        setInitialContent(data.post.content);
       }
     } catch {
-      toast.error("게시글을 불러올 수 없습니다")
-      router.push("/community")
+      toast.error("게시글을 불러올 수 없습니다");
+      router.push("/community");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleImageUpload = async (file: File): Promise<string | null> => {
-    const formData = new FormData()
-    formData.append("files", file)
+    const formData = new FormData();
+    formData.append("files", file);
     try {
-      const res = await fetch("/api/community/upload", { method: "POST", body: formData })
-      const data = await res.json()
-      if (data.success && data.urls?.length > 0) return data.urls[0]
-      toast.error(data.error || "업로드 실패")
-      return null
+      const res = await fetch("/api/community/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success && data.urls?.length > 0) return data.urls[0];
+      toast.error(data.error || "업로드 실패");
+      return null;
     } catch {
-      toast.error("이미지 업로드 실패")
-      return null
+      toast.error("이미지 업로드 실패");
+      return null;
     }
-  }
+  };
 
   const handleSubmit = async () => {
-    if (!selectedSchool) { toast.error("학교를 선택해주세요"); return }
-    if (!title.trim()) { toast.error("제목을 입력해주세요"); return }
-
-    const content = editorRef.current?.getHTML() || ""
-    const imageUrls = editorRef.current?.getImageUrls() || []
-
-    if (editorRef.current?.isEmpty()) {
-      toast.error("내용을 입력해주세요")
-      return
+    if (!selectedSchool) {
+      toast.error("학교를 선택해주세요");
+      return;
+    }
+    if (!title.trim()) {
+      toast.error("제목을 입력해주세요");
+      return;
     }
 
-    setSubmitting(true)
+    const content = editorRef.current?.getHTML() || "";
+    const imageUrls = editorRef.current?.getImageUrls() || [];
+
+    if (editorRef.current?.isEmpty()) {
+      toast.error("내용을 입력해주세요");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const url = isEdit ? `/api/community/${editId}` : "/api/community"
-      const method = isEdit ? "PUT" : "POST"
+      const url = isEdit ? `/api/community/${editId}` : "/api/community";
+      const method = isEdit ? "PUT" : "POST";
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schoolCode: selectedSchool, title, content, imageUrls }),
-      })
+        body: JSON.stringify({
+          schoolCode: selectedSchool,
+          title,
+          content,
+          imageUrls,
+        }),
+      });
 
-      const data = await res.json()
+      const data = await res.json();
       if (data.success || data.post) {
-        toast.success(isEdit ? "게시글이 수정되었습니다" : "게시글이 작성되었습니다")
-        router.push(isEdit ? `/community/${editId}` : `/community/${data.post.id}`)
+        toast.success(
+          isEdit ? "게시글이 수정되었습니다" : "게시글이 작성되었습니다",
+        );
+        router.push(
+          isEdit ? `/community/${editId}` : `/community/${data.post.id}`,
+        );
       } else {
-        toast.error(data.error || "작성 실패")
+        toast.error(data.error || "작성 실패");
       }
     } catch {
-      toast.error("오류가 발생했습니다")
+      toast.error("오류가 발생했습니다");
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -140,7 +167,7 @@ export default function CommunityWritePage() {
         </main>
         <MobileNav />
       </div>
-    )
+    );
   }
 
   return (
@@ -149,19 +176,20 @@ export default function CommunityWritePage() {
       <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-4">
           <div className="mx-auto max-w-2xl space-y-4">
-
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-lg font-bold">{isEdit ? "글 수정" : "글쓰기"}</h1>
+              <h1 className="text-lg font-bold">
+                {isEdit ? "글 수정" : "글쓰기"}
+              </h1>
             </div>
 
             {/* 학교 선택 */}
             <div>
               <p className="mb-2 text-sm font-medium">학교</p>
               <div className="flex flex-wrap gap-2">
-                {mySchools.map(s => (
+                {mySchools.map((s) => (
                   <button
                     key={s.school_code}
                     onClick={() => setSelectedSchool(s.school_code)}
@@ -178,7 +206,9 @@ export default function CommunityWritePage() {
                 ))}
               </div>
               {mySchools.length === 0 && (
-                <p className="text-xs text-muted-foreground">등록된 학교가 없습니다. 학교를 먼저 등록해주세요.</p>
+                <p className="text-xs text-muted-foreground">
+                  등록된 학교가 없습니다. 학교를 먼저 등록해주세요.
+                </p>
               )}
             </div>
 
@@ -210,14 +240,30 @@ export default function CommunityWritePage() {
               className="w-full gap-1.5"
               size="lg"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
               {isEdit ? "수정하기" : "작성하기"}
             </Button>
-
           </div>
         </div>
       </main>
       <MobileNav />
     </div>
-  )
+  );
+}
+export default function CommunityWritePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      }
+    >
+      <CommunityWriteContent />
+    </Suspense>
+  );
 }
