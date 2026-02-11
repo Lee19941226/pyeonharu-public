@@ -9,7 +9,7 @@ import {
   Loader2, Users, CheckCircle, XCircle, ShieldCheck,
   Building2, Phone, MapPin, Cross, ChevronDown,
   UtensilsCrossed as MealIcon, ShieldAlert, GraduationCap, LogIn, CalendarDays,
-  AlertTriangle,
+  AlertTriangle, Heart, MessageCircle, Eye, PenLine,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -513,6 +513,12 @@ export default function HomePage() {
   const [allSchoolMeals, setAllSchoolMeals] = useState<{ school: MySchool; meals: MealData[] }[]>([])
   const [mealLoading, setMealLoading] = useState(false)
   const [mealStatus, setMealStatus] = useState<"loading" | "no-login" | "no-school" | "no-meal" | "loaded">("loading")
+
+  // 커뮤니티 — 내 학교 최신글 + 인기글
+  const [communityPosts, setCommunityPosts] = useState<any[]>([])
+  const [popularLikes, setPopularLikes] = useState<any[]>([])
+  const [popularViews, setPopularViews] = useState<any[]>([])
+  const [communityLoading, setCommunityLoading] = useState(true)
   // ─── Effects ───
   useEffect(() => {
     const supabase = createClient()
@@ -542,6 +548,36 @@ export default function HomePage() {
   useEffect(() => {
     loadMealData()
   }, [user])
+
+  // 커뮤니티 인기글 로드
+  useEffect(() => {
+    loadCommunityPosts()
+  }, [])
+
+  const loadCommunityPosts = async () => {
+    setCommunityLoading(true)
+    try {
+      // 1) 내 학교 목록
+      const schoolRes = await fetch("/api/school/register")
+      const schoolData = await schoolRes.json()
+      const schools = schoolData.schools || []
+
+      // 2) 내 학교 최신글 (복수 학교 코드, 최신순, 10개)
+      if (schools.length > 0) {
+        const codes = schools.map((s: any) => s.school_code).join(",")
+        const res = await fetch(`/api/community?schoolCodes=${codes}&sort=latest&limit=10`)
+        const data = await res.json()
+        setCommunityPosts(data.posts || [])
+      }
+
+      // 3) 인기글 (전체 학교, 좋아요 TOP5 + 조회수 TOP5)
+      const popRes = await fetch("/api/community?mode=popular")
+      const popData = await popRes.json()
+      setPopularLikes(popData.topLikes || [])
+      setPopularViews(popData.topViews || [])
+    } catch { /* 무시 */ }
+    finally { setCommunityLoading(false) }
+  }
 
   const loadMealData = async () => {
     if (!user) {
@@ -1246,6 +1282,105 @@ export default function HomePage() {
               </CardContent>
             </Card>
           )}
+
+          {/* ═══════════════════════════════════════
+              4. 커뮤니티
+          ═══════════════════════════════════════ */}
+          <div className="pt-1 space-y-4">
+
+            {/* ── 내 학교 최신글 ── */}
+            <div>
+              <div className="mb-2">
+                <p className="text-sm font-medium text-muted-foreground">💬 내 학교 최신글</p>
+              </div>
+
+              {communityLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+                </div>
+              ) : communityPosts.length === 0 ? (
+                <Card className="border shadow-none border-dashed cursor-pointer transition-colors hover:bg-muted/50" onClick={() => router.push("/community")}>
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                        <MessageCircle className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">커뮤니티에 첫 글을 작성해보세요</p>
+                        <p className="text-xs text-muted-foreground">학교를 등록하면 커뮤니티에 참여할 수 있어요</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border shadow-none overflow-hidden">
+                  <CardContent className="p-0">
+                    {user && (
+                      <button onClick={() => router.push("/community/write")} className="flex w-full items-center justify-center gap-1.5 border-b py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors">
+                        <PenLine className="h-3 w-3" /> 글쓰기
+                      </button>
+                    )}
+                    {communityPosts.map((post, i) => (
+                      <div key={post.id} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70 ${i > 0 ? "border-t" : ""}`}>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{post.schoolName}</span>
+                          <p className="text-sm truncate">{post.title}</p>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground shrink-0 ml-3">
+                          <span className="flex items-center gap-0.5"><Heart className="h-3 w-3" />{post.like_count}</span>
+                          <span className="flex items-center gap-0.5"><MessageCircle className="h-3 w-3" />{post.comment_count}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => router.push("/community")} className="flex w-full items-center justify-center border-t py-2.5 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors">
+                      더보기
+                    </button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* ── 인기 게시글 (2열 그리드) ── */}
+            {!communityLoading && (popularLikes.length > 0 || popularViews.length > 0) && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">🔥 인기 게시글</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* 좋아요 TOP 5 */}
+                  <Card className="border shadow-none overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="px-3 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground">❤️ 좋아요 TOP</div>
+                      {popularLikes.slice(0, 5).map((post, i) => (
+                        <div key={post.id} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 ${i > 0 ? "border-t" : ""}`}>
+                          <span className="shrink-0 text-[11px] font-bold text-primary/60 w-3">{i + 1}</span>
+                          <p className="text-xs truncate flex-1">{post.title}</p>
+                          <span className="flex items-center gap-0.5 text-[10px] text-red-400 shrink-0">
+                            <Heart className="h-2.5 w-2.5 fill-red-400" />{post.like_count}
+                          </span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* 조회수 TOP 5 */}
+                  <Card className="border shadow-none overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="px-3 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground">👀 조회수 TOP</div>
+                      {popularViews.slice(0, 5).map((post, i) => (
+                        <div key={`v-${post.id}`} onClick={() => router.push(`/community/${post.id}`)} className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 ${i > 0 ? "border-t" : ""}`}>
+                          <span className="shrink-0 text-[11px] font-bold text-primary/60 w-3">{i + 1}</span>
+                          <p className="text-xs truncate flex-1">{post.title}</p>
+                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
+                            <Eye className="h-2.5 w-2.5" />{post.view_count}
+                          </span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+          </div>
 
         </div>
       </main>
