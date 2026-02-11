@@ -27,6 +27,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 interface SearchResult {
   foodCode: string;
@@ -232,21 +233,53 @@ function FoodMainContent() {
     router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
       scroll: false,
     });
+
     try {
+      // ✅ Open API 검색
       const response = await fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
       );
       const data = await response.json();
-      if (data.success) {
+
+      if (data.success && data.items && data.items.length > 0) {
+        // ✅ 검색 결과 있음
         setResults(data.items);
         setCurrentPage(1);
         saveSearchHistory(searchQuery);
       } else {
-        setResults([]);
+        // ✅ 검색 결과 없음 → AI 분석 시도
+        toast.info("등록된 제품이 없습니다. AI로 분석 중...");
+
+        try {
+          const aiResponse = await fetch("/api/food/analyze-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: searchQuery }),
+          });
+
+          const aiData = await aiResponse.json();
+
+          if (aiData.success) {
+            // sessionStorage에 저장
+            const aiResultId = `ai-text-${Date.now()}`;
+            sessionStorage.setItem(aiResultId, JSON.stringify(aiData));
+
+            // 결과 페이지로 이동
+            router.push(`/food/result/${aiResultId}`);
+          } else {
+            setResults([]);
+            toast.error("제품을 찾을 수 없습니다");
+          }
+        } catch (aiError) {
+          console.error("AI 분석 오류:", aiError);
+          setResults([]);
+          toast.error("AI 분석 중 오류가 발생했습니다");
+        }
       }
     } catch (error) {
       console.error("Search error:", error);
       setResults([]);
+      toast.error("검색 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }

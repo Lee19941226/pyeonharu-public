@@ -41,7 +41,6 @@ export default function CameraPage() {
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">(
     "environment",
   );
@@ -224,48 +223,18 @@ export default function CameraPage() {
   //이미지 분석
   const analyzeImage = async () => {
     if (!capturedImage) return;
-    setIsAnalyzing(true);
 
     try {
-      const response = await fetch("/api/food/analyze-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64: capturedImage.split(",")[1],
-        }),
-      });
+      // ✅ localStorage에 이미지 저장
+      localStorage.setItem("pendingImageAnalysis", capturedImage);
 
-      const result = await response.json();
-
-      if (result.success) {
-        const { method, foodCode, candidates, detectedIngredients } =
-          result.data;
-
-        if (method === "barcode" || method === "product_name") {
-          // 직접 결과로 이동
-          router.push(`/food/result/${foodCode}`);
-        } else if (method === "multiple_results" || method === "ingredients") {
-          // 선택 화면으로 이동
-          const params = new URLSearchParams({
-            candidates: JSON.stringify(candidates),
-            method: method,
-          });
-          if (detectedIngredients) {
-            params.append("ingredients", JSON.stringify(detectedIngredients));
-          }
-          router.push(`/food/select?${params.toString()}`);
-        }
-      } else {
-        throw new Error(result.error);
-      }
+      // ✅ 즉시 AI 결과 페이지로 이동
+      router.push("/food/ai-result");
     } catch (error) {
       console.error(error);
-      toast.error("이미지 분석 중 오류가 발생했습니다");
-    } finally {
-      setIsAnalyzing(false);
+      toast.error("이미지 저장 중 오류가 발생했습니다");
     }
   };
-
   // 재촬영/재업로드
   const retake = () => {
     setCapturedImage(null);
@@ -814,22 +783,9 @@ export default function CameraPage() {
                 <Button onClick={retake} variant="outline" className="flex-1">
                   다시 {mode === "camera" ? "촬영" : "업로드"}
                 </Button>
-                <Button
-                  onClick={analyzeImage}
-                  disabled={isAnalyzing}
-                  className="flex-1"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      분석 중...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      AI 분석하기
-                    </>
-                  )}
+                <Button onClick={analyzeImage} className="flex-1">
+                  <Zap className="mr-2 h-4 w-4" />
+                  AI 분석하기
                 </Button>
               </div>
 

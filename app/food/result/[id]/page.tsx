@@ -51,6 +51,8 @@ interface FoodResult {
   servingSize?: string;
   isSafe: boolean;
   hasNutritionInfo?: boolean;
+  detectedIngredients?: string[];
+  dataSource?: string;
 }
 
 export default function FoodResultPage() {
@@ -64,11 +66,110 @@ export default function FoodResultPage() {
   useEffect(() => {
     loadFoodResult();
     checkFavorite();
-  }, [params.id]);
+  }, [params.id, router]);
 
   const loadFoodResult = async () => {
     try {
-      const response = await fetch(`/api/food/result?code=${params.id}`);
+      // ✅ 타입 가드 추가
+      const id = Array.isArray(params.id) ? params.id[0] : params.id;
+
+      if (!id) {
+        setError("잘못된 요청입니다");
+        setIsLoading(false);
+        return;
+      }
+
+      // AI 결과인지 확인 (이미지 분석 or 텍스트 분석)
+      if (id.startsWith("ai-")) {
+        console.log("🤖 AI 분석 결과 로드");
+        const aiData = sessionStorage.getItem(id);
+
+        if (!aiData) {
+          setError("분석 결과를 찾을 수 없습니다");
+          setIsLoading(false);
+          return;
+        }
+
+        const analysisResult = JSON.parse(aiData);
+
+        // ✅ 원재료 처리 개선
+        let processedIngredients = analysisResult.detectedIngredients || [];
+        if (analysisResult.rawMaterials) {
+          // Open API 원재료는 쉼표로 구분
+          processedIngredients = analysisResult.rawMaterials
+            .split(/[,\(\)]+/)
+            .map((item: string) => item.trim())
+            .filter((item: string) => item.length > 0);
+        }
+
+        const aiResult: FoodResult = {
+          foodCode: id,
+          foodName: analysisResult.productName || "제품명 없음",
+          manufacturer: analysisResult.manufacturer || "",
+          weight: analysisResult.weight || "",
+          allergens: analysisResult.allergens || [],
+          userAllergens: analysisResult.matchedUserAllergens || [],
+          detectedAllergens: (analysisResult.allergens || []).map(
+            (allergen: string) => ({
+              name: allergen,
+              amount: "",
+              severity: analysisResult.matchedUserAllergens?.includes(allergen)
+                ? "high"
+                : "medium",
+            }),
+          ),
+          ingredients: processedIngredients,
+          isSafe: !analysisResult.hasUserAllergen,
+          dataSource: analysisResult.dataSource || "ai",
+          detectedIngredients: processedIngredients,
+
+          // 영양정보 (있으면)
+          nutritionDetails: analysisResult.nutritionInfo
+            ? [
+                {
+                  name: "열량",
+                  content: analysisResult.nutritionInfo.calories || "",
+                  unit: "",
+                },
+                {
+                  name: "나트륨",
+                  content: analysisResult.nutritionInfo.sodium || "",
+                  unit: "",
+                },
+                {
+                  name: "탄수화물",
+                  content: analysisResult.nutritionInfo.carbs || "",
+                  unit: "",
+                },
+                {
+                  name: "당류",
+                  content: analysisResult.nutritionInfo.sugars || "",
+                  unit: "",
+                },
+                {
+                  name: "지방",
+                  content: analysisResult.nutritionInfo.fat || "",
+                  unit: "",
+                },
+                {
+                  name: "단백질",
+                  content: analysisResult.nutritionInfo.protein || "",
+                  unit: "",
+                },
+              ].filter((item) => item.content)
+            : undefined,
+          servingSize: analysisResult.nutritionInfo?.servingSize,
+          hasNutritionInfo: !!analysisResult.nutritionInfo,
+        };
+
+        setResult(aiResult);
+        setIsLoading(false);
+        return;
+      }
+
+      // 일반 바코드 - Open API 조회
+      console.log("📊 Open API 조회");
+      const response = await fetch(`/api/food/result?code=${id}`);
       const data = await response.json();
 
       if (data.success) {
@@ -84,7 +185,6 @@ export default function FoodResultPage() {
       setIsLoading(false);
     }
   };
-
   const saveToHistory = (result: FoodResult) => {
     const historyItem = {
       foodCode: result.foodCode,
@@ -221,6 +321,14 @@ export default function FoodResultPage() {
             {/* 헤더 */}
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-3xl font-bold">{result.foodName}</h1>
+              {/* ✅ 데이터 출처 표시 */}
+              {result.dataSource && (
+                <Badge variant="outline" className="mt-2">
+                  {result.dataSource === "openapi"
+                    ? "📊 식약처 공식 데이터"
+                    : "🤖 AI 분석 결과"}
+                </Badge>
+              )}
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon">
                   <Share2 className="h-5 w-5" />
@@ -300,7 +408,24 @@ export default function FoodResultPage() {
                 </CardContent>
               </Card>
             )}
-
+            {/* AI가 감지한 재료 */}
+            {result.detectedIngredients &&
+              result.detectedIngredients.length > 0 && (
+                <Card className="mb-6">
+                  <CardContent className="p-6">
+                    <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                      🤖 AI가 감지한 원재료
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {result.detectedIngredients.map((ingredient, idx) => (
+                        <Badge key={idx} variant="secondary">
+                          {ingredient}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             {/* 원재료명 및 함량 */}
             <Card className="mb-6">
               <CardContent className="p-6">
