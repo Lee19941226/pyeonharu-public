@@ -6,11 +6,83 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
 
-    console.log("🔍 검색 바코드:", code);
+    console.log("🔍 검색 바코드/코드:", code);
+
+    const supabase = await createClient();
+
+    // ==========================================
+    // DB 캐시 우선 조회
+    // ==========================================
+    const { data: cachedData } = await supabase
+      .from("food_search_cache")
+      .select("*")
+      .eq("food_code", code)
+      .maybeSingle();
+
+    if (cachedData) {
+      console.log("✅ DB 캐시에서 발견:", cachedData.food_name);
+
+      // 사용자 알레르기 매칭
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      let userAllergens: any[] = [];
+
+      if (user) {
+        const { data: allergyData } = await supabase
+          .from("user_allergies")
+          .select("*")
+          .eq("user_id", user.id);
+        if (allergyData) userAllergens = allergyData;
+      }
+
+      const allergyNames = cachedData.allergens || [];
+      const detectedAllergens = allergyNames.map((allergen: string) => {
+        const match = userAllergens.find(
+          (ua) =>
+            allergen.includes(ua.allergen_name) ||
+            ua.allergen_name.includes(allergen),
+        );
+        return match
+          ? {
+              name: allergen,
+              severity: match.severity,
+              code: match.allergen_code,
+            }
+          : { name: allergen, severity: null, code: null };
+      });
+
+      // 원재료 파싱
+      const ingredients = cachedData.raw_materials
+        ? cachedData.raw_materials.split(",").map((i: string) => i.trim())
+        : [];
+
+      return NextResponse.json({
+        success: true,
+        result: {
+          foodCode: cachedData.food_code,
+          foodName: cachedData.food_name,
+          manufacturer: cachedData.manufacturer || "정보없음",
+          weight: cachedData.weight || "",
+          allergens: allergyNames,
+          detectedAllergens,
+          ingredients,
+          nutrition: {},
+          nutritionDetails: [],
+          crossContamination: [],
+          crossContaminationRisks: [],
+          allergyWarning: "",
+          dataSource: cachedData.data_source || "database",
+          isSafe: detectedAllergens.length === 0,
+          hasNutritionInfo: false,
+        },
+      });
+    }
+
+    console.log("❌ DB 캐시 없음, Open API 조회 진행");
 
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
-
     // ==========================================
     // API 1: 품목제조정보 (getFoodQrProdMnfInfo01)
     // ==========================================
@@ -346,7 +418,6 @@ export async function GET(req: NextRequest) {
     // ==========================================
     // 사용자 알레르기 매칭
     // ==========================================
-    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -420,6 +491,7 @@ export async function GET(req: NextRequest) {
       isSafe:
         detectedAllergens.length === 0 && crossContaminationRisks.length === 0,
       hasNutritionInfo: nutritionItems.length > 0,
+      dataSource: "openapi",
     };
 
     console.log("📋 최종 결과:");

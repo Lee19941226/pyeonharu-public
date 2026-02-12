@@ -111,25 +111,50 @@ export default function AIResultPage() {
 
       const data = await response.json();
       console.log("📦 API 응답 데이터:", data);
-      if (data.success) {
-        console.log("✅ 분석 성공!");
+if (data.success) {
+  console.log("✅ 분석 성공!");
+  
+  // ✅ foodCode가 있으면 result 페이지로 리다이렉트
+  if (data.foodCode) {
+    console.log("🔀 result 페이지로 이동:", data.foodCode);
+    
+    // 스캔 로그 저장
+    await fetch("/api/food/scan-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        foodCode: data.foodCode,
+        foodName: data.productName || "알 수 없는 제품",
+        manufacturer: data.manufacturer || "정보없음",
+        isSafe: !data.hasUserAllergen,
+        detectedAllergens: data.allergens || [],
+      }),
+    });
 
-        // localStorage 삭제
-        localStorage.removeItem("pendingImageAnalysis");
+    // localStorage 정리
+    localStorage.removeItem("pendingImageAnalysis");
+    
+    // result 페이지로 이동
+    router.push(`/food/result/${data.foodCode}`);
+    return;
+  }
 
-        const analysisResult = {
-          productName: data.productName,
-          manufacturer: data.manufacturer,
-          detectedIngredients: data.detectedIngredients || [],
-          allergens: data.allergens || [],
-          hasUserAllergen: data.hasUserAllergen || false,
-          matchedUserAllergens: data.matchedUserAllergens || [],
-          foodCode: data.foodCode,
-          dataSource: data.dataSource,
-          rawMaterials: data.rawMaterials,
-        };
+  // ✅ foodCode가 없으면 기존처럼 ai-result에서 표시
+  setResult({
+    productName: data.productName,
+    manufacturer: data.manufacturer,
+    detectedIngredients: data.detectedIngredients || [],
+    allergens: data.allergens || [],
+    hasUserAllergen: data.hasUserAllergen,
+    matchedUserAllergens: data.matchedUserAllergens || [],
+    foodCode: data.foodCode,
+    dataSource: data.dataSource,
+    rawMaterials: data.rawMaterials,
+    isProcessing: false,
+  });
 
-        console.log("🎯 최종 결과:", analysisResult);
+  localStorage.removeItem("pendingImageAnalysis");
+}
 
         // ✅ Open API 데이터가 있으면 해당 페이지로 이동
         if (data.foodCode) {

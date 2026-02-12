@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -131,12 +132,43 @@ export async function POST(req: NextRequest) {
       matchedUserAllergens,
       hasUserAllergen,
     });
+    // ==========================================
+    // ✨ Step 2.5: DB 캐시 조회 (제품명으로 검색)
+    // ==========================================
+    const supabase = await createClient();
+    let dbProductData = null;
+
+    if (analysisData.productName) {
+      console.log("🔍 DB 캐시 검색:", analysisData.productName);
+
+      const { data: cacheData } = await supabase
+        .from("food_search_cache")
+        .select("*")
+        .ilike("food_name", `%${analysisData.productName}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cacheData) {
+        dbProductData = {
+          productName: cacheData.food_name,
+          manufacturer: cacheData.manufacturer || "",
+          barcode: cacheData.food_code,
+          allergens: cacheData.allergens || [],
+          rawMaterials: cacheData.raw_materials || "",
+          weight: cacheData.weight || "",
+        };
+        console.log("✅ DB 캐시에서 발견:", dbProductData.productName);
+      } else {
+        console.log("❌ DB 캐시에 없음, Open API 진행");
+      }
+    }
 
     // ==========================================
     // Step 3: 바코드가 있으면 식약처 API 조회
     // ==========================================
     let foodCode = null;
-    let apiProductData = null; // ✅ 추가
+    let apiProductData = null;
 
     if (analysisData.barcode) {
       console.log("📊 바코드 발견, 식약처 API 조회:", analysisData.barcode);
@@ -193,15 +225,61 @@ export async function POST(req: NextRequest) {
     let finalAllergens = detectedAllergens;
     let finalProductName = analysisData.productName;
     let finalIngredients = analysisData.ingredients || [];
-    let dataSource = "ai"; // ✅ 데이터 출처 표시
+    let dataSource = "ai";
+    // foodCode 생성 (없으면 AI 기반 생성)
+    if (!foodCode) {
+      const timestamp = Date.now();
+      const productSlug = finalProductName
+        .toLowerCase()
+        .replace(/[^a-z0-9가-힣]/g, "-")
+        .slice(0, 30);
+      foodCode = `ai-${productSlug}-${timestamp}`;
+    }
 
-    // ✅ Open API 데이터가 있고 알레르기 정보가 있으면 우선 사용
-    if (apiProductData && apiProductData.allergens.length > 0) {
+    // DB에 저장 (중복 방지)
+    try {
+      await supabase.from("food_search_cache").upsert(
+        {
+          food_code: foodCode,
+          food_name: finalProductName,
+          manufacturer:
+            apiProductData?.manufacturer ||
+            analysisData.manufacturer ||
+            "정보없음",
+          allergens: finalAllergens,
+          raw_materials:
+            apiProductData?.rawMaterials || finalIngredients.join(", "),
+          weight: apiProductData?.weight || analysisData.weight,
+          data_source: dataSource,
+        },
+        { onConflict: "food_code" },
+      );
+      console.log("✅ 분석 결과 DB 저장 완료:", foodCode);
+    } catch (error) {
+      console.error("❌ DB 저장 실패:", error);
+    }
+    // 1순위: DB 캐시 데이터
+    if (dbProductData && dbProductData.allergens.length > 0) {
+      finalAllergens = dbProductData.allergens;
+      finalProductName = dbProductData.productName;
+      dataSource = "database";
+
+      if (dbProductData.rawMaterials) {
+        const rawMaterialsList = dbProductData.rawMaterials
+          .split(/[,\(\)]+/)
+          .map((item: string) => item.trim())
+          .filter((item: string) => item.length > 0);
+        finalIngredients = rawMaterialsList;
+      }
+
+      console.log("✅ DB 캐시 데이터 우선 적용");
+    }
+    // 2순위: Open API 데이터
+    else if (apiProductData && apiProductData.allergens.length > 0) {
       finalAllergens = apiProductData.allergens;
       finalProductName = apiProductData.productName;
       dataSource = "openapi";
 
-      // 원재료 파싱
       if (apiProductData.rawMaterials) {
         const rawMaterialsList = apiProductData.rawMaterials
           .split(/[,\(\)]+/)
@@ -210,7 +288,11 @@ export async function POST(req: NextRequest) {
         finalIngredients = rawMaterialsList;
       }
 
-      console.log("✅ Open API 데이터 우선 적용");
+      console.log("✅ Open API 데이터 적용");
+    }
+    // 3순위: AI 분석 결과 (그대로 사용)
+    else {
+      console.log("✅ AI 분석 결과 사용");
     }
 
     // 사용자 알레르기 재매칭

@@ -168,15 +168,36 @@ export default function FoodResultPage() {
 
       // 일반 바코드 - Open API 조회
       console.log("📊 Open API 조회");
-      const response = await fetch(`/api/food/result?code=${id}`);
-      const data = await response.json();
+      useEffect(() => {
+        const fetchResult = async () => {
+          try {
+            const response = await fetch(`/api/food/result?code=${id}`);
+            const data = await response.json();
 
-      if (data.success) {
-        setResult(data.result);
-        saveToHistory(data.result);
-      } else {
-        setError(data.error || "결과를 불러올 수 없습니다");
-      }
+            console.log("📦 API 전체 응답:", data); // ✅ 디버깅 추가
+
+            if (!data.success) {
+              setError("결과를 불러올 수 없습니다");
+              return;
+            }
+
+            // ✅ data.result가 있는지 확인
+            if (data.result) {
+              setResult(data.result);
+            } else {
+              // ✅ result 없이 바로 데이터가 올 수도 있음
+              setResult(data);
+            }
+          } catch (err) {
+            console.error("💥 로딩 에러:", err);
+            setError("결과를 불러오는 중 오류가 발생했습니다");
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        fetchResult();
+      }, [id]);
     } catch (error) {
       console.error("로딩 에러:", error);
       setError("결과를 불러오는 중 오류가 발생했습니다");
@@ -320,7 +341,13 @@ export default function FoodResultPage() {
             {/* 헤더 */}
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-3xl font-bold">{result.foodName}</h1>
-
+              {result.dataSource && (
+                <Badge variant="outline" className="text-xs">
+                  {result.dataSource === "database" && "DB"}
+                  {result.dataSource === "openapi" && "식약처 공식"}
+                  {result.dataSource === "ai" && "AI 분석"}
+                </Badge>
+              )}
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon">
                   <Share2 className="h-5 w-5" />

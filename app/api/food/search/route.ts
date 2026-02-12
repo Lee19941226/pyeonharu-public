@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY, // 환경변수에 키 저장 권장
+      apiKey: process.env.OPENAI_API_KEY,
     });
     if (!query || query.length < 2) {
       return NextResponse.json({ success: true, items: [], totalCount: 0 });
@@ -45,9 +45,9 @@ export async function GET(req: NextRequest) {
     }
 
     // ==========================================
-    // 3개 소스 병렬 실행: DB + OpenAPI + AI
+    // 1단계: DB + OpenAPI 병렬 실행
     // ==========================================
-    const [dbItems, openApiItems, aiItems] = await Promise.all([
+    const [dbItems, openApiItems] = await Promise.all([
       // ── Source 1: DB 캐시 ──
       (async () => {
         try {
@@ -79,16 +79,27 @@ export async function GET(req: NextRequest) {
           return [];
         }
       })(),
+    ]);
 
-      // ── Source 3: AI 분석 (항상 실행) ──
-      (async () => {
-        try {
-          const aiResponse = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "user",
-                content: `한국에서 실제로 판매되거나 흔히 먹는 식품 중 "${query}"가 포함되거나 관련된 제품/음식을 최대 15개 알려주세요.
+    console.log(
+      `📊 1차 검색 결과 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}`,
+    );
+
+    // ==========================================
+    // 2단계: 결과 부족 시 AI 호출 (5개 미만일 때만)
+    // ==========================================
+    let aiItems: any[] = [];
+    const totalResults = dbItems.length + openApiItems.length;
+
+    if (totalResults < 5) {
+      console.log("🤖 결과 부족, AI 호출 시작...");
+      try {
+        const aiResponse = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "user",
+              content: `한국에서 실제로 판매되거나 흔히 먹는 식품 중 "${query}"가 포함되거나 관련된 제품/음식을 최대 15개 알려주세요.
 가공식품, 음료, 과자, 일반 음식 모두 포함하세요.
 
 JSON 배열만 반환:
@@ -103,26 +114,28 @@ JSON 배열만 반환:
 
 한국 식약처 지정 22가지 알레르기 기준으로 분석:
 계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류`,
-              },
-            ],
-            max_tokens: 1500,
-          });
+            },
+          ],
+          max_tokens: 1500,
+        });
 
-          const aiText = aiResponse.choices[0].message.content || "[]";
-          const clean = aiText
-            .replace(/```json\n?/g, "")
-            .replace(/```\n?/g, "")
-            .trim();
-          return JSON.parse(clean);
-        } catch (e) {
-          console.error("AI 분석 실패:", e);
-          return [];
-        }
-      })(),
-    ]);
+        const aiText = aiResponse.choices[0].message.content || "[]";
+        const clean = aiText
+          .replace(/```json\n?/g, "")
+          .replace(/```\n?/g, "")
+          .trim();
+        aiItems = JSON.parse(clean);
+        console.log(`✅ AI 결과: ${aiItems.length}개 추가`);
+      } catch (e) {
+        console.error("❌ AI 분석 실패:", e);
+        aiItems = [];
+      }
+    } else {
+      console.log("✅ 충분한 결과 있음 (AI 호출 스킵)");
+    }
 
     console.log(
-      `📊 검색 결과 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}, AI: ${aiItems.length}`,
+      `📊 최종 검색 결과 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}, AI: ${aiItems.length}`,
     );
 
     // ==========================================
@@ -224,23 +237,29 @@ JSON 배열만 반환:
     // 중복 제거 (이름 유사도 기준)
     // ==========================================
     const deduped: ProductScore[] = [];
-    const seenNames: string[] = [];
+    const seenCodes = new Set<string>();
 
     // 점수 높은 순 정렬 (DB > OpenAPI > AI)
     allResults.sort((a, b) => b.score - a.score);
-
-    allResults.forEach((item) => {
-      const name = item.foodName.toLowerCase().replace(/\s/g, "");
-      // 이미 있는 이름과 70% 이상 겹치면 중복으로 판단
-      const isDuplicate = seenNames.some(
-        (seen) => name.includes(seen) || seen.includes(name),
-      );
-
-      if (!isDuplicate) {
-        deduped.push(item);
-        seenNames.push(name);
+    console.log("🔍 중복 제거 시작 - 총", allResults.length, "개");
+    allResults.forEach((item, index) => {
+      // ✅ foodCode가 이미 있으면 스킵
+      if (seenCodes.has(item.foodCode)) {
+        console.log("⚠️ 중복 제거:", item.foodName, item.foodCode);
+        return;
       }
+
+      // ✅ 새로운 항목만 추가
+      seenCodes.add(item.foodCode);
+      deduped.push(item);
+      console.log(
+        `  ✅ [${index}] 추가: ${item.foodName} (${item.foodCode}) [${item.dataSource}]`,
+      );
     });
+
+    console.log(
+      `✅ 중복 제거 완료: ${allResults.length}개 → ${deduped.length}개`,
+    );
 
     // ==========================================
     // AI 결과 중 신규 → DB 캐시 저장 (비동기)
@@ -255,6 +274,8 @@ JSON 배열만 반환:
             food_name: item.foodName,
             manufacturer: item.manufacturer || null,
             allergens: item.allergens,
+            raw_materials: null,
+            weight: null,
             data_source: "ai",
           })),
           { onConflict: "food_code" },
