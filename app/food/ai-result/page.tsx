@@ -91,7 +91,7 @@ export default function AIResultPage() {
         ? imageData.split(",")[1]
         : imageData;
 
-      console.log("📡 API 호출 시작...");
+      console.log("📡 AI 분석 API 호출 시작...");
 
       // AI 분석 API 호출
       const response = await fetch("/api/food/analyze-image", {
@@ -111,66 +111,66 @@ export default function AIResultPage() {
 
       const data = await response.json();
       console.log("📦 API 응답 데이터:", data);
-if (data.success) {
-  console.log("✅ 분석 성공!");
-  
-  // ✅ foodCode가 있으면 result 페이지로 리다이렉트
-  if (data.foodCode) {
-    console.log("🔀 result 페이지로 이동:", data.foodCode);
-    
-    // 스캔 로그 저장
-    await fetch("/api/food/scan-log", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        foodCode: data.foodCode,
-        foodName: data.productName || "알 수 없는 제품",
-        manufacturer: data.manufacturer || "정보없음",
-        isSafe: !data.hasUserAllergen,
-        detectedAllergens: data.allergens || [],
-      }),
-    });
 
-    // localStorage 정리
-    localStorage.removeItem("pendingImageAnalysis");
-    
-    // result 페이지로 이동
-    router.push(`/food/result/${data.foodCode}`);
-    return;
-  }
-
-  // ✅ foodCode가 없으면 기존처럼 ai-result에서 표시
-  setResult({
-    productName: data.productName,
-    manufacturer: data.manufacturer,
-    detectedIngredients: data.detectedIngredients || [],
-    allergens: data.allergens || [],
-    hasUserAllergen: data.hasUserAllergen,
-    matchedUserAllergens: data.matchedUserAllergens || [],
-    foodCode: data.foodCode,
-    dataSource: data.dataSource,
-    rawMaterials: data.rawMaterials,
-    isProcessing: false,
-  });
-
-  localStorage.removeItem("pendingImageAnalysis");
-}
-
-        // ✅ Open API 데이터가 있으면 해당 페이지로 이동
-        if (data.foodCode) {
-          router.push(`/food/result/${data.foodCode}`);
-        } else {
-          // ✅ Open API 데이터 없으면 AI 결과를 sessionStorage에 저장
-          const aiResultId = `ai-${Date.now()}`;
-          sessionStorage.setItem(aiResultId, JSON.stringify(analysisResult));
-          router.push(`/food/result/${aiResultId}`);
-        }
-      } else {
+      if (!data.success) {
         console.log("❌ 분석 실패:", data.error);
         localStorage.removeItem("pendingImageAnalysis");
         toast.error(data.error || "분석에 실패했습니다");
         setResult((prev) => ({ ...prev, isProcessing: false }));
+        return;
       }
+
+      console.log("✅ 분석 성공!");
+
+      // localStorage 정리
+      localStorage.removeItem("pendingImageAnalysis");
+
+      // 스캔 로그 저장 (비동기로 실행, 기다리지 않음)
+      fetch("/api/food/scan-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          foodCode: data.foodCode || `ai-${Date.now()}`,
+          foodName: data.productName || "알 수 없는 제품",
+          manufacturer: data.manufacturer || "정보없음",
+          isSafe: !data.hasUserAllergen,
+          detectedAllergens: data.allergens || [],
+        }),
+      }).catch(() => {}); // 에러 무시
+
+      // ✅ foodCode가 있으면 DB에 저장되어 있음 → 바로 이동
+      if (data.foodCode) {
+        console.log(
+          "🔀 DB에 저장된 제품, result 페이지로 이동:",
+          data.foodCode,
+        );
+        router.push(`/food/result/${data.foodCode}`);
+        return;
+      }
+
+      // ✅ foodCode 없음 → sessionStorage에 저장 후 이동
+      console.log("💾 AI 결과를 sessionStorage에 저장");
+      const analysisResult = {
+        productName: data.productName || "제품명 없음",
+        manufacturer: data.manufacturer || "",
+        detectedIngredients: data.detectedIngredients || [],
+        allergens: data.allergens || [],
+        hasUserAllergen: data.hasUserAllergen || false,
+        matchedUserAllergens: data.matchedUserAllergens || [],
+        dataSource: data.dataSource || "ai",
+        rawMaterials: data.rawMaterials || "",
+        nutritionInfo: data.nutritionInfo,
+        weight: data.weight || "",
+      };
+
+      const aiResultId = `ai-${Date.now()}`;
+      sessionStorage.setItem(aiResultId, JSON.stringify(analysisResult));
+
+      console.log(
+        "🔀 sessionStorage 저장 완료, result 페이지로 이동:",
+        aiResultId,
+      );
+      router.push(`/food/result/${aiResultId}`);
     } catch (error) {
       console.error("💥 분석 오류:", error);
       localStorage.removeItem("pendingImageAnalysis");
