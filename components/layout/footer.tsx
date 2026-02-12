@@ -14,7 +14,7 @@ export function Footer() {
               <span className="text-xl font-bold">편하루</span>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
-              우리 가족 식품 안전을 지키는 생활 플랫폼
+              알레르기가 있어도 편안하게 메뉴를 고를 수 있게
             </p>
           </div>
 

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, MapPin, ShieldCheck } from "lucide-react"
+import { ArrowRight, Camera, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function HeroSection() {
@@ -8,26 +8,26 @@ export function HeroSection() {
       <div className="container mx-auto px-4 py-16 md:py-24">
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="text-pretty text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
-            우리 가족 <span className="text-primary">식품 안전</span>을<br />
-            편하게 지키는 하루
+            알레르기가 있어도<br />
+            <span className="text-primary">편안한 메뉴 선택</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground md:text-xl">
-            바코드 한 번이면 3초 만에 알레르기 확인. 
-            내 주변 병원/약국 찾기부터 AI 증상 분석까지.
+            바코드·사진 한 번이면 5초 만에 알레르기 확인.
+            급식 체크부터 내 주변 맛집 매칭까지.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button size="lg" asChild className="w-full sm:w-auto">
               <Link href="/food">
                 <ShieldCheck className="mr-2 h-5 w-5" />
-                식품 안전 확인
+                이거 먹어도 돼?
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild className="w-full sm:w-auto bg-transparent">
-              <Link href="/search">
-                <MapPin className="mr-2 h-5 w-5" />
-                병원/약국 찾기
+              <Link href="/food/camera">
+                <Camera className="mr-2 h-5 w-5" />
+                바코드 스캔
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

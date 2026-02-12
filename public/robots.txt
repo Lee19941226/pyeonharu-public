@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /mypage
+Disallow: /login
+Disallow: /bookmarks
+
+Sitemap: https://v0-website-development-plan-beta-six.vercel.app/sitemap.xml

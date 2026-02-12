@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 const API_KEY = process.env.DISEASE_API_KEY || process.env.DATA_GO_KR_API_KEY;
 const BASE_URL = "https://apis.data.go.kr/1790387/EIDAPIService";
 
-// 감염병별 발생 현황
+// 媛먯뿼蹂묐퀎 諛쒖깮 ?꾪솴
 async function getDiseaseStats(year: string, numOfRows: number = 100) {
   const url = `${BASE_URL}/Disease?serviceKey=${API_KEY}&resType=2&searchType=1&searchYear=${year}&patntType=1&numOfRows=${numOfRows}&pageNo=1`;
 
@@ -22,30 +22,29 @@ async function getDiseaseStats(year: string, numOfRows: number = 100) {
   }
 }
 
-// 지역별 감염병 발생 현황 - 모든 시도 데이터 가져오기
-async function getRegionStats(year: string) {
-  // 시도 코드: 01~17 (00은 전체)
+// 吏??퀎 媛먯뿼蹂?諛쒖깮 ?꾪솴 - 紐⑤뱺 ?쒕룄 ?곗씠??媛?몄삤湲?async function getRegionStats(year: string) {
+  // ?쒕룄 肄붾뱶: 01~17 (00? ?꾩껜)
   const sidoCodes = [
-    { code: "01", name: "서울" },
-    { code: "02", name: "부산" },
-    { code: "03", name: "대구" },
-    { code: "04", name: "인천" },
-    { code: "05", name: "광주" },
-    { code: "06", name: "대전" },
-    { code: "07", name: "울산" },
-    { code: "08", name: "경기" },
-    { code: "09", name: "강원" },
-    { code: "10", name: "충북" },
-    { code: "11", name: "충남" },
-    { code: "12", name: "전북" },
-    { code: "13", name: "전남" },
-    { code: "14", name: "경북" },
-    { code: "15", name: "경남" },
-    { code: "16", name: "제주" },
-    { code: "17", name: "세종" },
+    { code: "01", name: "?쒖슱" },
+    { code: "02", name: "遺?? },
+    { code: "03", name: "?援? },
+    { code: "04", name: "?몄쿇" },
+    { code: "05", name: "愿묒＜" },
+    { code: "06", name: "??? },
+    { code: "07", name: "?몄궛" },
+    { code: "08", name: "寃쎄린" },
+    { code: "09", name: "媛뺤썝" },
+    { code: "10", name: "異⑸턿" },
+    { code: "11", name: "異⑸궓" },
+    { code: "12", name: "?꾨턿" },
+    { code: "13", name: "?꾨궓" },
+    { code: "14", name: "寃쎈턿" },
+    { code: "15", name: "寃쎈궓" },
+    { code: "16", name: "?쒖＜" },
+    { code: "17", name: "?몄쥌" },
   ];
 
-  // 모든 지역 병렬 요청
+  // 紐⑤뱺 吏??蹂묐젹 ?붿껌
   const results = await Promise.all(
     sidoCodes.map(async (sido) => {
       const url = `${BASE_URL}/Region?serviceKey=${API_KEY}&resType=2&searchType=1&searchYear=${year}&searchSidoCd=${sido.code}&numOfRows=100&pageNo=1`;
@@ -59,7 +58,7 @@ async function getRegionStats(year: string) {
 
         const itemList = Array.isArray(items) ? items : [items];
 
-        // 해당 지역의 감염병별 발생 건수 집계
+        // ?대떦 吏??쓽 媛먯뿼蹂묐퀎 諛쒖깮 嫄댁닔 吏묎퀎
         let total = 0;
         const diseases: { name: string; count: number }[] = [];
 
@@ -87,7 +86,7 @@ async function getRegionStats(year: string) {
     }),
   );
 
-  // null 제거하고 정렬
+  // null ?쒓굅?섍퀬 ?뺣젹
   return results
     .filter((r): r is NonNullable<typeof r> => r !== null && r.total > 0)
     .sort((a, b) => b.total - a.total);
@@ -123,14 +122,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 전체 데이터 (메인페이지용)
+    // ?꾩껜 ?곗씠??(硫붿씤?섏씠吏??
     const [diseaseData, regionData] = await Promise.all([
       getDiseaseStats(currentYear, 100),
       getRegionStats(currentYear),
     ]);
 
-    // 감염병 데이터 가공
-    let processedDiseases: any[] = [];
+    // 媛먯뿼蹂??곗씠??媛怨?    let processedDiseases: any[] = [];
     const diseaseItems = diseaseData?.response?.body?.items?.item;
 
     if (diseaseItems && Array.isArray(diseaseItems)) {
@@ -140,7 +138,7 @@ export async function GET(request: NextRequest) {
           return val && val !== "0" && val !== "-";
         })
         .map((item: any) => ({
-          name: item.icdNm?.replace("@", "").trim() || "알 수 없음",
+          name: item.icdNm?.replace("@", "").trim() || "?????놁쓬",
           count: parseInt(item.resultVal?.toString().replace(/,/g, "") || "0"),
           group: item.icdGroupNm || "",
           year: item.year || currentYear,
@@ -148,86 +146,85 @@ export async function GET(request: NextRequest) {
         .sort((a: any, b: any) => b.count - a.count);
     }
 
-    // 지역별 데이터 - getRegionStats가 이미 가공된 배열 반환
+    // 吏??퀎 ?곗씠??- getRegionStats媛 ?대? 媛怨듬맂 諛곗뿴 諛섑솚
     let processedRegions = regionData || [];
 
-    console.log("Region data count:", processedRegions.length);
 
-    // 지역 데이터가 없으면 샘플 사용
+    // 吏???곗씠?곌? ?놁쑝硫??섑뵆 ?ъ슜
     let isRegionSample = false;
     if (processedRegions.length === 0) {
       isRegionSample = true;
       processedRegions = [
         {
-          name: "서울",
+          name: "?쒖슱",
           total: 28453,
           diseases: [
-            { name: "백일해", count: 8234 },
-            { name: "CRE 감염증", count: 7821 },
-            { name: "수두", count: 5432 },
+            { name: "諛깆씪??, count: 8234 },
+            { name: "CRE 媛먯뿼利?, count: 7821 },
+            { name: "?섎몢", count: 5432 },
           ],
         },
         {
-          name: "경기",
+          name: "寃쎄린",
           total: 35621,
           diseases: [
-            { name: "백일해", count: 12453 },
-            { name: "CRE 감염증", count: 9876 },
-            { name: "수두", count: 6543 },
+            { name: "諛깆씪??, count: 12453 },
+            { name: "CRE 媛먯뿼利?, count: 9876 },
+            { name: "?섎몢", count: 6543 },
           ],
         },
         {
-          name: "부산",
+          name: "遺??,
           total: 12876,
           diseases: [
-            { name: "백일해", count: 4532 },
-            { name: "CRE 감염증", count: 3876 },
-            { name: "수두", count: 2134 },
+            { name: "諛깆씪??, count: 4532 },
+            { name: "CRE 媛먯뿼利?, count: 3876 },
+            { name: "?섎몢", count: 2134 },
           ],
         },
         {
-          name: "대구",
+          name: "?援?,
           total: 8932,
           diseases: [
-            { name: "백일해", count: 3421 },
-            { name: "CRE 감염증", count: 2654 },
-            { name: "수두", count: 1543 },
+            { name: "諛깆씪??, count: 3421 },
+            { name: "CRE 媛먯뿼利?, count: 2654 },
+            { name: "?섎몢", count: 1543 },
           ],
         },
         {
-          name: "인천",
+          name: "?몄쿇",
           total: 11234,
           diseases: [
-            { name: "백일해", count: 4123 },
-            { name: "CRE 감염증", count: 3456 },
-            { name: "수두", count: 2123 },
+            { name: "諛깆씪??, count: 4123 },
+            { name: "CRE 媛먯뿼利?, count: 3456 },
+            { name: "?섎몢", count: 2123 },
           ],
         },
         {
-          name: "광주",
+          name: "愿묒＜",
           total: 6543,
           diseases: [
-            { name: "백일해", count: 2341 },
-            { name: "CRE 감염증", count: 1987 },
-            { name: "수두", count: 1234 },
+            { name: "諛깆씪??, count: 2341 },
+            { name: "CRE 媛먯뿼利?, count: 1987 },
+            { name: "?섎몢", count: 1234 },
           ],
         },
         {
-          name: "대전",
+          name: "???,
           total: 5876,
           diseases: [
-            { name: "백일해", count: 2134 },
-            { name: "CRE 감염증", count: 1765 },
-            { name: "수두", count: 1098 },
+            { name: "諛깆씪??, count: 2134 },
+            { name: "CRE 媛먯뿼利?, count: 1765 },
+            { name: "?섎몢", count: 1098 },
           ],
         },
         {
-          name: "울산",
+          name: "?몄궛",
           total: 4321,
           diseases: [
-            { name: "백일해", count: 1654 },
-            { name: "CRE 감염증", count: 1234 },
-            { name: "수두", count: 876 },
+            { name: "諛깆씪??, count: 1654 },
+            { name: "CRE 媛먯뿼利?, count: 1234 },
+            { name: "?섎몢", count: 876 },
           ],
         },
       ];
@@ -250,7 +247,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Disease stats API error:", error);
     return NextResponse.json(
-      { success: false, error: "데이터를 불러오는데 실패했습니다." },
+      { success: false, error: "?곗씠?곕? 遺덈윭?ㅻ뒗???ㅽ뙣?덉뒿?덈떎." },
       { status: 500 },
     );
   }

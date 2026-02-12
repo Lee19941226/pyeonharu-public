@@ -1,7 +1,7 @@
 {
-  "name": "편하루 - 식품 알레르기 안전",
+  "name": "편하루 - 편안한 메뉴 선택",
   "short_name": "편하루",
-  "description": "바코드 스캔으로 식품 알레르기 확인, 급식 알레르기 체크, AI 증상 분석",
+  "description": "알레르기가 있어도 편안하게 메뉴를 고를 수 있게. 바코드·사진 알레르기 확인, 급식 체크, AI 증상 분석.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

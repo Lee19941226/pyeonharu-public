@@ -2,13 +2,18 @@ import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Card, CardContent } from "@/components/ui/card"
-import { MapPin, Stethoscope, Pill, ShieldCheck, Heart, Users, Sparkles } from "lucide-react"
+import { Camera, Stethoscope, Pill, ShieldCheck, Heart, Users, Sparkles, UtensilsCrossed } from "lucide-react"
 
 const features = [
   {
-    icon: MapPin,
-    title: "내 주변 병원/약국 찾기",
-    description: "현재 위치를 기반으로 가까운 병원과 약국을 지도에서 한눈에 찾을 수 있어요.",
+    icon: ShieldCheck,
+    title: "이거 먹어도 돼?",
+    description: "바코드 스캔이나 음식 사진 한 장으로 알레르기 성분을 5초 만에 확인하세요.",
+  },
+  {
+    icon: UtensilsCrossed,
+    title: "급식 알레르기 체크",
+    description: "학교를 등록하면 매일 급식 메뉴에서 위험한 알레르기 성분을 자동으로 표시해요.",
   },
   {
     icon: Stethoscope,
@@ -20,18 +25,13 @@ const features = [
     title: "약 정보 검색",
     description: "약 이름으로 복용법, 주의사항, 부작용, 병용금지 약물 정보를 확인하세요.",
   },
-  {
-    icon: ShieldCheck,
-    title: "식품 알레르기 확인",
-    description: "바코드 스캔 한 번으로 우리 가족이 먹어도 되는 식품인지 3초 만에 확인하세요.",
-  },
 ]
 
 const values = [
   {
     icon: Heart,
-    title: "안전",
-    description: "우리 가족의 식품 안전을 최우선으로 지킵니다.",
+    title: "안심",
+    description: "먹기 전 확인, 먹는 중 안심, 먹은 후 대응까지.",
   },
   {
     icon: Users,
@@ -41,7 +41,7 @@ const values = [
   {
     icon: Sparkles,
     title: "혁신",
-    description: "AI를 활용해 더 스마트한 일상을 제공합니다.",
+    description: "AI로 더 빠르고 정확한 알레르기 확인을 제공합니다.",
   },
 ]
 
@@ -58,12 +58,13 @@ export default function AboutPage() {
               <span className="text-4xl font-bold text-primary-foreground">편</span>
             </div>
             <h1 className="text-pretty text-3xl font-bold md:text-4xl lg:text-5xl">
-              우리 가족 <span className="text-primary">식품 안전</span>을<br />
-              편하게 지키는 플랫폼, 편하루
+              알레르기가 있어도<br />
+              <span className="text-primary">편안하게 메뉴를 고를 수 있게</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-              바코드 한 번으로 알레르기 확인, 아플 때 병원 찾기.
-              일상의 작은 불편함들을 편하루가 해결해드립니다.
+              바코드·사진 한 번이면 알레르기 확인 5초.
+              급식 체크, 맛집 매칭, AI 증상 분석까지.
+              편안한 하루의 식사, 편하루.
             </p>
           </div>
         </section>
