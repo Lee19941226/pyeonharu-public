@@ -35,7 +35,7 @@ interface AIAnalysisResult {
 
 export default function AIResultPage() {
   const router = useRouter();
-  const hasAnalyzed = useRef(false); // ✅ 중복 실행 방지
+  const hasAnalyzed = useRef(false);
   const [result, setResult] = useState<AIAnalysisResult>({
     detectedIngredients: [],
     allergens: [],

@@ -361,14 +361,20 @@ export default function FoodResultPage() {
 
             {/* 헤더 */}
             <div className="mb-6 flex items-center justify-between">
-              <h1 className="text-3xl font-bold">{result.foodName}</h1>
-              {result.dataSource && (
-                <Badge variant="outline" className="text-xs">
-                  {result.dataSource === "database" && "DB"}
-                  {result.dataSource === "openapi" && "식약처 공식"}
-                  {result.dataSource === "ai" && "AI 분석"}
-                </Badge>
-              )}
+              {/* 왼쪽: 제품명 + 뱃지 */}
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold">{result.foodName}</h1>
+
+                {result.dataSource && (
+                  <Badge variant="outline" className="text-xs">
+                    {result.dataSource === "database" && "DB"}
+                    {result.dataSource === "openapi" && "식약처 공식"}
+                    {result.dataSource === "ai" && "AI 분석"}
+                  </Badge>
+                )}
+              </div>
+
+              {/* 오른쪽 버튼 영역 */}
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon">
                   <Share2 className="h-5 w-5" />
