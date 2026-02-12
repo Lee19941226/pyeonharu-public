@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const normalizedQuery = query.toLowerCase().trim();
 
-    // ?ъ슜???뚮젅瑜닿린 ?뺣낫
+    // 사용자 알레르기 정보
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -45,10 +45,10 @@ export async function GET(req: NextRequest) {
     }
 
     // ==========================================
-    // 1?④퀎: DB + OpenAPI 蹂묐젹 ?ㅽ뻾
+    // 1단계: DB + OpenAPI 병렬 실행
     // ==========================================
     const [dbItems, openApiItems] = await Promise.all([
-      // ?? Source 1: DB 罹먯떆 ??
+      // ── Source 1: DB 캐시 ──
       (async () => {
         try {
           const { data } = await supabase
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         }
       })(),
 
-      // ?? Source 2: Open API (?뚮젅瑜닿린 ?뺣낫) ??
+      // ── Source 2: Open API (알레르기 정보) ──
       (async () => {
         try {
           const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
@@ -81,37 +81,39 @@ export async function GET(req: NextRequest) {
       })(),
     ]);
 
-      `?뱤 1李?寃??寃곌낵 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}`,
+    console.log(
+      `📊 1차 검색 결과 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}`,
     );
 
     // ==========================================
-    // 2?④퀎: 寃곌낵 遺議???AI ?몄텧 (5媛?誘몃쭔???뚮쭔)
+    // 2단계: 결과 부족 시 AI 호출 (5개 미만일 때만)
     // ==========================================
     let aiItems: any[] = [];
     const totalResults = dbItems.length + openApiItems.length;
 
     if (totalResults < 5) {
+      console.log("🤖 결과 부족, AI 호출 시작...");
       try {
         const aiResponse = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "user",
-              content: `?쒓뎅?먯꽌 ?ㅼ젣濡??먮ℓ?섍굅???뷀엳 癒밸뒗 ?앺뭹 以?"${query}"媛 ?ы븿?섍굅??愿?⑤맂 ?쒗뭹/?뚯떇??理쒕? 15媛??뚮젮二쇱꽭??
-媛怨듭떇?? ?뚮즺, 怨쇱옄, ?쇰컲 ?뚯떇 紐⑤몢 ?ы븿?섏꽭??
+              content: `한국에서 실제로 판매되거나 흔히 먹는 식품 중 "${query}"가 포함되거나 관련된 제품/음식을 최대 15개 알려주세요.
+가공식품, 음료, 과자, 일반 음식 모두 포함하세요.
 
-JSON 諛곗뿴留?諛섑솚:
+JSON 배열만 반환:
 [
   {
-    "foodName": "?ㅼ젣 ?쒗뭹紐??먮뒗 ?뚯떇紐?,
-    "manufacturer": "?쒖“??(媛怨듭떇?덉씤 寃쎌슦)",
-    "allergens": ["?뚮젅瑜닿린 ?좊컻臾쇱쭏"],
-    "category": "怨쇱옄|?뚮즺|?좎젣??鍮?硫대쪟|?뚯뒪|怨쇱씪|?뚯떇|湲고?"
+    "foodName": "실제 제품명 또는 음식명",
+    "manufacturer": "제조사 (가공식품인 경우)",
+    "allergens": ["알레르기 유발물질"],
+    "category": "과자|음료|유제품|빵|면류|소스|과일|음식|기타"
   }
 ]
 
-?쒓뎅 ?앹빟泥?吏??22媛吏 ?뚮젅瑜닿린 湲곗??쇰줈 遺꾩꽍:
-怨꾨?, ?곗쑀, 諛, 硫붾?, ?낆쉘, ??? ?몃몢, ?? 寃ш낵瑜? 媛묎컖瑜? ?덉슦, 寃? 怨좊벑?? ?ㅼ쭠?? 議곌컻瑜? ?앹꽑, 蹂듭댂?? ?좊쭏?? ?쇱?怨좉린, ?좉퀬湲? ??퀬湲? ?꾪솴?곕쪟`,
+한국 식약처 지정 22가지 알레르기 기준으로 분석:
+계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류`,
             },
           ],
           max_tokens: 1500,
@@ -123,22 +125,25 @@ JSON 諛곗뿴留?諛섑솚:
           .replace(/```\n?/g, "")
           .trim();
         aiItems = JSON.parse(clean);
+        console.log(`✅ AI 결과: ${aiItems.length}개 추가`);
       } catch (e) {
-        console.error("??AI 遺꾩꽍 ?ㅽ뙣:", e);
+        console.error("❌ AI 분석 실패:", e);
         aiItems = [];
       }
     } else {
+      console.log("✅ 충분한 결과 있음 (AI 호출 스킵)");
     }
 
-      `?뱤 理쒖쥌 寃??寃곌낵 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}, AI: ${aiItems.length}`,
+    console.log(
+      `📊 최종 검색 결과 - DB: ${dbItems.length}, OpenAPI: ${openApiItems.length}, AI: ${aiItems.length}`,
     );
 
     // ==========================================
-    // ?듯빀 寃곌낵 ?앹꽦 (?곗꽑?쒖쐞 ?먯닔 ?ы븿)
+    // 통합 결과 생성 (우선순위 점수 포함)
     // ==========================================
     const allResults: ProductScore[] = [];
 
-    // ?? 1?쒖쐞: DB 罹먯떆 (湲곕낯 ?먯닔 + 200) ??
+    // ── 1순위: DB 캐시 (기본 점수 + 200) ──
     dbItems.forEach((item: any) => {
       const hasAllergen = (item.allergens || []).some((a: string) =>
         userAllergens.some((ua) => a.includes(ua) || ua.includes(a)),
@@ -153,13 +158,13 @@ JSON 諛곗뿴留?諛섑솚:
         manufacturer: item.manufacturer || "",
         allergens: item.allergens || [],
         hasAllergen,
-        score: nameScore + 200, // DB ?곗꽑
+        score: nameScore + 200, // DB 우선
         matchReason: "DB",
         dataSource: "db",
       });
     });
 
-    // ?? 2?쒖쐞: Open API (湲곕낯 ?먯닔 + 100) ??
+    // ── 2순위: Open API (기본 점수 + 100) ──
     const openApiMap = new Map<string, ProductScore>();
 
     openApiItems.forEach((item: any) => {
@@ -184,8 +189,8 @@ JSON 諛곗뿴留?諛섑솚:
           foodName,
           allergens: [],
           hasAllergen: false,
-          score: score + 100, // OpenAPI ?곗꽑
-          matchReason: "?앹빟泥?,
+          score: score + 100, // OpenAPI 우선
+          matchReason: "식약처",
           dataSource: "openapi",
         });
       }
@@ -205,7 +210,7 @@ JSON 諛곗뿴留?諛섑솚:
 
     allResults.push(...Array.from(openApiMap.values()));
 
-    // ?? 3?쒖쐞: AI 寃곌낵 (湲곕낯 ?먯닔 60) ??
+    // ── 3순위: AI 결과 (기본 점수 60) ──
     if (Array.isArray(aiItems)) {
       aiItems.forEach((item: any, index: number) => {
         if (!item.foodName) return;
@@ -222,38 +227,42 @@ JSON 諛곗뿴留?諛섑솚:
           allergens: item.allergens || [],
           hasAllergen,
           score: 60,
-          matchReason: `AI (${item.category || "?앺뭹"})`,
+          matchReason: `AI (${item.category || "식품"})`,
           dataSource: "ai",
         });
       });
     }
 
     // ==========================================
-    // 以묐났 ?쒓굅 (?대쫫 ?좎궗??湲곗?)
+    // 중복 제거 (이름 유사도 기준)
     // ==========================================
     const deduped: ProductScore[] = [];
     const seenCodes = new Set<string>();
 
-    // ?먯닔 ?믪? ???뺣젹 (DB > OpenAPI > AI)
+    // 점수 높은 순 정렬 (DB > OpenAPI > AI)
     allResults.sort((a, b) => b.score - a.score);
+    console.log("🔍 중복 제거 시작 - 총", allResults.length, "개");
     allResults.forEach((item, index) => {
-      // ??foodCode媛 ?대? ?덉쑝硫??ㅽ궢
+      // ✅ foodCode가 이미 있으면 스킵
       if (seenCodes.has(item.foodCode)) {
+        console.log("⚠️ 중복 제거:", item.foodName, item.foodCode);
         return;
       }
 
-      // ???덈줈????ぉ留?異붽?
+      // ✅ 새로운 항목만 추가
       seenCodes.add(item.foodCode);
       deduped.push(item);
-        `  ??[${index}] 異붽?: ${item.foodName} (${item.foodCode}) [${item.dataSource}]`,
+      console.log(
+        `  ✅ [${index}] 추가: ${item.foodName} (${item.foodCode}) [${item.dataSource}]`,
       );
     });
 
-      `??以묐났 ?쒓굅 ?꾨즺: ${allResults.length}媛???${deduped.length}媛?,
+    console.log(
+      `✅ 중복 제거 완료: ${allResults.length}개 → ${deduped.length}개`,
     );
 
     // ==========================================
-    // AI 寃곌낵 以??좉퇋 ??DB 罹먯떆 ???(鍮꾨룞湲?
+    // AI 결과 중 신규 → DB 캐시 저장 (비동기)
     // ==========================================
     const aiToCache = deduped.filter((r) => r.dataSource === "ai");
     if (aiToCache.length > 0) {
@@ -271,10 +280,11 @@ JSON 諛곗뿴留?諛섑솚:
           })),
           { onConflict: "food_code" },
         )
+        .then(() => console.log("✅ AI 결과 DB 캐시 저장 완료"));
     }
 
     // ==========================================
-    // 諛섑솚
+    // 반환
     // ==========================================
     return NextResponse.json({
       success: true,
@@ -284,7 +294,7 @@ JSON 諛곗뿴留?諛섑솚:
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(
-      { success: false, error: "寃??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎" },
+      { success: false, error: "검색 중 오류가 발생했습니다" },
       { status: 500 },
     );
   }

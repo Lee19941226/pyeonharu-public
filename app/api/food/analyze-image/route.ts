@@ -1,4 +1,4 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -10,9 +10,11 @@ export async function POST(req: NextRequest) {
   try {
     const { imageBase64, userAllergens } = await req.json();
 
+    console.log("🤖 AI 이미지 분석 시작...");
+    console.log("👤 사용자 알레르기:", userAllergens);
 
     // ==========================================
-    // Step 1: OpenAI Vision?쇰줈 ?대?吏 遺꾩꽍
+    // Step 1: OpenAI Vision으로 이미지 분석
     // ==========================================
     interface AIAnalysisResult {
       productName: string;
@@ -37,30 +39,30 @@ export async function POST(req: NextRequest) {
     let analysisData: AIAnalysisResult;
     try {
       const visionResponse = await openai.chat.completions.create({
-        model: "gpt-4o-2024-08-06", // ??structured outputs 吏??紐⑤뜽
+        model: "gpt-4o-2024-08-06", // ✅ structured outputs 지원 모델
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `?뱀떊? ?쒓뎅 ?앺뭹 ?대?吏 ?먮퀎 ?꾨Ц媛?낅땲??
+                text: `당신은 한국 식품 이미지 판별 전문가입니다.
 
-[?묒뾽 紐⑺몴]
-?낅줈?쒕맂 ?대?吏 ???앺뭹??臾댁뾿?몄? 異붾줎?섍퀬, ?щ윭 ?꾨낫 以?媛??媛?μ꽦???믪? ??1媛쒖쓽 ?쒗뭹/?뚯떇留?理쒖쥌 ?좏깮?섏꽭??
+[작업 목표]
+업로드된 이미지 속 식품이 무엇인지 추론하고, 여러 후보 중 가장 가능성이 높은 단 1개의 제품/음식만 최종 선택하세요.
 
-[?먮퀎 ?꾨줈?몄뒪]
-1. ?대?吏濡쒕???媛?ν븳 ?꾨낫 ?앺뭹 3~5媛쒕? ?대??곸쑝濡?異붾줎?섏꽭??
-2. 媛??꾨낫??????쒓컖???뱀쭠, ?띿뒪???뺣낫, ?ъ옣 ?뺥깭 ?깆쓣 醫낇빀?섏뿬 ?쇱튂 ?뺣쪧(0~100)???됯??섏꽭??
-3. 媛???믪? ?뺣쪧??媛吏??꾨낫 1媛쒕쭔 理쒖쥌 ?좏깮?섏꽭??
-4. ?뺣쪧??50 誘몃쭔?대㈃ productName??"?앸퀎 遺덊솗??濡??묐떟?섏꽭??
+[판별 프로세스]
+1. 이미지로부터 가능한 후보 식품 3~5개를 내부적으로 추론하세요.
+2. 각 후보에 대해 시각적 특징, 텍스트 정보, 포장 형태 등을 종합하여 일치 확률(0~100)을 평가하세요.
+3. 가장 높은 확률을 가진 후보 1개만 최종 선택하세요.
+4. 확률이 50 미만이면 productName을 "식별 불확실"로 응답하세요.
 
-[?앺뭹 ?좏삎 援щ텇]
-- ?ъ옣?앺뭹: ?쒗뭹紐? ?쒖“?? 諛붿퐫?? ?뺥솗???먯옱猷?異붿텧
-- 議곕━?뚯떇: ?뚯떇紐? 二쇱슂 ?щ즺, 異붿젙 ?뚮젅瑜닿린 ?깅텇  
-- ?앹옱猷? ?щ즺紐? 異붿젙 ?뚮젅瑜닿린 ?깅텇
+[식품 유형 구분]
+- 포장식품: 제품명, 제조사, 바코드, 정확한 원재료 추출
+- 조리음식: 음식명, 주요 재료, 추정 알레르기 성분  
+- 식재료: 재료명, 추정 알레르기 성분
 
-?뚮젅瑜닿린 ?좊컻 臾쇱쭏? ?쒓뎅 ?앹빟泥?吏??22媛吏 以묒뿉?쒕쭔 ?좏깮?섏꽭??`,
+알레르기 유발 물질은 한국 식약처 지정 22가지 중에서만 선택하세요.`,
               },
               {
                 type: "image_url",
@@ -81,63 +83,63 @@ export async function POST(req: NextRequest) {
               properties: {
                 productName: {
                   type: "string",
-                  description: "?쒗뭹紐??먮뒗 ?뚯떇紐?(?? ?좊씪硫? 鍮꾨퉼諛?",
+                  description: "제품명 또는 음식명 (예: 신라면, 비빔밥)",
                 },
                 manufacturer: {
                   type: "string",
-                  description: "?쒖“??釉뚮옖??(?놁쑝硫?鍮?臾몄옄??",
+                  description: "제조사/브랜드 (없으면 빈 문자열)",
                 },
                 barcode: {
                   type: "string",
-                  description: "諛붿퐫???レ옄 (?놁쑝硫?鍮?臾몄옄??",
+                  description: "바코드 숫자 (없으면 빈 문자열)",
                 },
                 confidence: {
                   type: "number",
-                  description: "?좊ː??0~100",
+                  description: "신뢰도 0~100",
                 },
                 category: {
                   type: "string",
-                  enum: ["?ъ옣?앺뭹", "議곕━?뚯떇", "?앹옱猷?],
+                  enum: ["포장식품", "조리음식", "식재료"],
                 },
                 ingredients: {
                   type: "array",
                   items: { type: "string" },
-                  description: "?먯옱猷?紐⑸줉",
+                  description: "원재료 목록",
                 },
                 allergens: {
                   type: "array",
                   items: {
                     type: "string",
                     enum: [
-                      "怨꾨?",
-                      "?곗쑀",
-                      "諛",
-                      "硫붾?",
-                      "?낆쉘",
-                      "???,
-                      "?몃몢",
-                      "??,
-                      "寃ш낵瑜?,
-                      "媛묎컖瑜?,
-                      "?덉슦",
-                      "寃?,
-                      "怨좊벑??,
-                      "?ㅼ쭠??,
-                      "議곌컻瑜?,
-                      "?앹꽑",
-                      "蹂듭댂??,
-                      "?좊쭏??,
-                      "?쇱?怨좉린",
-                      "?좉퀬湲?,
-                      "??퀬湲?,
-                      "?꾪솴?곕쪟",
+                      "계란",
+                      "우유",
+                      "밀",
+                      "메밀",
+                      "땅콩",
+                      "대두",
+                      "호두",
+                      "잣",
+                      "견과류",
+                      "갑각류",
+                      "새우",
+                      "게",
+                      "고등어",
+                      "오징어",
+                      "조개류",
+                      "생선",
+                      "복숭아",
+                      "토마토",
+                      "돼지고기",
+                      "쇠고기",
+                      "닭고기",
+                      "아황산류",
                     ],
                   },
-                  description: "?뚮젅瑜닿린 ?좊컻 臾쇱쭏",
+                  description: "알레르기 유발 물질",
                 },
                 weight: {
                   type: "string",
-                  description: "?⑸웾/以묐웾 (?? 120g, ?놁쑝硫?鍮?臾몄옄??",
+                  description: "용량/중량 (예: 120g, 없으면 빈 문자열)",
                 },
                 nutritionInfo: {
                   type: "object",
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
                 },
                 identificationReason: {
                   type: "string",
-                  description: "???쒗뭹/?뚯떇?쇰줈 ?먮떒??洹쇨굅",
+                  description: "이 제품/음식으로 판단한 근거",
                 },
               },
               required: [
@@ -185,22 +187,22 @@ export async function POST(req: NextRequest) {
         temperature: 0.2,
       });
 
-      // ?댁젣 ?뚯떛 遺덊븘?? 諛붾줈 ?ъ슜
+      // 이제 파싱 불필요! 바로 사용
       const messageContent = visionResponse.choices[0]?.message?.content;
 
       if (!messageContent) {
-        throw new Error("AI ?묐떟??鍮꾩뼱?덉뒿?덈떎");
+        throw new Error("AI 응답이 비어있습니다");
       }
 
       analysisData = JSON.parse(messageContent) as AIAnalysisResult;
 
-      // 湲곕낯媛??ㅼ젙
+      // 기본값 설정
       const safeAnalysisData = {
-        productName: analysisData.productName || "?앸퀎 遺덊솗??,
+        productName: analysisData.productName || "식별 불확실",
         manufacturer: analysisData.manufacturer || "",
         barcode: analysisData.barcode || "",
         confidence: analysisData.confidence ?? 0,
-        category: analysisData.category || "?앹옱猷?,
+        category: analysisData.category || "식재료",
         ingredients: analysisData.ingredients || [],
         allergens: analysisData.allergens || [],
         weight: analysisData.weight || "",
@@ -209,26 +211,28 @@ export async function POST(req: NextRequest) {
       };
 
       if (safeAnalysisData.confidence < 50) {
-        safeAnalysisData.productName = "?앸퀎 遺덊솗??;
+        console.log("⚠️ 낮은 신뢰도:", safeAnalysisData.confidence);
+        safeAnalysisData.productName = "식별 불확실";
       }
 
+      console.log("✅ AI 최종 선택:", {
         name: safeAnalysisData.productName,
         confidence: safeAnalysisData.confidence,
         category: safeAnalysisData.category,
       });
     } catch (aiError) {
-      console.error("??AI 遺꾩꽍 ?ㅽ뙣:", aiError);
+      console.error("❌ AI 분석 실패:", aiError);
       return NextResponse.json(
         {
           success: false,
-          error: "AI ?대?吏 遺꾩꽍???ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄?댁＜?몄슂.",
+          error: "AI 이미지 분석에 실패했습니다. 다시 시도해주세요.",
         },
         { status: 500 },
       );
     }
 
     // ==========================================
-    // Step 2: ?ъ슜???뚮젅瑜닿린? 留ㅼ묶
+    // Step 2: 사용자 알레르기와 매칭
     // ==========================================
     const detectedAllergens = analysisData.allergens || [];
     const matchedUserAllergens: string[] = [];
@@ -250,18 +254,20 @@ export async function POST(req: NextRequest) {
 
     const hasUserAllergen = matchedUserAllergens.length > 0;
 
+    console.log("✅ 매칭 결과:", {
       detectedAllergens,
       matchedUserAllergens,
       hasUserAllergen,
     });
 
     // ==========================================
-    // Step 2.5: DB 罹먯떆?먯꽌 ?쒗뭹紐?寃??
+    // Step 2.5: DB 캐시에서 제품명 검색
     // ==========================================
     const supabase = await createClient();
     let dbProductData = null;
 
     if (analysisData.productName) {
+      console.log("🔍 DB 캐시 검색:", analysisData.productName);
 
       try {
         const { data: cacheData } = await supabase
@@ -281,20 +287,23 @@ export async function POST(req: NextRequest) {
             rawMaterials: cacheData.raw_materials || "",
             weight: cacheData.weight || "",
           };
+          console.log("✅ DB 캐시에서 발견:", dbProductData.productName);
         } else {
+          console.log("❌ DB 캐시에 없음, Open API 진행");
         }
       } catch (dbError) {
-        console.error("?좑툘 DB 議고쉶 ?ㅻ쪟:", dbError);
+        console.error("⚠️ DB 조회 오류:", dbError);
       }
     }
 
     // ==========================================
-    // Step 3: 諛붿퐫?쒓? ?덉쑝硫??앹빟泥?API 議고쉶
+    // Step 3: 바코드가 있으면 식약처 API 조회
     // ==========================================
     let foodCode = null;
     let apiProductData = null;
 
     if (!dbProductData && analysisData.barcode) {
+      console.log("📊 바코드 발견, 식약처 API 조회:", analysisData.barcode);
 
       const serviceKey = process.env.FOOD_API_KEY || "";
       const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
@@ -332,21 +341,22 @@ export async function POST(req: NextRequest) {
             weight: item.CPCTY || "",
           };
 
+          console.log("✅ Open API 제품 발견:", apiProductData);
         }
       } catch (apiError) {
-        console.error("???앹빟泥?API 議고쉶 ?ㅽ뙣:", apiError);
+        console.error("❌ 식약처 API 조회 실패:", apiError);
       }
     }
 
     // ==========================================
-    // Step 4: 理쒖쥌 寃곌낵 ?곗꽑?쒖쐞 寃곗젙
+    // Step 4: 최종 결과 우선순위 결정
     // ==========================================
     let finalAllergens = detectedAllergens;
     let finalProductName = analysisData.productName;
     let finalIngredients = analysisData.ingredients || [];
     let dataSource = "ai";
 
-    // 1?쒖쐞: DB 罹먯떆
+    // 1순위: DB 캐시
     if (dbProductData && dbProductData.allergens.length > 0) {
       finalAllergens = dbProductData.allergens;
       finalProductName = dbProductData.productName;
@@ -360,9 +370,10 @@ export async function POST(req: NextRequest) {
         finalIngredients = rawMaterialsList;
       }
 
+      console.log("✅ DB 캐시 데이터 우선 적용");
       foodCode = dbProductData.barcode;
     }
-    // 2?쒖쐞: Open API
+    // 2순위: Open API
     else if (apiProductData && apiProductData.allergens.length > 0) {
       finalAllergens = apiProductData.allergens;
       finalProductName = apiProductData.productName;
@@ -376,12 +387,14 @@ export async function POST(req: NextRequest) {
         finalIngredients = rawMaterialsList;
       }
 
+      console.log("✅ Open API 데이터 적용");
     }
-    // 3?쒖쐞: AI 遺꾩꽍 寃곌낵
+    // 3순위: AI 분석 결과
     else {
+      console.log("✅ AI 분석 결과 사용");
     }
 
-    // ?ъ슜???뚮젅瑜닿린 ?щℓ移?
+    // 사용자 알레르기 재매칭
     const finalMatchedAllergens: string[] = [];
     if (userAllergens && userAllergens.length > 0) {
       finalAllergens.forEach((allergen: string) => {
@@ -401,17 +414,17 @@ export async function POST(req: NextRequest) {
     const finalHasUserAllergen = finalMatchedAllergens.length > 0;
 
     // ==========================================
-    // Step 5: DB?????
+    // Step 5: DB에 저장
     // ==========================================
     let dbSaveSuccess = false;
     if (!foodCode) {
       const timestamp = Date.now();
 
-      // ??finalProductName???놁쓣 寃쎌슦 湲곕낯媛??ъ슜
-      const safeName = finalProductName || "?????녿뒗 ?쒗뭹";
+      // ✅ finalProductName이 없을 경우 기본값 사용
+      const safeName = finalProductName || "알 수 없는 제품";
       const productSlug = safeName
         .toLowerCase()
-        .replace(/[^a-z0-9媛-??/g, "-")
+        .replace(/[^a-z0-9가-힣]/g, "-")
         .slice(0, 30);
 
       foodCode = `ai-${productSlug}-${timestamp}`;
@@ -423,11 +436,11 @@ export async function POST(req: NextRequest) {
         .upsert(
           {
             food_code: foodCode,
-            food_name: finalProductName || "?????녿뒗 ?쒗뭹",
+            food_name: finalProductName || "알 수 없는 제품",
             manufacturer:
               apiProductData?.manufacturer ||
               analysisData.manufacturer ||
-              "?뺣낫?놁쓬",
+              "정보없음",
             allergens: finalAllergens,
             raw_materials:
               apiProductData?.rawMaterials ||
@@ -439,19 +452,20 @@ export async function POST(req: NextRequest) {
         );
 
       if (saveError) {
-        console.error("??DB ????ㅽ뙣:", saveError);
+        console.error("❌ DB 저장 실패:", saveError);
       } else {
+        console.log("✅ 분석 결과 DB 저장 완료:", foodCode);
       }
     } catch (saveError) {
-      console.error("??DB ???以??ㅻ쪟:", saveError);
+      console.error("❌ DB 저장 중 오류:", saveError);
     }
 
     // ==========================================
-    // Step 6: 理쒖쥌 寃곌낵 諛섑솚
+    // Step 6: 최종 결과 반환
     // ==========================================
     return NextResponse.json({
       success: true,
-      productName: finalProductName || "?????녿뒗 ?쒗뭹",
+      productName: finalProductName || "알 수 없는 제품",
       manufacturer:
         apiProductData?.manufacturer || analysisData.manufacturer || "",
       weight: apiProductData?.weight || analysisData.weight || "",
@@ -466,7 +480,7 @@ export async function POST(req: NextRequest) {
     });
 
     // ==========================================
-    // Step 6: 理쒖쥌 寃곌낵 諛섑솚
+    // Step 6: 최종 결과 반환
     // ==========================================
     return NextResponse.json({
       success: true,
@@ -483,14 +497,14 @@ export async function POST(req: NextRequest) {
       nutritionInfo: analysisData.nutritionInfo,
     });
   } catch (error) {
-    console.error("?뮙 ?꾩껜 遺꾩꽍 ?먮윭:", error);
+    console.error("💥 전체 분석 에러:", error);
     return NextResponse.json(
       {
         success: false,
         error:
           error instanceof Error
             ? error.message
-            : "?대?吏 遺꾩꽍 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎",
+            : "이미지 분석 중 오류가 발생했습니다",
       },
       { status: 500 },
     );
