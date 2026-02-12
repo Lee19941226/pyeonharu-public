@@ -8,26 +8,59 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "편하루 - 우리 가족 식품 안전",
+  title: {
+    default: "편하루 - 바코드로 식품 알레르기 확인 | 급식 알레르기 체크",
+    template: "%s | 편하루",
+  },
   description:
-    "바코드 한 번으로 식품 알레르기 확인. 내 주변 병원/약국 찾기, AI 증상 분석까지. 편하루와 함께 일상을 더 편하게 만들어보세요.",
-  generator: "v0.app",
+    "바코드 스캔 한 번으로 식품 알레르기 성분을 확인하세요. 학교 급식 알레르기 자동 체크, AI 증상 분석, 내 주변 병원·약국 찾기까지. 식품 알레르기가 있는 학생을 위한 필수 앱.",
   keywords: [
-    "식품 알레르기",
-    "바코드 알레르기",
+    "식품 알레르기 확인",
+    "바코드 알레르기 체크",
+    "급식 알레르기",
+    "학교 급식 알레르기",
+    "알레르기 앱",
+    "식품 성분 확인",
+    "알레르기 바코드 스캔",
     "병원 찾기",
     "약국 찾기",
-    "증상 분석",
-    "급식 알레르기",
+    "AI 증상 분석",
+    "편하루",
   ],
   authors: [{ name: "편하루" }],
+  creator: "편하루",
+  publisher: "편하루",
+  metadataBase: new URL("https://v0-website-development-plan-beta-six.vercel.app"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "편하루 - 우리 가족 식품 안전",
+    title: "편하루 - 바코드로 식품 알레르기 확인",
     description:
-      "바코드 한 번으로 식품 알레르기 확인. 내 주변 병원/약국 찾기, AI 증상 분석까지.",
+      "바코드 스캔으로 알레르기 성분 확인, 급식 알레르기 체크, AI 증상 분석, 병원·약국 찾기. 식품 알레르기 학생 필수 앱.",
     type: "website",
     locale: "ko_KR",
+    siteName: "편하루",
+    url: "https://v0-website-development-plan-beta-six.vercel.app",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "편하루 - 바코드로 식품 알레르기 확인",
+    description:
+      "바코드 스캔으로 알레르기 성분 확인, 급식 알레르기 체크, AI 증상 분석.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
@@ -36,8 +69,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#4ade80" },
-    { media: "(prefers-color-scheme: dark)", color: "#22c55e" },
+    { media: "(prefers-color-scheme: light)", color: "#4A7C59" },
+    { media: "(prefers-color-scheme: dark)", color: "#4A7C59" },
   ],
 };
 
@@ -54,6 +87,12 @@ export default function RootLayout({
           as="style"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
+          crossOrigin="anonymous"
+        ></script>
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="font-sans antialiased bg-background text-foreground">
         <Script

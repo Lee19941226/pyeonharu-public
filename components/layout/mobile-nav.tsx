@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Camera, ShieldCheck, Bell, User } from "lucide-react";
+import { Home, MapPin, Camera, MessageSquare, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/", icon: Home, label: "홈" },
-  { href: "/food", icon: ShieldCheck, label: "안전식품" },
-  // 중앙 FAB는 별도 렌더링
-  { href: "/food/history", icon: Bell, label: "알림" },
-  { href: "/mypage", icon: User, label: "마이" },
-];
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -21,14 +13,17 @@ export function MobileNav() {
     pathname === href || (href !== "/" && pathname.startsWith(href));
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
-      <div className="flex h-16 items-center justify-around">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden"
+      data-tour="bottom-nav"
+    >
+      <div className="mx-auto flex h-16 max-w-md items-center justify-around">
         {/* 홈 */}
         <Link
           href="/"
           className={cn(
-            "flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors",
-            isActive("/") && pathname === "/"
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
+            pathname === "/"
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
@@ -37,18 +32,18 @@ export function MobileNav() {
           <span>홈</span>
         </Link>
 
-        {/* 안전식품 */}
+        {/* 위치 (병원/약국) */}
         <Link
-          href="/food"
+          href="/search"
           className={cn(
-            "flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors",
-            isActive("/food")
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
+            isActive("/search")
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          <ShieldCheck className="h-5 w-5" />
-          <span>안전식품</span>
+          <MapPin className="h-5 w-5" />
+          <span>위치</span>
         </Link>
 
         {/* 중앙 FAB — 바코드 스캔 */}
@@ -60,27 +55,25 @@ export function MobileNav() {
           <Camera className="h-6 w-6" />
         </button>
 
-        {/* 알림 (현재는 확인 기록으로 연결, Phase 2에서 알림으로 전환) */}
+        {/* 커뮤니티 */}
         <Link
-          href="/food/history"
+          href="/community"
           className={cn(
-            "relative flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors",
-            isActive("/food/history")
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
+            isActive("/community")
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          <Bell className="h-5 w-5" />
-          <span>알림</span>
-          {/* 위험 감지 시 빨간 점 — Phase 2에서 동적 표시 */}
-          {/* <span className="absolute right-2 top-1 h-2 w-2 rounded-full bg-red-500" /> */}
+          <MessageSquare className="h-5 w-5" />
+          <span>커뮤니티</span>
         </Link>
 
-        {/* 마이 */}
+        {/* 마이페이지 */}
         <Link
           href="/mypage"
           className={cn(
-            "flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors",
+            "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
             isActive("/mypage")
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
