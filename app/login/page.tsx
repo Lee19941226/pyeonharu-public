@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isOAuthLoading, setIsOAuthLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const reason = searchParams?.get("reason");
+  const [showScanLimitBanner, setShowScanLimitBanner] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +70,11 @@ export default function LoginPage() {
       setIsOAuthLoading(null);
     }
   };
-
+  useEffect(() => {
+    if (reason === "scan_limit") {
+      setShowScanLimitBanner(true);
+    }
+  }, [reason]);
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
@@ -83,7 +90,30 @@ export default function LoginPage() {
           </Link>
         </div>
       </header>
-
+      {/* ✅ 스캔 제한 배너 */}
+      {showScanLimitBanner && (
+        <Card className="mb-6 border-orange-500 bg-orange-50">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 shrink-0 text-orange-600" />
+              <div>
+                <h3 className="font-semibold text-orange-900">
+                  오늘 무료 스캔 횟수를 모두 사용하셨습니다
+                </h3>
+                <p className="mt-2 text-sm text-orange-800">
+                  회원가입하면 <strong>무제한 스캔</strong>이 가능합니다!
+                </p>
+                <ul className="mt-3 space-y-1 text-sm text-orange-800">
+                  <li>✓ 무제한 바코드 스캔</li>
+                  <li>✓ 스캔 기록 영구 보관</li>
+                  <li>✓ 알레르기 프로필 관리</li>
+                  <li>✓ 멀티 디바이스 동기화</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Main Content */}
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md">

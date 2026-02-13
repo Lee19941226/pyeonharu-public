@@ -104,7 +104,25 @@ export default function AIResultPage() {
       });
 
       console.log("📡 API 응답 상태:", response.status);
+      // 스캔 제한 체크 (429 에러)
+      if (response.status === 429) {
+        const data = await response.json();
+        console.log("🚫 스캔 제한 초과:", data);
 
+        localStorage.removeItem("pendingImageAnalysis");
+
+        // 스캔 제한 모달 표시
+        toast.error(data.message || "하루 무료 스캔 횟수를 초과했습니다", {
+          duration: 5000,
+        });
+
+        // 회원가입 페이지로 이동 (3초 후)
+        setTimeout(() => {
+          router.push("/login?reason=scan_limit");
+        }, 3000);
+
+        return;
+      }
       if (!response.ok) {
         throw new Error(`API 오류: ${response.status}`);
       }
@@ -112,6 +130,22 @@ export default function AIResultPage() {
       const data = await response.json();
       console.log("📦 API 응답 데이터:", data);
 
+      // ✅ 남은 스캔 횟수 표시 (비로그인 사용자)
+      if (!user) {
+        const remainingScans = response.headers.get("X-Remaining-Scans");
+        if (remainingScans) {
+          console.log(`📊 남은 무료 스캔: ${remainingScans}/5`);
+
+          if (parseInt(remainingScans) <= 2) {
+            toast.info(
+              `오늘 무료 스캔 ${remainingScans}회 남았습니다. 회원가입하면 무제한!`,
+              {
+                duration: 4000,
+              },
+            );
+          }
+        }
+      }
       if (!data.success) {
         console.log("❌ 분석 실패:", data.error);
         localStorage.removeItem("pendingImageAnalysis");
