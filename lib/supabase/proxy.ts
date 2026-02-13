@@ -34,28 +34,74 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // ==========================================
-  // [Phase 11] 보호 경로 재정의 - 알레르기 중심으로 변경
+  // 보호 경로 체크
   // ==========================================
-  // ❌ 이전: ['/mypage', '/bookmarks', '/closet', '/style']
-  // ✅ 변경: 코디/옷장 제거, 알레르기 관련 추가
-  const protectedPaths = [
-    "/mypage", // 마이페이지
-    "/bookmarks", // 즐겨찾기
-    "/food/profile", // 알레르기 프로필 관리
-    "/family", // 가족 관리 (나중에 추가될 기능)
-  ];
+  const protectedPaths = ["/mypage", "/bookmarks", "/food/profile", "/family"];
 
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path),
   );
 
-  // 비로그인 사용자가 보호 경로 접근 시 로그인 페이지로 리다이렉트
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    // ✅ 로그인 후 원래 페이지로 돌아가도록 redirect 파라미터 추가
     url.searchParams.set("redirect", request.nextUrl.pathname);
     return NextResponse.redirect(url);
+  }
+
+  // ==========================================
+  // 비로그인 스캔 제한 체크 (일 5회)
+  // ==========================================
+  // 분석 API 호출 시에만 체크
+  if (!user && request.nextUrl.pathname === "/api/food/analyze-image") {
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const scanDate = request.cookies.get("scan_date")?.value;
+    const scanCountCookie = request.cookies.get("scan_count")?.value;
+
+    let scanCount = 0;
+
+    // 날짜가 다르면 카운트 리셋
+    if (scanDate !== today) {
+      scanCount = 0;
+      supabaseResponse.cookies.set("scan_date", today, {
+        maxAge: 60 * 60 * 24, // 24시간
+        httpOnly: true,
+        sameSite: "lax",
+      });
+    } else {
+      scanCount = scanCountCookie ? parseInt(scanCountCookie, 10) : 0;
+    }
+
+    // 5회 초과 시 제한
+    if (scanCount >= 5) {
+      console.log("🚫 비로그인 스캔 제한 초과:", scanCount);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "scan_limit_exceeded",
+          message:
+            "하루 무료 스캔 횟수(5회)를 초과했습니다. 회원가입하면 무제한 스캔이 가능합니다.",
+          remainingScans: 0,
+        },
+        { status: 429 }, // Too Many Requests
+      );
+    }
+
+    // 카운트 증가
+    scanCount += 1;
+    supabaseResponse.cookies.set("scan_count", scanCount.toString(), {
+      maxAge: 60 * 60 * 24, // 24시간
+      httpOnly: true,
+      sameSite: "lax",
+    });
+
+    // 남은 횟수를 응답 헤더에 추가
+    supabaseResponse.headers.set(
+      "X-Remaining-Scans",
+      (5 - scanCount).toString(),
+    );
+
+    console.log(`✅ 비로그인 스캔 허용: ${scanCount}/5`);
   }
 
   return supabaseResponse;
