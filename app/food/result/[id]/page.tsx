@@ -21,6 +21,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { getAllergenInfo } from "@/lib/allergen-info";
 import type { AllergenInfo } from "@/lib/allergen-info";
+import { createClient } from "@/lib/supabase/client";
 
 interface FoodResult {
   foodCode: string;
@@ -201,7 +202,7 @@ export default function FoodResultPage() {
       setIsLoading(false);
     }
   };
-  const saveToHistory = (result: FoodResult) => {
+  const saveToHistory = async (result: FoodResult) => {
     // ✅ result가 없으면 바로 리턴
     if (!result) {
       console.warn("⚠️ saveToHistory: result가 없습니다");
@@ -212,42 +213,96 @@ export default function FoodResultPage() {
     if (typeof window === "undefined") return;
 
     const historyItem = {
-      foodCode: result.foodCode,
-      foodName: result.foodName,
+      barcode: result.foodCode,
+      product_name: result.foodName,
       manufacturer: result.manufacturer || "정보없음",
-      checkedAt: new Date().toISOString(),
-      isSafe: result.isSafe,
+      is_safe: result.isSafe,
+      detected_allergens: result.detectedAllergens?.map((a) => a.name) || [],
+      checked_at: new Date().toISOString(),
     };
 
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // ==========================================
+      // 로그인 사용자 → Supabase에 저장
+      // ==========================================
+      if (user) {
+        const { error } = await supabase.from("food_check_history").insert({
+          user_id: user.id,
+          member_id: null, // 나중에 가족 기능 추가 시 사용
+          barcode: historyItem.barcode,
+          product_name: historyItem.product_name,
+          manufacturer: historyItem.manufacturer,
+          is_safe: historyItem.is_safe,
+          detected_allergens: historyItem.detected_allergens,
+          checked_at: historyItem.checked_at,
+        });
+
+        if (error) {
+          console.error("❌ Supabase 저장 실패:", error);
+          // ✅ DB 실패 시 localStorage에 fallback
+          saveToLocalStorage(historyItem);
+        } else {
+          console.log("✅ Supabase에 스캔 기록 저장 완료");
+        }
+
+        // DB에도 스캔 로그 저장 (주간 리포트용 - 기존 유지)
+        fetch("/api/food/scan-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            foodCode: result.foodCode,
+            foodName: result.foodName,
+            manufacturer: result.manufacturer || "정보없음",
+            isSafe: result.isSafe,
+            detectedAllergens:
+              result.detectedAllergens?.map((a) => a.name) || [],
+          }),
+        }).catch(() => {});
+      }
+      // ==========================================
+      // 비로그인 사용자 → localStorage에 저장
+      // ==========================================
+      else {
+        console.log("👤 비로그인 사용자, localStorage에 저장");
+        saveToLocalStorage(historyItem);
+      }
+    } catch (error) {
+      console.error("❌ saveToHistory 오류:", error);
+      // 에러 발생 시 localStorage에 fallback
+      saveToLocalStorage(historyItem);
+    }
+  };
+
+  // ==========================================
+  // localStorage 저장 헬퍼 함수
+  // ==========================================
+  const saveToLocalStorage = (historyItem: any) => {
     try {
       const existing = localStorage.getItem("food_check_history");
       let history = existing ? JSON.parse(existing) : [];
 
+      // 중복 제거 (같은 barcode)
       history = history.filter(
-        (item: any) => item.foodCode !== result.foodCode,
+        (item: any) => item.barcode !== historyItem.barcode,
       );
+
+      // 최신 항목을 맨 앞에 추가
       history.unshift(historyItem);
 
+      // 최대 50개까지만 저장
       if (history.length > 50) {
         history = history.slice(0, 50);
       }
 
       localStorage.setItem("food_check_history", JSON.stringify(history));
-
-      // DB에도 스캔 기록 저장
-      fetch("/api/food/scan-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          foodCode: result.foodCode,
-          foodName: result.foodName,
-          manufacturer: result.manufacturer || "정보없음",
-          isSafe: result.isSafe,
-          detectedAllergens: result.detectedAllergens?.map((a) => a.name) || [],
-        }),
-      }).catch(() => {});
+      console.log("✅ localStorage에 저장 완료");
     } catch (error) {
-      console.error("❌ saveToHistory 오류:", error);
+      console.error("❌ localStorage 저장 실패:", error);
     }
   };
 

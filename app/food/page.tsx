@@ -125,6 +125,7 @@ function FoodMainContent() {
       setIsLoggedIn(true);
       loadFavorites();
       loadUserAllergens();
+      loadRecentProducts();
     }
   };
 
@@ -146,9 +147,70 @@ function FoodMainContent() {
     if (saved) setSearchHistory(JSON.parse(saved));
   };
 
-  const loadRecentProducts = () => {
-    const saved = localStorage.getItem("food_check_history");
-    if (saved) setRecentProducts(JSON.parse(saved).slice(0, 5));
+  const loadRecentProducts = async () => {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // ==========================================
+    // 로그인 사용자 → Supabase에서 조회
+    // ==========================================
+    if (user) {
+      try {
+        const { data, error } = await supabase
+          .from("food_check_history")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("checked_at", { ascending: false })
+          .limit(5);
+
+        if (error) {
+          console.error("❌ Supabase 조회 실패:", error);
+          // 실패 시 localStorage에서 조회 (fallback)
+          loadRecentProductsFromLocalStorage();
+        } else if (data && data.length > 0) {
+          // ✅ Supabase 데이터를 화면에 맞게 변환
+          const formattedData = data.map((item) => ({
+            foodCode: item.barcode,
+            foodName: item.product_name,
+            manufacturer: item.manufacturer,
+            checkedAt: item.checked_at,
+            isSafe: item.is_safe,
+          }));
+          setRecentProducts(formattedData);
+          console.log("✅ Supabase에서 최근 제품 조회 완료:", data.length);
+        } else {
+          // 데이터가 없으면 localStorage 확인
+          loadRecentProductsFromLocalStorage();
+        }
+      } catch (error) {
+        console.error("❌ 최근 제품 조회 오류:", error);
+        loadRecentProductsFromLocalStorage();
+      }
+    }
+    // ==========================================
+    // 비로그인 사용자 → localStorage에서 조회
+    // ==========================================
+    else {
+      loadRecentProductsFromLocalStorage();
+    }
+  };
+
+  // ==========================================
+  // localStorage에서 조회 (fallback)
+  // ==========================================
+  const loadRecentProductsFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem("food_check_history");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setRecentProducts(parsed.slice(0, 5));
+        console.log("✅ localStorage에서 최근 제품 조회");
+      }
+    } catch (error) {
+      console.error("❌ localStorage 조회 실패:", error);
+    }
   };
 
   const loadFavorites = async () => {
