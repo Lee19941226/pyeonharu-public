@@ -75,8 +75,66 @@ export default function FoodResultPage() {
   useEffect(() => {
     loadFoodResult();
     checkFavorite();
+
+    if (typeof window !== "undefined" && window.Kakao) {
+      console.log("🔑 Kakao SDK 로드됨");
+
+      if (!window.Kakao.isInitialized()) {
+        window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
+        console.log("✅ Kakao 초기화 완료");
+        console.log("🔑 사용 중인 키:", process.env.NEXT_PUBLIC_KAKAO_KEY);
+      }
+    } else {
+      console.error("❌ Kakao SDK 로드 실패");
+    }
   }, [params.id, router]);
 
+  // 카카오톡 공유
+  const shareToKakao = () => {
+    if (!result || !window.Kakao) {
+      toast.error("카카오톡 공유를 사용할 수 없습니다");
+      return;
+    }
+
+    const isSafe = result.isSafe;
+    const allergenText =
+      !isSafe && result.detectedAllergens && result.detectedAllergens.length > 0
+        ? `(${result.detectedAllergens.map((a: any) => a.name).join(", ")})`
+        : "";
+
+    window.Kakao.Share.sendDefault({
+      objectType: "feed",
+      content: {
+        title: `${result.foodName}`,
+        description: isSafe
+          ? `🟢 안전해요! 알레르기 성분이 없습니다`
+          : `🔴 위험해요! ${allergenText}`,
+        imageUrl: "https://your-domain.com/og-image.png", // TODO: 실제 이미지 URL
+        link: {
+          mobileWebUrl: `${window.location.origin}/food/result/${result.foodCode}`,
+          webUrl: `${window.location.origin}/food/result/${result.foodCode}`,
+        },
+      },
+      buttons: [
+        {
+          title: "상세 보기",
+          link: {
+            mobileWebUrl: `${window.location.origin}/food/result/${result.foodCode}`,
+            webUrl: `${window.location.origin}/food/result/${result.foodCode}`,
+          },
+        },
+        {
+          title: "편하루 시작하기",
+          link: {
+            mobileWebUrl: window.location.origin,
+            webUrl: window.location.origin,
+          },
+        },
+      ],
+    });
+
+    toast.success("카카오톡 공유 창을 열었습니다");
+  };
   const loadFoodResult = async () => {
     try {
       const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -438,19 +496,60 @@ export default function FoodResultPage() {
                 )}
               </div>
 
-              {/* 오른쪽 버튼 영역 */}
-              <div className="flex gap-2">
-                <Button variant="ghost" size="icon">
-                  <Share2 className="h-5 w-5" />
+              {/* 오른쪽: 버튼 영역 */}
+              <div className="flex items-center gap-2">
+                {/* 카카오톡 공유 버튼 */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={shareToKakao}
+                  title="카카오톡 공유"
+                  className="
+    group
+    rounded-full
+    transition-all duration-200
+    hover:bg-yellow-400
+    hover:shadow-md
+    hover:scale-110
+  "
+                >
+                  <svg
+                    className="
+      h-6 w-6
+      fill-[#3C1E1E]
+      transition-colors duration-200
+      group-hover:fill-black
+    "
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.8 6.7-.2.8-.6 2.8-.7 3.2 0 .2 0 .4.2.5.1.1.3.1.4 0 .5-.3 3.7-2.4 4.3-2.8.3 0 .7.1 1 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z" />
+                  </svg>
                 </Button>
+
+                {/* 즐겨찾기 버튼 */}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={toggleFavorite}
                   disabled={!result.isSafe}
+                  className="
+    group
+    rounded-full
+    transition-all duration-200
+    hover:bg-red-50
+    hover:scale-110
+  "
                 >
                   <Heart
-                    className={`h-5 w-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
+                    className={`
+      h-5 w-5
+      transition-all duration-200
+      ${
+        isFavorite
+          ? "fill-red-500 text-red-500 scale-110"
+          : "text-gray-400 group-hover:text-red-500 group-hover:fill-red-500"
+      }
+    `}
                   />
                 </Button>
               </div>
