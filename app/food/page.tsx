@@ -99,7 +99,12 @@ function FoodMainContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userAllergens, setUserAllergens] = useState<string[]>([]);
   const isInitialMount = useRef(true);
-
+  const [safetyStats, setSafetyStats] = useState({
+    total: 0,
+    safe: 0,
+    danger: 0,
+    percentage: 0,
+  });
   useEffect(() => {
     const urlQuery = searchParams.get("q");
     if (urlQuery && isInitialMount.current) {
@@ -153,9 +158,6 @@ function FoodMainContent() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // ==========================================
-    // 로그인 사용자 → Supabase에서 조회
-    // ==========================================
     if (user) {
       try {
         const { data, error } = await supabase
@@ -163,14 +165,12 @@ function FoodMainContent() {
           .select("*")
           .eq("user_id", user.id)
           .order("checked_at", { ascending: false })
-          .limit(5);
+          .limit(10); // ✅ 최근 10개
 
         if (error) {
           console.error("❌ Supabase 조회 실패:", error);
-          // 실패 시 localStorage에서 조회 (fallback)
           loadRecentProductsFromLocalStorage();
         } else if (data && data.length > 0) {
-          // ✅ Supabase 데이터를 화면에 맞게 변환
           const formattedData = data.map((item) => ({
             foodCode: item.barcode,
             foodName: item.product_name,
@@ -179,33 +179,57 @@ function FoodMainContent() {
             isSafe: item.is_safe,
           }));
           setRecentProducts(formattedData);
+
+          // ✅ 안전/위험 통계 계산
+          const safeCount = data.filter((item) => item.is_safe).length;
+          const dangerCount = data.length - safeCount;
+          const percentage = Math.round((safeCount / data.length) * 100);
+
+          setSafetyStats({
+            total: data.length,
+            safe: safeCount,
+            danger: dangerCount,
+            percentage: percentage,
+          });
+
           console.log("✅ Supabase에서 최근 제품 조회 완료:", data.length);
+          console.log(
+            "📊 안전/위험 비율:",
+            `${safeCount}/${data.length} (${percentage}%)`,
+          );
         } else {
-          // 데이터가 없으면 localStorage 확인
           loadRecentProductsFromLocalStorage();
         }
       } catch (error) {
         console.error("❌ 최근 제품 조회 오류:", error);
         loadRecentProductsFromLocalStorage();
       }
-    }
-    // ==========================================
-    // 비로그인 사용자 → localStorage에서 조회
-    // ==========================================
-    else {
+    } else {
       loadRecentProductsFromLocalStorage();
     }
   };
 
-  // ==========================================
-  // localStorage에서 조회 (fallback)
-  // ==========================================
   const loadRecentProductsFromLocalStorage = () => {
     try {
       const saved = localStorage.getItem("food_check_history");
       if (saved) {
         const parsed = JSON.parse(saved);
-        setRecentProducts(parsed.slice(0, 5));
+        const recent = parsed.slice(0, 10);
+        setRecentProducts(recent);
+
+        // ✅ localStorage 데이터도 통계 계산
+        const safeCount = recent.filter((item: any) => item.isSafe).length;
+        const dangerCount = recent.length - safeCount;
+        const percentage =
+          recent.length > 0 ? Math.round((safeCount / recent.length) * 100) : 0;
+
+        setSafetyStats({
+          total: recent.length,
+          safe: safeCount,
+          danger: dangerCount,
+          percentage: percentage,
+        });
+
         console.log("✅ localStorage에서 최근 제품 조회");
       }
     } catch (error) {
@@ -708,6 +732,66 @@ function FoodMainContent() {
                           </Button>
                         </Link>
                       </div>
+                      {/* ✅ 안전/위험 비율 시각화 */}
+                      {safetyStats.total > 0 && (
+                        <div className="mb-4 rounded-lg border bg-muted/50 p-3">
+                          {/* 통계 헤더 */}
+                          <div className="mb-2 flex items-center justify-between text-sm">
+                            <span className="font-medium">
+                              최근 {safetyStats.total}개 중
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              <span className="font-bold text-green-600">
+                                {safetyStats.safe}개 안전
+                              </span>
+                              {safetyStats.danger > 0 && (
+                                <>
+                                  {" · "}
+                                  <span className="font-bold text-red-600">
+                                    {safetyStats.danger}개 위험
+                                  </span>
+                                </>
+                              )}
+                            </span>
+                          </div>
+
+                          {/* 프로그레스 바 */}
+                          <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
+                              style={{ width: `${safetyStats.percentage}%` }}
+                            />
+                          </div>
+
+                          {/* 퍼센트 표시 */}
+                          <div className="mt-2 text-center">
+                            <span className="text-2xl font-bold text-green-600">
+                              {safetyStats.percentage}%
+                            </span>
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              안전한 선택
+                            </span>
+                          </div>
+
+                          {/* 격려 메시지 */}
+                          {safetyStats.percentage >= 80 && (
+                            <p className="mt-2 text-center text-xs text-green-700">
+                              🎉 훌륭해요! 안전한 식품을 잘 선택하고 계세요
+                            </p>
+                          )}
+                          {safetyStats.percentage >= 50 &&
+                            safetyStats.percentage < 80 && (
+                              <p className="mt-2 text-center text-xs text-blue-700">
+                                💪 좋은 습관이에요! 조금만 더 주의하세요
+                              </p>
+                            )}
+                          {safetyStats.percentage < 50 && (
+                            <p className="mt-2 text-center text-xs text-orange-700">
+                              ⚠️ 위험한 제품이 많아요. 신중하게 선택하세요
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="space-y-2">
                         {recentProducts.map((product, idx) => (
                           <div
