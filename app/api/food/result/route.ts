@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import OpenAI from "openai";
 
 export async function GET(req: NextRequest) {
   try {
@@ -432,6 +433,144 @@ export async function GET(req: NextRequest) {
         return null;
       })
       .filter(Boolean);
+    // ==========================================
+    // 대체 식품 조회 (위험한 제품일 때만)
+    // ==========================================
+    let alternatives: any[] = [];
+
+    if (detectedAllergens.length > 0) {
+      console.log("🔍 대체 식품 검색 시작...");
+
+      // 감지된 알레르기 성분들
+      const allergenNames = detectedAllergens.map((a) => a?.name ?? null);
+
+      // ==========================================
+      // Step 1: DB에서 검증된 대체품 조회
+      // ==========================================
+      try {
+        const { data: altData, error: altError } = await supabase
+          .from("safe_alternatives")
+          .select("*")
+          .eq("danger_barcode", code)
+          .in("danger_allergen", allergenNames)
+          .eq("verified", true)
+          .limit(3);
+
+        if (!altError && altData && altData.length > 0) {
+          alternatives = altData.map((alt) => ({
+            barcode: alt.safe_barcode,
+            productName: alt.safe_product_name,
+            manufacturer: alt.safe_manufacturer,
+            category: alt.category,
+            reason: alt.recommendation_reason,
+            dataSource: "database", // ✅ DB 출처 표시
+          }));
+
+          console.log(`✅ DB 대체 식품 ${alternatives.length}개 발견`);
+        }
+      } catch (error) {
+        console.error("❌ DB 대체 식품 조회 실패:", error);
+      }
+
+      // ==========================================
+      // Step 2: DB에 없으면 AI에게 추천 요청
+      // ==========================================
+      if (alternatives.length === 0) {
+        console.log("🤖 AI 대체 식품 추천 시작...");
+
+        try {
+          const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+          });
+
+          const aiResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "user",
+                content: `한국에서 실제로 판매되는 식품 중, "${productName}" (${allergenNames.join(", ")} 알레르기 위험)의 안전한 대체품 3개를 추천해주세요.
+
+조건:
+- ${allergenNames.join(", ")} 성분이 없어야 함
+- 비슷한 카테고리 (${productName}가 과자면 과자, 음료면 음료)
+- 한국에서 쉽게 구할 수 있는 제품
+- 실제 제품명과 제조사 사용
+
+JSON 형식으로만 응답하세요.`,
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "alternative_recommendations",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    alternatives: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          productName: {
+                            type: "string",
+                            description: "대체 제품명",
+                          },
+                          manufacturer: {
+                            type: "string",
+                            description: "제조사",
+                          },
+                          category: {
+                            type: "string",
+                            description: "카테고리 (과자, 음료, 빵 등)",
+                          },
+                          reason: {
+                            type: "string",
+                            description: "추천 이유 (20자 이내)",
+                          },
+                        },
+                        required: [
+                          "productName",
+                          "manufacturer",
+                          "category",
+                          "reason",
+                        ],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["alternatives"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            temperature: 0.3,
+          });
+
+          const aiContent = aiResponse.choices[0]?.message?.content;
+          if (aiContent) {
+            const aiData = JSON.parse(aiContent);
+
+            if (aiData.alternatives && Array.isArray(aiData.alternatives)) {
+              alternatives = aiData.alternatives
+                .slice(0, 3)
+                .map((alt: any) => ({
+                  barcode: "", // AI는 바코드 모름
+                  productName: alt.productName,
+                  manufacturer: alt.manufacturer,
+                  category: alt.category,
+                  reason: alt.reason,
+                  dataSource: "ai", // ✅ AI 출처 표시
+                }));
+
+              console.log(`✅ AI 대체 식품 ${alternatives.length}개 생성`);
+            }
+          }
+        } catch (aiError) {
+          console.error("❌ AI 대체 식품 실패:", aiError);
+        }
+      }
+    }
 
     // ==========================================
     // 최종 결과
@@ -455,6 +594,7 @@ export async function GET(req: NextRequest) {
         detectedAllergens.length === 0 && crossContaminationRisks.length === 0,
       hasNutritionInfo: nutritionItems.length > 0,
       dataSource: "openapi",
+      alternatives: alternatives,
     };
 
     console.log("📋 최종 결과:");
