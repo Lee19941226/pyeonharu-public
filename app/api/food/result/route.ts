@@ -84,119 +84,106 @@ export async function GET(req: NextRequest) {
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
     // ==========================================
-    // API 1: 품목제조정보 (getFoodQrProdMnfInfo01)
+    // Open API 병렬 호출 (Promise.allSettled)
     // ==========================================
-    let productInfo = null;
-    try {
-      const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
-      url.searchParams.append("serviceKey", serviceKey);
-      url.searchParams.append("pageNo", "1");
-      url.searchParams.append("numOfRows", "1");
-      url.searchParams.append("type", "json");
-      url.searchParams.append("brcd_no", code);
+    console.log("🚀 5개 API 병렬 호출 시작...");
 
-      console.log("📡 품목제조정보 API");
+    const [
+      productResult,
+      allergyResult,
+      rawMaterialResult,
+      nutritionResult,
+      attentionResult,
+    ] = await Promise.allSettled([
+      // API 1: 품목제조정보
+      (async () => {
+        const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
+        url.searchParams.append("serviceKey", serviceKey);
+        url.searchParams.append("pageNo", "1");
+        url.searchParams.append("numOfRows", "1");
+        url.searchParams.append("type", "json");
+        url.searchParams.append("brcd_no", code);
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        return data.body?.items?.[0] || null;
+      })(),
 
-      const response = await fetch(url.toString());
-      const data = await response.json();
-      productInfo = data.body?.items?.[0] || null;
+      // API 2: 알레르기정보
+      (async () => {
+        const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
+        url.searchParams.append("serviceKey", serviceKey);
+        url.searchParams.append("pageNo", "1");
+        url.searchParams.append("numOfRows", "100");
+        url.searchParams.append("type", "json");
+        url.searchParams.append("brcd_no", code);
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        return data.body?.items || [];
+      })(),
 
-      console.log("✅ 품목제조정보:", productInfo ? "획득" : "없음");
-      if (productInfo) {
-        console.log("   제품명:", productInfo.PRDCT_NM);
-        console.log("   제조사:", productInfo.MNFCTUR);
-        console.log("   원재료:", productInfo.RAWMTRL_NM ? "있음" : "없음"); // ✅ 확인
-      }
-    } catch (error) {
-      console.error("⚠️ 품목제조정보 실패");
-    }
+      // API 3: 원재료정보
+      (async () => {
+        const url = new URL(`${baseUrl}/getFoodQrProdRawmtrl01`);
+        url.searchParams.append("serviceKey", serviceKey);
+        url.searchParams.append("pageNo", "1");
+        url.searchParams.append("numOfRows", "100");
+        url.searchParams.append("type", "json");
+        url.searchParams.append("brcd_no", code);
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        return data.body?.items || [];
+      })(),
+
+      // API 4: 영양표시정보
+      (async () => {
+        const url = new URL(`${baseUrl}/getFoodQrProdNsd01`);
+        url.searchParams.append("serviceKey", serviceKey);
+        url.searchParams.append("pageNo", "1");
+        url.searchParams.append("numOfRows", "50");
+        url.searchParams.append("type", "json");
+        url.searchParams.append("brcd_no", code);
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        return data.body?.items || [];
+      })(),
+
+      // API 5: 주의사항정보
+      (async () => {
+        const url = new URL(`${baseUrl}/getFoodQrIndctAttnInfo01`);
+        url.searchParams.append("serviceKey", serviceKey);
+        url.searchParams.append("pageNo", "1");
+        url.searchParams.append("numOfRows", "1");
+        url.searchParams.append("type", "json");
+        url.searchParams.append("brcd_no", code);
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        return data.body?.items?.[0] || null;
+      })(),
+    ]);
+
+    console.log("✅ 병렬 호출 완료");
 
     // ==========================================
-    // API 2: 알레르기정보 (getFoodQrAllrgyInfo01)
+    // 결과 추출 (성공한 것만)
     // ==========================================
-    let allergyItems = [];
-    try {
-      const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
-      url.searchParams.append("serviceKey", serviceKey);
-      url.searchParams.append("pageNo", "1");
-      url.searchParams.append("numOfRows", "100");
-      url.searchParams.append("type", "json");
-      url.searchParams.append("brcd_no", code);
+    const productInfo =
+      productResult.status === "fulfilled" ? productResult.value : null;
+    const allergyItems =
+      allergyResult.status === "fulfilled" ? allergyResult.value : [];
+    const rawMaterialItems =
+      rawMaterialResult.status === "fulfilled" ? rawMaterialResult.value : [];
+    const nutritionItems =
+      nutritionResult.status === "fulfilled" ? nutritionResult.value : [];
+    const attentionInfo =
+      attentionResult.status === "fulfilled" ? attentionResult.value : null;
 
-      console.log("📡 알레르기정보 API");
-
-      const response = await fetch(url.toString());
-      const data = await response.json();
-      allergyItems = data.body?.items || [];
-
-      console.log(`✅ 알레르기: ${allergyItems.length}개`);
-    } catch (error) {
-      console.error("⚠️ 알레르기정보 실패:", error);
-    }
-
-    // ==========================================
-    // API 3: 원재료정보 (getFoodQrProdRawatrl01)
-    // ==========================================
-    let rawMaterialItems = [];
-    try {
-      const url = new URL(`${baseUrl}/getFoodQrProdRawmtrl01`);
-      url.searchParams.append("serviceKey", serviceKey);
-      url.searchParams.append("pageNo", "1");
-      url.searchParams.append("numOfRows", "100");
-      url.searchParams.append("type", "json");
-      url.searchParams.append("brcd_no", code);
-
-      console.log("📡 원재료정보 API");
-
-      const response = await fetch(url.toString());
-      const data = await response.json();
-      rawMaterialItems = data.body?.items || [];
-
-      console.log(`✅ 원재료: ${rawMaterialItems.length}개`);
-
-      if (rawMaterialItems.length > 0) {
-        console.log(
-          "📦 원재료 샘플:",
-          rawMaterialItems[0].PRVW_CN?.substring(0, 100),
-        );
-      }
-    } catch (error) {
-      console.error("⚠️ 원재료정보 실패:", error);
-    }
-
-    // ==========================================
-    // API 4: 영양표시정보 (getFoodQrProdNsd01)
-    // ==========================================
-    let nutritionItems = [];
-    try {
-      const url = new URL(`${baseUrl}/getFoodQrProdNsd01`);
-      url.searchParams.append("serviceKey", serviceKey);
-      url.searchParams.append("pageNo", "1");
-      url.searchParams.append("numOfRows", "50");
-      url.searchParams.append("type", "json");
-      url.searchParams.append("brcd_no", code);
-
-      console.log("📡 영양표시정보 API");
-
-      const response = await fetch(url.toString());
-      const data = await response.json();
-      nutritionItems = data.body?.items || [];
-
-      console.log(`✅ 영양정보: ${nutritionItems.length}개`);
-
-      if (nutritionItems.length > 0) {
-        console.log("🔍🔍🔍 영양정보 전체 필드 확인 🔍🔍🔍");
-        console.log("첫 번째 항목:");
-        console.log(JSON.stringify(nutritionItems[0], null, 2));
-        console.log("\n두 번째 항목:");
-        console.log(JSON.stringify(nutritionItems[1], null, 2));
-        console.log("\n세 번째 항목:");
-        console.log(JSON.stringify(nutritionItems[2], null, 2));
-      }
-    } catch (error) {
-      console.error("⚠️ 영양표시정보 실패:", error);
-    }
-
+    // 각 결과 로깅
+    console.log("📊 API 결과:");
+    console.log(`  - 품목제조정보: ${productInfo ? "✅" : "❌"}`);
+    console.log(`  - 알레르기: ${allergyItems.length}개`);
+    console.log(`  - 원재료: ${rawMaterialItems.length}개`);
+    console.log(`  - 영양정보: ${nutritionItems.length}개`);
+    console.log(`  - 주의사항: ${attentionInfo ? "✅" : "❌"}`);
     // ==========================================
     // 영양정보 추출 (데이터 병합 섹션에 추가)
     // ==========================================
@@ -211,10 +198,10 @@ export async function GET(req: NextRequest) {
     // 영양성분 목록
     const nutritionDetails = nutritionItems
       .map((item: any) => {
-        const name = item.NIRWMT_NM || ""; // ✅ 영양성분명 (열량, 나트륨 등)
-        const content = item.CTA || ""; // ✅ 함량 (370.000, 470.000 등)
-        const unit = item.IGRD_UCD || ""; // ✅ 단위 (kcal, mg, g)
-        const percentage = item.NTRTN_RT || ""; // 영양성분 기준치 비율
+        const name = item.NIRWMT_NM || "";
+        const content = item.CTA || "";
+        const unit = item.IGRD_UCD || "";
+        const percentage = item.NTRTN_RT || "";
 
         return {
           name: name,
@@ -229,30 +216,6 @@ export async function GET(req: NextRequest) {
     if (nutritionDetails.length > 0) {
       console.log("   샘플:", nutritionDetails.slice(0, 3));
     }
-
-    // ==========================================
-    // API 5: 식품표시정보 주의사항 (getFoodQrIndctAttnInfo01)
-    // ==========================================
-    let attentionInfo = null;
-    try {
-      const url = new URL(`${baseUrl}/getFoodQrIndctAttnInfo01`);
-      url.searchParams.append("serviceKey", serviceKey);
-      url.searchParams.append("pageNo", "1");
-      url.searchParams.append("numOfRows", "1");
-      url.searchParams.append("type", "json");
-      url.searchParams.append("brcd_no", code);
-
-      console.log("📡 주의사항정보 API");
-
-      const response = await fetch(url.toString());
-      const data = await response.json();
-      attentionInfo = data.body?.items?.[0] || null;
-
-      console.log("✅ 주의사항:", attentionInfo ? "있음" : "없음");
-    } catch (error) {
-      console.error("⚠️ 주의사항정보 실패:", error);
-    }
-
     // ==========================================
     // 데이터 확인
     // ==========================================
