@@ -32,7 +32,9 @@ export const metadata: Metadata = {
   authors: [{ name: "편하루" }],
   creator: "편하루",
   publisher: "편하루",
-  metadataBase: new URL("https://v0-website-development-plan-beta-six.vercel.app"),
+  metadataBase: new URL(
+    "https://v0-website-development-plan-beta-six.vercel.app",
+  ),
   alternates: {
     canonical: "/",
   },
@@ -95,6 +97,13 @@ export default function RootLayout({
           crossOrigin="anonymous"
         ></script>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        {/* Kakao SDK */}
+        <script
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
+          integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4"
+          crossOrigin="anonymous"
+          async
+        />
       </head>
       <body className="font-sans antialiased bg-background text-foreground">
         <Script
