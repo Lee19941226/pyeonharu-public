@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   creator: "편하루",
   publisher: "편하루",
   metadataBase: new URL(
-    "https://v0-website-development-plan-beta-six.vercel.app",
+    "https://www.pyeonharu.com",
   ),
   alternates: {
     canonical: "/",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
     siteName: "편하루",
-    url: "https://v0-website-development-plan-beta-six.vercel.app",
+    url: "https://www.pyeonharu.com",
   },
   twitter: {
     card: "summary_large_image",
