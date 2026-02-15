@@ -174,6 +174,7 @@ export default function AIResultPage() {
           dataSource: data.dataSource || "ai",
           rawMaterials: data.rawMaterials || [],
           nutritionInfo: data.nutritionInfo || null,
+          ingredients: data.ingredients || data.detectedIngredients || [],
         }),
       );
 

@@ -36,6 +36,13 @@ interface SearchResult {
   allergens: string[];
   hasAllergen: boolean;
   searchType?: string;
+  dataSource?: string;
+  rawMaterials?: string;
+  weight?: string;
+  ingredients?: string[];
+  detectedIngredients?: string[];
+  nutritionInfo?: any;
+  matchedUserAllergens?: string[];
 }
 
 interface SearchHistory {
@@ -348,10 +355,45 @@ function FoodMainContent() {
           if (aiData.success) {
             // sessionStorage에 저장
             const aiResultId = `ai-text-${Date.now()}`;
-            sessionStorage.setItem(aiResultId, JSON.stringify(aiData));
+            sessionStorage.setItem(
+              `ai_result_${aiResultId}`,
+              JSON.stringify({
+                productName: aiData.productName || searchQuery,
+                manufacturer: aiData.manufacturer || "",
+                weight: aiData.weight || "",
+                detectedIngredients: aiData.detectedIngredients || [],
+                allergens: aiData.allergens || [],
+                hasUserAllergen: aiData.hasUserAllergen || false,
+                matchedUserAllergens: aiData.matchedUserAllergens || [],
+                dataSource: "ai",
+                rawMaterials: aiData.rawMaterials || "",
+                nutritionInfo: aiData.nutritionInfo || null,
+              }),
+            );
 
-            // 결과 페이지로 이동
-            router.push(`/food/result/${aiResultId}`);
+            // ✅ 검색 결과로 표시
+            setResults([
+              {
+                foodCode: aiResultId,
+                foodName: aiData.productName || searchQuery,
+                manufacturer: aiData.manufacturer || "AI 분석 결과",
+                allergens: aiData.allergens || [],
+                hasAllergen: aiData.hasUserAllergen || false,
+                dataSource: "ai",
+                rawMaterials: aiData.rawMaterials || "",
+                weight: aiData.weight || "",
+                ingredients:
+                  aiData.ingredients || aiData.detectedIngredients || [],
+                detectedIngredients:
+                  aiData.detectedIngredients || aiData.ingredients || [],
+                nutritionInfo: aiData.nutritionInfo || null,
+                matchedUserAllergens: aiData.matchedUserAllergens || [],
+              },
+            ]);
+            setCurrentPage(1);
+            saveSearchHistory(searchQuery);
+
+            toast.success("AI 분석 완료!");
           } else {
             setResults([]);
             toast.error("제품을 찾을 수 없습니다");
@@ -377,8 +419,38 @@ function FoodMainContent() {
     currentPage * ITEMS_PER_PAGE,
   );
   const handlePageChange = (page: number) => setCurrentPage(page);
-  const handleProductClick = (foodCode: string) =>
+  const handleProductClick = (foodCode: string) => {
+    // ✅ AI 결과인 경우 sessionStorage에 저장 후 이동
+    if (foodCode.startsWith("ai-")) {
+      const aiResult = results.find((r) => r.foodCode === foodCode);
+
+      if (aiResult) {
+        // sessionStorage에 저장
+        const storageKey = `ai_result_${foodCode}`;
+        sessionStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            productName: aiResult.foodName,
+            manufacturer: aiResult.manufacturer || "",
+            weight: aiResult.weight || "",
+            detectedIngredients: aiResult.detectedIngredients || [],
+            allergens: aiResult.allergens || [],
+            hasUserAllergen: aiResult.hasAllergen || false,
+            matchedUserAllergens: aiResult.matchedUserAllergens || [],
+            dataSource: "ai",
+            rawMaterials: aiResult.rawMaterials || "",
+            nutritionInfo: aiResult.nutritionInfo || null,
+            ingredients:
+              aiResult.ingredients || aiResult.detectedIngredients || [],
+          }),
+        );
+
+        console.log("✅ AI 검색 결과 sessionStorage 저장:", storageKey);
+      }
+    }
+
     router.push(`/food/result/${foodCode}`);
+  };
   const handleKeywordClick = (keyword: string) => {
     setQuery(keyword);
     setShowHistory(false);
