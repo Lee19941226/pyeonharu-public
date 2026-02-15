@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, ShoppingCart, Home } from "lucide-react";
+import { CheckCircle, XCircle, ShoppingCart, Home, Share2 } from "lucide-react";
 
 export default function ScanSummaryPage() {
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function ScanSummaryPage() {
           {/* 헤더 */}
           <div className="mb-6 text-center">
             <ShoppingCart className="mx-auto mb-3 h-16 w-16 text-primary" />
-            <h1 className="mb-2 text-3xl font-bold">장보기 완료!</h1>
+            <h1 className="mb-2 text-3xl font-bold">제품 확인!</h1>
             <p className="text-muted-foreground">
               총 {results.length}개 제품을 확인했어요
             </p>
@@ -75,6 +75,29 @@ export default function ScanSummaryPage() {
                   <p className="text-sm text-red-700">위험</p>
                 </div>
               </div>
+
+              {/* 격려 메시지 */}
+              {safePercentage >= 80 && (
+                <div className="mt-4 rounded-lg bg-green-50 p-3 text-center">
+                  <p className="text-sm font-medium text-green-900">
+                    🎉 훌륭해요! 안전한 식품을 잘 선택하셨습니다
+                  </p>
+                </div>
+              )}
+              {safePercentage >= 50 && safePercentage < 80 && (
+                <div className="mt-4 rounded-lg bg-blue-50 p-3 text-center">
+                  <p className="text-sm font-medium text-blue-900">
+                    💪 좋은 선택이에요! 조금만 더 주의하세요
+                  </p>
+                </div>
+              )}
+              {safePercentage < 50 && (
+                <div className="mt-4 rounded-lg bg-orange-50 p-3 text-center">
+                  <p className="text-sm font-medium text-orange-900">
+                    ⚠️ 위험한 제품이 많네요. 더 신중하게 선택하세요
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -99,10 +122,10 @@ export default function ScanSummaryPage() {
                   >
                     {result.isSafe ? "✓" : "✕"}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{result.foodName}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{result.foodName}</p>
                     {result.manufacturer && (
-                      <p className="text-sm text-muted-foreground truncate">
+                      <p className="truncate text-sm text-muted-foreground">
                         {result.manufacturer}
                       </p>
                     )}
@@ -128,24 +151,26 @@ export default function ScanSummaryPage() {
           </Card>
 
           {/* 액션 버튼 */}
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 space-y-3">
             <Button
               onClick={() => {
                 localStorage.removeItem("scan_summary");
                 router.push("/food/camera");
               }}
-              className="flex-1"
+              className="w-full"
               variant="default"
+              size="lg"
             >
-              <ShoppingCart className="mr-2 h-4 w-4" />
+              <ShoppingCart className="mr-2 h-5 w-5" />
               다시 스캔
             </Button>
             <Button
               onClick={() => router.push("/")}
-              className="flex-1"
+              className="w-full"
               variant="outline"
+              size="lg"
             >
-              <Home className="mr-2 h-4 w-4" />
+              <Home className="mr-2 h-5 w-5" />
               홈으로
             </Button>
           </div>

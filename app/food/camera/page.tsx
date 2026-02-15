@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Clock,
   Image as ImageIcon,
+  ShoppingCart,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -30,6 +31,12 @@ export default function CameraPage() {
 
   // 최근 확인 제품
   const [recentProducts, setRecentProducts] = useState<any[]>([]);
+
+  // ✅ 연속 스캔 모드
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [scannedResults, setScannedResults] = useState<any[]>([]);
+  const [currentResult, setCurrentResult] = useState<any>(null);
+  const [showResultSheet, setShowResultSheet] = useState(false);
 
   useEffect(() => {
     // 최근 확인 제품 로드
@@ -78,15 +85,65 @@ export default function CameraPage() {
       );
 
       // ✅ QR 코드 발견!
-      toast.success("바코드 인식 성공!");
-      setTimeout(() => {
-        router.push(`/food/result/${result}`);
-      }, 500);
+      if (continuousMode) {
+        // 연속 스캔 모드: 결과 가져와서 하프시트 표시
+        await fetchResultForContinuousMode(result);
+      } else {
+        // 일반 모드: 바로 결과 페이지로
+        toast.success("바코드 인식 성공!");
+        setTimeout(() => {
+          router.push(`/food/result/${result}`);
+        }, 500);
+      }
     } catch {
       // ✅ QR 코드 없음 → AI 분석으로 진행
       console.log("QR 코드 없음, AI 분석으로 진행");
       setIsAnalyzing(false);
-      toast.info("성분표를 분석할 준비가 되었습니다");
+
+      if (!continuousMode) {
+        toast.info("성분표를 분석할 준비가 되었습니다");
+      }
+    }
+  };
+
+  // ==========================================
+  // 연속 스캔 모드: 결과 가져오기
+  // ==========================================
+  const fetchResultForContinuousMode = async (barcode: string) => {
+    try {
+      const response = await fetch(`/api/food/result?code=${barcode}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("제품 정보 조회 실패");
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const scanResult = {
+          foodCode: barcode,
+          foodName: data.result.foodName,
+          manufacturer: data.result.manufacturer,
+          isSafe: data.result.isSafe,
+          detectedAllergens:
+            data.result.detectedAllergens?.map((a: any) => a.name) || [],
+          scannedAt: new Date().toISOString(),
+        };
+
+        setScannedResults((prev) => [...prev, scanResult]);
+        setCurrentResult(scanResult);
+        setShowResultSheet(true);
+        setCapturedImage(null);
+        setIsAnalyzing(false);
+
+        toast.success("스캔 완료!");
+      }
+    } catch (error) {
+      console.error("결과 조회 실패:", error);
+      toast.error("제품 정보를 가져올 수 없습니다");
+      setIsAnalyzing(false);
     }
   };
 
@@ -106,18 +163,125 @@ export default function CameraPage() {
   };
 
   // ==========================================
-  // AI 분석
+  // AI 분석 (연속 스캔 지원)
   // ==========================================
   const analyzeImage = async () => {
     if (!capturedImage) return;
 
     try {
       localStorage.setItem("pendingImageAnalysis", capturedImage);
-      router.push("/food/ai-result");
+
+      if (continuousMode) {
+        await analyzeInContinuousMode();
+      } else {
+        router.push("/food/ai-result");
+      }
     } catch (error) {
       console.error(error);
       toast.error("이미지 저장 중 오류가 발생했습니다");
     }
+  };
+
+  // ==========================================
+  // 연속 스캔 모드 AI 분석
+  // ==========================================
+  const analyzeInContinuousMode = async () => {
+    try {
+      setIsAnalyzing(true);
+      toast.info("AI 분석 중...");
+
+      const imageData = localStorage.getItem("pendingImageAnalysis");
+      if (!imageData) return;
+
+      const base64Data = imageData.includes(",")
+        ? imageData.split(",")[1]
+        : imageData;
+
+      // 사용자 알레르기 가져오기
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      let userAllergens: string[] = [];
+
+      if (user) {
+        const { data } = await supabase
+          .from("user_allergies")
+          .select("allergen_name")
+          .eq("user_id", user.id);
+        if (data) {
+          userAllergens = data.map((item) => item.allergen_name);
+        }
+      }
+
+      // AI 분석 API 호출
+      const response = await fetch("/api/food/analyze-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: base64Data,
+          userAllergens: userAllergens,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("분석 실패");
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const scanResult = {
+          foodCode: data.foodCode || `ai-${Date.now()}`,
+          foodName: data.productName || "알 수 없는 제품",
+          manufacturer: data.manufacturer || "",
+          isSafe: !data.hasUserAllergen,
+          detectedAllergens: data.allergens || [],
+          scannedAt: new Date().toISOString(),
+        };
+
+        setScannedResults((prev) => [...prev, scanResult]);
+        setCurrentResult(scanResult);
+        setShowResultSheet(true);
+        setCapturedImage(null);
+        setIsAnalyzing(false);
+
+        toast.success("분석 완료!");
+      } else {
+        toast.error("분석에 실패했습니다");
+        setIsAnalyzing(false);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("분석 중 오류가 발생했습니다");
+      setIsAnalyzing(false);
+    } finally {
+      localStorage.removeItem("pendingImageAnalysis");
+    }
+  };
+
+  // ==========================================
+  // 다음 스캔
+  // ==========================================
+  const handleNextScan = () => {
+    setShowResultSheet(false);
+    setCurrentResult(null);
+    setCapturedImage(null);
+
+    // 파일 입력 초기화
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    toast.success("다음 제품을 스캔하세요");
+  };
+
+  // ==========================================
+  // 스캔 종료
+  // ==========================================
+  const handleFinishScan = () => {
+    localStorage.setItem("scan_summary", JSON.stringify(scannedResults));
+    router.push("/food/scan-summary");
   };
 
   // ==========================================
@@ -132,9 +296,119 @@ export default function CameraPage() {
   };
 
   // ==========================================
+  // 결과 하프시트 컴포넌트
+  // ==========================================
+  const ResultHalfSheet = () => {
+    if (!showResultSheet || !currentResult) return null;
+
+    return (
+      <>
+        <div
+          className="fixed inset-0 z-40 bg-black/50"
+          onClick={() => setShowResultSheet(false)}
+        />
+
+        <div className="fixed bottom-0 left-0 right-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl animate-in slide-in-from-bottom">
+          <div className="p-6">
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-300" />
+
+            <div
+              className={`mb-4 rounded-xl p-4 ${
+                currentResult.isSafe
+                  ? "bg-green-100 border-2 border-green-500"
+                  : "bg-red-100 border-2 border-red-500"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {currentResult.isSafe ? (
+                  <CheckCircle className="h-12 w-12 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-12 w-12 text-red-600" />
+                )}
+                <div className="flex-1">
+                  <h3
+                    className={`text-2xl font-bold ${
+                      currentResult.isSafe ? "text-green-900" : "text-red-900"
+                    }`}
+                  >
+                    {currentResult.isSafe ? "안전해요!" : "위험해요!"}
+                  </h3>
+                  <p
+                    className={`text-sm ${
+                      currentResult.isSafe ? "text-green-700" : "text-red-700"
+                    }`}
+                  >
+                    {currentResult.isSafe
+                      ? "알레르기 성분이 없습니다"
+                      : `${currentResult.detectedAllergens?.length || 0}개 알레르기 감지`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <h4 className="text-lg font-bold">{currentResult.foodName}</h4>
+              {currentResult.manufacturer && (
+                <p className="text-sm text-muted-foreground">
+                  {currentResult.manufacturer}
+                </p>
+              )}
+            </div>
+
+            {!currentResult.isSafe && currentResult.detectedAllergens && (
+              <div className="mb-4 rounded-lg bg-red-50 p-3">
+                <p className="mb-2 text-sm font-medium text-red-900">
+                  ⚠️ 감지된 알레르기
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {currentResult.detectedAllergens.map(
+                    (allergen: string, idx: number) => (
+                      <Badge key={idx} variant="destructive">
+                        {allergen}
+                      </Badge>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                onClick={handleNextScan}
+                className="flex-1"
+                variant="default"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                다음 제품 스캔
+              </Button>
+              <Button
+                onClick={handleFinishScan}
+                className="flex-1"
+                variant="outline"
+              >
+                스캔 종료
+              </Button>
+            </div>
+
+            <Button
+              onClick={() =>
+                router.push(`/food/result/${currentResult.foodCode}`)
+              }
+              variant="ghost"
+              className="mt-2 w-full text-sm text-blue-600"
+            >
+              상세 정보 보기 →
+            </Button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // ==========================================
   // 렌더링: 촬영된 이미지 확인
   // ==========================================
-  if (capturedImage) {
+  if (capturedImage && !continuousMode) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
@@ -228,7 +502,7 @@ export default function CameraPage() {
   }
 
   // ==========================================
-  // 렌더링: 메인 화면 (1개 버튼)
+  // 렌더링: 메인 화면
   // ==========================================
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -246,6 +520,55 @@ export default function CameraPage() {
                 식품 사진을 촬영하거나 업로드하세요
               </p>
             </div>
+
+            {/* ✅ 연속 스캔 모드 토글 */}
+            <Card className="border-2 border-blue-500 bg-blue-50">
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <ShoppingCart className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium text-blue-900">연속 스캔 모드</p>
+                    <p className="text-xs text-blue-700">
+                      {continuousMode ? "ON - 연속 스캔" : "OFF"}
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={continuousMode}
+                    onChange={(e) => {
+                      setContinuousMode(e.target.checked);
+                      if (e.target.checked) {
+                        setScannedResults([]);
+                        toast.success("연속 스캔 모드 활성화!", {
+                          description: "여러 제품을 빠르게 확인하세요",
+                        });
+                      } else {
+                        toast.info("일반 모드로 전환");
+                      }
+                    }}
+                    className="peer sr-only"
+                  />
+                  <div className="peer h-6 w-11 rounded-full bg-gray-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300"></div>
+                </label>
+              </CardContent>
+            </Card>
+
+            {/* ✅ 스캔 카운터 (연속 모드일 때만) */}
+            {continuousMode && scannedResults.length > 0 && (
+              <Card className="border-2 border-primary bg-primary/10">
+                <CardContent className="p-4 text-center">
+                  <p className="text-lg font-bold text-primary">
+                    📦 {scannedResults.length}개 스캔 완료
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    안전: {scannedResults.filter((r) => r.isSafe).length}개 ·
+                    위험: {scannedResults.filter((r) => !r.isSafe).length}개
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 메인 촬영 버튼 */}
             <Card className="border-2 border-primary shadow-lg">
@@ -269,7 +592,7 @@ export default function CameraPage() {
                     size="lg"
                   >
                     <Camera className="mr-2 h-5 w-5" />
-                    카메라 촬영
+                    카메라로 촬영
                   </Button>
 
                   {/* 갤러리 업로드 */}
@@ -285,7 +608,7 @@ export default function CameraPage() {
                     size="lg"
                   >
                     <ImageIcon className="mr-2 h-5 w-5" />
-                    이미지 업로드
+                    갤러리에서 선택
                   </Button>
                 </div>
 
@@ -302,25 +625,23 @@ export default function CameraPage() {
             {/* 촬영 가이드 */}
             <Card>
               <CardContent className="p-4">
-                <p className="mb-3 text-sm font-medium">📸 이렇게 찍어주세요</p>
+                <p className="mb-3 text-sm font-medium">📸 촬영 가이드</p>
                 <ul className="space-y-2 text-xs text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>성분표나 바코드가 또렷하게 보이게 찍어주세요</span>
+                    <span>성분표 또는 바코드가 선명하게 보이도록</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>빛 반사가 없는 밝은 곳에서 촬영하면 더 좋아요</span>
+                    <span>빛 반사가 없는 곳에서</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>글자가 기울지 않게 정면에서 찍어주세요</span>
+                    <span>글자가 수평이 되도록 촬영</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>
-                      바코드까지 함께 찍어주시면 더 빠르게 확인할 수 있어요
-                    </span>
+                    <span>바코드가 있으면 포함해서 촬영하면 더 빠름</span>
                   </li>
                 </ul>
               </CardContent>
@@ -376,18 +697,21 @@ export default function CameraPage() {
         </div>
       </main>
 
-      {/* ✅ 카메라 직접 실행 (모바일) + 갤러리 (공통) */}
+      {/* 카메라 입력 */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment" // ✅ 모바일에서 카메라 앱 직접 실행
+        capture="environment"
         className="hidden"
         onChange={handleFileUpload}
       />
 
       {/* 숨겨진 QR reader */}
       <div id="qr-reader-hidden" className="hidden" />
+
+      {/* 하프시트 */}
+      <ResultHalfSheet />
     </div>
   );
 }
