@@ -53,99 +53,75 @@ export default function AIResultPage() {
   }, []);
 
   const startAnalysis = async () => {
-    console.log("🚀 분석 시작...");
-
-    // localStorage에서 이미지 가져오기
-    const imageData = localStorage.getItem("pendingImageAnalysis");
-
-    if (!imageData) {
-      console.log("❌ 이미지 없음, 카메라로 이동");
-      router.push("/food/camera");
-      return;
-    }
-
-    console.log("✅ 이미지 발견");
-
-    // 사용자 알레르기 가져오기
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    let userAllergens: string[] = [];
-    if (user) {
-      const { data } = await supabase
-        .from("user_allergies")
-        .select("allergen_name")
-        .eq("user_id", user.id);
-
-      if (data) {
-        userAllergens = data.map((item) => item.allergen_name);
-        console.log("👤 사용자 알레르기:", userAllergens);
-      }
-    }
-
     try {
-      // Base64 데이터만 추출
+      setResult((prev) => ({ ...prev, isProcessing: true }));
+
+      const imageData = localStorage.getItem("pendingImageAnalysis");
+      if (!imageData) {
+        toast.error("분석할 이미지가 없습니다");
+        router.push("/food/camera");
+        return;
+      }
+
       const base64Data = imageData.includes(",")
         ? imageData.split(",")[1]
         : imageData;
 
-      console.log("📡 AI 분석 API 호출 시작...");
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      // AI 분석 API 호출
+      let userAllergens: string[] = [];
+      if (user) {
+        const { data: allergyData } = await supabase
+          .from("user_allergies")
+          .select("allergen_name")
+          .eq("user_id", user.id);
+
+        if (allergyData) {
+          userAllergens = allergyData.map((item) => item.allergen_name);
+        }
+      }
+
       const response = await fetch("/api/food/analyze-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           imageBase64: base64Data,
           userAllergens: userAllergens,
         }),
       });
 
-      console.log("📡 API 응답 상태:", response.status);
-      // 스캔 제한 체크 (429 에러)
       if (response.status === 429) {
         const data = await response.json();
-        console.log("🚫 스캔 제한 초과:", data);
-
-        localStorage.removeItem("pendingImageAnalysis");
-
-        // 스캔 제한 모달 표시
-        toast.error(data.message || "하루 무료 스캔 횟수를 초과했습니다", {
-          duration: 5000,
-        });
-
-        // 회원가입 페이지로 이동 (3초 후)
+        toast.error(data.message, { duration: 5000 });
         setTimeout(() => {
           router.push("/login?reason=scan_limit");
         }, 3000);
-
         return;
       }
+
+      if (!user) {
+        const remainingScans = response.headers.get("X-Remaining-Scans");
+        if (remainingScans && parseInt(remainingScans) <= 2) {
+          toast.info(
+            `오늘 무료 스캔 ${remainingScans}회 남았습니다. 회원가입하면 무제한!`,
+            {
+              duration: 4000,
+            },
+          );
+        }
+      }
+
       if (!response.ok) {
-        throw new Error(`API 오류: ${response.status}`);
+        throw new Error("분석 실패");
       }
 
       const data = await response.json();
-      console.log("📦 API 응답 데이터:", data);
 
-      // ✅ 남은 스캔 횟수 표시 (비로그인 사용자)
-      if (!user) {
-        const remainingScans = response.headers.get("X-Remaining-Scans");
-        if (remainingScans) {
-          console.log(`📊 남은 무료 스캔: ${remainingScans}/5`);
-
-          if (parseInt(remainingScans) <= 2) {
-            toast.info(
-              `오늘 무료 스캔 ${remainingScans}회 남았습니다. 회원가입하면 무제한!`,
-              {
-                duration: 4000,
-              },
-            );
-          }
-        }
-      }
       if (!data.success) {
         console.log("❌ 분석 실패:", data.error);
         localStorage.removeItem("pendingImageAnalysis");
@@ -156,10 +132,7 @@ export default function AIResultPage() {
 
       console.log("✅ 분석 성공!");
 
-      // localStorage 정리
-      localStorage.removeItem("pendingImageAnalysis");
-
-      // 스캔 로그 저장 (비동기로 실행, 기다리지 않음)
+      // 스캔 로그 저장 (비동기)
       fetch("/api/food/scan-log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -170,7 +143,7 @@ export default function AIResultPage() {
           isSafe: !data.hasUserAllergen,
           detectedAllergens: data.allergens || [],
         }),
-      }).catch(() => {}); // 에러 무시
+      }).catch(() => {});
 
       // ✅ foodCode가 있으면 DB에 저장되어 있음 → 바로 이동
       if (data.foodCode) {
@@ -178,6 +151,7 @@ export default function AIResultPage() {
           "🔀 DB에 저장된 제품, result 페이지로 이동:",
           data.foodCode,
         );
+        localStorage.removeItem("pendingImageAnalysis");
         router.push(`/food/result/${data.foodCode}`);
         return;
       }
@@ -186,7 +160,7 @@ export default function AIResultPage() {
       console.log("💾 AI 결과를 sessionStorage에 저장");
       const aiId = `ai-${Date.now()}`;
 
-      // ✅ sessionStorage에 저장
+      // sessionStorage에 저장
       sessionStorage.setItem(
         `ai_result_${aiId}`,
         JSON.stringify({
@@ -203,15 +177,17 @@ export default function AIResultPage() {
         }),
       );
 
+      console.log("✅ sessionStorage 저장 완료:", aiId);
+
       // localStorage 정리
       localStorage.removeItem("pendingImageAnalysis");
 
       // AI 결과 페이지로 이동
       router.push(`/food/result/${aiId}`);
     } catch (error) {
-      console.error("💥 분석 오류:", error);
+      console.error("💥 분석 중 오류:", error);
       localStorage.removeItem("pendingImageAnalysis");
-      toast.error("이미지 분석 중 오류가 발생했습니다");
+      toast.error("분석 중 오류가 발생했습니다");
       setResult((prev) => ({ ...prev, isProcessing: false }));
     }
   };

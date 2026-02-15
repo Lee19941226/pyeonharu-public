@@ -19,3 +19,6 @@ npm install @tiptap/extension-bubble-menu
 
 2026-02-13 22:04 이용재
 npm install react-kakao-sdk
+
+2026-02-15 16:29 이용재
+npm install @vercel/og

@@ -89,18 +89,16 @@ export default function FoodResultPage() {
     }
   }, [params.id, router]);
 
-  // 카카오톡 공유
   const shareToKakao = () => {
     if (!result || !window.Kakao) {
       toast.error("카카오톡 공유를 사용할 수 없습니다");
       return;
     }
-    //로컬호스트 체크(배포 후 변경)
+
+    // localhost 체크
     if (
       window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1" ||
-      window.location.hostname ===
-        "https://v0-website-development-plan-beta-six.vercel.app/" //실제 도메인
+      window.location.hostname === "127.0.0.1"
     ) {
       toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", {
         description: "배포 후 테스트해주세요",
@@ -108,12 +106,22 @@ export default function FoodResultPage() {
       });
       return;
     }
+
     const isSafe = result.isSafe;
     const allergenText =
       !isSafe && result.detectedAllergens && result.detectedAllergens.length > 0
-        ? `(${result.detectedAllergens.map((a: any) => a.name).join(", ")})`
+        ? result.detectedAllergens.map((a: any) => a.name).join(", ")
         : "";
+
     const shareUrl = `${window.location.origin}/food/result/${result.foodCode}?shared=kakao`;
+
+    // ✅ 동적 OG 이미지 URL
+    const ogImageUrl = new URL(`${window.location.origin}/api/og`);
+    ogImageUrl.searchParams.set("name", result.foodName);
+    ogImageUrl.searchParams.set("safe", isSafe.toString());
+    ogImageUrl.searchParams.set("allergens", allergenText);
+    ogImageUrl.searchParams.set("manufacturer", result.manufacturer || "");
+
     try {
       window.Kakao.Share.sendDefault({
         objectType: "feed",
@@ -122,7 +130,7 @@ export default function FoodResultPage() {
           description: isSafe
             ? `🟢 안전해요! 알레르기 성분이 없습니다`
             : `🔴 위험해요! ${allergenText}`,
-          imageUrl: "https://your-domain.com/og-image.png", // TODO: 실제 이미지 URL
+          imageUrl: ogImageUrl.toString(), // ✅ 동적 이미지
           link: {
             mobileWebUrl: shareUrl,
             webUrl: shareUrl,
@@ -137,7 +145,7 @@ export default function FoodResultPage() {
             },
           },
           {
-            title: "알레르기 확인",
+            title: "내 알레르기 확인하기",
             link: {
               mobileWebUrl: window.location.origin,
               webUrl: window.location.origin,
@@ -162,7 +170,8 @@ export default function FoodResultPage() {
         console.log("🤖 AI 분석 결과 로드");
 
         // sessionStorage에서 AI 결과 가져오기
-        const analysisData = sessionStorage.getItem(`ai_result_${id}`);
+        const storageKey = `ai_result_${id}`;
+        const analysisData = sessionStorage.getItem(storageKey);
 
         if (analysisData) {
           const analysisResult = JSON.parse(analysisData);
@@ -468,8 +477,6 @@ export default function FoodResultPage() {
   const safeAllergens = result?.allergens || [];
   const safeDetectedAllergens = result?.detectedAllergens || [];
   const safeIngredients = result?.ingredients || [];
-  const safeNutritionDetails = result?.nutritionDetails || [];
-  const safeCrossContamination = result?.crossContamination || [];
   const safeUserAllergens = result.userAllergens || [];
   const safeCrossContaminationRisks = result.crossContaminationRisks || [];
 
