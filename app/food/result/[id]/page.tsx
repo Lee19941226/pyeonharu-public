@@ -25,7 +25,7 @@ import type { AllergenInfo } from "@/lib/allergen-info";
 import { createClient } from "@/lib/supabase/client";
 
 interface FoodResult {
-  foodCode: string;
+  foodCode: string | undefined;
   foodName: string;
   manufacturer: string;
   weight: string;
@@ -95,177 +95,186 @@ export default function FoodResultPage() {
       toast.error("카카오톡 공유를 사용할 수 없습니다");
       return;
     }
-
+    //로컬호스트 체크(배포 후 변경)
+    if (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.hostname ===
+        "https://v0-website-development-plan-beta-six.vercel.app/" //실제 도메인
+    ) {
+      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", {
+        description: "배포 후 테스트해주세요",
+        duration: 5000,
+      });
+      return;
+    }
     const isSafe = result.isSafe;
     const allergenText =
       !isSafe && result.detectedAllergens && result.detectedAllergens.length > 0
         ? `(${result.detectedAllergens.map((a: any) => a.name).join(", ")})`
         : "";
-
-    window.Kakao.Share.sendDefault({
-      objectType: "feed",
-      content: {
-        title: `${result.foodName}`,
-        description: isSafe
-          ? `🟢 안전해요! 알레르기 성분이 없습니다`
-          : `🔴 위험해요! ${allergenText}`,
-        imageUrl: "https://your-domain.com/og-image.png", // TODO: 실제 이미지 URL
-        link: {
-          mobileWebUrl: `${window.location.origin}/food/result/${result.foodCode}`,
-          webUrl: `${window.location.origin}/food/result/${result.foodCode}`,
-        },
-      },
-      buttons: [
-        {
-          title: "상세 보기",
+    const shareUrl = `${window.location.origin}/food/result/${result.foodCode}?shared=kakao`;
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title: `${result.foodName}`,
+          description: isSafe
+            ? `🟢 안전해요! 알레르기 성분이 없습니다`
+            : `🔴 위험해요! ${allergenText}`,
+          imageUrl: "https://your-domain.com/og-image.png", // TODO: 실제 이미지 URL
           link: {
-            mobileWebUrl: `${window.location.origin}/food/result/${result.foodCode}`,
-            webUrl: `${window.location.origin}/food/result/${result.foodCode}`,
+            mobileWebUrl: shareUrl,
+            webUrl: shareUrl,
           },
         },
-        {
-          title: "편하루 시작하기",
-          link: {
-            mobileWebUrl: window.location.origin,
-            webUrl: window.location.origin,
+        buttons: [
+          {
+            title: "상세 보기",
+            link: {
+              mobileWebUrl: shareUrl,
+              webUrl: shareUrl,
+            },
           },
-        },
-      ],
-    });
+          {
+            title: "알레르기 확인",
+            link: {
+              mobileWebUrl: window.location.origin,
+              webUrl: window.location.origin,
+            },
+          },
+        ],
+      });
 
-    toast.success("카카오톡 공유 창을 열었습니다");
+      toast.success("카카오톡 공유 완료!");
+    } catch (error) {
+      console.error("카카오톡 공유 오류:", error);
+      toast.error("카카오톡 공유에 실패했습니다");
+    }
   };
   const loadFoodResult = async () => {
     try {
+      setIsLoading(true);
       const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-      if (!id) {
-        setError("잘못된 요청입니다");
-        setIsLoading(false);
-        return;
-      }
+      // ✅ AI 분석 결과 체크 (ai-로 시작)
+      if (id?.startsWith("ai-")) {
+        console.log("🤖 AI 분석 결과 로드");
 
-      // ✅ AI 결과도 먼저 API로 조회 시도 (DB에 저장되어 있을 수 있음)
-      console.log("🔍 API로 데이터 조회:", id);
-      const response = await fetch(`/api/food/result?code=${id}`);
-      const data = await response.json();
+        // sessionStorage에서 AI 결과 가져오기
+        const analysisData = sessionStorage.getItem(`ai_result_${id}`);
 
-      console.log("📦 API 응답:", data);
+        if (analysisData) {
+          const analysisResult = JSON.parse(analysisData);
 
-      if (data.success && data.result) {
-        // ✅ API에서 데이터 찾음
-        setResult(data.result);
-        setIsLoading(false);
+          // FoodResult 형식으로 변환
+          const processedIngredients = analysisResult.detectedIngredients || [];
 
-        // ✅ saveToHistory는 setResult 이후, 비동기로 실행
-        setTimeout(() => {
-          if (data.result) saveToHistory(data.result);
-        }, 0);
+          const aiResult: FoodResult = {
+            foodCode: id,
+            foodName: analysisResult.productName || "제품명 없음",
+            manufacturer: analysisResult.manufacturer || "",
+            weight: analysisResult.weight || "",
+            allergens: analysisResult.allergens || [],
+            userAllergens: analysisResult.matchedUserAllergens || [],
+            detectedAllergens: (analysisResult.allergens || []).map(
+              (allergen: string) => ({
+                name: allergen,
+                amount: "",
+                severity: analysisResult.matchedUserAllergens?.includes(
+                  allergen,
+                )
+                  ? "high"
+                  : "medium",
+              }),
+            ),
+            ingredients: processedIngredients,
+            isSafe: !analysisResult.hasUserAllergen,
+            dataSource: analysisResult.dataSource || "ai",
+            detectedIngredients: processedIngredients,
+            nutritionDetails: analysisResult.nutritionInfo
+              ? [
+                  {
+                    name: "열량",
+                    content: analysisResult.nutritionInfo.calories || "",
+                    unit: "",
+                  },
+                  {
+                    name: "나트륨",
+                    content: analysisResult.nutritionInfo.sodium || "",
+                    unit: "",
+                  },
+                  {
+                    name: "탄수화물",
+                    content: analysisResult.nutritionInfo.carbs || "",
+                    unit: "",
+                  },
+                  {
+                    name: "당류",
+                    content: analysisResult.nutritionInfo.sugars || "",
+                    unit: "",
+                  },
+                  {
+                    name: "지방",
+                    content: analysisResult.nutritionInfo.fat || "",
+                    unit: "",
+                  },
+                  {
+                    name: "단백질",
+                    content: analysisResult.nutritionInfo.protein || "",
+                    unit: "",
+                  },
+                ].filter((item) => item.content)
+              : undefined,
+            servingSize: analysisResult.nutritionInfo?.servingSize,
+            hasNutritionInfo: !!analysisResult.nutritionInfo,
+            alternatives: [], // AI는 대체품 없음
+          };
 
-        return;
-      }
+          setResult(aiResult);
+          setIsLoading(false);
 
-      // ✅ API에서 못 찾았고, ai-로 시작하면 sessionStorage 확인
-      if (id.startsWith("ai-")) {
-        console.log("🤖 sessionStorage에서 AI 결과 확인");
-        const aiData = sessionStorage.getItem(id);
+          // saveToHistory 비동기 실행
+          setTimeout(() => {
+            saveToHistory(aiResult);
+          }, 0);
 
-        if (!aiData) {
-          console.error("❌ sessionStorage에도 없음");
-          setError("분석 결과를 찾을 수 없습니다");
+          return;
+        } else {
+          // sessionStorage에도 없으면 에러
+          setError("AI 분석 결과를 찾을 수 없습니다");
           setIsLoading(false);
           return;
         }
-
-        const analysisResult = JSON.parse(aiData);
-
-        // ✅ 원재료 처리
-        let processedIngredients = analysisResult.detectedIngredients || [];
-        if (analysisResult.rawMaterials) {
-          processedIngredients = analysisResult.rawMaterials
-            .split(/[,\(\)]+/)
-            .map((item: string) => item.trim())
-            .filter((item: string) => item.length > 0);
-        }
-
-        const aiResult: FoodResult = {
-          foodCode: id,
-          foodName: analysisResult.productName || "제품명 없음",
-          manufacturer: analysisResult.manufacturer || "",
-          weight: analysisResult.weight || "",
-          allergens: analysisResult.allergens || [],
-          userAllergens: analysisResult.matchedUserAllergens || [],
-          detectedAllergens: (analysisResult.allergens || []).map(
-            (allergen: string) => ({
-              name: allergen,
-              amount: "",
-              severity: analysisResult.matchedUserAllergens?.includes(allergen)
-                ? "high"
-                : "medium",
-            }),
-          ),
-          ingredients: processedIngredients,
-          isSafe: !analysisResult.hasUserAllergen,
-          dataSource: analysisResult.dataSource || "ai",
-          detectedIngredients: processedIngredients,
-
-          // 영양정보
-          nutritionDetails: analysisResult.nutritionInfo
-            ? [
-                {
-                  name: "열량",
-                  content: analysisResult.nutritionInfo.calories || "",
-                  unit: "",
-                },
-                {
-                  name: "나트륨",
-                  content: analysisResult.nutritionInfo.sodium || "",
-                  unit: "",
-                },
-                {
-                  name: "탄수화물",
-                  content: analysisResult.nutritionInfo.carbs || "",
-                  unit: "",
-                },
-                {
-                  name: "당류",
-                  content: analysisResult.nutritionInfo.sugars || "",
-                  unit: "",
-                },
-                {
-                  name: "지방",
-                  content: analysisResult.nutritionInfo.fat || "",
-                  unit: "",
-                },
-                {
-                  name: "단백질",
-                  content: analysisResult.nutritionInfo.protein || "",
-                  unit: "",
-                },
-              ].filter((item) => item.content)
-            : undefined,
-          servingSize: analysisResult.nutritionInfo?.servingSize,
-          hasNutritionInfo: !!analysisResult.nutritionInfo,
-          alternatives: [],
-        };
-
-        setResult(aiResult);
-        setIsLoading(false);
-
-        // saveToHistory는 setResult 이후, 비동기로 실행
-        setTimeout(() => {
-          saveToHistory(aiResult);
-        }, 0);
-
-        return;
       }
 
-      // ✅ 둘 다 실패
-      setError("분석 결과를 찾을 수 없습니다");
-      setIsLoading(false);
+      // ✅ 일반 제품 (DB 조회)
+      console.log("🔍 DB에서 제품 조회:", id);
+
+      const response = await fetch(`/api/food/result?code=${id}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("제품 정보를 불러올 수 없습니다");
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setResult(data.result);
+
+        // saveToHistory 비동기 실행
+        setTimeout(() => {
+          saveToHistory(data.result);
+        }, 0);
+      } else {
+        setError(data.error || "제품 정보를 불러올 수 없습니다");
+      }
     } catch (error) {
       console.error("💥 로딩 에러:", error);
       setError("결과를 불러오는 중 오류가 발생했습니다");
+    } finally {
       setIsLoading(false);
     }
   };

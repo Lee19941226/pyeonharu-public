@@ -184,27 +184,30 @@ export default function AIResultPage() {
 
       // ✅ foodCode 없음 → sessionStorage에 저장 후 이동
       console.log("💾 AI 결과를 sessionStorage에 저장");
-      const analysisResult = {
-        productName: data.productName || "제품명 없음",
-        manufacturer: data.manufacturer || "",
-        detectedIngredients: data.detectedIngredients || [],
-        allergens: data.allergens || [],
-        hasUserAllergen: data.hasUserAllergen || false,
-        matchedUserAllergens: data.matchedUserAllergens || [],
-        dataSource: data.dataSource || "ai",
-        rawMaterials: data.rawMaterials || "",
-        nutritionInfo: data.nutritionInfo,
-        weight: data.weight || "",
-      };
+      const aiId = `ai-${Date.now()}`;
 
-      const aiResultId = `ai-${Date.now()}`;
-      sessionStorage.setItem(aiResultId, JSON.stringify(analysisResult));
-
-      console.log(
-        "🔀 sessionStorage 저장 완료, result 페이지로 이동:",
-        aiResultId,
+      // ✅ sessionStorage에 저장
+      sessionStorage.setItem(
+        `ai_result_${aiId}`,
+        JSON.stringify({
+          productName: data.productName || "제품명 없음",
+          manufacturer: data.manufacturer || "",
+          weight: data.weight || "",
+          detectedIngredients: data.detectedIngredients || [],
+          allergens: data.allergens || [],
+          hasUserAllergen: data.hasUserAllergen || false,
+          matchedUserAllergens: data.matchedUserAllergens || [],
+          dataSource: data.dataSource || "ai",
+          rawMaterials: data.rawMaterials || [],
+          nutritionInfo: data.nutritionInfo || null,
+        }),
       );
-      router.push(`/food/result/${aiResultId}`);
+
+      // localStorage 정리
+      localStorage.removeItem("pendingImageAnalysis");
+
+      // AI 결과 페이지로 이동
+      router.push(`/food/result/${aiId}`);
     } catch (error) {
       console.error("💥 분석 오류:", error);
       localStorage.removeItem("pendingImageAnalysis");
