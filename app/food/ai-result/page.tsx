@@ -156,23 +156,43 @@ export default function AIResultPage() {
         return;
       }
 
-      // ✅ foodCode 없음 → sessionStorage에 저장 후 이동
-      console.log("💾 AI 결과를 sessionStorage에 저장");
+      // ✅ foodCode 없음 → DB에 저장 후 이동
+      console.log("💾 AI 결과를 DB와 sessionStorage에 저장");
       const aiId = `ai-${Date.now()}`;
 
-      // sessionStorage에 저장
+      // 1. ✅ Supabase DB에 저장 (추가!)
+      try {
+        const supabase = createClient();
+        await supabase.from("food_search_cache").upsert({
+          food_code: aiId,
+          food_name: data.productName || "제품명 없음",
+          manufacturer: data.manufacturer || "",
+          allergens: data.allergens || [],
+          raw_materials: data.rawMaterials || "",
+          weight: data.weight || "",
+          data_source: "ai",
+          created_at: new Date().toISOString(),
+        });
+        console.log("✅ DB 저장 완료");
+      } catch (dbError) {
+        console.error("⚠️ DB 저장 실패:", dbError);
+        // DB 저장 실패해도 계속 진행 (sessionStorage 백업 있음)
+      }
+
+      // 2. sessionStorage에도 저장 (백업)
       sessionStorage.setItem(
         `ai_result_${aiId}`,
         JSON.stringify({
           productName: data.productName || "제품명 없음",
           manufacturer: data.manufacturer || "",
           weight: data.weight || "",
-          detectedIngredients: data.detectedIngredients || [],
+          detectedIngredients:
+            data.detectedIngredients || data.ingredients || [],
           allergens: data.allergens || [],
           hasUserAllergen: data.hasUserAllergen || false,
           matchedUserAllergens: data.matchedUserAllergens || [],
-          dataSource: data.dataSource || "ai",
-          rawMaterials: data.rawMaterials || [],
+          dataSource: "ai",
+          rawMaterials: data.rawMaterials || "",
           nutritionInfo: data.nutritionInfo || null,
           ingredients: data.ingredients || data.detectedIngredients || [],
         }),
@@ -180,10 +200,10 @@ export default function AIResultPage() {
 
       console.log("✅ sessionStorage 저장 완료:", aiId);
 
-      // localStorage 정리
+      // 3. ✅ localStorage 정리 (이미지 데이터 삭제)
       localStorage.removeItem("pendingImageAnalysis");
 
-      // AI 결과 페이지로 이동
+      // 4. AI 결과 페이지로 이동
       router.push(`/food/result/${aiId}`);
     } catch (error) {
       console.error("💥 분석 중 오류:", error);

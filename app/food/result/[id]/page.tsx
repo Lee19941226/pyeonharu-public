@@ -115,7 +115,7 @@ export default function FoodResultPage() {
 
     const shareUrl = `${window.location.origin}/food/result/${result.foodCode}?shared=kakao`;
 
-    // ✅ 동적 OG 이미지 URL
+    // 동적 OG 이미지 URL
     const ogImageUrl = new URL(`${window.location.origin}/api/og`);
     ogImageUrl.searchParams.set("name", result.foodName);
     ogImageUrl.searchParams.set("safe", isSafe.toString());
@@ -130,7 +130,7 @@ export default function FoodResultPage() {
           description: isSafe
             ? `🟢 안전해요! 알레르기 성분이 없습니다`
             : `🔴 위험해요! ${allergenText}`,
-          imageUrl: ogImageUrl.toString(), // ✅ 동적 이미지
+          imageUrl: ogImageUrl.toString(),
           link: {
             mobileWebUrl: shareUrl,
             webUrl: shareUrl,
@@ -165,24 +165,51 @@ export default function FoodResultPage() {
       setIsLoading(true);
       const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-      // ✅ AI 분석 결과 체크 (ai-로 시작)
-      if (id?.startsWith("ai-")) {
-        console.log("🤖 AI 분석 결과 로드");
+      console.log("🔍 결과 로드 시작:", id);
 
-        // sessionStorage에서 AI 결과 가져오기
+      // AI 분석 결과 체크 (ai-로 시작)
+      if (id?.startsWith("ai-")) {
+        console.log("🤖 AI 분석 결과 로드 시도");
+
+        // 1. DB 먼저 조회 (우선순위 1)
+        try {
+          console.log("📦 DB에서 AI 결과 조회 시도");
+          const response = await fetch(`/api/food/result?code=${id}`, {
+            credentials: "include",
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              console.log("✅ DB에서 AI 결과 로드 성공");
+              setResult(data.result);
+              setIsLoading(false);
+
+              setTimeout(() => {
+                saveToHistory(data.result);
+              }, 0);
+
+              return; // 성공하면 여기서 종료
+            }
+          }
+        } catch (dbError) {
+          console.warn("⚠️ DB 조회 실패, sessionStorage 확인:", dbError);
+        }
+
+        // 2. ✅ sessionStorage 백업 (우선순위 2)
         const storageKey = `ai_result_${id}`;
         console.log("📦 sessionStorage 키:", storageKey);
+
         const analysisData = sessionStorage.getItem(storageKey);
-        console.log("📦 저장된 데이터:", analysisData ? "있음" : "없음");
+        console.log(
+          "📦 sessionStorage 데이터:",
+          analysisData ? "있음" : "없음",
+        );
 
         if (analysisData) {
-          console.log(
-            "✅ 데이터 내용:",
-            analysisData.substring(0, 200) + "...",
-          );
+          console.log("✅ sessionStorage에서 AI 결과 로드");
           const analysisResult = JSON.parse(analysisData);
 
-          console.log("✅ AI 결과 파싱 성공");
           // FoodResult 형식으로 변환
           const processedIngredients = analysisResult.detectedIngredients || [];
 
@@ -244,29 +271,27 @@ export default function FoodResultPage() {
               : undefined,
             servingSize: analysisResult.nutritionInfo?.servingSize,
             hasNutritionInfo: !!analysisResult.nutritionInfo,
-            alternatives: [], // AI는 대체품 없음
+            alternatives: [],
           };
 
           setResult(aiResult);
           setIsLoading(false);
 
-          // saveToHistory 비동기 실행
           setTimeout(() => {
             saveToHistory(aiResult);
           }, 0);
 
           return;
         } else {
-          // sessionStorage에도 없으면 에러
-          console.error("❌ sessionStorage에 AI 결과 없음");
-          console.error("❌ 사용 가능한 모든 키:", Object.keys(sessionStorage));
+          // 3. DB도 없고 sessionStorage도 없음
+          console.error("❌ AI 결과를 찾을 수 없음");
           setError("AI 분석 결과를 찾을 수 없습니다");
           setIsLoading(false);
           return;
         }
       }
 
-      // ✅ 일반 제품 (DB 조회)
+      // 일반 제품 (DB 조회)
       console.log("🔍 DB에서 제품 조회:", id);
 
       const response = await fetch(`/api/food/result?code=${id}`, {
@@ -282,7 +307,6 @@ export default function FoodResultPage() {
       if (data.success) {
         setResult(data.result);
 
-        // saveToHistory 비동기 실행
         setTimeout(() => {
           saveToHistory(data.result);
         }, 0);
