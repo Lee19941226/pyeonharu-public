@@ -1,38 +1,47 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 // GET /api/community/[id] — 게시글 상세 조회
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params
-  const supabase = await createClient()
+  const { id } = await params;
+  const supabase = await createClient();
 
   // 게시글 조회
   const { data: post, error } = await supabase
     .from("community_posts")
     .select("*")
     .eq("id", id)
-    .single()
+    .single();
 
   if (error || !post) {
-    console.error("게시글 조회 실패:", error)
-    return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 })
+    console.error("게시글 조회 실패:", error);
+    return NextResponse.json(
+      { error: "게시글을 찾을 수 없습니다." },
+      { status: 404 },
+    );
   }
 
-  // 조회수 증가
-  await supabase
-    .from("community_posts")
-    .update({ view_count: (post.view_count || 0) + 1 })
-    .eq("id", id)
+  // 조회수 중복 방어 (쿠키 기반 24시간)
+  const viewedCookie = req.cookies.get(`viewed_${id}`)?.value;
+  let newViewCount = post.view_count || 0;
+
+  if (!viewedCookie) {
+    newViewCount += 1;
+    await supabase
+      .from("community_posts")
+      .update({ view_count: newViewCount })
+      .eq("id", id);
+  }
 
   // 작성자 닉네임 조회
   const { data: authorProfile } = await supabase
     .from("profiles")
     .select("nickname, avatar_url")
     .eq("id", post.user_id)
-    .single()
+    .single();
 
   // 학교 이름 조회
   const { data: schoolInfo } = await supabase
@@ -40,34 +49,42 @@ export async function GET(
     .select("school_name")
     .eq("school_code", post.school_code)
     .limit(1)
-    .maybeSingle()
+    .maybeSingle();
 
   // 댓글 조회
   const { data: comments } = await supabase
     .from("community_comments")
     .select("*")
     .eq("post_id", id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: true });
 
   // 댓글 작성자 닉네임 일괄 조회
-  const commentUserIds = [...new Set((comments || []).map(c => c.user_id))]
-  const profileMap: Record<string, { nickname: string; avatar_url: string | null }> = {}
+  const commentUserIds = [...new Set((comments || []).map((c) => c.user_id))];
+  const profileMap: Record<
+    string,
+    { nickname: string; avatar_url: string | null }
+  > = {};
 
   if (commentUserIds.length > 0) {
     const { data: profiles } = await supabase
       .from("profiles")
       .select("id, nickname, avatar_url")
-      .in("id", commentUserIds)
+      .in("id", commentUserIds);
 
     for (const p of profiles || []) {
-      profileMap[p.id] = { nickname: p.nickname || "익명", avatar_url: p.avatar_url }
+      profileMap[p.id] = {
+        nickname: p.nickname || "익명",
+        avatar_url: p.avatar_url,
+      };
     }
   }
 
   // 로그인 사용자 좋아요 여부
-  const { data: { user } } = await supabase.auth.getUser()
-  let isPostLiked = false
-  let likedCommentIds: Set<string> = new Set()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let isPostLiked = false;
+  let likedCommentIds: Set<string> = new Set();
 
   if (user) {
     const { data: postLike } = await supabase
@@ -75,24 +92,24 @@ export async function GET(
       .select("id")
       .eq("user_id", user.id)
       .eq("post_id", id)
-      .maybeSingle()
+      .maybeSingle();
 
-    isPostLiked = !!postLike
+    isPostLiked = !!postLike;
 
     if (comments && comments.length > 0) {
-      const commentIds = comments.map(c => c.id)
+      const commentIds = comments.map((c) => c.id);
       const { data: commentLikes } = await supabase
         .from("community_likes")
         .select("comment_id")
         .eq("user_id", user.id)
-        .in("comment_id", commentIds)
+        .in("comment_id", commentIds);
 
-      likedCommentIds = new Set((commentLikes || []).map(l => l.comment_id))
+      likedCommentIds = new Set((commentLikes || []).map((l) => l.comment_id));
     }
   }
 
   // 댓글을 트리 구조로 변환
-  const allComments = (comments || []).map(c => ({
+  const allComments = (comments || []).map((c) => ({
     id: c.id,
     postId: c.post_id,
     userId: c.user_id,
@@ -105,21 +122,21 @@ export async function GET(
     isOwner: user?.id === c.user_id,
     createdAt: c.created_at,
     replies: [] as any[],
-  }))
+  }));
 
   // 1단 댓글과 대댓글 분리
-  const topComments = allComments.filter(c => !c.parentId)
-  const replies = allComments.filter(c => c.parentId)
+  const topComments = allComments.filter((c) => !c.parentId);
+  const replies = allComments.filter((c) => c.parentId);
 
   // 대댓글을 부모에 연결
   for (const reply of replies) {
-    const parent = topComments.find(c => c.id === reply.parentId)
+    const parent = topComments.find((c) => c.id === reply.parentId);
     if (parent) {
-      parent.replies.push(reply)
+      parent.replies.push(reply);
     }
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     post: {
       ...post,
       schoolName: schoolInfo?.school_name || post.school_code,
@@ -127,27 +144,43 @@ export async function GET(
       avatarUrl: authorProfile?.avatar_url || null,
       isLiked: isPostLiked,
       isOwner: user?.id === post.user_id,
-      view_count: (post.view_count || 0) + 1,
+      view_count: newViewCount,
     },
     comments: topComments,
-  })
+  });
+
+  // 24시간 동안 중복 조회 방지 쿠키
+  if (!viewedCookie) {
+    response.cookies.set(`viewed_${id}`, "1", {
+      maxAge: 60 * 60 * 24, // 24시간
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  }
+
+  return response;
 }
 
 // PUT /api/community/[id] — 게시글 수정
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 })
+    return NextResponse.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 },
+    );
   }
 
-  const body = await req.json()
-  const { title, content, imageUrls } = body
+  const body = await req.json();
+  const { title, content, imageUrls } = body;
 
   const { data, error } = await supabase
     .from("community_posts")
@@ -160,37 +193,48 @@ export async function PUT(
     .eq("id", id)
     .eq("user_id", user.id) // 본인만
     .select()
-    .single()
+    .single();
 
   if (error) {
-    return NextResponse.json({ error: "수정 권한이 없거나 게시글을 찾을 수 없습니다." }, { status: 403 })
+    return NextResponse.json(
+      { error: "수정 권한이 없거나 게시글을 찾을 수 없습니다." },
+      { status: 403 },
+    );
   }
 
-  return NextResponse.json({ success: true, post: data })
+  return NextResponse.json({ success: true, post: data });
 }
 
 // DELETE /api/community/[id] — 게시글 삭제
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 })
+    return NextResponse.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 },
+    );
   }
 
   const { error } = await supabase
     .from("community_posts")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: "삭제 권한이 없거나 게시글을 찾을 수 없습니다." }, { status: 403 })
+    return NextResponse.json(
+      { error: "삭제 권한이 없거나 게시글을 찾을 수 없습니다." },
+      { status: 403 },
+    );
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true });
 }

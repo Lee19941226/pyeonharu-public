@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
+import { Home, UtensilsCrossed } from "lucide-react";
 
 export function Header() {
   const router = useRouter();
@@ -122,7 +123,30 @@ export function Header() {
           </div>
           <span className="text-xl font-bold text-foreground">편하루</span>
         </Link>
-
+        {/* 상단 탭 */}
+        <nav className="hidden md:flex items-center gap-1 ml-6">
+          <Link
+            href="/"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              pathname === "/"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            <Home className="h-4 w-4" />홈
+          </Link>
+          <Link
+            href="/restaurant"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              pathname.startsWith("/restaurant")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            <UtensilsCrossed className="h-4 w-4" />
+            음식점
+          </Link>
+        </nav>
         {/* Desktop — 네비 탭 없음 (로고 + 로그인만) */}
         <div className="hidden items-center gap-2 md:flex">
           {isLoggedIn ? (
@@ -159,8 +183,7 @@ export function Header() {
                     href="/food/profile"
                     className="flex items-center gap-2"
                   >
-                    <ShieldCheck className="h-4 w-4" />
-                    내 알레르기 정보
+                    <ShieldCheck className="h-4 w-4" />내 알레르기 정보
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -203,6 +226,32 @@ export function Header() {
       {isMobileMenuOpen && (
         <div className="fixed inset-x-0 top-16 bottom-0 z-40 border-t bg-background md:hidden overflow-y-auto">
           <nav className="container mx-auto space-y-1 px-4 py-4">
+            {/* 탭 메뉴 */}
+            <div className="mb-3 flex gap-2">
+              <Link
+                href="/"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium ${
+                  pathname === "/"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <Home className="h-4 w-4" />홈
+              </Link>
+              <Link
+                href="/restaurant"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium ${
+                  pathname.startsWith("/restaurant")
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <UtensilsCrossed className="h-4 w-4" />
+                음식점
+              </Link>
+            </div>
             {isLoggedIn ? (
               <div className="space-y-1">
                 <div className="mb-3 flex items-center gap-3 rounded-lg bg-muted p-3">
@@ -229,8 +278,8 @@ export function Header() {
                   href="/food/profile"
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm hover:bg-muted"
                 >
-                  <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-                  내 알레르기 정보
+                  <ShieldCheck className="h-5 w-5 text-muted-foreground" />내
+                  알레르기 정보
                 </Link>
                 <button
                   onClick={() => {
