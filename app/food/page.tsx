@@ -112,15 +112,43 @@ function FoodMainContent() {
     danger: 0,
     percentage: 0,
   });
+  // useEffect - URL 쿼리 파라미터 감지
   useEffect(() => {
     const urlQuery = searchParams.get("q");
     if (urlQuery && isInitialMount.current) {
       setQuery(urlQuery);
       setHasSearched(true);
-      handleSearch(urlQuery);
+
+      // ✅ 즉시 검색 실행
+      performSearch(urlQuery);
+
+      isInitialMount.current = false;
     }
-    isInitialMount.current = false;
   }, [searchParams]);
+
+  // useEffect - query 변경 감지 (기존 코드)
+  useEffect(() => {
+    if (query.length === 0) {
+      updateURL("");
+      if (hasSearched) setResults([]);
+      setShowHistory(true);
+      setCurrentPage(1);
+      return;
+    }
+    if (query.length < 2) return;
+    setShowHistory(false);
+
+    // ✅ isInitialMount일 때는 이미 실행했으므로 스킵
+    if (isInitialMount.current) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      performSearch(query);
+      updateURL(query);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     loadSearchHistory();

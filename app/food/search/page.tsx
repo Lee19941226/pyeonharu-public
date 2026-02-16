@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import {
   Camera,
   Lightbulb,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface SearchResult {
@@ -42,7 +42,6 @@ interface SearchHistory {
 
 const ITEMS_PER_PAGE = 10;
 
-// 인기 검색어
 const POPULAR_KEYWORDS = [
   "새우",
   "계란",
@@ -56,7 +55,6 @@ const POPULAR_KEYWORDS = [
   "토마토",
 ];
 
-// 추천 검색어
 const RECOMMENDED_KEYWORDS = [
   "과자",
   "라면",
@@ -72,6 +70,9 @@ const RECOMMENDED_KEYWORDS = [
 
 export default function FoodSearchPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isInitialMount = useRef(true);
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -80,9 +81,23 @@ export default function FoodSearchPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // ==========================================
+  // ✅ URL 쿼리 파라미터 감지 및 자동 검색
+  useEffect(() => {
+    const urlQuery = searchParams.get("q");
+
+    if (urlQuery && isInitialMount.current) {
+      console.log("🔍 URL에서 검색어 감지:", urlQuery);
+      setQuery(urlQuery);
+      setHasSearched(true);
+
+      // ✅ 즉시 검색 실행
+      handleSearch(urlQuery);
+
+      isInitialMount.current = false;
+    }
+  }, [searchParams]);
+
   // 검색 기록 불러오기
-  // ==========================================
   useEffect(() => {
     loadSearchHistory();
   }, []);
@@ -109,13 +124,13 @@ export default function FoodSearchPage() {
     localStorage.removeItem("food_search_history");
   };
 
-  // ==========================================
-  // 실시간 검색 (debounce)
-  // ==========================================
   useEffect(() => {
+    if (isInitialMount.current && searchParams.get("q")) {
+      return;
+    }
+
     if (query.length === 0) {
       if (hasSearched) {
-        // ✅ 이전에 검색했다가 지운 경우
         setResults([]);
       }
       setShowHistory(true);
@@ -136,14 +151,12 @@ export default function FoodSearchPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // ==========================================
   // 검색 실행
-  // ==========================================
   const handleSearch = async (searchQuery: string) => {
     if (searchQuery.length < 2) return;
 
     setIsLoading(true);
-    setHasSearched(true); // ✅ 검색했음을 기록
+    setHasSearched(true);
 
     try {
       const response = await fetch(
@@ -153,7 +166,7 @@ export default function FoodSearchPage() {
 
       if (data.success) {
         setResults(data.items);
-        setCurrentPage(1); // ✅ 새 검색 시 1페이지로
+        setCurrentPage(1);
         saveSearchHistory(searchQuery);
       } else {
         console.error("Search failed:", data.error);
@@ -167,9 +180,7 @@ export default function FoodSearchPage() {
     }
   };
 
-  // ==========================================
   // 페이징
-  // ==========================================
   const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
   const currentResults = results.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -178,19 +189,14 @@ export default function FoodSearchPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    //window.scrollTo({ top: 0, behavior: "smooth" }); (페이지 변경 시 위로 이동)
   };
 
-  // ==========================================
   // 제품 클릭
-  // ==========================================
   const handleProductClick = (foodCode: string) => {
-    // ✅ AI 결과인 경우 sessionStorage에 저장 후 이동
     if (foodCode.startsWith("ai-")) {
       const aiResult = results.find((r) => r.foodCode === foodCode);
 
       if (aiResult) {
-        // sessionStorage에 저장
         const storageKey = `ai_result_${foodCode}`;
         sessionStorage.setItem(
           storageKey,
@@ -215,18 +221,14 @@ export default function FoodSearchPage() {
     router.push(`/food/result/${foodCode}`);
   };
 
-  // ==========================================
   // 검색 기록 클릭
-  // ==========================================
   const handleHistoryClick = (historyQuery: string) => {
     setQuery(historyQuery);
     setShowHistory(false);
     handleSearch(historyQuery);
   };
 
-  // ==========================================
   // 키워드 클릭
-  // ==========================================
   const handleKeywordClick = (keyword: string) => {
     setQuery(keyword);
     setShowHistory(false);
@@ -268,7 +270,7 @@ export default function FoodSearchPage() {
                     setQuery("");
                     setResults([]);
                     setShowHistory(true);
-                    setHasSearched(false); // ✅ 초기화
+                    setHasSearched(false);
                   }}
                 >
                   <X className="h-5 w-5" />
@@ -302,45 +304,40 @@ export default function FoodSearchPage() {
             )}
 
             {/* 검색 기록 */}
-            {showHistory && searchHistory.length > 0 && !isLoading && (
-              <Card className="mb-6">
-                <CardContent className="p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="flex items-center gap-2 font-medium">
-                      <Clock className="h-4 w-4" />
-                      최근 검색
-                    </h3>
+            {showHistory && !isLoading && searchHistory.length > 0 && (
+              <div className="mb-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-sm font-medium">
+                    <Clock className="h-4 w-4" />
+                    최근 검색
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-muted-foreground"
+                    onClick={clearSearchHistory}
+                  >
+                    전체 삭제
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {searchHistory.map((item, idx) => (
                     <Button
-                      variant="ghost"
+                      key={idx}
+                      variant="outline"
                       size="sm"
-                      onClick={clearSearchHistory}
-                      className="h-auto p-0 text-xs text-muted-foreground"
+                      onClick={() => handleHistoryClick(item.query)}
                     >
-                      전체 삭제
+                      {item.query}
                     </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {searchHistory.map((item, idx) => (
-                      <Button
-                        key={idx}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleKeywordClick(item.query)}
-                        className="h-auto gap-2 py-2"
-                      >
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        {item.query}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                  ))}
+                </div>
+              </div>
             )}
 
-            {/* 인기 검색어 & 추천 검색어 */}
+            {/* 추천 검색어 */}
             {showHistory && !isLoading && (
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* 인기 검색어 */}
+              <div className="space-y-6">
                 <Card>
                   <CardContent className="p-4">
                     <h3 className="mb-3 flex items-center gap-2 font-medium">
@@ -351,14 +348,10 @@ export default function FoodSearchPage() {
                       {POPULAR_KEYWORDS.map((keyword, idx) => (
                         <Button
                           key={idx}
-                          variant="secondary"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleKeywordClick(keyword)}
-                          className="gap-1"
                         >
-                          <span className="text-xs font-bold text-primary">
-                            {idx + 1}
-                          </span>
                           {keyword}
                         </Button>
                       ))}
@@ -366,7 +359,6 @@ export default function FoodSearchPage() {
                   </CardContent>
                 </Card>
 
-                {/* 추천 검색어 */}
                 <Card>
                   <CardContent className="p-4">
                     <h3 className="mb-3 flex items-center gap-2 font-medium">
@@ -424,60 +416,58 @@ export default function FoodSearchPage() {
               </div>
             )}
 
-            {/* 검색 결과 */}
+            {/* 검색 결과 목록 */}
             {!isLoading && currentResults.length > 0 && (
               <div className="space-y-3">
                 {currentResults.map((item) => (
                   <Card
                     key={item.foodCode}
-                    className="cursor-pointer transition-all hover:shadow-md hover:border-primary"
+                    className="cursor-pointer transition-all hover:shadow-md"
                     onClick={() => handleProductClick(item.foodCode)}
                   >
                     <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <h3 className="mb-2 font-medium leading-tight">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                            item.hasAllergen
+                              ? "bg-red-100 text-red-600"
+                              : "bg-green-100 text-green-600"
+                          }`}
+                        >
+                          {item.hasAllergen ? (
+                            <AlertCircle className="h-5 w-5" />
+                          ) : (
+                            <CheckCircle className="h-5 w-5" />
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium truncate">
                             {item.foodName}
                           </h3>
-                          {item.dataSource === "ai" && (
-                            <Badge
-                              variant="outline"
-                              className="ml-2 text-[10px] text-purple-600 border-purple-300"
-                            >
-                              AI 추천
-                            </Badge>
+                          {item.manufacturer && (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {item.manufacturer}
+                            </p>
                           )}
-                          <div className="mb-2 flex flex-wrap gap-2">
-                            {item.searchType && (
-                              <Badge variant="secondary" className="text-xs">
-                                {item.searchType}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {item.allergens.slice(0, 3).map((allergen, idx) => (
+                              <Badge
+                                key={idx}
+                                variant={
+                                  item.hasAllergen ? "destructive" : "secondary"
+                                }
+                                className="text-xs"
+                              >
+                                {allergen}
                               </Badge>
-                            )}
-                            {item.hasAllergen && (
-                              <Badge variant="destructive" className="text-xs">
-                                내 알레르기 포함
+                            ))}
+                            {item.allergens.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{item.allergens.length - 3}
                               </Badge>
                             )}
                           </div>
-                          {item.allergens.length > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              알레르기 성분:{" "}
-                              {item.allergens.slice(0, 4).join(", ")}
-                              {item.allergens.length > 4 &&
-                                ` 외 ${item.allergens.length - 4}개`}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex-shrink-0">
-                          {item.hasAllergen ? (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                              <AlertCircle className="h-6 w-6 text-destructive" />
-                            </div>
-                          ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
-                              <CheckCircle className="h-6 w-6 text-green-600" />
-                            </div>
-                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -487,7 +477,7 @@ export default function FoodSearchPage() {
             )}
 
             {/* 페이징 */}
-            {!isLoading && results.length > ITEMS_PER_PAGE && (
+            {!isLoading && totalPages > 1 && (
               <div className="mt-6 flex items-center justify-center gap-2">
                 <Button
                   variant="outline"
@@ -498,7 +488,7 @@ export default function FoodSearchPage() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
                     pageNum = i + 1;
@@ -512,7 +502,7 @@ export default function FoodSearchPage() {
 
                   return (
                     <Button
-                      key={i}
+                      key={pageNum}
                       variant={currentPage === pageNum ? "default" : "outline"}
                       size="icon"
                       onClick={() => handlePageChange(pageNum)}

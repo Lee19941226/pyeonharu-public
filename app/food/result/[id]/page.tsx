@@ -74,20 +74,21 @@ export default function FoodResultPage() {
 
   useEffect(() => {
     loadFoodResult();
-    checkFavorite();
 
+    // Kakao SDK 초기화
     if (typeof window !== "undefined" && window.Kakao) {
-      console.log("🔑 Kakao SDK 로드됨");
-
       if (!window.Kakao.isInitialized()) {
         window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
-        console.log("✅ Kakao 초기화 완료");
-        console.log("🔑 사용 중인 키:", process.env.NEXT_PUBLIC_KAKAO_KEY);
       }
-    } else {
-      console.error("❌ Kakao SDK 로드 실패");
     }
   }, [params.id, router]);
+
+  // ✅ result가 로드된 후에 즐겨찾기 확인
+  useEffect(() => {
+    if (result && result.foodCode) {
+      checkFavorite();
+    }
+  }, [result]);
 
   const shareToKakao = () => {
     if (!result || !window.Kakao) {
@@ -425,26 +426,66 @@ export default function FoodResultPage() {
   };
 
   const checkFavorite = async () => {
+    if (!result || !result.foodCode) {
+      console.log("⚠️ result 또는 foodCode 없음");
+      return;
+    }
+
     try {
+      console.log("🔍 즐겨찾기 확인:", result.foodCode);
+
       const response = await fetch(
-        `/api/food/favorites/check?code=${params.id}`,
+        `/api/food/favorites/check?code=${result.foodCode}`,
       );
+
+      if (!response.ok) {
+        console.error("❌ 즐겨찾기 확인 실패:", response.status);
+        return;
+      }
+
       const data = await response.json();
+      console.log("✅ 즐겨찾기 상태:", data.favorited);
       setIsFavorite(data.favorited);
     } catch (error) {
-      console.error("즐겨찾기 확인 실패:", error);
+      console.error("❌ 즐겨찾기 확인 오류:", error);
     }
   };
 
+  // ✅ toggleFavorite 수정 - 로그인 확인 추가
   const toggleFavorite = async () => {
-    if (!result) return;
+    if (!result || !result.foodCode) {
+      toast.error("제품 정보를 불러오는 중입니다");
+      return;
+    }
+
+    // ✅ 로그인 확인
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      toast.error("로그인이 필요합니다", {
+        action: {
+          label: "로그인",
+          onClick: () => router.push("/login"),
+        },
+      });
+      return;
+    }
 
     try {
       if (isFavorite) {
+        // ✅ 삭제
         const response = await fetch(
           `/api/food/favorites?code=${result.foodCode}`,
           { method: "DELETE" },
         );
+
+        if (!response.ok) {
+          throw new Error("삭제 실패");
+        }
+
         const data = await response.json();
 
         if (data.success) {
@@ -452,28 +493,37 @@ export default function FoodResultPage() {
           toast.success("즐겨찾기에서 제거되었습니다");
         }
       } else {
+        // ✅ 추가
         const response = await fetch("/api/food/favorites", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             foodCode: result.foodCode,
             foodName: result.foodName,
-            manufacturer: result.manufacturer,
+            manufacturer: result.manufacturer || "정보없음",
             isSafe: result.isSafe,
           }),
         });
+
+        if (!response.ok) {
+          if (response.status === 409) {
+            toast.error("이미 즐겨찾기에 있습니다");
+            setIsFavorite(true); // ✅ 상태 동기화
+            return;
+          }
+          throw new Error("추가 실패");
+        }
+
         const data = await response.json();
 
         if (data.success) {
           setIsFavorite(true);
           toast.success("즐겨찾기에 추가되었습니다");
-        } else if (response.status === 409) {
-          toast.error("이미 즐겨찾기에 있습니다");
         }
       }
     } catch (error) {
-      console.error("즐겨찾기 처리 실패:", error);
-      toast.error("오류가 발생했습니다");
+      console.error("❌ 즐겨찾기 처리 실패:", error);
+      toast.error("즐겨찾기 처리 중 오류가 발생했습니다");
     }
   };
 
@@ -580,7 +630,7 @@ export default function FoodResultPage() {
                   variant="ghost"
                   size="icon"
                   onClick={toggleFavorite}
-                  disabled={!result.isSafe}
+                  disabled={result.isSafe}
                   className="
     group
     rounded-full
@@ -603,26 +653,29 @@ export default function FoodResultPage() {
                 </Button>
               </div>
             </div>
-
-            {/* 알레르기 정보 */}
-            {safeAllergens.length > 0 && (
-              <Card className="mb-6">
-                <CardContent className="pt-6">
-                  <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                    알레르기 성분
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {safeAllergens.map((allergen, index) => (
-                      <Badge key={index} variant="destructive">
-                        {allergen}
-                      </Badge>
-                    ))}
+            {/* 안전 여부 카드 - 안전 */}
+            {result.isSafe && (
+              <Card className="mb-6 border-green-600 bg-green-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-green-900">
+                        안전합니다!
+                      </h2>
+                      <p className="text-sm text-green-700">
+                        귀하의 알레르기 성분이 포함되지 않았습니다
+                      </p>
+                      <p className="text-sm text-green-700">
+                        안심하고 드셔도 좋습니다
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             )}
-
             {/* 안전 여부 카드 - 위험 */}
             {!result.isSafe && (
               <Card className="mb-6 border-destructive bg-destructive/10">
@@ -661,6 +714,172 @@ export default function FoodResultPage() {
                 </CardContent>
               </Card>
             )}
+            {/* 내 알레르기 검출 (조건부) */}
+            {safeUserAllergens.length > 0 ? (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 font-semibold">
+                    🚨 귀하의 알레르기와 일치하는 성분 (
+                    {safeDetectedAllergens.length}개 검출)
+                  </h3>
+                  {safeDetectedAllergens.length > 0 ? (
+                    <div className="space-y-3">
+                      {safeDetectedAllergens.map((allergen, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg bg-destructive/10 p-4"
+                        >
+                          <p className="font-medium text-destructive">
+                            ⚠️ {allergen.name} ({allergen.amount})
+                          </p>
+                          <p className="text-sm text-destructive/80">
+                            심각도: {allergen.severity} 🔴
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-green-50 p-8 text-center">
+                      <div className="mb-2 text-4xl">✓</div>
+                      <p className="text-sm font-medium text-green-800">
+                        검출된 알레르기 성분이 없습니다 (0개)
+                      </p>
+                      <p className="mt-1 text-xs text-green-600">
+                        귀하의 알레르기와 일치하는 성분이 없습니다
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              safeAllergens.length > 0 && (
+                <Card className="mb-6">
+                  <CardContent className="p-6">
+                    <h3 className="mb-4 font-semibold">
+                      🔬 알레르기 유발 성분 ({safeAllergens.length}개)
+                    </h3>
+                    <div className="space-y-2">
+                      {safeAllergens.map((allergen, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 rounded-lg bg-amber-50 p-3"
+                        >
+                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                          <p className="text-sm text-amber-900">{allergen}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 rounded-lg bg-muted p-3">
+                      <p className="text-xs text-muted-foreground">
+                        💡 로그인하고 알레르기를 등록하면 자동으로 위험 성분을
+                        확인해드려요
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            )}
+            {/* 알레르기 성분별 주요 증상 */}
+            {safeAllergens.length > 0 && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                    💊 알레르기 성분별 주요 증상
+                  </h3>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    이 제품에 포함된 알레르기 유발 성분과 대표 증상입니다
+                  </p>
+                  <div className="space-y-4">
+                    {safeAllergens
+                      .map((allergen) => getAllergenInfo(allergen))
+                      .filter((info): info is AllergenInfo => info !== null)
+                      .map((info, idx) => (
+                        <div
+                          key={idx}
+                          className={`rounded-lg border-l-4 p-4 ${
+                            info.severity === "high"
+                              ? "border-red-500 bg-red-50"
+                              : info.severity === "medium"
+                                ? "border-orange-500 bg-orange-50"
+                                : "border-yellow-500 bg-yellow-50"
+                          }`}
+                        >
+                          <div className="mb-2 flex items-center justify-between">
+                            <h4 className="font-semibold">{info.name}</h4>
+                            <Badge
+                              variant={
+                                info.severity === "high"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {info.severity === "high"
+                                ? "높은 위험"
+                                : info.severity === "medium"
+                                  ? "중간 위험"
+                                  : "낮은 위험"}
+                            </Badge>
+                          </div>
+                          <p className="mb-3 text-sm text-muted-foreground">
+                            {info.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {info.symptoms.map((symptom, sIdx) => (
+                              <span
+                                key={sIdx}
+                                className={`rounded-full px-2.5 py-1 text-xs ${
+                                  info.severity === "high"
+                                    ? "bg-red-100 text-red-700"
+                                    : info.severity === "medium"
+                                      ? "bg-orange-100 text-orange-700"
+                                      : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {symptom}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {/* 교차오염 위험 (사용자 알레르기 일치) */}
+            {safeCrossContaminationRisks.length > 0 && (
+              <Card className="mb-6 border-orange-500 bg-orange-50">
+                <CardContent className="p-6">
+                  <div className="mb-4 flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
+                      <AlertTriangle className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-orange-900">
+                        교차오염 주의!
+                      </h2>
+                      <p className="text-sm text-orange-800">
+                        제조시설에서 귀하의 알레르기 성분을 취급합니다
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {safeCrossContaminationRisks.map((risk, idx) => (
+                      <div key={idx} className="rounded-lg bg-orange-100 p-3">
+                        <p className="font-medium text-orange-900">
+                          ⚠️ {risk.name} (심각도: {risk.severity})
+                        </p>
+                        <p className="text-sm text-orange-800">
+                          같은 제조시설에서 {risk.name}를 사용한 제품을
+                          제조합니다
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 대체 식품 추천 (위험할 때만 표시) */}
             {!result.isSafe &&
               result.alternatives &&
@@ -743,30 +962,6 @@ export default function FoodResultPage() {
                 </Card>
               )}
 
-            {/* 안전 여부 카드 - 안전 */}
-            {result.isSafe && (
-              <Card className="mb-6 border-green-600 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-green-900">
-                        안전합니다!
-                      </h2>
-                      <p className="text-sm text-green-700">
-                        귀하의 알레르기 성분이 포함되지 않았습니다
-                      </p>
-                      <p className="text-sm text-green-700">
-                        안심하고 드셔도 좋습니다
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* 원재료 통합 섹션 */}
             <Card className="mb-6">
               <CardContent className="p-6">
@@ -813,174 +1008,6 @@ export default function FoodResultPage() {
                 )}
               </CardContent>
             </Card>
-
-            {/* 알레르기 성분별 주요 증상 */}
-            {safeAllergens.length > 0 && (
-              <Card className="mb-6">
-                <CardContent className="p-6">
-                  <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                    💊 알레르기 성분별 주요 증상
-                  </h3>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    이 제품에 포함된 알레르기 유발 성분과 대표 증상입니다
-                  </p>
-                  <div className="space-y-4">
-                    {safeAllergens
-                      .map((allergen) => getAllergenInfo(allergen))
-                      .filter((info): info is AllergenInfo => info !== null)
-                      .map((info, idx) => (
-                        <div
-                          key={idx}
-                          className={`rounded-lg border-l-4 p-4 ${
-                            info.severity === "high"
-                              ? "border-red-500 bg-red-50"
-                              : info.severity === "medium"
-                                ? "border-orange-500 bg-orange-50"
-                                : "border-yellow-500 bg-yellow-50"
-                          }`}
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <h4 className="font-semibold">{info.name}</h4>
-                            <Badge
-                              variant={
-                                info.severity === "high"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {info.severity === "high"
-                                ? "높은 위험"
-                                : info.severity === "medium"
-                                  ? "중간 위험"
-                                  : "낮은 위험"}
-                            </Badge>
-                          </div>
-                          <p className="mb-3 text-sm text-muted-foreground">
-                            {info.description}
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {info.symptoms.map((symptom, sIdx) => (
-                              <span
-                                key={sIdx}
-                                className={`rounded-full px-2.5 py-1 text-xs ${
-                                  info.severity === "high"
-                                    ? "bg-red-100 text-red-700"
-                                    : info.severity === "medium"
-                                      ? "bg-orange-100 text-orange-700"
-                                      : "bg-yellow-100 text-yellow-700"
-                                }`}
-                              >
-                                {symptom}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 내 알레르기 검출 (조건부) */}
-            {safeUserAllergens.length > 0 ? (
-              <Card className="mb-6">
-                <CardContent className="p-6">
-                  <h3 className="mb-4 font-semibold">
-                    🚨 귀하의 알레르기와 일치하는 성분 (
-                    {safeDetectedAllergens.length}개 검출)
-                  </h3>
-                  {safeDetectedAllergens.length > 0 ? (
-                    <div className="space-y-3">
-                      {safeDetectedAllergens.map((allergen, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg bg-destructive/10 p-4"
-                        >
-                          <p className="font-medium text-destructive">
-                            ⚠️ {allergen.name} ({allergen.amount})
-                          </p>
-                          <p className="text-sm text-destructive/80">
-                            심각도: {allergen.severity} 🔴
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg bg-green-50 p-8 text-center">
-                      <div className="mb-2 text-4xl">✓</div>
-                      <p className="text-sm font-medium text-green-800">
-                        검출된 알레르기 성분이 없습니다 (0개)
-                      </p>
-                      <p className="mt-1 text-xs text-green-600">
-                        귀하의 알레르기와 일치하는 성분이 없습니다
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              safeAllergens.length > 0 && (
-                <Card className="mb-6">
-                  <CardContent className="p-6">
-                    <h3 className="mb-4 font-semibold">
-                      🔬 알레르기 유발 성분 ({safeAllergens.length}개)
-                    </h3>
-                    <div className="space-y-2">
-                      {safeAllergens.map((allergen, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 rounded-lg bg-amber-50 p-3"
-                        >
-                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                          <p className="text-sm text-amber-900">{allergen}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 rounded-lg bg-muted p-3">
-                      <p className="text-xs text-muted-foreground">
-                        💡 로그인하고 알레르기를 등록하면 자동으로 위험 성분을
-                        확인해드려요
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            )}
-
-            {/* 교차오염 위험 (사용자 알레르기 일치) */}
-            {safeCrossContaminationRisks.length > 0 && (
-              <Card className="mb-6 border-orange-500 bg-orange-50">
-                <CardContent className="p-6">
-                  <div className="mb-4 flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
-                      <AlertTriangle className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-orange-900">
-                        교차오염 주의!
-                      </h2>
-                      <p className="text-sm text-orange-800">
-                        제조시설에서 귀하의 알레르기 성분을 취급합니다
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {safeCrossContaminationRisks.map((risk, idx) => (
-                      <div key={idx} className="rounded-lg bg-orange-100 p-3">
-                        <p className="font-medium text-orange-900">
-                          ⚠️ {risk.name} (심각도: {risk.severity})
-                        </p>
-                        <p className="text-sm text-orange-800">
-                          같은 제조시설에서 {risk.name}를 사용한 제품을
-                          제조합니다
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* 알레르기 미등록 안내 */}
             {safeUserAllergens.length === 0 && (
