@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
-import { Home, UtensilsCrossed } from "lucide-react";
+import { Home, UtensilsCrossed, Activity } from "lucide-react";
 
 export function Header() {
   const router = useRouter();
@@ -146,6 +146,17 @@ export function Header() {
             <UtensilsCrossed className="h-4 w-4" />
             음식점
           </Link>
+          <Link
+            href="/diet"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              pathname.startsWith("/diet")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            <Activity className="h-4 w-4" />
+            식단관리
+          </Link>
         </nav>
         {/* Desktop — 네비 탭 없음 (로고 + 로그인만) */}
         <div className="hidden items-center gap-2 md:flex">
@@ -250,6 +261,18 @@ export function Header() {
               >
                 <UtensilsCrossed className="h-4 w-4" />
                 음식점
+              </Link>
+              <Link
+                href="/diet"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium ${
+                  pathname.startsWith("/diet")
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                식단관리
               </Link>
             </div>
             {isLoggedIn ? (
