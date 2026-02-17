@@ -7,13 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, AlertCircle, ArrowRight } from "lucide-react";
-
-interface Candidate {
-  foodCode: string;
-  foodName: string;
-  manufacturer?: string;
-  matchedIngredient?: string;
-}
+import { Candidate } from "@/types/food";
 
 function SelectProductContent() {
   const router = useRouter();
@@ -65,7 +59,13 @@ function SelectProductContent() {
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {ingredients.map((ingredient, idx) => (
-                      <Badge key={idx} variant="secondary" className="bg-blue-100 text-blue-700">{ingredient}</Badge>
+                      <Badge
+                        key={idx}
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-700"
+                      >
+                        {ingredient}
+                      </Badge>
                     ))}
                   </div>
                 </CardContent>
@@ -76,20 +76,41 @@ function SelectProductContent() {
                 <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
                 <div className="text-sm text-amber-800">
                   <p className="font-semibold">확인이 필요합니다</p>
-                  <p className="mt-1">여러 제품이 검색되었습니다. 촬영한 제품과 가장 비슷한 것을 선택하세요.</p>
+                  <p className="mt-1">
+                    여러 제품이 검색되었습니다. 촬영한 제품과 가장 비슷한 것을
+                    선택하세요.
+                  </p>
                 </div>
               </CardContent>
             </Card>
             <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">{candidates.length}개의 후보 제품</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {candidates.length}개의 후보 제품
+              </p>
               {candidates.map((candidate, idx) => (
-                <Card key={idx} className="group cursor-pointer transition-all hover:border-primary hover:shadow-md" onClick={() => router.push(`/food/result/${candidate.foodCode}`)}>
+                <Card
+                  key={idx}
+                  className="group cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                  onClick={() =>
+                    router.push(`/food/result/${candidate.foodCode}`)
+                  }
+                >
                   <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">{idx + 1}</div>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">
+                      {idx + 1}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium">{candidate.foodName}</p>
-                      {candidate.manufacturer && <p className="text-sm text-muted-foreground">{candidate.manufacturer}</p>}
-                      {candidate.matchedIngredient && <Badge variant="secondary" className="mt-1 text-xs">{candidate.matchedIngredient} 포함</Badge>}
+                      {candidate.manufacturer && (
+                        <p className="text-sm text-muted-foreground">
+                          {candidate.manufacturer}
+                        </p>
+                      )}
+                      {candidate.matchedIngredient && (
+                        <Badge variant="secondary" className="mt-1 text-xs">
+                          {candidate.matchedIngredient} 포함
+                        </Badge>
+                      )}
                     </div>
                     <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
                   </CardContent>
@@ -100,15 +121,37 @@ function SelectProductContent() {
               <Card>
                 <CardContent className="flex flex-col items-center py-12">
                   <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
-                  <p className="text-center font-medium">제품을 찾을 수 없습니다</p>
-                  <p className="mt-2 text-center text-sm text-muted-foreground">더 선명한 사진을 다시 시도해보세요</p>
-                  <Button variant="outline" className="mt-6" onClick={() => router.back()}>다시 촬영하기</Button>
+                  <p className="text-center font-medium">
+                    제품을 찾을 수 없습니다
+                  </p>
+                  <p className="mt-2 text-center text-sm text-muted-foreground">
+                    더 선명한 사진을 다시 시도해보세요
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-6"
+                    onClick={() => router.back()}
+                  >
+                    다시 촬영하기
+                  </Button>
                 </CardContent>
               </Card>
             )}
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => router.back()}>다시 촬영</Button>
-              <Button variant="outline" className="flex-1" onClick={() => router.push("/food/search")}>직접 검색</Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.back()}
+              >
+                다시 촬영
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.push("/food/search")}
+              >
+                직접 검색
+              </Button>
             </div>
           </div>
         </div>
@@ -119,7 +162,13 @@ function SelectProductContent() {
 
 export default function SelectProductPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p>로딩 중...</p></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p>로딩 중...</p>
+        </div>
+      }
+    >
       <SelectProductContent />
     </Suspense>
   );

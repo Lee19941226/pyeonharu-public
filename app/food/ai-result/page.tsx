@@ -19,19 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-
-interface AIAnalysisResult {
-  productName?: string;
-  manufacturer?: string;
-  detectedIngredients: string[];
-  allergens: string[];
-  hasUserAllergen: boolean;
-  matchedUserAllergens: string[];
-  foodCode?: string;
-  dataSource?: string;
-  rawMaterials?: string;
-  isProcessing: boolean;
-}
+import { AIAnalysisResult } from "@/types/food";
 
 export default function AIResultPage() {
   const router = useRouter();

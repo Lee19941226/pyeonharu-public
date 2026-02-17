@@ -25,17 +25,36 @@ export interface FoodResult {
   allergens: string[];
   allergyWarning?: string;
   crossContamination?: string[];
-  crossContaminationRisks?: DetectedAllergen[];
+  crossContaminationRisks?: Array<{
+    name: string;
+    type: string;
+    severity: string;
+  }>;
   userAllergens: string[];
-  detectedAllergens: DetectedAllergen[];
+  detectedAllergens: Array<{
+    name: string;
+    amount: string;
+    severity: string;
+  }>;
   ingredients: string[];
-  nutritionDetails?: NutritionDetail[];
+  nutritionDetails?: Array<{
+    name: string;
+    content: string;
+    unit: string;
+    percentage?: string;
+  }>;
   servingSize?: string;
   isSafe: boolean;
   hasNutritionInfo?: boolean;
   detectedIngredients?: string[];
-  dataSource?: "openapi" | "database" | "ai";
-  alternatives?: AlternativeProduct[];
+  dataSource?: string;
+  alternatives?: Array<{
+    barcode: string;
+    productName: string;
+    manufacturer?: string;
+    category: string;
+    reason?: string;
+  }>;
 }
 
 export interface DetectedAllergen {
@@ -46,7 +65,6 @@ export interface DetectedAllergen {
   code?: string | null;
 }
 
-// ✅ 새로 추가
 export interface NutritionDetail {
   name: string;
   content: string;
@@ -106,11 +124,11 @@ export interface SearchResult {
 // 즐겨찾기 타입
 export interface FoodFavorite {
   id: string;
-  food_code: string;
-  food_name: string;
+  foodCode: string;
+  foodName: string;
   manufacturer: string;
-  is_safe: boolean;
-  created_at: string;
+  isSafe: boolean;
+  createdAt: string;
 }
 
 // 검색 기록 타입
@@ -126,4 +144,57 @@ export interface RecentProduct {
   isSafe: boolean;
   checkedAt: string;
   manufacturer?: string;
+}
+
+// AI 분석 결과 타입
+export interface AIAnalysisResult {
+  productName?: string;
+  manufacturer?: string;
+  detectedIngredients: string[];
+  allergens: string[];
+  hasUserAllergen: boolean;
+  matchedUserAllergens: string[];
+  foodCode?: string;
+  dataSource?: string;
+  rawMaterials?: string;
+  nutritionInfo?: NutritionInfo;
+  ingredients?: string[];
+  weight?: string;
+  isProcessing: boolean;
+}
+
+// 제품 후보 타입 (select 페이지)
+export interface Candidate {
+  foodCode: string;
+  foodName: string;
+  manufacturer?: string;
+  matchedIngredient?: string;
+}
+
+// ✅ 연속 스캔 결과 타입 (camera 페이지)
+export interface ScannedResult {
+  foodCode: string;
+  foodName: string;
+  manufacturer?: string;
+  isSafe: boolean;
+  detectedAllergens: string[];
+  scannedAt: string;
+}
+
+// ✅ 온보딩 데모 결과 타입
+export interface DemoResult {
+  foodName: string;
+  allergens: string[];
+  detectedAllergens: Array<{
+    name: string;
+    severity: string;
+  }>;
+  isSafe: boolean;
+}
+export interface HistoryItem {
+  foodCode: string;
+  foodName: string;
+  manufacturer?: string;
+  checkedAt: string;
+  isSafe: boolean;
 }

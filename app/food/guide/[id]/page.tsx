@@ -8,17 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Phone, MapPin, AlertCircle, Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-
-interface GuideData {
-  allergen: string;
-  immediateActions: string[];
-  emergencySymptoms: string[];
-  hospitalSymptoms: string[];
-  alternatives: Array<{
-    name: string;
-    emoji: string;
-  }>;
-}
+import { GuideData } from "@/types/food";
 
 export default function EmergencyGuidePage() {
   const params = useParams();

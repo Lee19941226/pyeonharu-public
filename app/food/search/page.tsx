@@ -22,23 +22,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-
-interface SearchResult {
-  foodCode: string;
-  foodName: string;
-  manufacturer: string;
-  allergens: string[];
-  hasAllergen: boolean;
-  searchType?: string;
-  dataSource?: string;
-  rawMaterials?: string;
-  weight?: string;
-}
-
-interface SearchHistory {
-  query: string;
-  timestamp: number;
-}
+import type { SearchResult, SearchHistory } from "@/types/food";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -204,13 +188,15 @@ export default function FoodSearchPage() {
             productName: aiResult.foodName,
             manufacturer: aiResult.manufacturer || "",
             weight: aiResult.weight || "",
-            detectedIngredients: [],
+            detectedIngredients: aiResult.detectedIngredients || [],
             allergens: aiResult.allergens || [],
-            hasUserAllergen: false,
-            matchedUserAllergens: [],
+            hasUserAllergen: aiResult.hasAllergen || false,
+            matchedUserAllergens: aiResult.matchedUserAllergens || [],
             dataSource: "ai",
             rawMaterials: aiResult.rawMaterials || "",
-            nutritionInfo: null,
+            nutritionInfo: aiResult.nutritionInfo || null,
+            ingredients:
+              aiResult.ingredients || aiResult.detectedIngredients || [],
           }),
         );
 

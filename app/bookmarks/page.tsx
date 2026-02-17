@@ -24,7 +24,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
+import { FoodBookmark } from "@/types/food";
 interface HospitalBookmark {
   id: string;
   name: string;
@@ -33,7 +33,7 @@ interface HospitalBookmark {
   category: string;
   lat: number;
   lng: number;
-  created_at: string;
+  createdAt: string;
 }
 
 interface PharmacyBookmark {
@@ -44,17 +44,7 @@ interface PharmacyBookmark {
   category: string;
   lat: number;
   lng: number;
-  created_at: string;
-}
-
-// ✅ 음식 즐겨찾기 인터페이스 추가
-interface FoodBookmark {
-  id: string;
-  food_code: string;
-  food_name: string;
-  manufacturer: string;
-  is_safe: boolean;
-  created_at: string;
+  createdAt: string;
 }
 
 export default function BookmarksPage() {
@@ -127,7 +117,7 @@ export default function BookmarksPage() {
         method: "DELETE",
       });
       if (res.ok) {
-        setFoods((prev) => prev.filter((f) => f.food_code !== itemId));
+        setFoods((prev) => prev.filter((f) => f.foodCode !== itemId));
       }
     } else {
       // 병원/약국 삭제
@@ -318,7 +308,7 @@ export default function BookmarksPage() {
                       key={item.id}
                       className="cursor-pointer transition-all hover:shadow-md"
                       onClick={() =>
-                        router.push(`/food/result/${item.food_code}`)
+                        router.push(`/food/result/${item.foodCode}`)
                       }
                     >
                       <CardContent className="p-4">
@@ -326,12 +316,12 @@ export default function BookmarksPage() {
                           {/* 안전 여부 아이콘 */}
                           <div
                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                              item.is_safe
+                              item.isSafe
                                 ? "bg-green-100 text-green-600"
                                 : "bg-red-100 text-red-600"
                             }`}
                           >
-                            {item.is_safe ? (
+                            {item.isSafe ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <AlertCircle className="h-5 w-5" />
@@ -341,7 +331,7 @@ export default function BookmarksPage() {
                           {/* 제품 정보 */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium truncate">
-                              {item.food_name}
+                              {item.foodName}
                             </h3>
                             {item.manufacturer && (
                               <p className="text-sm text-muted-foreground truncate">
@@ -351,15 +341,15 @@ export default function BookmarksPage() {
                             <div className="mt-1 flex items-center gap-2">
                               <span
                                 className={`text-xs px-2 py-0.5 rounded-full ${
-                                  item.is_safe
+                                  item.isSafe
                                     ? "bg-green-100 text-green-700"
                                     : "bg-red-100 text-red-700"
                                 }`}
                               >
-                                {item.is_safe ? "안전" : "주의"}
+                                {item.isSafe ? "안전" : "주의"}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {new Date(item.created_at).toLocaleDateString(
+                                {new Date(item.createdAt).toLocaleDateString(
                                   "ko-KR",
                                 )}
                               </span>
@@ -373,7 +363,7 @@ export default function BookmarksPage() {
                             className="shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleRemove("food", item.food_code);
+                              handleRemove("food", item.foodCode);
                             }}
                           >
                             <Trash2 className="h-4 w-4" />

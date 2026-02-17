@@ -26,23 +26,7 @@ import {
   getDetailedAllergenInfo,
   DetailedAllergenInfo,
 } from "@/lib/allergen-info";
-
-interface Allergen {
-  code: string;
-  name: string;
-  emoji: string;
-  description: string;
-  category:
-    | "곡물"
-    | "유제품·계란"
-    | "갑각류·어패류"
-    | "견과류"
-    | "과일·채소"
-    | "육류"
-    | "기타";
-  severity: "high" | "medium" | "low";
-  commonNames?: string[];
-}
+import { Allergen } from "@/types/food";
 
 const ALLERGENS: Allergen[] = [
   // 곡물류

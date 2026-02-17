@@ -23,46 +23,7 @@ import { toast } from "sonner";
 import { getAllergenInfo } from "@/lib/allergen-info";
 import type { AllergenInfo } from "@/lib/allergen-info";
 import { createClient } from "@/lib/supabase/client";
-
-interface FoodResult {
-  foodCode: string | undefined;
-  foodName: string;
-  manufacturer: string;
-  weight: string;
-  allergens: string[];
-  allergyWarning?: string;
-  crossContamination?: string[];
-  crossContaminationRisks?: Array<{
-    name: string;
-    type: string;
-    severity: string;
-  }>;
-  userAllergens: string[];
-  detectedAllergens: Array<{
-    name: string;
-    amount: string;
-    severity: string;
-  }>;
-  ingredients: string[];
-  nutritionDetails?: Array<{
-    name: string;
-    content: string;
-    unit: string;
-    percentage?: string;
-  }>;
-  servingSize?: string;
-  isSafe: boolean;
-  hasNutritionInfo?: boolean;
-  detectedIngredients?: string[];
-  dataSource?: string;
-  alternatives?: Array<{
-    barcode: string;
-    productName: string;
-    manufacturer?: string;
-    category: string;
-    reason?: string;
-  }>;
-}
+import { FoodResult } from "@/types/food";
 
 export default function FoodResultPage() {
   const params = useParams();

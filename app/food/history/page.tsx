@@ -7,14 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Trash2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-interface HistoryItem {
-  foodCode: string;
-  foodName: string;
-  manufacturer?: string;
-  checkedAt: string;
-  isSafe: boolean;
-}
+import { HistoryItem } from "@/types/food";
 
 export default function HistoryPage() {
   const router = useRouter();

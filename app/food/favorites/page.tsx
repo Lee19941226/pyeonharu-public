@@ -9,15 +9,7 @@ import { Star, Trash2, AlertCircle, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { LoginModal } from "@/components/auth/login-modal";
-
-interface FoodFavorite {
-  id: string;
-  food_code: string;
-  food_name: string;
-  manufacturer: string;
-  is_safe: boolean;
-  created_at: string;
-}
+import { FoodFavorite } from "@/types/food";
 
 export default function FoodFavoritesPage() {
   const router = useRouter();
@@ -65,7 +57,7 @@ export default function FoodFavoritesPage() {
       });
 
       if (response.ok) {
-        setFavorites((prev) => prev.filter((f) => f.food_code !== foodCode));
+        setFavorites((prev) => prev.filter((f) => f.foodCode !== foodCode));
       }
     } catch (error) {
       console.error("삭제 실패:", error);
@@ -159,21 +151,19 @@ export default function FoodFavoritesPage() {
                   <Card
                     key={item.id}
                     className="cursor-pointer transition-all hover:shadow-md"
-                    onClick={() =>
-                      router.push(`/food/result/${item.food_code}`)
-                    }
+                    onClick={() => router.push(`/food/result/${item.foodCode}`)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
                         {/* 안전 여부 아이콘 */}
                         <div
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                            item.is_safe
+                            item.isSafe
                               ? "bg-green-100 text-green-600"
                               : "bg-red-100 text-red-600"
                           }`}
                         >
-                          {item.is_safe ? (
+                          {item.isSafe ? (
                             <CheckCircle className="h-5 w-5" />
                           ) : (
                             <AlertCircle className="h-5 w-5" />
@@ -183,7 +173,7 @@ export default function FoodFavoritesPage() {
                         {/* 제품 정보 */}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium truncate">
-                            {item.food_name}
+                            {item.foodName}
                           </h3>
                           {item.manufacturer && (
                             <p className="text-sm text-muted-foreground truncate">
@@ -193,15 +183,15 @@ export default function FoodFavoritesPage() {
                           <div className="mt-1 flex items-center gap-2">
                             <span
                               className={`text-xs px-2 py-0.5 rounded-full ${
-                                item.is_safe
+                                item.isSafe
                                   ? "bg-green-100 text-green-700"
                                   : "bg-red-100 text-red-700"
                               }`}
                             >
-                              {item.is_safe ? "안전" : "주의"}
+                              {item.isSafe ? "안전" : "주의"}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {formatDate(item.created_at)}
+                              {formatDate(item.createdAt)}
                             </span>
                           </div>
                         </div>
@@ -213,7 +203,7 @@ export default function FoodFavoritesPage() {
                           className="shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeFavorite(item.food_code);
+                            removeFavorite(item.foodCode);
                           }}
                         >
                           <Trash2 className="h-4 w-4" />

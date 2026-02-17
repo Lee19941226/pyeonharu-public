@@ -28,40 +28,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-
-interface SearchResult {
-  foodCode: string;
-  foodName: string;
-  manufacturer: string;
-  allergens: string[];
-  hasAllergen: boolean;
-  searchType?: string;
-  dataSource?: string;
-  rawMaterials?: string;
-  weight?: string;
-  ingredients?: string[];
-  detectedIngredients?: string[];
-  nutritionInfo?: any;
-  matchedUserAllergens?: string[];
-}
-
-interface SearchHistory {
-  query: string;
-  timestamp: number;
-}
-
-interface RecentProduct {
-  foodCode: string;
-  foodName: string;
-  isSafe: boolean;
-  checkedAt: string;
-}
-
-interface FoodFavorite {
-  foodCode: string;
-  foodName: string;
-  isSafe: boolean;
-}
+import type {
+  SearchResult,
+  SearchHistory,
+  RecentProduct,
+  FoodFavorite,
+} from "@/types/food";
 
 const ITEMS_PER_PAGE = 10;
 
