@@ -156,11 +156,11 @@ export default function AIResultPage() {
         return;
       }
 
-      // ✅ foodCode 없음 → DB에 저장 후 이동
+      // foodCode 없음 → DB에 저장 후 이동
       console.log("💾 AI 결과를 DB와 sessionStorage에 저장");
       const aiId = `ai-${Date.now()}`;
 
-      // 1. ✅ Supabase DB에 저장 (추가!)
+      // 1. Supabase DB에 저장
       try {
         const supabase = createClient();
         await supabase.from("food_search_cache").upsert({
@@ -200,7 +200,7 @@ export default function AIResultPage() {
 
       console.log("✅ sessionStorage 저장 완료:", aiId);
 
-      // 3. ✅ localStorage 정리 (이미지 데이터 삭제)
+      // 3. localStorage 정리 (이미지 데이터 삭제)
       localStorage.removeItem("pendingImageAnalysis");
 
       // 4. AI 결과 페이지로 이동
