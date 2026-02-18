@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 
 export async function GET(req: NextRequest) {
-  // ✅ 변수 선언 (맨 위로 이동)
+  // ✅ 변수 선언
   let productName = "제품";
   let manufacturer = "";
   let weight = "";
@@ -57,7 +57,9 @@ export async function GET(req: NextRequest) {
       productName = cachedData.food_name;
       manufacturer = cachedData.manufacturer || "정보없음";
       weight = cachedData.weight || "";
-      allergyNames = cachedData.allergens || [];
+      allergyNames = (cachedData.allergens || []).filter(
+        (a: string) => a && a.trim().length > 0,
+      );
 
       // ✅ 원재료 파싱
       if (cachedData.raw_materials) {
@@ -66,7 +68,105 @@ export async function GET(req: NextRequest) {
           .map((i: string) => i.trim())
           .filter((i: string) => i.length > 0);
       }
+      // ==========================================
+      // ✅ 데이터 보완 로직 (원재료 또는 알레르기 없을 때)
+      // ==========================================
+      const needsEnrichment =
+        !cachedData.raw_materials ||
+        !cachedData.allergens ||
+        cachedData.allergens.length === 0;
 
+      if (needsEnrichment && cachedData.data_source === "ai") {
+        console.log("🔄 DB 데이터 불완전, AI로 보완 시작...");
+        console.log(
+          `  - 원재료: ${cachedData.raw_materials ? "있음" : "없음"}`,
+        );
+        console.log(`  - 알레르기: ${cachedData.allergens?.length || 0}개`);
+
+        try {
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+          const enrichResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "user",
+                content: `"${productName}" (제조사: ${manufacturer || "알 수 없음"})의 정확한 제품 정보를 알려주세요.
+
+**중요: 실제로 한국에서 판매되는 제품의 정보만 제공하세요.**
+
+JSON 형식으로만 응답:
+{
+  "exists": true 또는 false (실제 존재하는 제품인지),
+  "allergens": ["알레르기 유발물질"],
+  "ingredients": ["주요 원재료 7~10개"],
+  "confidence": 0.0~1.0 (정보 신뢰도)
+}
+
+**알레르기 22가지:** 계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류
+
+실제 존재하지 않는 제품이면 exists: false로 반환하세요.`,
+              },
+            ],
+            max_tokens: 500,
+          });
+
+          const aiText = enrichResponse.choices[0].message.content || "{}";
+          const clean = aiText
+            .replace(/```json\n?/g, "")
+            .replace(/```\n?/g, "")
+            .trim();
+          const enrichData = JSON.parse(clean);
+
+          // ✅ 실제 제품이고 신뢰도 높을 때만 업데이트
+          if (enrichData.exists && enrichData.confidence >= 0.7) {
+            console.log(
+              "✅ AI 보완 데이터 획득 (신뢰도:",
+              enrichData.confidence,
+              ")",
+            );
+
+            // DB 업데이트
+            const updateData: any = {};
+
+            if (enrichData.ingredients && enrichData.ingredients.length > 0) {
+              updateData.raw_materials = enrichData.ingredients.join(", ");
+              ingredients = enrichData.ingredients;
+            }
+
+            if (enrichData.allergens && enrichData.allergens.length > 0) {
+              const cleanAllergens = enrichData.allergens.filter(
+                (a: string) => a && a.trim().length > 0,
+              );
+
+              if (cleanAllergens.length > 0) {
+                updateData.allergens = cleanAllergens;
+                allergyNames = cleanAllergens;
+              }
+            }
+
+            // ✅ 업데이트 실행
+            if (Object.keys(updateData).length > 0) {
+              await supabase
+                .from("food_search_cache")
+                .update(updateData)
+                .eq("food_code", cachedData.food_code);
+
+              console.log("✅ DB 업데이트 완료:", {
+                원재료: updateData.raw_materials ? "보완됨" : "기존 유지",
+                알레르기: updateData.allergens
+                  ? `${updateData.allergens.length}개 보완`
+                  : "기존 유지",
+              });
+            }
+          } else {
+            console.log("⚠️ AI 보완 실패 - 신뢰도 낮거나 제품 미존재");
+          }
+        } catch (enrichError) {
+          console.error("❌ AI 데이터 보완 실패:", enrichError);
+          // 실패해도 기존 데이터로 계속 진행
+        }
+      }
       // ✅ 사용자 알레르기와 매칭
       detectedAllergens = allergyNames
         .map((allergen: string) => {
@@ -259,7 +359,12 @@ export async function GET(req: NextRequest) {
       // 알레르기 성분 (중복 제거)
       allergyNames = [
         ...new Set(
-          allergyItems.map((item: any) => item.ALG_CSG_MTR_NM).filter(Boolean),
+          allergyItems
+            .map((item: any) => item.ALG_CSG_MTR_NM)
+            .filter(
+              (name: string) =>
+                typeof name === "string" && name.trim().length > 0,
+            ),
         ),
       ];
 
@@ -280,7 +385,7 @@ export async function GET(req: NextRequest) {
 
       // ✅ 정교한 원재료 파싱 함수
       function parseIngredients(text: string): string[] {
-        const ingredients: string[] = [];
+        const items: string[] = [];
         let current = "";
         let depth = 0;
 
@@ -297,7 +402,7 @@ export async function GET(req: NextRequest) {
             // 괄호 밖의 쉼표만 분리
             const trimmed = current.trim();
             if (trimmed) {
-              ingredients.push(trimmed);
+              items.push(trimmed);
             }
             current = "";
           } else {
@@ -308,14 +413,14 @@ export async function GET(req: NextRequest) {
         // 마지막 항목
         const trimmed = current.trim();
         if (trimmed) {
-          ingredients.push(trimmed);
+          items.push(trimmed);
         }
 
-        return ingredients;
+        return items;
       }
 
       // 원재료 추출 부분 수정
-      const ingredients: string[] = rawMaterialsText
+      ingredients = rawMaterialsText
         ? parseIngredients(rawMaterialsText).slice(0, 30)
         : [];
 
@@ -451,7 +556,6 @@ export async function GET(req: NextRequest) {
     // ==========================================
     let alternatives: any[] = [];
 
-    // ✅ 위험한 제품일 때만 (사용자 알레르기 검출됨)
     if (detectedAllergens.length > 0) {
       console.log("🔍 대체 식품 추천 시작...");
       console.log("  - 현재 제품:", productName);
@@ -469,17 +573,13 @@ export async function GET(req: NextRequest) {
           .limit(20);
 
         if (safeProducts && safeProducts.length > 0) {
-          // ✅ 사용자 알레르기 없는 제품만
           const filtered = safeProducts.filter((product: any) => {
             const productAllergens = product.allergens || [];
-
-            // 위험 알레르기와 겹치는지 확인
             const hasUserAllergen = productAllergens.some((pa: string) =>
               detectedAllergens.some(
                 (da) => pa.includes(da?.name) || da?.name.includes(pa),
               ),
             );
-
             return !hasUserAllergen;
           });
 
@@ -495,12 +595,11 @@ export async function GET(req: NextRequest) {
           console.log(`✅ DB에서 안전한 대체품 ${alternatives.length}개 발견`);
         }
 
-        // 2. DB 부족하면 AI로 추가 생성
+        // 2. ✅ AI로 실제 제품 추천 + DB 저장
         if (alternatives.length < 3) {
-          console.log("🤖 AI 대체품 생성...");
+          console.log("🤖 AI 대체품 생성 + DB 저장...");
 
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
           const userAllergenNames = detectedAllergens
             .map((d) => d?.name)
             .join(", ");
@@ -510,27 +609,39 @@ export async function GET(req: NextRequest) {
             messages: [
               {
                 role: "user",
-                content: `"${productName}" 대신 먹을 수 있는 실제 제품 3가지를 추천해주세요.
+                content: `"${productName}" 대신 먹을 수 있는 한국에서 실제로 판매되는 제품 3가지를 추천해주세요.
+
+**중요 규칙:**
+1. 실제 존재하는 제품만 (임의 제품 금지)
+2. 제품명은 100% 한국어로만
+3. 제조사도 정확히 명시
 
 **제외해야 할 알레르기:** ${userAllergenNames}
 
-**조건:**
-- 실제 판매되는 제품만 (임의 제품 금지)
-- 위 알레르기 성분이 없어야 함
-- 비슷한 용도/맛
+**올바른 예시:**
+✅ {"productName": "오리온 초코파이", "manufacturer": "오리온", "allergens": ["밀", "대두"], "ingredients": ["밀가루", "설탕", "식물성유지"]}
+✅ {"productName": "빙그레 바나나맛우유", "manufacturer": "빙그레", "allergens": ["우유"], "ingredients": ["우유", "설탕", "바나나"]}
+
+**잘못된 예시:**
+❌ {"productName": "초코과자 A"} (임의 제품)
+❌ {"productName": "Chocolate Snack"} (영어)
 
 JSON 형식:
 [
   {
-    "productName": "실제 제품명",
+    "productName": "실제 제품명 (한국어만)",
     "manufacturer": "제조사",
-    "category": "카테고리",
-    "reason": "추천 이유 (간단히)"
+    "allergens": ["알레르기 (22가지 중)"],
+    "ingredients": ["주요 원재료 5~7개"],
+    "category": "과자|음료|유제품|빵|면류",
+    "reason": "추천 이유"
   }
-]`,
+]
+
+**알레르기 22가지:** 계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류`,
               },
             ],
-            max_tokens: 500,
+            max_tokens: 800,
           });
 
           const aiText = aiResponse.choices[0].message.content || "[]";
@@ -538,24 +649,61 @@ JSON 형식:
             .replace(/```json\n?/g, "")
             .replace(/```\n?/g, "")
             .trim();
-          const aiAlternatives = JSON.parse(clean);
+          let aiAlternatives = JSON.parse(clean);
 
-          if (Array.isArray(aiAlternatives)) {
-            alternatives = [
-              ...alternatives,
-              ...aiAlternatives
-                .slice(0, 3 - alternatives.length)
-                .map((alt: any) => ({
-                  barcode: "",
+          // 한국어 검증
+          aiAlternatives = aiAlternatives.filter((alt: any) => {
+            if (!alt.productName) return false;
+
+            const nonKoreanPattern =
+              /[\u0600-\u06FF\u0750-\u077F\u4E00-\u9FFF]/;
+            if (nonKoreanPattern.test(alt.productName)) {
+              console.warn("⚠️ 비한국어 제품명 제외:", alt.productName);
+              return false;
+            }
+
+            return true;
+          });
+
+          // AI 추천 제품을 DB에 저장
+          if (Array.isArray(aiAlternatives) && aiAlternatives.length > 0) {
+            for (const alt of aiAlternatives.slice(
+              0,
+              3 - alternatives.length,
+            )) {
+              const aiProductId = `ai-alt-${Buffer.from(alt.productName).toString("base64url").slice(0, 20)}-${Date.now()}`;
+
+              // DB에 저장
+              try {
+                await supabase.from("food_search_cache").upsert({
+                  food_code: aiProductId,
+                  food_name: alt.productName,
+                  manufacturer: alt.manufacturer || "",
+                  allergens: alt.allergens || [],
+                  raw_materials: alt.ingredients.join(", "),
+                  data_source: "ai",
+                  created_at: new Date().toISOString(),
+                });
+
+                console.log(`✅ AI 대체품 DB 저장: ${alt.productName}`);
+
+                // alternatives 배열에 추가
+                alternatives.push({
+                  barcode: aiProductId, // 실제 food_code
                   productName: alt.productName,
                   manufacturer: alt.manufacturer,
                   category: alt.category,
                   reason: alt.reason,
                   dataSource: "ai",
-                })),
-            ];
+                });
+              } catch (dbError) {
+                console.error("⚠️ AI 대체품 DB 저장 실패:", dbError);
+              }
+            }
 
-            console.log(`✅ AI 대체품 ${aiAlternatives.length}개 추가`);
+            console.log(
+              `✅ AI 대체품 ${alternatives.length}개 생성 + DB 저장 완료`,
+            );
           }
         }
       } catch (error) {
