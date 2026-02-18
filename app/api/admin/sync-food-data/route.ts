@@ -1,46 +1,94 @@
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
-import { NextResponse } from "next/server";
 
-export async function GET() {
-  const serviceKey = process.env.FOOD_API_KEY || "";
-  const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
-  const supabase = await createClient();
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const serviceKey = process.env.FOOD_API_KEY || "";
+    const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
 
-  let pageNo = 1;
-  let totalSynced = 0;
+    let pageNo = 1;
+    let totalSynced = 0;
+    const maxPages = 1000; // 안전장치 (무한루프 방지)
 
-  while (true) {
-    const url = `${baseUrl}/getFoodQrAllrgyInfo01?serviceKey=${serviceKey}&pageNo=${pageNo}&numOfRows=1000&type=json`;
-    const res = await fetch(url);
-    const data = await res.json();
+    console.log("🚀 식약처 데이터 동기화 시작...");
 
-    const items = data.body?.items || [];
-    if (items.length === 0) break; // 더 이상 데이터 없으면 종료
+    while (pageNo <= maxPages) {
+      // 식약처 API 호출
+      const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
+      url.searchParams.append("serviceKey", serviceKey);
+      url.searchParams.append("pageNo", pageNo.toString());
+      url.searchParams.append("numOfRows", "1000");
+      url.searchParams.append("type", "json");
 
-    // DB에 저장
-    const insertData = items.map((item: any) => ({
-      food_code: item.BRCD_NO,
-      food_name: item.PRDLST_NM,
-      manufacturer: item.BSSH_NM,
-      allergens: [item.ALLERGY1, item.ALLERGY2, item.ALLERGY3].filter(Boolean),
-      raw_materials: item.RAWMTRL_NM,
-      weight: item.CPCTY,
-      data_source: "openapi",
-      chosung: getChosung(item.PRDLST_NM),
-      created_at: new Date().toISOString(),
-    }));
+      console.log(`📊 페이지 ${pageNo} 조회 중...`);
 
-    await supabase
-      .from("food_search_cache")
-      .upsert(insertData, { onConflict: "food_code" });
+      const res = await fetch(url.toString());
+      const data = await res.json();
 
-    totalSynced += items.length;
-    pageNo++;
+      const items = data.body?.items || [];
 
-    // API 부하 방지 (1초 대기)
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (items.length === 0) {
+        console.log("✅ 더 이상 데이터 없음, 동기화 완료!");
+        break;
+      }
+
+      // DB에 저장할 데이터 준비
+      const insertData = items.map((item: any) => {
+        // 알레르기 정보 수집
+        const allergens: string[] = [];
+        if (item.ALLERGY1) allergens.push(item.ALLERGY1);
+        if (item.ALLERGY2) allergens.push(item.ALLERGY2);
+        if (item.ALLERGY3) allergens.push(item.ALLERGY3);
+        if (item.ALLERGY4) allergens.push(item.ALLERGY4);
+        if (item.ALLERGY5) allergens.push(item.ALLERGY5);
+        if (item.ALLERGY6) allergens.push(item.ALLERGY6);
+
+        return {
+          food_code: item.BRCD_NO,
+          food_name: item.PRDLST_NM,
+          manufacturer: item.BSSH_NM || null,
+          allergens: allergens.filter(Boolean),
+          raw_materials: item.RAWMTRL_NM || null,
+          weight: item.CPCTY || null,
+          data_source: "openapi",
+          chosung: getChosung(item.PRDLST_NM),
+          created_at: new Date().toISOString(),
+        };
+      });
+
+      // DB 저장
+      const { error } = await supabase
+        .from("food_search_cache")
+        .upsert(insertData, { onConflict: "food_code" });
+
+      if (error) {
+        console.error(`❌ 페이지 ${pageNo} 저장 실패:`, error);
+      } else {
+        totalSynced += items.length;
+        console.log(
+          `✅ 페이지 ${pageNo}: ${items.length}개 저장 (누적: ${totalSynced}개)`,
+        );
+      }
+
+      pageNo++;
+
+      // API 부하 방지 (1초 대기)
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    return NextResponse.json({
+      success: true,
+      totalSynced,
+      totalPages: pageNo - 1,
+      message: `${totalSynced}개 제품 동기화 완료`,
+    });
+  } catch (error) {
+    console.error("❌ 동기화 오류:", error);
+    return NextResponse.json(
+      { success: false, error: "동기화 중 오류 발생" },
+      { status: 500 },
+    );
   }
-
-  return NextResponse.json({ success: true, totalSynced });
 }
