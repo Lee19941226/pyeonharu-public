@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
     let pageNo = 1;
     let totalSynced = 0;
-    const maxPages = 1000; // 안전장치 (무한루프 방지)
+    const maxPages = 2000; // 안전장치 (무한루프 방지)
 
     console.log("🚀 식약처 데이터 동기화 시작...");
 
@@ -19,14 +19,18 @@ export async function GET(req: NextRequest) {
       const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", pageNo.toString());
-      url.searchParams.append("numOfRows", "1000");
+      url.searchParams.append("numOfRows", "500");
       url.searchParams.append("type", "json");
 
       console.log(`📊 페이지 ${pageNo} 조회 중...`);
-
+      console.log("🔗 요청 URL:", url.toString());
       const res = await fetch(url.toString());
+      console.log("📡 HTTP Status:", res.status);
       const data = await res.json();
-
+      console.log("📦 전체 응답:", JSON.stringify(data, null, 2));
+      console.log("📦 header:", data.header);
+      console.log("📦 body:", data.body);
+      console.log("📦 items 개수:", data.body?.items?.length || 0);
       const items = data.body?.items || [];
 
       if (items.length === 0) {
@@ -35,29 +39,31 @@ export async function GET(req: NextRequest) {
       }
 
       // DB에 저장할 데이터 준비
-      const insertData = items.map((item: any) => {
-        // 알레르기 정보 수집
-        const allergens: string[] = [];
-        if (item.ALLERGY1) allergens.push(item.ALLERGY1);
-        if (item.ALLERGY2) allergens.push(item.ALLERGY2);
-        if (item.ALLERGY3) allergens.push(item.ALLERGY3);
-        if (item.ALLERGY4) allergens.push(item.ALLERGY4);
-        if (item.ALLERGY5) allergens.push(item.ALLERGY5);
-        if (item.ALLERGY6) allergens.push(item.ALLERGY6);
+      const insertData = items
+        .filter((item: any) => item.BRCD_NO && item.PRDLST_NM)
+        .map((item: any) => {
+          // 알레르기 정보 수집
+          const allergens: string[] = [];
+          if (item.ALLERGY1) allergens.push(item.ALLERGY1);
+          if (item.ALLERGY2) allergens.push(item.ALLERGY2);
+          if (item.ALLERGY3) allergens.push(item.ALLERGY3);
+          if (item.ALLERGY4) allergens.push(item.ALLERGY4);
+          if (item.ALLERGY5) allergens.push(item.ALLERGY5);
+          if (item.ALLERGY6) allergens.push(item.ALLERGY6);
 
-        return {
-          food_code: item.BRCD_NO,
-          food_name: item.PRDLST_NM,
-          manufacturer: item.BSSH_NM || null,
-          allergens: allergens.filter(Boolean),
-          raw_materials: item.RAWMTRL_NM || null,
-          weight: item.CPCTY || null,
-          data_source: "openapi",
-          chosung: getChosung(item.PRDLST_NM),
-          created_at: new Date().toISOString(),
-        };
-      });
-
+          return {
+            food_code: item.BRCD_NO,
+            food_name: item.PRDLST_NM,
+            manufacturer: item.BSSH_NM || null,
+            allergens: allergens.filter(Boolean),
+            raw_materials: item.RAWMTRL_NM || null,
+            weight: item.CPCTY || null,
+            data_source: "openapi",
+            chosung: getChosung(item.PRDLST_NM),
+            created_at: new Date().toISOString(),
+          };
+        });
+      console.log("💾 저장 시작:", insertData.length, "개");
       // DB 저장
       const { error } = await supabase
         .from("food_search_cache")

@@ -2,7 +2,10 @@
  * 한글 텍스트를 초성으로 변환
  * 예: "오리온 초코송이" → "ㅇㄹㅇ ㅊㅋㅅㅇ"
  */
-export function getChosung(text: string): string {
+export function getChosung(text: string | null | undefined): string {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
   const CHO = [
     "ㄱ",
     "ㄲ",
