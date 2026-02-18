@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { getChosung, normalizeChosungQuery } from "@/lib/utils/chosung";
 
 interface ProductScore {
   foodCode: string;
@@ -55,12 +56,46 @@ export async function GET(req: NextRequest) {
       // ── Source 1: DB 캐시 ──
       (async () => {
         try {
-          const { data } = await supabase
+          // 1. 일반 텍스트 검색
+          const textQuery = supabase
             .from("food_search_cache")
             .select("*")
-            .ilike("food_name", `%${query}%`)
-            .limit(50);
-          return data || [];
+            .or(`food_name.ilike.%${query}%,manufacturer.ilike.%${query}%`)
+            .limit(30);
+
+          // 2. 초성 검색 (쿼리에 한글 자음만 있으면)
+          const isChosungQuery = /^[ㄱ-ㅎ\s]+$/.test(query);
+          let chosungQuery;
+
+          if (isChosungQuery) {
+            const normalizedChosung = normalizeChosungQuery(query);
+            chosungQuery = supabase
+              .from("food_search_cache")
+              .select("*")
+              .ilike("chosung", `%${normalizedChosung}%`)
+              .limit(30);
+          }
+
+          // 3. 병렬 실행 후 합치기
+          const [textResults, chosungResults] = await Promise.all([
+            textQuery.then(({ data }) => data || []),
+            isChosungQuery && chosungQuery
+              ? chosungQuery.then(({ data }) => data || [])
+              : Promise.resolve([]),
+          ]);
+
+          // 4. 중복 제거 (food_code 기준)
+          const seen = new Set<string>();
+          const merged: any[] = [];
+
+          [...textResults, ...chosungResults].forEach((item) => {
+            if (!seen.has(item.food_code)) {
+              seen.add(item.food_code);
+              merged.push(item);
+            }
+          });
+
+          return merged;
         } catch {
           return [];
         }
@@ -354,6 +389,7 @@ NOT "초코파이 A", "초코파이 B" (❌)
               raw_materials: rawMaterials || null,
               weight: item.weight || null,
               data_source: "ai",
+              chosung: getChosung(item.foodName),
               created_at: new Date().toISOString(),
             };
           }),

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getChosung } from "@/lib/utils/chosung";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -488,6 +489,8 @@ export async function POST(req: NextRequest) {
               finalIngredients.join(", ") ||
               null,
             data_source: dataSource,
+            chosung: getChosung(finalProductName),
+            created_at: new Date().toISOString(),
             nutrition_info: finalNutritionInfo,
           },
           { onConflict: "food_code" },
