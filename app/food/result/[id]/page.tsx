@@ -650,7 +650,10 @@ export default function FoodResultPage() {
                         주의! 알레르기 위험
                       </h2>
                       <p className="text-sm text-destructive/80">
-                        {safeDetectedAllergens.map((a) => a.name).join(", ")}{" "}
+                        {safeDetectedAllergens
+                          .filter((a) => a && a.name)
+                          .map((a) => a.name)
+                          .join(", ")}{" "}
                         함유
                       </p>
                       <p className="text-sm text-destructive/80">
@@ -841,6 +844,52 @@ export default function FoodResultPage() {
               </Card>
             )}
 
+            {/* 원재료 통합 섹션 */}
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                  📝 원재료명 및 함량
+                </h3>
+
+                {safeIngredients.length > 0 ? (
+                  // ✅ Open API 원재료 (상세) - 번호 매긴 리스트
+                  <div className="max-h-[600px] space-y-2 overflow-y-auto pr-2">
+                    {safeIngredients.map((ingredient, idx) => (
+                      <div key={idx} className="flex gap-3 text-sm">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                          {idx + 1}
+                        </span>
+                        <span className="flex-1 leading-relaxed">
+                          {ingredient}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : result.detectedIngredients &&
+                  result.detectedIngredients.length > 0 ? (
+                  // ✅ AI 감지 재료 - 배지 형태
+                  <div>
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      ✔ 주요 원재료
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {result.detectedIngredients.map((ingredient, idx) => (
+                        <Badge key={idx} variant="secondary">
+                          {ingredient}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  // ✅ 원재료 정보 없음
+                  <div className="rounded-lg bg-muted p-8 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      원재료 정보가 제공되지 않습니다
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             {/* 대체 식품 추천 (위험할 때만 표시) */}
             {!result.isSafe &&
               result.alternatives &&
@@ -922,53 +971,6 @@ export default function FoodResultPage() {
                   </CardContent>
                 </Card>
               )}
-
-            {/* 원재료 통합 섹션 */}
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                  📝 원재료명 및 함량
-                </h3>
-
-                {safeIngredients.length > 0 ? (
-                  // ✅ Open API 원재료 (상세) - 번호 매긴 리스트
-                  <div className="max-h-[600px] space-y-2 overflow-y-auto pr-2">
-                    {safeIngredients.map((ingredient, idx) => (
-                      <div key={idx} className="flex gap-3 text-sm">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 leading-relaxed">
-                          {ingredient}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : result.detectedIngredients &&
-                  result.detectedIngredients.length > 0 ? (
-                  // ✅ AI 감지 재료 - 배지 형태
-                  <div>
-                    <p className="mb-3 text-sm text-muted-foreground">
-                      ✔ 주요 원재료
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {result.detectedIngredients.map((ingredient, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {ingredient}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  // ✅ 원재료 정보 없음
-                  <div className="rounded-lg bg-muted p-8 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      원재료 정보가 제공되지 않습니다
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* 알레르기 미등록 안내 */}
             {safeUserAllergens.length === 0 && (
