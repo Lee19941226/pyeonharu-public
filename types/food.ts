@@ -198,3 +198,12 @@ export interface HistoryItem {
   checkedAt: string;
   isSafe: boolean;
 }
+// 음식 즐겨찾기
+export interface FoodBookmark {
+  id: string;
+  foodCode: string;
+  foodName: string;
+  manufacturer: string;
+  isSafe: boolean;
+  createdAt: string;
+}
