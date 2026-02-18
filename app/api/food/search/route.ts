@@ -103,28 +103,53 @@ export async function GET(req: NextRequest) {
           messages: [
             {
               role: "user",
-              content: `한국에서 실제로 판매되거나 흔히 먹는 식품 중 "${query}"가 포함되거나 관련된 제품/음식을 최대 15개 알려주세요.
-가공식품, 음료, 과자, 일반 음식 모두 포함하고, 
-* 중요: 실제 존재하는 제품만 알려주세요. 임의로 만들지 마세요.*
+              content: `한국에서 실제로 판매되는 식품 중 "${query}"와 관련된 제품 15개를 찾아주세요.
 
-JSON 배열만 반환:
+**중요 규칙:**
+1. 제품명은 반드시 한국어로만 작성하세요
+2. 실제 존재하는 제품만 알려주세요 (임의로 만들지 마세요)
+3. 외국어, 아랍어, 영어 등 한국어가 아닌 언어는 절대 사용하지 마세요
+4. 제품명에 특수문자나 이모지를 넣지 마세요
+
+**올바른 예시:**
+✅ "오리온 초코파이"
+✅ "롯데 칸쵸"
+✅ "농심 새우깡"
+✅ "빙그레 바나나맛우유"
+
+**잘못된 예시:**
+❌ "오리온 سودا" (아랍어 포함)
+❌ "Orion Chips" (영어)
+❌ "초코파이🍫" (이모지)
+
+JSON 배열 형식으로만 반환:
 [
   {
-    "foodName": "실제 제품명 또는 음식명",
-    "manufacturer": "제조사 (가공식품인 경우)",
+    "foodName": "실제 제품명 (한국어만)",
+    "manufacturer": "제조사 (예: 오리온, 롯데제과)",
     "allergens": ["알레르기 유발물질"],
-    "category": "과자|음료|유제품|빵|면류|소스|과일|음식|기타"
-    "ingredients": ["주요 원재료를 3~5개 나열"]
+    "ingredients": ["주요 원재료 3~5개"],
+    "category": "과자|음료|유제품|빵|면류|소스|식재료|기타",
+    "weight": "용량 (예: 120g)" 
   }
 ]
 
-한국 식약처 지정 22가지 알레르기 기준으로 분석:
+**알레르기 유발물질 (한국 식약처 지정 22가지만 사용):**
 계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류
 
-**예시:**
+**실제 제품 예시:**
 "초코파이" 검색 시:
-- ✅ "오리온 초코파이", "롯데 몽쉘", "크라운 초코하임" (실제 제품)
-- ❌ "초코파이 A", "초코파이 B" (임의 제품)`,
+- "오리온 초코파이" (⭕)
+- "롯데 몽쉘" (⭕)
+- "크라운 초코하임" (⭕)
+NOT "초코파이 A", "초코파이 B" (❌)
+
+"우유" 검색 시:
+- "서울우유" (⭕)
+- "빙그레 바나나맛우유" (⭕)
+- "매일유업 상하목장 유기농우유" (⭕)
+
+다시 한번 강조: 제품명은 100% 한국어로만 작성하세요!`,
             },
           ],
           max_tokens: 2000,
@@ -135,8 +160,30 @@ JSON 배열만 반환:
           .replace(/```json\n?/g, "")
           .replace(/```\n?/g, "")
           .trim();
-        aiItems = JSON.parse(clean);
-        console.log(`✅ AI 결과: ${aiItems.length}개 추가`);
+        let aiItems = JSON.parse(clean);
+        // ✅ 한국어가 아닌 제품명 필터링
+        aiItems = aiItems.filter((item: any) => {
+          if (!item.foodName) return false;
+
+          // 아랍어, 히브리어, 중국어 간체/번체 등 비한글/비영어 문자 체크
+          const nonKoreanPattern =
+            /[\u0600-\u06FF\u0750-\u077F\u4E00-\u9FFF\u3400-\u4DBF]/;
+
+          if (nonKoreanPattern.test(item.foodName)) {
+            console.warn("⚠️ 비한국어 제품명 제외:", item.foodName);
+            return false;
+          }
+
+          // 이모지 체크
+          const emojiPattern = /[\u{1F300}-\u{1F9FF}]/u;
+          if (emojiPattern.test(item.foodName)) {
+            console.warn("⚠️ 이모지 포함 제품명 제외:", item.foodName);
+            return false;
+          }
+
+          return true;
+        });
+        console.log(`✅ AI 결과 : ${aiItems.length}개 추가`);
       } catch (e) {
         console.error("❌ AI 분석 실패:", e);
         aiItems = [];
