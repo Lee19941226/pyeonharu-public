@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     // ==========================================
     // Step 1: OpenAI Vision으로 이미지 분석
     // ==========================================
-    interface AIAnalysisResult {
+    interface OpenAIVisionResponse {
       productName: string;
       manufacturer: string;
       barcode: string;
@@ -36,10 +36,12 @@ export async function POST(req: NextRequest) {
       } | null;
       identificationReason: string;
     }
-    let analysisData: AIAnalysisResult;
+
+    // ✅ 타입 변경
+    let analysisData: OpenAIVisionResponse;
     try {
       const visionResponse = await openai.chat.completions.create({
-        model: "gpt-4o-2024-08-06", // ✅ structured outputs 지원 모델
+        model: "gpt-4o-2024-08-06",
         messages: [
           {
             role: "user",
@@ -194,7 +196,7 @@ export async function POST(req: NextRequest) {
         throw new Error("AI 응답이 비어있습니다");
       }
 
-      analysisData = JSON.parse(messageContent) as AIAnalysisResult;
+      analysisData = JSON.parse(messageContent) as OpenAIVisionResponse;
 
       // 기본값 설정
       const safeAnalysisData = {
@@ -286,6 +288,7 @@ export async function POST(req: NextRequest) {
             allergens: cacheData.allergens || [],
             rawMaterials: cacheData.raw_materials || "",
             weight: cacheData.weight || "",
+            nutritionInfo: cacheData.nutrition_info || null,
           };
           console.log("✅ DB 캐시에서 발견:", dbProductData.productName);
         } else {
@@ -309,21 +312,29 @@ export async function POST(req: NextRequest) {
       const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
 
       try {
-        const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
-        url.searchParams.append("serviceKey", serviceKey);
-        url.searchParams.append("pageNo", "1");
-        url.searchParams.append("numOfRows", "1");
-        url.searchParams.append("type", "json");
-        url.searchParams.append("brcd_no", analysisData.barcode);
+        // ✅ 병렬로 알레르기 + 영양정보 조회
+        const [allergyResponse, nutritionResponse] = await Promise.all([
+          // 알레르기 정보
+          fetch(
+            `${baseUrl}/getFoodQrAllrgyInfo01?serviceKey=${serviceKey}&pageNo=1&numOfRows=1&type=json&brcd_no=${analysisData.barcode}`,
+          ),
+          // 영양정보
+          fetch(
+            `${baseUrl}/getFoodQrProdNsd01?serviceKey=${serviceKey}&pageNo=1&numOfRows=100&type=json&brcd_no=${analysisData.barcode}`,
+          ),
+        ]);
 
-        const allergyResponse = await fetch(url.toString());
         const allergyData = await allergyResponse.json();
+        const nutritionData = await nutritionResponse.json();
+
         const allergyItems = allergyData.body?.items || [];
+        const nutritionItems = nutritionData.body?.items || [];
 
         if (allergyItems.length > 0) {
           const item = allergyItems[0];
           foodCode = item.BRCD_NO;
 
+          // 알레르기 정보 수집
           const apiAllergens: string[] = [];
           if (item.ALLERGY1) apiAllergens.push(item.ALLERGY1);
           if (item.ALLERGY2) apiAllergens.push(item.ALLERGY2);
@@ -332,6 +343,33 @@ export async function POST(req: NextRequest) {
           if (item.ALLERGY5) apiAllergens.push(item.ALLERGY5);
           if (item.ALLERGY6) apiAllergens.push(item.ALLERGY6);
 
+          // ✅ 영양정보 추출
+          let nutritionInfo = null;
+          if (nutritionItems.length > 0) {
+            const nutritionMap: Record<string, string> = {};
+
+            nutritionItems.forEach((nutItem: any) => {
+              const name = nutItem.NTR_NM; // 영양소명
+              const content = nutItem.NTR_CN; // 함량
+              if (name && content) {
+                nutritionMap[name] = content;
+              }
+            });
+
+            nutritionInfo = {
+              servingSize:
+                nutritionMap["1회제공량"] || nutritionMap["총내용량"] || "",
+              calories: nutritionMap["열량"] || "",
+              sodium: nutritionMap["나트륨"] || "",
+              carbs: nutritionMap["탄수화물"] || "",
+              sugars: nutritionMap["당류"] || "",
+              fat: nutritionMap["지방"] || "",
+              protein: nutritionMap["단백질"] || "",
+            };
+
+            console.log("✅ 영양정보 추출:", nutritionInfo);
+          }
+
           apiProductData = {
             productName: item.PRDLST_NM || analysisData.productName,
             manufacturer: item.BSSH_NM,
@@ -339,6 +377,7 @@ export async function POST(req: NextRequest) {
             allergens: apiAllergens.filter(Boolean),
             rawMaterials: item.RAWMTRL_NM || "",
             weight: item.CPCTY || "",
+            nutritionInfo: nutritionInfo,
           };
 
           console.log("✅ Open API 제품 발견:", apiProductData);
@@ -419,8 +458,6 @@ export async function POST(req: NextRequest) {
     let dbSaveSuccess = false;
     if (!foodCode) {
       const timestamp = Date.now();
-
-      // ✅ finalProductName이 없을 경우 기본값 사용
       const safeName = finalProductName || "알 수 없는 제품";
       const productSlug = safeName
         .toLowerCase()
@@ -429,7 +466,11 @@ export async function POST(req: NextRequest) {
 
       foodCode = `ai-${productSlug}-${timestamp}`;
     }
-
+    const finalNutritionInfo =
+      apiProductData?.nutritionInfo ||
+      dbProductData?.nutritionInfo ||
+      analysisData.nutritionInfo ||
+      null;
     try {
       const { error: saveError } = await supabase
         .from("food_search_cache")
@@ -447,6 +488,7 @@ export async function POST(req: NextRequest) {
               finalIngredients.join(", ") ||
               null,
             data_source: dataSource,
+            nutrition_info: finalNutritionInfo,
           },
           { onConflict: "food_code" },
         );
@@ -455,6 +497,7 @@ export async function POST(req: NextRequest) {
         console.error("❌ DB 저장 실패:", saveError);
       } else {
         console.log("✅ 분석 결과 DB 저장 완료:", foodCode);
+        dbSaveSuccess = true;
       }
     } catch (saveError) {
       console.error("❌ DB 저장 중 오류:", saveError);
@@ -473,28 +516,18 @@ export async function POST(req: NextRequest) {
       allergens: finalAllergens,
       hasUserAllergen: finalHasUserAllergen,
       matchedUserAllergens: finalMatchedAllergens,
-      foodCode: dbSaveSuccess ? foodCode : null,
-      dataSource,
-      rawMaterials: apiProductData?.rawMaterials || null,
-      nutritionInfo: analysisData.nutritionInfo,
-    });
+      foodCode: dbSaveSuccess ? foodCode : undefined,
 
-    // ==========================================
-    // Step 6: 최종 결과 반환
-    // ==========================================
-    return NextResponse.json({
-      success: true,
-      productName: finalProductName,
-      manufacturer: apiProductData?.manufacturer || analysisData.manufacturer,
-      weight: apiProductData?.weight || analysisData.weight,
-      detectedIngredients: finalIngredients,
-      allergens: finalAllergens,
-      hasUserAllergen: finalHasUserAllergen,
-      matchedUserAllergens: finalMatchedAllergens,
-      foodCode,
-      dataSource,
-      rawMaterials: apiProductData?.rawMaterials,
-      nutritionInfo: analysisData.nutritionInfo,
+      // ✅ 추가: 원재료 정보
+      rawMaterials:
+        apiProductData?.rawMaterials || finalIngredients.join(", ") || "",
+
+      // ✅ 추가: 영양 정보
+      nutritionInfo: finalNutritionInfo,
+
+      // ✅ 추가: ingredients (detectedIngredients와 동일하지만 명시적으로)
+      ingredients: finalIngredients,
+      dataSource: dataSource,
     });
   } catch (error) {
     console.error("💥 전체 분석 에러:", error);

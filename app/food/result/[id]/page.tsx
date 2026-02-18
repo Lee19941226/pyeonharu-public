@@ -129,52 +129,66 @@ export default function FoodResultPage() {
 
       console.log("🔍 결과 로드 시작:", id);
 
-      // AI 분석 결과 체크 (ai-로 시작)
-      if (id?.startsWith("ai-")) {
-        console.log("🤖 AI 분석 결과 로드 시도");
+      // ==========================================
+      // 1단계: 무조건 API 우선 호출 (AI든 일반이든)
+      // ==========================================
+      try {
+        console.log("📡 API 호출:", `/api/food/result?code=${id}`);
 
-        // 1. DB 먼저 조회 (우선순위 1)
-        try {
-          console.log("📦 DB에서 AI 결과 조회 시도");
-          const response = await fetch(`/api/food/result?code=${id}`, {
-            credentials: "include",
-          });
+        const response = await fetch(`/api/food/result?code=${id}`, {
+          credentials: "include",
+        });
 
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              console.log("✅ DB에서 AI 결과 로드 성공");
-              setResult(data.result);
-              setIsLoading(false);
+        // ✅ API 성공
+        if (response.ok) {
+          const data = await response.json();
 
-              setTimeout(() => {
-                saveToHistory(data.result);
-              }, 0);
+          if (data.success) {
+            console.log("✅ API 성공 - 완전한 결과 로드");
+            console.log("  - 제품명:", data.result.foodName);
+            console.log("  - 데이터 소스:", data.result.dataSource);
+            console.log(
+              "  - 원재료:",
+              data.result.ingredients?.length || 0,
+              "개",
+            );
+            console.log(
+              "  - 대체품:",
+              data.result.alternatives?.length || 0,
+              "개",
+            );
 
-              return; // 성공하면 여기서 종료
-            }
+            setResult(data.result);
+
+            setTimeout(() => {
+              saveToHistory(data.result);
+            }, 0);
+
+            return; // ✅ 성공 시 여기서 종료
           }
-        } catch (dbError) {
-          console.warn("⚠️ DB 조회 실패, sessionStorage 확인:", dbError);
         }
 
-        // 2. ✅ sessionStorage 백업 (우선순위 2)
-        const storageKey = `ai_result_${id}`;
-        console.log("📦 sessionStorage 키:", storageKey);
+        // ⚠️ API 응답은 왔지만 실패
+        console.warn("⚠️ API 응답 실패:", response.status);
+      } catch (apiError) {
+        console.error("❌ API 호출 오류:", apiError);
+      }
 
+      // ==========================================
+      // 2단계: API 실패 시 sessionStorage 백업 (AI만)
+      // ==========================================
+      if (id?.startsWith("ai-")) {
+        console.log("🔄 sessionStorage 백업 확인 (AI 결과)");
+
+        const storageKey = `ai_result_${id}`;
         const analysisData = sessionStorage.getItem(storageKey);
-        console.log(
-          "📦 sessionStorage 데이터:",
-          analysisData ? "있음" : "없음",
-        );
 
         if (analysisData) {
-          console.log("✅ sessionStorage에서 AI 결과 로드");
+          console.log("✅ sessionStorage에서 복구");
+
           const analysisResult = JSON.parse(analysisData);
 
-          // FoodResult 형식으로 변환
-          const processedIngredients = analysisResult.detectedIngredients || [];
-
+          // ✅ FoodResult 형식으로 변환
           const aiResult: FoodResult = {
             foodCode: id,
             foodName: analysisResult.productName || "제품명 없음",
@@ -193,10 +207,15 @@ export default function FoodResultPage() {
                   : "medium",
               }),
             ),
-            ingredients: analysisResult.ingredients || processedIngredients,
+            ingredients:
+              analysisResult.ingredients ||
+              analysisResult.detectedIngredients ||
+              [],
             isSafe: !analysisResult.hasUserAllergen,
             dataSource: analysisResult.dataSource || "ai",
-            detectedIngredients: processedIngredients,
+            detectedIngredients: analysisResult.detectedIngredients || [],
+
+            // ✅ 영양정보
             nutritionDetails: analysisResult.nutritionInfo
               ? [
                   {
@@ -233,50 +252,31 @@ export default function FoodResultPage() {
               : undefined,
             servingSize: analysisResult.nutritionInfo?.servingSize,
             hasNutritionInfo: !!analysisResult.nutritionInfo,
-            alternatives: [],
+            alternatives: [], // sessionStorage에는 대체품 없음
           };
 
           setResult(aiResult);
-          setIsLoading(false);
 
           setTimeout(() => {
             saveToHistory(aiResult);
           }, 0);
 
-          return;
-        } else {
-          // 3. DB도 없고 sessionStorage도 없음
-          console.error("❌ AI 결과를 찾을 수 없음");
-          setError("AI 분석 결과를 찾을 수 없습니다");
-          setIsLoading(false);
-          return;
+          return; // ✅ 백업 사용 성공
         }
+
+        // ❌ sessionStorage에도 없음
+        console.error("❌ sessionStorage에도 데이터 없음");
+        setError("AI 분석 결과를 찾을 수 없습니다");
+        return;
       }
 
-      // 일반 제품 (DB 조회)
-      console.log("🔍 DB에서 제품 조회:", id);
-
-      const response = await fetch(`/api/food/result?code=${id}`, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("제품 정보를 불러올 수 없습니다");
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setResult(data.result);
-
-        setTimeout(() => {
-          saveToHistory(data.result);
-        }, 0);
-      } else {
-        setError(data.error || "제품 정보를 불러올 수 없습니다");
-      }
+      // ==========================================
+      // 3단계: 일반 제품인데 API 실패 → 에러
+      // ==========================================
+      console.error("❌ 제품 정보를 불러올 수 없음");
+      setError("제품 정보를 불러올 수 없습니다");
     } catch (error) {
-      console.error("💥 로딩 에러:", error);
+      console.error("💥 loadFoodResult 전체 오류:", error);
       setError("결과를 불러오는 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);

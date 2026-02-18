@@ -11,6 +11,10 @@ interface ProductScore {
   score: number;
   matchReason: string;
   dataSource: "db" | "openapi" | "ai";
+  ingredients?: string[];
+  detectedIngredients?: string[];
+  weight?: string;
+  rawMaterials?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -100,7 +104,8 @@ export async function GET(req: NextRequest) {
             {
               role: "user",
               content: `한국에서 실제로 판매되거나 흔히 먹는 식품 중 "${query}"가 포함되거나 관련된 제품/음식을 최대 15개 알려주세요.
-가공식품, 음료, 과자, 일반 음식 모두 포함하세요.
+가공식품, 음료, 과자, 일반 음식 모두 포함하고, 
+* 중요: 실제 존재하는 제품만 알려주세요. 임의로 만들지 마세요.*
 
 JSON 배열만 반환:
 [
@@ -109,14 +114,20 @@ JSON 배열만 반환:
     "manufacturer": "제조사 (가공식품인 경우)",
     "allergens": ["알레르기 유발물질"],
     "category": "과자|음료|유제품|빵|면류|소스|과일|음식|기타"
+    "ingredients": ["주요 원재료를 3~5개 나열"]
   }
 ]
 
 한국 식약처 지정 22가지 알레르기 기준으로 분석:
-계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류`,
+계란, 우유, 밀, 메밀, 땅콩, 대두, 호두, 잣, 견과류, 갑각류, 새우, 게, 고등어, 오징어, 조개류, 생선, 복숭아, 토마토, 돼지고기, 쇠고기, 닭고기, 아황산류
+
+**예시:**
+"초코파이" 검색 시:
+- ✅ "오리온 초코파이", "롯데 몽쉘", "크라운 초코하임" (실제 제품)
+- ❌ "초코파이 A", "초코파이 B" (임의 제품)`,
             },
           ],
-          max_tokens: 1500,
+          max_tokens: 2000,
         });
 
         const aiText = aiResponse.choices[0].message.content || "[]";
@@ -158,9 +169,11 @@ JSON 배열만 반환:
         manufacturer: item.manufacturer || "",
         allergens: item.allergens || [],
         hasAllergen,
-        score: nameScore + 200, // DB 우선
+        score: nameScore + 200,
         matchReason: "DB",
         dataSource: "db",
+        rawMaterials: item.raw_materials || "",
+        weight: item.weight || "",
       });
     });
 
@@ -229,6 +242,7 @@ JSON 배열만 반환:
           score: 60,
           matchReason: `AI (${item.category || "식품"})`,
           dataSource: "ai",
+          ingredients: item.ingredients || [],
         });
       });
     }
@@ -266,23 +280,46 @@ JSON 배열만 반환:
     // ==========================================
     const aiToCache = deduped.filter((r) => r.dataSource === "ai");
     if (aiToCache.length > 0) {
+      console.log(`💾 AI 결과 ${aiToCache.length}개 DB 캐시 저장 시작...`);
+
       supabase
         .from("food_search_cache")
         .upsert(
-          aiToCache.map((item) => ({
-            food_code: item.foodCode,
-            food_name: item.foodName,
-            manufacturer: item.manufacturer || null,
-            allergens: item.allergens,
-            raw_materials: null,
-            weight: null,
-            data_source: "ai",
-          })),
+          aiToCache.map((item) => {
+            // ✅ AI 결과에서 원재료 정보 추출
+            const rawMaterials =
+              item.rawMaterials ||
+              item.ingredients?.join(", ") ||
+              item.detectedIngredients?.join(", ") ||
+              "";
+
+            console.log(`  - ${item.foodName}:`);
+            console.log(
+              `    raw_materials: "${rawMaterials.substring(0, 50)}..."`,
+            );
+            console.log(`    allergens: [${item.allergens.join(", ")}]`);
+
+            return {
+              food_code: item.foodCode,
+              food_name: item.foodName,
+              manufacturer: item.manufacturer || null,
+              allergens: item.allergens || [],
+              raw_materials: rawMaterials || null,
+              weight: item.weight || null,
+              data_source: "ai",
+              created_at: new Date().toISOString(),
+            };
+          }),
           { onConflict: "food_code" },
         )
-        .then(() => console.log("✅ AI 결과 DB 캐시 저장 완료"));
+        .then(({ error }) => {
+          if (error) {
+            console.error("❌ AI 결과 DB 캐시 저장 실패:", error);
+          } else {
+            console.log("✅ AI 결과 DB 캐시 저장 완료");
+          }
+        });
     }
-
     // ==========================================
     // 반환
     // ==========================================

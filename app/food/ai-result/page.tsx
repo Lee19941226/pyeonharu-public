@@ -19,8 +19,31 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { AIAnalysisResult } from "@/types/food";
 
+interface AIAnalysisResult {
+  productName?: string;
+  manufacturer?: string;
+  detectedIngredients: string[];
+  allergens: string[];
+  hasUserAllergen: boolean;
+  matchedUserAllergens: string[];
+  foodCode?: string;
+  dataSource?: string;
+  rawMaterials?: string;
+  nutritionInfo?: NutritionInfo;
+  ingredients?: string[];
+  weight?: string;
+  isProcessing: boolean;
+}
+interface NutritionInfo {
+  calories?: string;
+  sodium?: string;
+  carbs?: string;
+  protein?: string;
+  fat?: string;
+  sugars?: string;
+  servingSize?: string;
+}
 export default function AIResultPage() {
   const router = useRouter();
   const hasAnalyzed = useRef(false);
@@ -148,23 +171,47 @@ export default function AIResultPage() {
       console.log("💾 AI 결과를 DB와 sessionStorage에 저장");
       const aiId = `ai-${Date.now()}`;
 
-      // 1. Supabase DB에 저장
+      // 1. ✅ Supabase DB에 저장
       try {
         const supabase = createClient();
-        await supabase.from("food_search_cache").upsert({
+
+        // ✅ rawMaterials 변수 정의
+        const rawMaterials =
+          data.rawMaterials ||
+          (data.detectedIngredients || data.ingredients || []).join(", ") ||
+          "";
+
+        console.log("💾 DB 저장 데이터:", {
           food_code: aiId,
           food_name: data.productName || "제품명 없음",
-          manufacturer: data.manufacturer || "",
-          allergens: data.allergens || [],
-          raw_materials: data.rawMaterials || "",
-          weight: data.weight || "",
-          data_source: "ai",
-          created_at: new Date().toISOString(),
+          raw_materials: rawMaterials,
+          allergens: data.allergens?.lenghth || 0,
         });
-        console.log("✅ DB 저장 완료");
+
+        const { error: dbError } = await supabase
+          .from("food_search_cache")
+          .upsert({
+            food_code: aiId,
+            food_name: data.productName || "제품명 없음",
+            manufacturer: data.manufacturer || "",
+            allergens: data.allergens || [],
+            raw_materials: rawMaterials,
+            weight: data.weight || "",
+            data_source: "ai",
+            created_at: new Date().toISOString(),
+          });
+        if (dbError) {
+          console.error("❌ DB 저장 오류:", dbError);
+        } else {
+          console.log("✅ DB 저장 완료");
+          console.log("  - food_code:", aiId);
+          console.log(
+            "  - raw_materials:",
+            rawMaterials.substring(0, 50) + "...",
+          );
+        }
       } catch (dbError) {
         console.error("⚠️ DB 저장 실패:", dbError);
-        // DB 저장 실패해도 계속 진행 (sessionStorage 백업 있음)
       }
 
       // 2. sessionStorage에도 저장 (백업)
