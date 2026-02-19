@@ -170,7 +170,8 @@ export async function GET(req: NextRequest) {
     let debugResponses: any[] = []
 
     for (const endpoint of endpoints) {
-      const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cy=${userLat}&cx=${userLng}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
+      // cx=경도, cy=위도 (API 문서 기준)
+      const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cx=${userLng}&cy=${userLat}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
 
       try {
         const apiRes = await fetch(apiUrl)
@@ -185,6 +186,11 @@ export async function GET(req: NextRequest) {
         if (apiRes.ok && apiText.trim().startsWith("{")) {
           try {
             const parsed = JSON.parse(apiText)
+            // NODATA_ERROR면 다음 엔드포인트 시도
+            if (parsed?.header?.resultCode === "03" || parsed?.header?.resultMsg === "NODATA_ERROR") {
+              lastError = `${endpoint}: NODATA_ERROR`
+              continue
+            }
             apiData = parsed
             break
           } catch {
