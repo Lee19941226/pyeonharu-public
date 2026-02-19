@@ -167,6 +167,7 @@ export async function GET(req: NextRequest) {
 
     let apiData: any = null
     let lastError = ""
+    let debugResponses: any[] = []
 
     for (const endpoint of endpoints) {
       const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cy=${userLat}&cx=${userLng}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
@@ -174,35 +175,55 @@ export async function GET(req: NextRequest) {
       try {
         const apiRes = await fetch(apiUrl)
         const apiText = await apiRes.text()
+        
+        debugResponses.push({
+          endpoint: endpoint.split("/").pop(),
+          status: apiRes.status,
+          raw: apiText.slice(0, 500),
+        })
 
-        if (apiRes.ok) {
+        if (apiRes.ok && apiText.trim().startsWith("{")) {
           try {
             const parsed = JSON.parse(apiText)
-            // 성공 응답 확인 (body가 있는지)
-            if (parsed?.body || parsed?.items) {
-              apiData = parsed
-              break
-            }
-            lastError = `${endpoint} ok but no body: keys=${Object.keys(parsed).join(",")}, raw=${apiText.slice(0, 300)}`
+            apiData = parsed
+            break
           } catch {
-            // JSON 파싱 실패 시 다음 엔드포인트 시도
+            // JSON 파싱 실패
           }
         }
         lastError = `${apiRes.status}: ${apiText.slice(0, 200)}`
       } catch (err: any) {
         lastError = err?.message || "fetch error"
+        debugResponses.push({ endpoint: endpoint.split("/").pop(), error: lastError })
       }
     }
 
-    if (!apiData) {
-      return NextResponse.json({
-        error: "음식점 검색에 실패했습니다.",
-        debug: { lastError }
-      }, { status: 500 })
+    // 디버그: API 원본 응답 반환
+    if (!apiData || debugResponses.length > 0) {
+      // 임시: 디버그용으로 raw 응답도 반환
     }
 
-    const items = apiData?.body?.items || apiData?.items || []
-    const totalCount = apiData?.body?.totalCount || apiData?.totalCount || 0
+    // 응답 구조 탐색 (다양한 구조 대응)
+    let items: any[] = []
+    let totalCount = 0
+    if (apiData) {
+      // 가능한 구조들 탐색
+      items = apiData?.body?.items 
+        || apiData?.items 
+        || apiData?.response?.body?.items?.item
+        || apiData?.response?.body?.items
+        || apiData?.header?.body?.items
+        || []
+      totalCount = apiData?.body?.totalCount 
+        || apiData?.totalCount 
+        || apiData?.response?.body?.totalCount
+        || (Array.isArray(items) ? items.length : 0)
+      
+      // items가 배열이 아닌 경우 대응
+      if (items && !Array.isArray(items)) {
+        items = [items]
+      }
+    }
 
     // 3. 음식점 데이터 변환 + 알레르기 매칭
     const seenNames = new Set<string>()
@@ -269,8 +290,7 @@ export async function GET(req: NextRequest) {
       debug: {
         itemsRaw: items.length,
         totalCount,
-        apiBodyKeys: apiData?.body ? Object.keys(apiData.body) : Object.keys(apiData),
-        firstItem: items[0] ? JSON.stringify(items[0]).slice(0, 300) : null,
+        debugResponses,
       },
     })
   } catch (error) {
