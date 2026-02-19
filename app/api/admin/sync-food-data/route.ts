@@ -10,12 +10,10 @@ export async function GET(req: NextRequest) {
 
     let pageNo = 1;
     let totalSynced = 0;
-    const maxPages = 2000;
 
     console.log("🚀 식약처 데이터 동기화 시작...");
 
-    while (pageNo <= maxPages) {
-      // ✅ 올바른 API: 품목제조정보
+    while (true) {
       const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", pageNo.toString());
@@ -23,12 +21,11 @@ export async function GET(req: NextRequest) {
       url.searchParams.append("type", "json");
 
       console.log(`📊 페이지 ${pageNo} 조회 중...`);
-
       const res = await fetch(url.toString());
       const data = await res.json();
 
       // ✅ 응답 구조 확인
-      let items = [];
+      let items: any[] = [];
       if (Array.isArray(data.body?.items)) {
         items = data.body.items;
       } else if (data.body?.items?.item) {
@@ -39,20 +36,13 @@ export async function GET(req: NextRequest) {
 
       console.log(`📦 페이지 ${pageNo}: ${items.length}개 발견`);
 
-      if (items.length > 0 && pageNo === 1) {
-        console.log(
-          "🔍 첫 번째 아이템 구조:",
-          JSON.stringify(items[0], null, 2),
-        );
-      }
-
       if (items.length === 0) {
         console.log("✅ 더 이상 데이터 없음, 동기화 완료!");
         break;
       }
-      // ✅ DB에 저장할 데이터 준비 (중복 제거)
-      const dataMap = new Map<string, any>();
 
+      // ✅ 페이지 내 중복 제거 + 마지막 값 유지
+      const dataMap = new Map<string, any>();
       items.forEach((item: any) => {
         const foodName = item.PRDCT_NM || item.PRDLST_NM;
         const manufacturer = item.BUES_NM || item.BSSH_NM;
@@ -60,21 +50,18 @@ export async function GET(req: NextRequest) {
 
         if (!barcode || !foodName) return;
 
-        // ✅ 이미 있으면 스킵 (첫 번째 것만 사용)
-        if (dataMap.has(barcode)) {
-          return;
-        }
-
+        // 마지막 값 덮어쓰기
         dataMap.set(barcode, {
           food_code: barcode,
           food_name: foodName,
           manufacturer: manufacturer || null,
-          allergens: [],
-          raw_materials: null,
+          allergens: [], // 나중에 매핑 가능
+          raw_materials: null, // 나중에 매핑 가능
           weight: item.QNT || item.CPCTY || null,
           data_source: "openapi",
           chosung: getChosung(foodName),
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
       });
 
@@ -92,14 +79,13 @@ export async function GET(req: NextRequest) {
 
       console.log(`💾 페이지 ${pageNo}: ${insertData.length}개 저장 시작...`);
 
-      // ✅ DB 저장
+      // ✅ DB 저장: food_code 중복 시 최신으로 덮어쓰기
       const { error } = await supabase
         .from("food_search_cache")
         .upsert(insertData, { onConflict: "food_code" });
 
       if (error) {
         console.error(`❌ 페이지 ${pageNo} 저장 실패:`, error);
-        // 에러 발생해도 계속 진행
       } else {
         totalSynced += insertData.length;
         console.log(
@@ -116,7 +102,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       totalSynced,
-      totalPages: pageNo - 1,
       message: `${totalSynced}개 제품 동기화 완료`,
     });
   } catch (error) {
