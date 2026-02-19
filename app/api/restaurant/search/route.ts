@@ -153,25 +153,37 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. 소상공인 상가정보 API - 반경 내 상가업소 조회
-    const numOfRows = 100
-    const apiUrl = new URL("https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius")
-    apiUrl.searchParams.append("ServiceKey", serviceKey)
-    apiUrl.searchParams.append("cy", String(userLat))  // 위도
-    apiUrl.searchParams.append("cx", String(userLng))  // 경도
-    apiUrl.searchParams.append("radius", radius)
-    apiUrl.searchParams.append("indsLclsCd", "Q")      // 음식점 대분류
-    apiUrl.searchParams.append("numOfRows", String(numOfRows))
-    apiUrl.searchParams.append("pageNo", page)
-    apiUrl.searchParams.append("type", "json")
-
-    const apiRes = await fetch(apiUrl.toString())
-
-    if (!apiRes.ok) {
-      console.error("[Restaurant Search] API 오류:", apiRes.status)
-      return NextResponse.json({ error: "음식점 검색에 실패했습니다." }, { status: 500 })
+    let decodedKey = serviceKey
+    // 이중 인코딩 방지
+    if (decodedKey.includes("%")) {
+      try { decodedKey = decodeURIComponent(decodedKey) } catch { /* 원본 사용 */ }
     }
 
-    const apiData = await apiRes.json()
+    const numOfRows = 100
+    const apiUrl = `https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius?ServiceKey=${encodeURIComponent(decodedKey)}&cy=${userLat}&cx=${userLng}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
+
+    const apiRes = await fetch(apiUrl)
+
+    if (!apiRes.ok) {
+      const errText = await apiRes.text()
+      console.error("[Restaurant Search] API 오류:", apiRes.status, errText)
+      return NextResponse.json({ 
+        error: "음식점 검색에 실패했습니다.",
+        debug: { status: apiRes.status, body: errText.slice(0, 500) }
+      }, { status: 500 })
+    }
+
+    const apiText = await apiRes.text()
+    let apiData: any
+    try {
+      apiData = JSON.parse(apiText)
+    } catch {
+      return NextResponse.json({
+        error: "API 응답 파싱 실패",
+        debug: { body: apiText.slice(0, 500) }
+      }, { status: 500 })
+    }
+
     const items = apiData?.body?.items || []
     const totalCount = apiData?.body?.totalCount || 0
 
