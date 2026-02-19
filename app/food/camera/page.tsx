@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Html5Qrcode, Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -41,127 +41,78 @@ function CameraPageContent() {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
 
+  // ✅ 웹캠 상태 관리
+  const [webcamState, setWebcamState] = useState<
+    "idle" | "requesting" | "scanning" | "error"
+  >("idle");
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+
   // ==========================================
-  // 웹캠 스캔 시작 (데스크탑)
+  // 웹캠 스캔 시작 (데스크탑) - Html5Qrcode 직접 사용
   // ==========================================
   const startWebcamScan = useCallback(async () => {
     try {
-      // ✅ DOM 엘리먼트 먼저 확인
-      const container = document.getElementById("qr-reader-webcam");
-      if (!container) {
-        console.error("❌ qr-reader-webcam 엘리먼트 없음");
-        return;
+      setWebcamState("requesting");
+
+      // 기존 인스턴스 정리
+      if (html5QrCodeRef.current) {
+        try {
+          await html5QrCodeRef.current.stop();
+        } catch {
+          // ignore
+        }
+        html5QrCodeRef.current = null;
       }
 
-      console.log("✅ qr-reader-webcam 엘리먼트 확인됨");
+      const html5QrCode = new Html5Qrcode("qr-reader-webcam");
+      html5QrCodeRef.current = html5QrCode;
 
-      const html5QrCode = new Html5QrcodeScanner(
-        "qr-reader-webcam",
+      await html5QrCode.start(
+        { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 },
-          rememberLastUsedCamera: true,
-          showTorchButtonIfSupported: true,
+          qrbox: { width: 250, height: 150 },
         },
-        false,
-      );
-
-      html5QrCode.render(
         (decodedText) => {
-          html5QrCode.clear();
-          toast.success("바코드 인식 성공!");
-          router.push(`/food/result/${decodedText}`);
+          // 바코드 인식 성공
+          html5QrCode
+            .stop()
+            .then(() => {
+              html5QrCodeRef.current = null;
+              toast.success("바코드 인식 성공!");
+              router.push(`/food/result/${decodedText}`);
+            })
+            .catch(() => {
+              router.push(`/food/result/${decodedText}`);
+            });
         },
-        (errorMessage) => {
-          // 스캔 중
+        () => {
+          // 스캔 중 (무시)
         },
       );
 
-      // ✅ 스타일 적용 (500ms 후)
-      setTimeout(() => {
-        const container = document.getElementById("qr-reader-webcam");
-        if (!container) return;
-
-        const buttons = container.querySelectorAll("button");
-        buttons.forEach((btn) => {
-          if (btn.textContent?.includes("Request Camera Permissions")) {
-            btn.textContent = "📷 카메라 권한 허용";
-            btn.style.cssText = `
-              padding: 14px 28px !important;
-              font-size: 16px !important;
-              font-weight: 600 !important;
-              background: hsl(var(--primary)) !important;
-              color: white !important;
-              border: none !important;
-              border-radius: 8px !important;
-              cursor: pointer !important;
-              width: 100% !important;
-              max-width: 300px !important;
-              margin: 0 auto !important;
-              display: block !important;
-            `;
-          }
-          if (btn.textContent?.includes("Stop Scanning")) {
-            btn.textContent = "⏹️ 스캔 중지";
-          }
-        });
-
-        const links = container.querySelectorAll("a");
-        links.forEach((link) => {
-          if (link.textContent?.includes("Scan an Image File")) {
-            link.textContent = "📁 파일에서 스캔하기";
-            link.style.cssText = `
-              font-size: 14px !important;
-              color: hsl(var(--primary)) !important;
-              text-decoration: underline !important;
-              display: block !important;
-              text-align: center !important;
-              margin-top: 12px !important;
-            `;
-          }
-        });
-
-        const spans = container.querySelectorAll("span");
-        spans.forEach((span) => {
-          if (span.textContent?.includes("Request Camera Permissions")) {
-            span.textContent = "카메라 권한을 허용해주세요";
-            span.style.cssText = `
-              font-size: 16px !important;
-              font-weight: 500 !important;
-              display: block !important;
-              text-align: center !important;
-              margin-bottom: 16px !important;
-            `;
-          }
-        });
-
-        console.log("✅ 웹캠 스타일 적용 완료");
-      }, 500);
+      setWebcamState("scanning");
     } catch (error) {
       console.error("웹캠 스캔 오류:", error);
-      toast.error("웹캠을 사용할 수 없습니다");
+      setWebcamState("error");
+      toast.error(
+        "카메라를 사용할 수 없습니다. 브라우저 설정에서 카메라 권한을 확인해주세요.",
+      );
     }
   }, [router]);
 
   // ==========================================
-  // ✅ useEffect 1: 웹캠 모드 (데스크탑)
+  // ✅ useEffect 1: 웹캠 모드 cleanup
   // ==========================================
   useEffect(() => {
-    if (mode === "webcam") {
-      console.log("✅ 웹캠 모드 감지");
-
-      // ✅ 100ms 딜레이 후 실행 (DOM 렌더링 대기)
-      const timer = setTimeout(() => {
-        startWebcamScan();
-      }, 100);
-
-      // ✅ Cleanup
-      return () => {
-        clearTimeout(timer);
-        console.log("🧹 웹캠 useEffect cleanup");
-      };
-    }
-  }, [mode, startWebcamScan]);
+    return () => {
+      // cleanup: 카메라 정지
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current.stop().catch(() => {});
+        html5QrCodeRef.current = null;
+      }
+    };
+  }, [mode]);
 
   // ==========================================
   // ✅ useEffect 2: 연속 스캔 모드 (모바일)
@@ -429,7 +380,10 @@ function CameraPageContent() {
       fileInputRef.current.value = "";
     }
   };
-  // ✅ 웹캠 스캔 모드
+
+  // ==========================================
+  // ✅ 웹캠 스캔 모드 렌더링
+  // ==========================================
   if (mode === "webcam") {
     return (
       <div className="flex min-h-screen flex-col bg-background">
@@ -448,33 +402,97 @@ function CameraPageContent() {
                 </p>
               </div>
 
-              {/* 안내 카드 */}
-              <Card className="border-blue-200 bg-blue-50">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
-                      <Camera className="h-5 w-5 text-blue-600" />
+              {/* 안내 카드 - 카메라 스캔 중이 아닐 때만 표시 */}
+              {webcamState !== "scanning" && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                        <Camera className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="mb-1 font-semibold text-blue-900">
+                          카메라 권한이 필요합니다
+                        </p>
+                        <p className="text-sm text-blue-800">
+                          브라우저에서 카메라 권한을 &quot;허용&quot;해주세요.
+                          바코드를 인식하는 데만 사용됩니다.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="mb-1 font-semibold text-blue-900">
-                        카메라 권한이 필요합니다
-                      </p>
-                      <p className="text-sm text-blue-800">
-                        브라우저에서 카메라 권한을 "허용"해주세요. 바코드를
-                        인식하는 데만 사용됩니다.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
-              {/* 웹캠 스캔 영역 */}
+              {/* ✅ 웹캠 스캔 영역 - 커스텀 UI */}
               <Card>
                 <CardContent className="p-4">
+                  {/* idle 상태: 카메라 시작 버튼 */}
+                  {webcamState === "idle" && (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+                        <Camera className="h-10 w-10 text-primary" />
+                      </div>
+                      <p className="mb-2 text-sm font-medium text-foreground">
+                        카메라를 시작하려면 아래 버튼을 눌러주세요
+                      </p>
+                      <p className="mb-6 text-xs text-muted-foreground">
+                        브라우저에서 카메라 접근 허용 팝업이 표시됩니다
+                      </p>
+                      <Button
+                        onClick={startWebcamScan}
+                        size="lg"
+                        className="px-8"
+                      >
+                        <Camera className="mr-2 h-5 w-5" />
+                        카메라 시작하기
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* requesting 상태: 로딩 */}
+                  {webcamState === "requesting" && (
+                    <div className="flex flex-col items-center justify-center py-16">
+                      <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      <p className="text-sm text-muted-foreground">
+                        카메라 연결 중...
+                      </p>
+                    </div>
+                  )}
+
+                  {/* error 상태: 에러 메시지 + 재시도 */}
+                  {webcamState === "error" && (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                        <AlertCircle className="h-8 w-8 text-red-600" />
+                      </div>
+                      <p className="mb-1 text-sm font-medium text-red-900">
+                        카메라에 접근할 수 없습니다
+                      </p>
+                      <p className="mb-4 text-xs text-muted-foreground">
+                        브라우저 설정에서 카메라 권한을 허용해주세요
+                      </p>
+                      <Button onClick={startWebcamScan} variant="outline">
+                        다시 시도
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 카메라 피드가 렌더링될 div (scanning일 때만 표시) */}
                   <div
                     id="qr-reader-webcam"
-                    className="rounded-lg overflow-hidden"
+                    className={`rounded-lg overflow-hidden ${
+                      webcamState === "scanning" ? "" : "hidden"
+                    }`}
                   />
+
+                  {/* scanning 상태: 활성 표시 */}
+                  {webcamState === "scanning" && (
+                    <div className="mt-3 flex items-center justify-center gap-2 text-sm text-green-600">
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                      카메라 활성 — 바코드를 비춰주세요
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -506,7 +524,14 @@ function CameraPageContent() {
               {/* 버튼 */}
               <div className="flex gap-3">
                 <Button
-                  onClick={() => router.push("/")}
+                  onClick={() => {
+                    // 카메라 정지 후 이동
+                    if (html5QrCodeRef.current) {
+                      html5QrCodeRef.current.stop().catch(() => {});
+                      html5QrCodeRef.current = null;
+                    }
+                    router.push("/");
+                  }}
                   variant="outline"
                   className="flex-1"
                 >
@@ -525,8 +550,13 @@ function CameraPageContent() {
 
                       toast.info("바코드 인식 중...");
                       try {
-                        const html5QrCode = new Html5Qrcode("qr-reader-hidden");
-                        const barcode = await html5QrCode.scanFile(file, false);
+                        const html5QrCode = new Html5Qrcode(
+                          "qr-reader-hidden",
+                        );
+                        const barcode = await html5QrCode.scanFile(
+                          file,
+                          false,
+                        );
                         toast.success("바코드 인식 성공!");
                         router.push(`/food/result/${barcode}`);
                       } catch {
@@ -551,6 +581,7 @@ function CameraPageContent() {
       </div>
     );
   }
+
   // ==========================================
   // 결과 하프시트 컴포넌트
   // ==========================================
@@ -595,47 +626,34 @@ function CameraPageContent() {
                     }`}
                   >
                     {currentResult.isSafe
-                      ? "알레르기 성분이 없습니다"
-                      : `${currentResult.detectedAllergens?.length || 0}개 알레르기 감지`}
+                      ? "내 알레르기 성분이 없습니다"
+                      : "내 알레르기 성분이 포함되어 있습니다"}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="mb-4">
-              <h4 className="text-lg font-bold">{currentResult.foodName}</h4>
+            <div className="mb-4 space-y-2">
+              <p className="text-lg font-bold">{currentResult.foodName}</p>
               {currentResult.manufacturer && (
                 <p className="text-sm text-muted-foreground">
                   {currentResult.manufacturer}
                 </p>
               )}
+              {currentResult.detectedAllergens.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {currentResult.detectedAllergens.map((a: string) => (
+                    <Badge key={a} variant="destructive">
+                      {a}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {!currentResult.isSafe && currentResult.detectedAllergens && (
-              <div className="mb-4 rounded-lg bg-red-50 p-3">
-                <p className="mb-2 text-sm font-medium text-red-900">
-                  ⚠️ 감지된 알레르기
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {currentResult.detectedAllergens.map(
-                    (allergen: string, idx: number) => (
-                      <Badge key={idx} variant="destructive">
-                        {allergen}
-                      </Badge>
-                    ),
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleNextScan}
-                className="flex-1"
-                variant="default"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                다음 제품 스캔
+            <div className="flex gap-2">
+              <Button onClick={handleNextScan} className="flex-1">
+                다음 스캔
               </Button>
               <Button
                 onClick={handleFinishScan}
@@ -886,19 +904,21 @@ function CameraPageContent() {
                 <ul className="space-y-2 text-xs text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>성분표 또는 바코드가 선명하게 보이도록</span>
+                    <span>바코드 또는 성분표가 선명하게 보이도록 촬영</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>빛 반사가 없는 곳에서</span>
+                    <span>빛 반사를 피해서 촬영하면 인식률이 높아집니다</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>글자가 수평이 되도록 촬영</span>
+                    <span>글자가 수평이 되도록 촬영해주세요</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <span>바코드가 있으면 포함해서 촬영하면 더 빠름</span>
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <span>
+                      바코드가 인식되면 자동으로 결과 페이지로 이동합니다
+                    </span>
                   </li>
                 </ul>
               </CardContent>
@@ -910,14 +930,18 @@ function CameraPageContent() {
                 <CardContent className="p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">최근 확인</p>
+                    <p className="text-sm font-medium">최근 확인 제품</p>
                   </div>
                   <div className="space-y-2">
                     {recentProducts.map((product, idx) => (
-                      <Link key={idx} href={`/food/result/${product.foodCode}`}>
-                        <div className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-muted">
+                      <Link
+                        key={idx}
+                        href={`/food/result/${product.foodCode}`}
+                        className="block rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-3">
                           <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                            className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
                               product.isSafe
                                 ? "bg-green-100 text-green-600"
                                 : "bg-red-100 text-red-600"
