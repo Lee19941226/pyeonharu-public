@@ -955,7 +955,7 @@ export default function RestaurantPage() {
           <div className="mx-auto flex max-w-4xl gap-6">
 
             {/* 왼쪽: 음식점 리스트 */}
-            <div className="min-w-0 flex-1 max-w-xl">
+            <div className="min-w-0 flex-1">
 
               {/* 위치 + 결과 수 */}
               {locationName && hasSearched && (
@@ -1024,7 +1024,7 @@ export default function RestaurantPage() {
               )}
 
               {/* ═══ 음식점 카드 리스트 ═══ */}
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {filteredRestaurants.map((restaurant, idx) => {
                   const risk = RISK_CONFIG[restaurant.riskLevel];
                   const RiskIcon = risk.icon;
