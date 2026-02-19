@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,7 @@ const RECOMMENDED_KEYWORDS = [
   "김치",
 ];
 
-export default function FoodSearchPage() {
+function FoodSearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isInitialMount = useRef(true);
@@ -70,7 +70,6 @@ export default function FoodSearchPage() {
     const urlQuery = searchParams.get("q");
 
     if (urlQuery && isInitialMount.current) {
-      console.log("🔍 URL에서 검색어 감지:", urlQuery);
       setQuery(urlQuery);
       setHasSearched(true);
 
@@ -199,8 +198,6 @@ export default function FoodSearchPage() {
               aiResult.ingredients || aiResult.detectedIngredients || [],
           }),
         );
-
-        console.log("✅ AI 검색 결과 sessionStorage 저장:", storageKey);
       }
     }
 
@@ -377,8 +374,14 @@ export default function FoodSearchPage() {
                     <div className="text-sm text-blue-900">
                       <p className="mb-2 font-medium">💡 검색 팁</p>
                       <ul className="space-y-1 text-xs">
-                        <li>• 제품명으로 검색: "새우깡", "칸쵸"</li>
-                        <li>• 원재료로 검색: "계란", "우유", "밀가루"</li>
+                        <li>
+                          • 제품명으로 검색: &quot;새우깡&quot;,
+                          &quot;칸쵸&quot;
+                        </li>
+                        <li>
+                          • 원재료로 검색: &quot;계란&quot;, &quot;우유&quot;,
+                          &quot;밀가루&quot;
+                        </li>
                         <li>• 알레르기 성분 포함 제품까지 검색됩니다</li>
                       </ul>
                     </div>
@@ -521,7 +524,7 @@ export default function FoodSearchPage() {
                       검색 결과가 없습니다
                     </h3>
                     <p className="mb-6 text-center text-sm text-muted-foreground">
-                      "{query}"에 대한 제품을 찾을 수 없어요
+                      &quot;{query}&quot;에 대한 제품을 찾을 수 없어요
                       <br />
                       다른 검색어를 시도해보세요
                     </p>
@@ -546,5 +549,19 @@ export default function FoodSearchPage() {
 
       <MobileNav />
     </div>
+  );
+}
+
+export default function FoodSearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      }
+    >
+      <FoodSearchContent />
+    </Suspense>
   );
 }
