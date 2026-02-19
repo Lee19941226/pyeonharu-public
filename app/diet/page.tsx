@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import {
   Camera,
+  ImageIcon,
   PenLine,
   Trash2,
   X,
@@ -94,6 +95,7 @@ export default function DietPage() {
   const router = useRouter()
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   // State
   const [user, setUser] = useState<any>(null)
@@ -336,7 +338,7 @@ export default function DietPage() {
                 <Button
                   variant="outline"
                   className="flex-1 gap-2 border-primary/30 text-primary hover:bg-primary/5"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => cameraInputRef.current?.click()}
                   disabled={isAnalyzing}
                 >
                   {isAnalyzing ? (
@@ -347,17 +349,39 @@ export default function DietPage() {
                   {isAnalyzing ? "분석 중..." : "사진 촬영"}
                 </Button>
                 <Button
+                  variant="outline"
+                  className="flex-1 gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isAnalyzing}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  앨범 선택
+                </Button>
+                <Button
                   className="flex-1 gap-2"
                   onClick={() => setShowManualInput(true)}
                 >
                   <PenLine className="h-4 w-4" />
                   직접 입력
                 </Button>
+                {/* 카메라 전용 */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handlePhotoAnalyze(file)
+                    e.target.value = ""
+                  }}
+                />
+                {/* 앨범/갤러리 전용 (capture 없음) */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
