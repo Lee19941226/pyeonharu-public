@@ -602,7 +602,7 @@ function FoodSearchContent() {
   );
 }
 
-export default function FoodSearchPage() {
+function FoodSearchPageInner() {
   const ITEMS_PER_PAGE = 10;
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -976,5 +976,28 @@ export default function FoodSearchPage() {
 
       <MobileNav />
     </div>
+  );
+}
+
+export default function FoodSearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col bg-background">
+          <Header />
+          <main className="flex-1 pb-16 md:pb-0">
+            <div className="container mx-auto px-4 py-8">
+              <div className="mx-auto max-w-3xl text-center py-12">
+                <div className="mb-4 text-4xl">🔍</div>
+                <p className="text-lg font-medium">로딩 중...</p>
+              </div>
+            </div>
+          </main>
+          <MobileNav />
+        </div>
+      }
+    >
+      <FoodSearchPageInner />
+    </Suspense>
   );
 }
