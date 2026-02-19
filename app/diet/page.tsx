@@ -79,6 +79,57 @@ function CircularProgress({ current, total, isOver }: { current: number; total: 
   )
 }
 
+// ─── 칼로리 분석 카드 (공용 컴포넌트) ───
+function CalorieAnalysisCard({ totalCal, bmr, overAmount }: { totalCal: number; bmr: number; overAmount: number }) {
+  return (
+    <Card className="border-red-200 bg-red-50/50">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold">
+            AI
+          </div>
+          <div>
+            <p className="text-sm font-bold text-red-600">오늘의 칼로리 분석</p>
+            <p className="text-[10px] text-muted-foreground">최종 누적 기준 · GPT-4o</p>
+          </div>
+        </div>
+
+        <div className="rounded-md bg-white border-l-2 border-red-500 p-3">
+          <p className="text-xs">
+            금일 총 <strong className="text-red-600">{totalCal.toLocaleString()}kcal</strong> 섭취
+          </p>
+          <p className="text-xs">
+            기초대사량 {bmr.toLocaleString()}kcal 대비{" "}
+            <strong className="text-red-600">{overAmount.toLocaleString()}kcal 초과</strong>
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs font-bold mb-2">💪 소모 운동량</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {getExercise(overAmount).map((ex) => (
+              <div
+                key={ex.name}
+                className="flex items-center justify-between rounded-md bg-green-50 px-2.5 py-1.5 text-xs"
+              >
+                <span>{ex.emoji} {ex.name}</span>
+                <span className="font-bold text-primary">{ex.mins}분</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md bg-purple-50 p-2.5">
+          <p className="text-[10px] text-purple-700">
+            ⚠️ AI 추정 칼로리는 음식 사진을 기반으로 통상적인 값을 추측한 데이터이며,
+            실제 칼로리와 차이가 있을 수 있습니다. 정확한 칼로리를 아는 경우 직접 입력을 권장합니다.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Types ───
 interface DietEntry {
   id: string
@@ -265,7 +316,9 @@ export default function DietPage() {
 
       <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-4">
-          <div className="mx-auto max-w-lg space-y-4">
+          <div className="relative flex gap-6 justify-center">
+            {/* ─── 메인 콘텐츠 (왼쪽) ─── */}
+            <div className="w-full max-w-lg space-y-4">
 
             {/* ─── 날짜 네비게이션 ─── */}
             <div className="flex items-center justify-between">
@@ -405,6 +458,17 @@ export default function DietPage() {
               </Card>
             )}
 
+            {/* ─── AI 분석 리포트 (모바일: 타임라인 상단에 표시) ─── */}
+            {isOver && entries.length > 0 && (
+              <div className="md:hidden">
+                <CalorieAnalysisCard
+                  totalCal={totalCal}
+                  bmr={bmr}
+                  overAmount={overAmount}
+                />
+              </div>
+            )}
+
             {/* ─── 타임라인 ─── */}
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
@@ -517,54 +581,21 @@ export default function DietPage() {
               </div>
             )}
 
-            {/* ─── AI 분석 리포트 (초과 시 타임라인 하단) ─── */}
+            </div>{/* max-w-lg 끝 */}
+
+            {/* ─── AI 분석 리포트 (데스크톱: 오른쪽 고정) ─── */}
             {isOver && entries.length > 0 && (
-              <Card className="border-red-200 bg-red-50/50">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold">
-                      AI
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-red-600">오늘의 칼로리 분석</p>
-                      <p className="text-[10px] text-muted-foreground">최종 누적 기준 · GPT-4o</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md bg-white border-l-2 border-red-500 p-3">
-                    <p className="text-xs">
-                      금일 총 <strong className="text-red-600">{totalCal.toLocaleString()}kcal</strong> 섭취
-                    </p>
-                    <p className="text-xs">
-                      기초대사량 {bmr.toLocaleString()}kcal 대비{" "}
-                      <strong className="text-red-600">{overAmount.toLocaleString()}kcal 초과</strong>
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold mb-2">💪 소모 운동량</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {getExercise(overAmount).map((ex) => (
-                        <div
-                          key={ex.name}
-                          className="flex items-center justify-between rounded-md bg-green-50 px-2.5 py-1.5 text-xs"
-                        >
-                          <span>{ex.emoji} {ex.name}</span>
-                          <span className="font-bold text-primary">{ex.mins}분</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-md bg-purple-50 p-2.5">
-                    <p className="text-[10px] text-purple-700">
-                      ⚠️ AI 추정 칼로리는 음식 사진을 기반으로 통상적인 값을 추측한 데이터이며,
-                      실제 칼로리와 차이가 있을 수 있습니다. 정확한 칼로리를 아는 경우 직접 입력을 권장합니다.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="hidden md:block">
+                <div className="sticky top-20 w-72">
+                  <CalorieAnalysisCard
+                    totalCal={totalCal}
+                    bmr={bmr}
+                    overAmount={overAmount}
+                  />
+                </div>
+              </div>
             )}
+
           </div>
         </div>
       </main>
