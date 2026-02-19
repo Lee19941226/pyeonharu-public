@@ -839,32 +839,6 @@ export default function RestaurantPage() {
         </div>
       )}
 
-      {/* 기준 위치 변경 */}
-      <div>
-        <p className="mb-2 text-xs font-semibold text-muted-foreground">기준 위치</p>
-        {locationName && (
-          <p className="mb-1.5 text-xs text-foreground font-medium truncate">📍 {locationName}</p>
-        )}
-        <div className="flex gap-1">
-          <Input
-            placeholder="시/구/동 (예: 강남, 판교)"
-            value={addressInput}
-            onChange={(e) => setAddressInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && searchByAddress()}
-            className="h-7 text-xs"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 text-xs px-2"
-            onClick={searchByAddress}
-            disabled={isGeocodingAddress || !addressInput.trim()}
-          >
-            {isGeocodingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "이동"}
-          </Button>
-        </div>
-      </div>
-
       {/* 반경 슬라이더 */}
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -1198,7 +1172,34 @@ export default function RestaurantPage() {
 
             {/* ═══ 오른쪽: 데스크톱 고정 필터 사이드바 ═══ */}
             <aside className="hidden md:block w-56 shrink-0">
-              <div className="sticky top-20">
+              <div className="sticky top-20 space-y-3">
+                {/* 기준 위치 변경 */}
+                <div className="rounded-xl border bg-card p-4">
+                  <p className="mb-2 text-xs font-semibold text-muted-foreground">📍 기준 위치</p>
+                  {locationName && (
+                    <p className="mb-1.5 text-xs text-foreground font-medium truncate">{locationName}</p>
+                  )}
+                  <div className="flex gap-1">
+                    <Input
+                      placeholder="시/구/동 (예: 강남)"
+                      value={addressInput}
+                      onChange={(e) => setAddressInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && searchByAddress()}
+                      className="h-7 text-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 text-xs px-2"
+                      onClick={searchByAddress}
+                      disabled={isGeocodingAddress || !addressInput.trim()}
+                    >
+                      {isGeocodingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "이동"}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 필터 */}
                 <div className="rounded-xl border bg-card p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
