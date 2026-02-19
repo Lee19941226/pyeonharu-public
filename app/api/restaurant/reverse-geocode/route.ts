@@ -12,7 +12,12 @@ export async function GET(req: NextRequest) {
   const clientId = process.env.NAVER_MAP_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID
   const clientSecret = process.env.NAVER_MAP_CLIENT_SECRET
 
-  console.log("[Reverse Geocode] clientId:", clientId ? "있음" : "없음", "clientSecret:", clientSecret ? "있음" : "없음")
+  let debugInfo: any = {
+    hasClientId: !!clientId,
+    hasClientSecret: !!clientSecret,
+    clientIdPrefix: clientId?.slice(0, 4) || "none",
+    naverApiStatus: "skipped",
+  }
 
   // 네이버 Reverse Geocoding API 사용
   if (clientId && clientSecret) {
@@ -26,11 +31,11 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      console.log("[Reverse Geocode] 네이버 응답 상태:", res.status)
+      debugInfo.naverApiStatus = res.status
 
       if (res.ok) {
         const data = await res.json()
-        console.log("[Reverse Geocode] 네이버 응답:", JSON.stringify(data).slice(0, 300))
+        debugInfo.naverResultCount = data.results?.length || 0
         const results = data.results || []
 
         if (results.length > 0) {
@@ -53,11 +58,13 @@ export async function GET(req: NextRequest) {
             sigungu,
             dong,
             full: `${sido} ${sigungu} ${dong}`.trim(),
+            debug: debugInfo,
           })
         }
       }
     } catch (err: any) {
-      console.error("[Reverse Geocode] 네이버 API 오류:", err?.message || err)
+      debugInfo.naverApiStatus = "error"
+      debugInfo.error = err?.message || "unknown"
     }
   }
 
@@ -70,6 +77,7 @@ export async function GET(req: NextRequest) {
     sigungu: "",
     dong: "",
     full: address,
+    debug: debugInfo,
   })
 }
 
