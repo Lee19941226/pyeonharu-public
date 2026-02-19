@@ -63,6 +63,14 @@ const CATEGORY_ALLERGY_MAP: Record<string, string[]> = {
   "커피전문점": ["우유", "대두"],
   "제과점": ["밀", "계란", "우유", "견과류", "대두"],
   "탕/찌개": ["대두", "밀", "쇠고기", "돼지고기"],
+  "국/탕/찌개류": ["대두", "밀", "쇠고기", "돼지고기"],
+  "구이": ["쇠고기", "돼지고기", "대두", "참깨"],
+  "한식 일반": ["대두", "밀", "참깨", "쇠고기", "돼지고기", "계란"],
+  "일식 일반": ["밀", "대두", "갑각류", "조개류", "고등어"],
+  "중식 일반": ["밀", "대두", "땅콩", "갑각류", "계란"],
+  "커피": ["우유", "대두"],
+  "음료": ["우유", "대두"],
+  "주점": ["밀", "대두", "땅콩"],
 }
 
 // 사용자 알레르기 기반 위험도 계산
@@ -92,25 +100,21 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
 
 // 상가정보 API 업종 소분류명에서 간단 카테고리 추출
 function simplifyCategory(indsSclsNm: string, indsMclsNm: string): string {
-  // 소분류명을 우선 사용, 없으면 중분류명
   return indsSclsNm || indsMclsNm || "음식점"
 }
 
 // 카테고리 매칭 (부분 일치)
 function findAllergens(category: string, userAllergens: string[]): { level: "safe" | "caution" | "danger"; matched: string[] } {
-  // 정확히 일치하는 키 먼저 찾기
   if (CATEGORY_ALLERGY_MAP[category]) {
     return calculateRisk(CATEGORY_ALLERGY_MAP[category], userAllergens)
   }
 
-  // 부분 일치로 찾기
   for (const [key, allergens] of Object.entries(CATEGORY_ALLERGY_MAP)) {
     if (category.includes(key) || key.includes(category)) {
       return calculateRisk(allergens, userAllergens)
     }
   }
 
-  // 기본 음식점 알레르기 (매칭 안 되면)
   return calculateRisk(["대두", "밀"], userAllergens)
 }
 
@@ -118,8 +122,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const userLat = parseFloat(searchParams.get("lat") || "0")
   const userLng = parseFloat(searchParams.get("lng") || "0")
-  const radius = searchParams.get("radius") || "2000" // 기본 반경 2km
-  const query = searchParams.get("query") || "" // 텍스트 검색어 (상호명 필터용)
+  const radius = searchParams.get("radius") || "2000"
+  const query = searchParams.get("query") || ""
   const page = searchParams.get("page") || "1"
 
   if (!userLat || !userLng) {
@@ -153,85 +157,105 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. 소상공인 상가정보 API - 반경 내 상가업소 조회
+    // ※ PDF 명세서 기준 (2025.06 OpenAPI 활용가이드)
+    // - 엔드포인트: /B553077/api/open/sdsc2/storeListInRadius
+    // - 필수: serviceKey, radius, cx(경도), cy(위도)
+    // - 옵션: indsLclsCd(업종대분류), numOfRows, pageNo, type
+    // - radius 최대 2000m
+    // - cx=경도, cy=위도 (주의: cx가 경도(lng), cy가 위도(lat))
+
     let decodedKey = serviceKey
+    // 환경변수에 URL 인코딩된 키가 저장된 경우 디코딩
     if (decodedKey.includes("%")) {
       try { decodedKey = decodeURIComponent(decodedKey) } catch { /* 원본 사용 */ }
     }
 
-    const numOfRows = 100
-    // 엔드포인트: sdsc2 (신규) 또는 sdsc (구버전) 둘 다 시도
-    const endpoints = [
-      "https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius",
-      "https://apis.data.go.kr/B553077/api/open/sdsc/storeListInRadius",
-    ]
+    const numOfRows = 200 // 음식점만 필터하므로 더 많이 가져오기
+    const endpoint = "https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius"
+
+    // ★ 핵심 수정: indsLclsCd=I2 (음식점 대분류) 필터 적용
+    // ★ 핵심 수정: serviceKey 파라미터명 (PDF 명세서 기준 소문자 s)
+    const apiUrl = new URL(endpoint)
+    apiUrl.searchParams.append("serviceKey", decodedKey)
+    apiUrl.searchParams.append("radius", Math.min(parseInt(radius), 2000).toString())
+    apiUrl.searchParams.append("cx", userLng.toString()) // cx = 경도(lng)
+    apiUrl.searchParams.append("cy", userLat.toString()) // cy = 위도(lat)
+    apiUrl.searchParams.append("indsLclsCd", "I2") // ★ 음식점만 조회
+    apiUrl.searchParams.append("numOfRows", numOfRows.toString())
+    apiUrl.searchParams.append("pageNo", page)
+    apiUrl.searchParams.append("type", "json")
+
+    console.log("[Restaurant Search] API URL:", apiUrl.toString().replace(decodedKey, "***KEY***"))
 
     let apiData: any = null
-    let lastError = ""
-    let debugResponses: any[] = []
+    let debugInfo: any = {}
 
-    for (const endpoint of endpoints) {
-      // 테스트: indsLclsCd 필터 없이 + 다양한 파라미터 시도
-      const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cx=${userLng}&cy=${userLat}&radius=${radius}&numOfRows=${numOfRows}&pageNo=${page}&type=json`
+    try {
+      const apiRes = await fetch(apiUrl.toString())
+      const apiText = await apiRes.text()
 
-      try {
-        const apiRes = await fetch(apiUrl)
-        const apiText = await apiRes.text()
-        
-        debugResponses.push({
-          endpoint: endpoint.split("/").pop(),
-          status: apiRes.status,
-          raw: apiText.slice(0, 500),
-        })
-
-        if (apiRes.ok && apiText.trim().startsWith("{")) {
-          try {
-            const parsed = JSON.parse(apiText)
-            // NODATA_ERROR면 다음 엔드포인트 시도
-            if (parsed?.header?.resultCode === "03" || parsed?.header?.resultMsg === "NODATA_ERROR") {
-              lastError = `${endpoint}: NODATA_ERROR`
-              continue
-            }
-            apiData = parsed
-            break
-          } catch {
-            // JSON 파싱 실패
-          }
-        }
-        lastError = `${apiRes.status}: ${apiText.slice(0, 200)}`
-      } catch (err: any) {
-        lastError = err?.message || "fetch error"
-        debugResponses.push({ endpoint: endpoint.split("/").pop(), error: lastError })
+      debugInfo = {
+        status: apiRes.status,
+        contentType: apiRes.headers.get("content-type"),
+        rawPreview: apiText.slice(0, 300),
       }
+
+      console.log("[Restaurant Search] API Response status:", apiRes.status)
+      console.log("[Restaurant Search] API Response preview:", apiText.slice(0, 200))
+
+      if (apiRes.ok) {
+        // JSON 응답 파싱
+        if (apiText.trim().startsWith("{") || apiText.trim().startsWith("[")) {
+          apiData = JSON.parse(apiText)
+        } else if (apiText.includes("<resultCode>")) {
+          // XML 응답이 온 경우 (type=json인데 XML이 오는 에러 상황)
+          const resultCode = apiText.match(/<resultCode>([^<]+)<\/resultCode>/)?.[1]
+          const resultMsg = apiText.match(/<resultMsg>([^<]+)<\/resultMsg>/)?.[1]
+          debugInfo.xmlError = { resultCode, resultMsg }
+          console.error("[Restaurant Search] XML 응답 수신:", resultCode, resultMsg)
+        }
+      }
+    } catch (fetchErr: any) {
+      debugInfo.fetchError = fetchErr?.message
+      console.error("[Restaurant Search] Fetch error:", fetchErr)
     }
 
-    // 디버그: API 원본 응답 반환
-    if (!apiData || debugResponses.length > 0) {
-      // 임시: 디버그용으로 raw 응답도 반환
-    }
-
-    // 응답 구조 탐색 (다양한 구조 대응)
+    // 3. 응답 데이터 파싱
+    // PDF 명세서 기준 JSON 구조:
+    // { header: { resultCode, resultMsg, ... }, body: { items: [...], numOfRows, pageNo, totalCount } }
     let items: any[] = []
     let totalCount = 0
+
     if (apiData) {
-      // 가능한 구조들 탐색
-      items = apiData?.body?.items 
-        || apiData?.items 
-        || apiData?.response?.body?.items?.item
-        || apiData?.response?.body?.items
-        || apiData?.header?.body?.items
-        || []
-      totalCount = apiData?.body?.totalCount 
-        || apiData?.totalCount 
-        || apiData?.response?.body?.totalCount
-        || (Array.isArray(items) ? items.length : 0)
-      
-      // items가 배열이 아닌 경우 대응
-      if (items && !Array.isArray(items)) {
-        items = [items]
+      // 정상 응답 구조 (PDF 명세서 기준)
+      if (apiData.body?.items) {
+        items = Array.isArray(apiData.body.items) ? apiData.body.items : [apiData.body.items]
+        totalCount = apiData.body.totalCount || items.length
       }
+      // 간혹 다른 구조로 올 수 있는 경우 대비
+      else if (apiData.items) {
+        items = Array.isArray(apiData.items) ? apiData.items : [apiData.items]
+        totalCount = apiData.totalCount || items.length
+      }
+
+      // 결과 코드 확인
+      const resultCode = apiData.header?.resultCode || apiData.resultCode
+      const resultMsg = apiData.header?.resultMsg || apiData.resultMsg
+      
+      if (resultCode && resultCode !== "00") {
+        console.error("[Restaurant Search] API Error:", resultCode, resultMsg)
+        debugInfo.apiError = { resultCode, resultMsg }
+      }
+
+      console.log("[Restaurant Search] Parsed items:", items.length, "totalCount:", totalCount)
     }
 
-    // 3. 음식점 데이터 변환 + 알레르기 매칭
+    // items 내부에 item 배열이 있는 경우도 대비 (XML→JSON 변환 시)
+    if (items.length === 1 && Array.isArray(items[0]?.item)) {
+      items = items[0].item
+    }
+
+    // 4. 음식점 데이터 변환 + 알레르기 매칭
     const seenNames = new Set<string>()
     let restaurants = items
       .map((item: any) => {
@@ -283,7 +307,7 @@ export async function GET(req: NextRequest) {
       })
       .filter(Boolean)
 
-    // 4. 거리순 정렬
+    // 5. 거리순 정렬
     restaurants = restaurants.sort((a: any, b: any) => a.distanceKm - b.distanceKm)
 
     return NextResponse.json({
@@ -296,7 +320,9 @@ export async function GET(req: NextRequest) {
       debug: {
         itemsRaw: items.length,
         totalCount,
-        debugResponses,
+        apiStatus: debugInfo.status,
+        apiError: debugInfo.apiError,
+        rawPreview: debugInfo.rawPreview,
       },
     })
   } catch (error) {
