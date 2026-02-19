@@ -97,6 +97,8 @@ export default function RestaurantPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // AI 분석
   const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null);
@@ -114,7 +116,6 @@ export default function RestaurantPage() {
       setUser(user);
 
       if (user) {
-        // ✅ user_allergies 테이블에서 알레르기 조회
         const { data: allergyData } = await supabase
           .from("user_allergies")
           .select("allergen_name")
@@ -125,7 +126,6 @@ export default function RestaurantPage() {
         }
       }
 
-      // 위치 기반 자동 검색
       detectLocation();
     };
 
@@ -143,24 +143,17 @@ export default function RestaurantPage() {
         const { latitude, longitude } = position.coords;
         setUserCoords({ lat: latitude, lng: longitude });
 
+        // 역지오코딩으로 위치명 표시
         try {
-          const res = await fetch(
-            `/api/restaurant/reverse-geocode?lat=${latitude}&lng=${longitude}`,
-          );
+          const res = await fetch(`/api/restaurant/reverse-geocode?lat=${latitude}&lng=${longitude}`);
           const data = await res.json();
-          if (data.address) {
-            // 표시는 동까지, 검색은 시군구 단위
-            setLocationName(data.full || data.address);
-            const searchAddr = data.sigungu || data.address;
-            searchRestaurants(`${searchAddr} 음식점`, latitude, longitude);
-          } else {
-            setLocationName("내 위치");
-            searchRestaurants("내주변 음식점", latitude, longitude);
-          }
+          setLocationName(data.full || data.address || "내 위치");
         } catch {
           setLocationName("내 위치");
-          searchRestaurants("내주변 음식점", latitude, longitude);
         }
+
+        // 좌표 기반 바로 검색
+        searchRestaurants(latitude, longitude);
       },
       () => {
         toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
@@ -168,33 +161,37 @@ export default function RestaurantPage() {
     );
   };
 
-  const searchRestaurants = async (query: string, lat?: number, lng?: number) => {
-    if (!query.trim()) return;
-
+  const searchRestaurants = async (lat: number, lng: number, query?: string, page?: number) => {
     setIsLoading(true);
     setHasSearched(true);
 
     try {
-      let url = `/api/restaurant/search?query=${encodeURIComponent(query)}&display=20`;
+      const params = new URLSearchParams({
+        lat: String(lat),
+        lng: String(lng),
+        radius: "2000",
+        page: String(page || 1),
+      });
+      if (query) params.append("query", query);
 
-      // 사용자 좌표 전달
-      const coordLat = lat || userCoords?.lat;
-      const coordLng = lng || userCoords?.lng;
-      if (coordLat && coordLng) {
-        url += `&lat=${coordLat}&lng=${coordLng}`;
-      }
-
-      const res = await fetch(url);
+      const res = await fetch(`/api/restaurant/search?${params.toString()}`);
       const data = await res.json();
 
       if (data.success) {
-        setRestaurants(data.restaurants || []);
+        if (page && page > 1) {
+          // 더보기: 기존에 추가
+          setRestaurants(prev => [...prev, ...(data.restaurants || [])]);
+        } else {
+          setRestaurants(data.restaurants || []);
+        }
+        setTotalCount(data.total || 0);
+        setCurrentPage(page || 1);
         if (data.userAllergens) {
           setUserAllergens(data.userAllergens);
         }
       } else {
         toast.error(data.error || "검색에 실패했습니다");
-        setRestaurants([]);
+        if (!page || page === 1) setRestaurants([]);
       }
     } catch {
       toast.error("검색 중 오류가 발생했습니다");
@@ -205,9 +202,16 @@ export default function RestaurantPage() {
   };
 
   const handleSearch = () => {
-    if (!searchQuery.trim()) return;
-    setLocationName(searchQuery);
-    searchRestaurants(`${searchQuery} 음식점`);
+    if (!userCoords) {
+      toast.error("위치 정보가 없습니다. '내 위치로 검색'을 먼저 눌러주세요");
+      return;
+    }
+    searchRestaurants(userCoords.lat, userCoords.lng, searchQuery.trim() || undefined);
+  };
+
+  const handleLoadMore = () => {
+    if (!userCoords) return;
+    searchRestaurants(userCoords.lat, userCoords.lng, searchQuery.trim() || undefined, currentPage + 1);
   };
 
   const analyzeRestaurant = async (restaurant: Restaurant) => {
@@ -219,15 +223,11 @@ export default function RestaurantPage() {
     }
 
     setSelectedRestaurant(key);
-
     if (aiAnalysis[key]) return;
 
     if (userAllergens.length === 0) {
       toast.error("알레르기를 등록해야 AI 분석을 사용할 수 있어요", {
-        action: {
-          label: "등록하기",
-          onClick: () => router.push("/food/profile"),
-        },
+        action: { label: "등록하기", onClick: () => router.push("/food/profile") },
       });
       return;
     }
@@ -246,7 +246,6 @@ export default function RestaurantPage() {
       });
 
       const data = await res.json();
-
       if (data.success) {
         setAiAnalysis((prev) => ({ ...prev, [key]: data.analysis }));
       } else {
@@ -265,12 +264,6 @@ export default function RestaurantPage() {
       ? restaurants
       : restaurants.filter((r) => r.riskLevel === riskFilter);
 
-  // 정렬: safe → caution → danger
-  const sortedRestaurants = [...filteredRestaurants].sort((a, b) => {
-    const order = { safe: 0, caution: 1, danger: 2 };
-    return order[a.riskLevel] - order[b.riskLevel];
-  });
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -284,7 +277,7 @@ export default function RestaurantPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="지역 또는 음식점 검색 (예: 군포 한식)"
+                    placeholder="상호명 또는 업종 검색 (예: 치킨, 한식)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -292,20 +285,11 @@ export default function RestaurantPage() {
                   />
                 </div>
                 <Button onClick={handleSearch} disabled={isLoading}>
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "검색"
-                  )}
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "검색"}
                 </Button>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={detectLocation}
-              >
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={detectLocation}>
                 <Navigation className="h-3.5 w-3.5" />내 위치로 검색
               </Button>
             </div>
@@ -319,11 +303,7 @@ export default function RestaurantPage() {
                     <p className="text-sm font-medium text-blue-900">
                       알레르기를 등록하면 음식점별 위험도를 확인할 수 있어요
                     </p>
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 text-blue-600"
-                      onClick={() => router.push("/food/profile")}
-                    >
+                    <Button variant="link" className="h-auto p-0 text-blue-600" onClick={() => router.push("/food/profile")}>
                       알레르기 등록하러 가기 →
                     </Button>
                   </div>
@@ -343,7 +323,7 @@ export default function RestaurantPage() {
 
             {/* 필터 */}
             {restaurants.length > 0 && userAllergens.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                 {(["all", "safe", "caution", "danger"] as const).map((filter) => (
                   <Button
@@ -367,19 +347,18 @@ export default function RestaurantPage() {
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
                   {locationName && (
-                    <>
-                      <MapPin className="inline h-3.5 w-3.5 mr-1" />
-                      {locationName}
-                    </>
+                    <><MapPin className="inline h-3.5 w-3.5 mr-1" />{locationName}</>
                   )}
-                  {" · "}
-                  {sortedRestaurants.length}개 음식점
+                  {" · "}반경 2km · {filteredRestaurants.length}개 음식점
+                  {totalCount > restaurants.length && (
+                    <span className="text-xs"> (전체 {totalCount}개)</span>
+                  )}
                 </p>
               </div>
             )}
 
             {/* 로딩 */}
-            {isLoading && (
+            {isLoading && restaurants.length === 0 && (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <Card key={i}>
@@ -406,12 +385,12 @@ export default function RestaurantPage() {
                 </div>
                 <h2 className="mb-2 text-lg font-semibold">내 주변 음식점 알레르기 체크</h2>
                 <p className="mb-1 text-sm text-muted-foreground">위치를 허용하면 주변 음식점을 자동으로 검색해요</p>
-                <p className="text-sm text-muted-foreground">또는 검색창에 지역명을 입력하세요</p>
+                <p className="text-sm text-muted-foreground">반경 2km 내 음식점을 거리순으로 보여드려요</p>
               </div>
             )}
 
             {/* 결과 없음 */}
-            {hasSearched && !isLoading && sortedRestaurants.length === 0 && (
+            {hasSearched && !isLoading && filteredRestaurants.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="text-sm text-muted-foreground">
                   {riskFilter !== "all"
@@ -423,7 +402,7 @@ export default function RestaurantPage() {
 
             {/* 음식점 카드 리스트 */}
             <div className="space-y-3">
-              {sortedRestaurants.map((restaurant, idx) => {
+              {filteredRestaurants.map((restaurant, idx) => {
                 const risk = RISK_CONFIG[restaurant.riskLevel];
                 const RiskIcon = risk.icon;
                 const isSelected = selectedRestaurant === restaurant.name;
@@ -452,8 +431,7 @@ export default function RestaurantPage() {
 
                         {userAllergens.length > 0 && (
                           <Badge className={`shrink-0 ${risk.badgeClass}`} variant={risk.badgeVariant}>
-                            <RiskIcon className="h-3 w-3 mr-1" />
-                            {risk.label}
+                            <RiskIcon className="h-3 w-3 mr-1" />{risk.label}
                           </Badge>
                         )}
                       </div>
@@ -526,10 +504,7 @@ export default function RestaurantPage() {
                             </div>
                           )}
 
-                          {analysis.tips && (
-                            <p className="text-xs text-muted-foreground">💡 {analysis.tips}</p>
-                          )}
-
+                          {analysis.tips && <p className="text-xs text-muted-foreground">💡 {analysis.tips}</p>}
                           <p className="text-[10px] text-muted-foreground/60">⚠️ {analysis.disclaimer}</p>
                         </div>
                       )}
@@ -545,6 +520,24 @@ export default function RestaurantPage() {
                 );
               })}
             </div>
+
+            {/* 더보기 버튼 */}
+            {hasSearched && !isLoading && totalCount > restaurants.length && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleLoadMore}
+              >
+                더 많은 음식점 보기 ({restaurants.length} / {totalCount})
+              </Button>
+            )}
+
+            {/* 더보기 로딩 */}
+            {isLoading && restaurants.length > 0 && (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              </div>
+            )}
           </div>
         </div>
       </main>

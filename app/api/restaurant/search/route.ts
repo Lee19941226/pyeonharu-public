@@ -4,9 +4,12 @@ import { createClient } from "@/lib/supabase/server"
 // 카테고리별 일반적인 알레르기 위험 성분 매핑
 const CATEGORY_ALLERGY_MAP: Record<string, string[]> = {
   "한식": ["대두", "밀", "참깨", "쇠고기", "돼지고기", "계란"],
+  "중식": ["밀", "대두", "땅콩", "갑각류", "참깨", "계란"],
   "중국식": ["밀", "대두", "땅콩", "갑각류", "참깨", "계란"],
   "일식": ["밀", "대두", "갑각류", "조개류", "고등어", "새우", "게"],
+  "일식/수산물": ["밀", "대두", "갑각류", "조개류", "고등어", "새우", "게"],
   "양식": ["밀", "우유", "계란", "대두", "쇠고기"],
+  "서양식": ["밀", "우유", "계란", "대두", "쇠고기"],
   "해물,생선요리": ["갑각류", "조개류", "고등어", "새우", "게", "오징어"],
   "육류,고기요리": ["쇠고기", "돼지고기", "닭고기", "대두", "밀"],
   "분식": ["밀", "대두", "계란", "우유"],
@@ -22,6 +25,7 @@ const CATEGORY_ALLERGY_MAP: Record<string, string[]> = {
   "냉면": ["밀", "메밀", "대두", "계란", "쇠고기"],
   "샤브샤브": ["쇠고기", "대두", "밀", "갑각류", "조개류"],
   "태국식": ["땅콩", "갑각류", "대두", "밀"],
+  "동남아식": ["땅콩", "갑각류", "대두", "밀"],
   "베트남식": ["땅콩", "갑각류", "대두", "밀", "고등어"],
   "인도식": ["우유", "밀", "견과류", "대두"],
   "멕시코식": ["밀", "우유", "대두", "쇠고기"],
@@ -32,10 +36,33 @@ const CATEGORY_ALLERGY_MAP: Record<string, string[]> = {
   "떡볶이": ["밀", "대두", "계란"],
   "순대": ["밀", "대두", "돼지고기"],
   "김밥": ["밀", "대두", "계란", "참깨"],
+  "김밥(도시락)": ["밀", "대두", "계란", "참깨"],
   "죽": ["참깨", "대두", "쇠고기", "갑각류"],
   "도시락": ["밀", "대두", "계란", "쇠고기"],
   "아이스크림": ["우유", "계란", "대두", "견과류", "밀"],
   "샐러드": ["견과류", "우유", "계란", "대두"],
+  "호프/통닭": ["밀", "닭고기", "대두", "계란"],
+  "부대찌개": ["밀", "대두", "돼지고기", "우유"],
+  "감자탕": ["돼지고기", "대두", "밀"],
+  "삼겹살": ["돼지고기", "대두", "참깨"],
+  "곱창전골": ["쇠고기", "돼지고기", "밀", "대두"],
+  "백반/한정식": ["대두", "밀", "참깨", "쇠고기", "돼지고기", "계란"],
+  "국밥": ["대두", "밀", "돼지고기", "쇠고기"],
+  "설렁탕": ["쇠고기", "밀", "대두"],
+  "갈비": ["쇠고기", "대두", "참깨", "밀"],
+  "불고기": ["쇠고기", "대두", "참깨", "밀"],
+  "닭갈비": ["닭고기", "밀", "대두", "참깨"],
+  "닭볶음탕": ["닭고기", "대두", "밀"],
+  "해장국": ["대두", "돼지고기", "쇠고기"],
+  "순두부": ["대두", "갑각류", "조개류"],
+  "보리밥": ["밀", "대두", "참깨"],
+  "회": ["갑각류", "조개류", "고등어", "새우", "게"],
+  "횟집": ["갑각류", "조개류", "고등어", "새우", "게"],
+  "생선회": ["갑각류", "조개류", "고등어", "새우", "게"],
+  "카페/찻집": ["우유", "대두", "밀", "견과류"],
+  "커피전문점": ["우유", "대두"],
+  "제과점": ["밀", "계란", "우유", "견과류", "대두"],
+  "탕/찌개": ["대두", "밀", "쇠고기", "돼지고기"],
 }
 
 // 사용자 알레르기 기반 위험도 계산
@@ -48,19 +75,6 @@ function calculateRisk(
   if (matched.length === 0) return { level: "safe", matched: [] }
   if (matched.length >= 3) return { level: "danger", matched }
   return { level: "caution", matched }
-}
-
-// 네이버 카테고리 → 간단 카테고리 추출
-function extractCategory(fullCategory: string): string {
-  const parts = fullCategory.split(">")
-  return parts[parts.length - 1].trim()
-}
-
-// 네이버 좌표 변환 (katec → 위경도 근사)
-function convertNaverCoord(mapx: string, mapy: string): { lat: number; lng: number } {
-  const lng = parseInt(mapx) / 10000000
-  const lat = parseInt(mapy) / 10000000
-  return { lat, lng }
 }
 
 // Haversine 거리 계산 (km)
@@ -76,22 +90,45 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const query = searchParams.get("query") || ""
-  const display = searchParams.get("display") || "20"
-  const userLat = parseFloat(searchParams.get("lat") || "0")
-  const userLng = parseFloat(searchParams.get("lng") || "0")
+// 상가정보 API 업종 소분류명에서 간단 카테고리 추출
+function simplifyCategory(indsSclsNm: string, indsMclsNm: string): string {
+  // 소분류명을 우선 사용, 없으면 중분류명
+  return indsSclsNm || indsMclsNm || "음식점"
+}
 
-  if (!query) {
-    return NextResponse.json({ error: "검색어가 필요합니다." }, { status: 400 })
+// 카테고리 매칭 (부분 일치)
+function findAllergens(category: string, userAllergens: string[]): { level: "safe" | "caution" | "danger"; matched: string[] } {
+  // 정확히 일치하는 키 먼저 찾기
+  if (CATEGORY_ALLERGY_MAP[category]) {
+    return calculateRisk(CATEGORY_ALLERGY_MAP[category], userAllergens)
   }
 
-  const clientId = process.env.NAVER_CLIENT_ID
-  const clientSecret = process.env.NAVER_CLIENT_SECRET
+  // 부분 일치로 찾기
+  for (const [key, allergens] of Object.entries(CATEGORY_ALLERGY_MAP)) {
+    if (category.includes(key) || key.includes(category)) {
+      return calculateRisk(allergens, userAllergens)
+    }
+  }
 
-  if (!clientId || !clientSecret) {
-    return NextResponse.json({ error: "네이버 API 키가 설정되지 않았습니다." }, { status: 500 })
+  // 기본 음식점 알레르기 (매칭 안 되면)
+  return calculateRisk(["대두", "밀"], userAllergens)
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const userLat = parseFloat(searchParams.get("lat") || "0")
+  const userLng = parseFloat(searchParams.get("lng") || "0")
+  const radius = searchParams.get("radius") || "2000" // 기본 반경 2km
+  const query = searchParams.get("query") || "" // 텍스트 검색어 (상호명 필터용)
+  const page = searchParams.get("page") || "1"
+
+  if (!userLat || !userLng) {
+    return NextResponse.json({ error: "위치 정보(lat, lng)가 필요합니다." }, { status: 400 })
+  }
+
+  const serviceKey = process.env.SBIZ_API_KEY
+  if (!serviceKey) {
+    return NextResponse.json({ error: "상가정보 API 키가 설정되지 않았습니다." }, { status: 500 })
   }
 
   try {
@@ -115,106 +152,89 @@ export async function GET(req: NextRequest) {
       // 비로그인도 허용
     }
 
-    // 2. 네이버 지역 검색 API 병렬 호출 (최대 5페이지 × 20개 = 100개)
-    const pageSize = 20
-    const maxPages = 5
-    const naverHeaders = {
-      "X-Naver-Client-Id": clientId,
-      "X-Naver-Client-Secret": clientSecret,
-    }
+    // 2. 소상공인 상가정보 API - 반경 내 상가업소 조회
+    const numOfRows = 100
+    const apiUrl = new URL("https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius")
+    apiUrl.searchParams.append("ServiceKey", serviceKey)
+    apiUrl.searchParams.append("cy", String(userLat))  // 위도
+    apiUrl.searchParams.append("cx", String(userLng))  // 경도
+    apiUrl.searchParams.append("radius", radius)
+    apiUrl.searchParams.append("indsLclsCd", "Q")      // 음식점 대분류
+    apiUrl.searchParams.append("numOfRows", String(numOfRows))
+    apiUrl.searchParams.append("pageNo", page)
+    apiUrl.searchParams.append("type", "json")
 
-    // 첫 페이지 먼저 호출하여 총 결과 수 확인
-    const firstUrl = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=${pageSize}&start=1&sort=comment`
-    const firstRes = await fetch(firstUrl, { headers: naverHeaders })
+    const apiRes = await fetch(apiUrl.toString())
 
-    if (!firstRes.ok) {
-      const errText = await firstRes.text()
-      console.error("[Restaurant Search] 네이버 API 오류:", errText)
+    if (!apiRes.ok) {
+      console.error("[Restaurant Search] API 오류:", apiRes.status)
       return NextResponse.json({ error: "음식점 검색에 실패했습니다." }, { status: 500 })
     }
 
-    const firstData = await firstRes.json()
-    const totalAvailable = Math.min(firstData.total || 0, 100) // 네이버 API 최대 100
-    const totalPages = Math.min(Math.ceil(totalAvailable / pageSize), maxPages)
+    const apiData = await apiRes.json()
+    const items = apiData?.body?.items || []
+    const totalCount = apiData?.body?.totalCount || 0
 
-    // 나머지 페이지 병렬 호출
-    let allItems = [...(firstData.items || [])]
-
-    if (totalPages > 1) {
-      const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
-      const pageResults = await Promise.allSettled(
-        remainingPages.map(async (page) => {
-          const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=${pageSize}&start=${(page - 1) * pageSize + 1}&sort=comment`
-          const res = await fetch(url, { headers: naverHeaders })
-          if (!res.ok) return []
-          const data = await res.json()
-          return data.items || []
-        })
-      )
-
-      for (const result of pageResults) {
-        if (result.status === "fulfilled") {
-          allItems = [...allItems, ...result.value]
-        }
-      }
-    }
-
-    // 3. 음식점 카테고리 필터 + 알레르기 매칭 + 중복 제거
+    // 3. 음식점 데이터 변환 + 알레르기 매칭
     const seenNames = new Set<string>()
-    let restaurants = allItems
-      .filter((item: any) => item.category?.includes("음식점"))
+    let restaurants = items
       .map((item: any) => {
-        const category = extractCategory(item.category || "")
-        const { lat, lng } = convertNaverCoord(item.mapx, item.mapy)
+        const name = item.bizesNm || ""
+        if (!name || seenNames.has(name)) return null
+        seenNames.add(name)
 
-        // 카테고리 기반 알레르기 매칭
-        const categoryAllergens = CATEGORY_ALLERGY_MAP[category] || []
-        const risk = calculateRisk(categoryAllergens, userAllergens)
+        const lat = parseFloat(item.lat) || 0
+        const lng = parseFloat(item.lon) || 0
+        const category = simplifyCategory(item.indsSclsNm || "", item.indsMclsNm || "")
 
-        // HTML 태그 제거
-        const cleanName = (item.title || "").replace(/<[^>]*>/g, "")
+        // 알레르기 매칭
+        const risk = findAllergens(category, userAllergens)
 
-        // 중복 제거
-        if (seenNames.has(cleanName)) return null
-        seenNames.add(cleanName)
-
-        // 거리 계산 (사용자 좌표가 있으면)
+        // 거리 계산
         let distance = ""
         let distanceKm = 9999
-        if (userLat && userLng && lat && lng) {
+        if (lat && lng) {
           distanceKm = haversine(userLat, userLng, lat, lng)
           distance = distanceKm < 1
             ? `${Math.round(distanceKm * 1000)}m`
             : `${distanceKm.toFixed(1)}km`
         }
 
+        // 텍스트 검색 필터 (query가 있으면)
+        if (query) {
+          const q = query.replace(/\s*(음식점|맛집)\s*/g, "").trim().toLowerCase()
+          if (q && !name.toLowerCase().includes(q) && !category.toLowerCase().includes(q)) {
+            return null
+          }
+        }
+
         return {
-          name: cleanName,
+          name,
           category,
-          categoryFull: item.category,
-          address: item.address,
-          roadAddress: item.roadAddress,
+          categoryFull: `${item.indsLclsNm || ""}>${item.indsMclsNm || ""}>${item.indsSclsNm || ""}`,
+          address: item.lnoAdr || "",
+          roadAddress: item.rdnmAdr || "",
           lat,
           lng,
-          phone: item.telephone || "",
-          link: item.link || "",
+          phone: item.telNo || "",
+          link: "",
           riskLevel: risk.level,
           matchedAllergens: risk.matched,
-          categoryAllergens,
+          categoryAllergens: CATEGORY_ALLERGY_MAP[category] || [],
           distance,
           distanceKm,
         }
       })
       .filter(Boolean)
 
-    // 4. 사용자 좌표가 있으면 거리순 정렬
-    if (userLat && userLng) {
-      restaurants = restaurants.sort((a: any, b: any) => a.distanceKm - b.distanceKm)
-    }
+    // 4. 거리순 정렬
+    restaurants = restaurants.sort((a: any, b: any) => a.distanceKm - b.distanceKm)
 
     return NextResponse.json({
       success: true,
-      total: restaurants.length,
+      total: totalCount,
+      count: restaurants.length,
+      page: parseInt(page),
       restaurants,
       userAllergens,
     })
