@@ -149,8 +149,8 @@ export default function RestaurantPage() {
           );
           const data = await res.json();
           if (data.address) {
-            setLocationName(data.address);
-            // 시군구 단위로 검색
+            // 표시는 동까지, 검색은 시군구 단위
+            setLocationName(data.full || data.address);
             const searchAddr = data.sigungu || data.address;
             searchRestaurants(`${searchAddr} 음식점`, latitude, longitude);
           } else {

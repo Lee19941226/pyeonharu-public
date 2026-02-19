@@ -115,27 +115,54 @@ export async function GET(req: NextRequest) {
       // 비로그인도 허용
     }
 
-    // 2. 네이버 지역 검색 API 호출
-    const naverUrl = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=${display}&sort=comment`
+    // 2. 네이버 지역 검색 API 병렬 호출 (최대 5페이지 × 20개 = 100개)
+    const pageSize = 20
+    const maxPages = 5
+    const naverHeaders = {
+      "X-Naver-Client-Id": clientId,
+      "X-Naver-Client-Secret": clientSecret,
+    }
 
-    const naverRes = await fetch(naverUrl, {
-      headers: {
-        "X-Naver-Client-Id": clientId,
-        "X-Naver-Client-Secret": clientSecret,
-      },
-    })
+    // 첫 페이지 먼저 호출하여 총 결과 수 확인
+    const firstUrl = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=${pageSize}&start=1&sort=comment`
+    const firstRes = await fetch(firstUrl, { headers: naverHeaders })
 
-    if (!naverRes.ok) {
-      const errText = await naverRes.text()
+    if (!firstRes.ok) {
+      const errText = await firstRes.text()
       console.error("[Restaurant Search] 네이버 API 오류:", errText)
       return NextResponse.json({ error: "음식점 검색에 실패했습니다." }, { status: 500 })
     }
 
-    const naverData = await naverRes.json()
+    const firstData = await firstRes.json()
+    const totalAvailable = Math.min(firstData.total || 0, 100) // 네이버 API 최대 100
+    const totalPages = Math.min(Math.ceil(totalAvailable / pageSize), maxPages)
 
-    // 3. 음식점 카테고리 필터 + 알레르기 매칭
-    let restaurants = (naverData.items || [])
-      .filter((item: any) => item.category?.startsWith("음식점"))
+    // 나머지 페이지 병렬 호출
+    let allItems = [...(firstData.items || [])]
+
+    if (totalPages > 1) {
+      const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+      const pageResults = await Promise.allSettled(
+        remainingPages.map(async (page) => {
+          const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=${pageSize}&start=${(page - 1) * pageSize + 1}&sort=comment`
+          const res = await fetch(url, { headers: naverHeaders })
+          if (!res.ok) return []
+          const data = await res.json()
+          return data.items || []
+        })
+      )
+
+      for (const result of pageResults) {
+        if (result.status === "fulfilled") {
+          allItems = [...allItems, ...result.value]
+        }
+      }
+    }
+
+    // 3. 음식점 카테고리 필터 + 알레르기 매칭 + 중복 제거
+    const seenNames = new Set<string>()
+    let restaurants = allItems
+      .filter((item: any) => item.category?.includes("음식점"))
       .map((item: any) => {
         const category = extractCategory(item.category || "")
         const { lat, lng } = convertNaverCoord(item.mapx, item.mapy)
@@ -146,6 +173,10 @@ export async function GET(req: NextRequest) {
 
         // HTML 태그 제거
         const cleanName = (item.title || "").replace(/<[^>]*>/g, "")
+
+        // 중복 제거
+        if (seenNames.has(cleanName)) return null
+        seenNames.add(cleanName)
 
         // 거리 계산 (사용자 좌표가 있으면)
         let distance = ""
@@ -174,6 +205,7 @@ export async function GET(req: NextRequest) {
           distanceKm,
         }
       })
+      .filter(Boolean)
 
     // 4. 사용자 좌표가 있으면 거리순 정렬
     if (userLat && userLng) {
@@ -182,7 +214,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      total: naverData.total,
+      total: restaurants.length,
       restaurants,
       userAllergens,
     })
