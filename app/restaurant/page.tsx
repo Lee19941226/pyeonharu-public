@@ -51,14 +51,18 @@ interface Restaurant {
 interface AIAnalysis {
   riskLevel: string;
   summary: string;
+  popularity: string;
+  popularityNote: string;
   estimatedMenus: Array<{
     name: string;
+    price: string;
     allergens: string[];
     matchedUserAllergens: string[];
     risk: string;
   }>;
   safeOptions: string[];
   tips: string;
+  overallReview: string;
   disclaimer: string;
 }
 
@@ -346,21 +350,43 @@ function AIAnalysisModal({
 
           {analysis && (
             <>
-              {/* 요약 */}
-              <div className="rounded-lg bg-muted/50 p-3">
+              {/* 요약 + 유명도 */}
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
                 <p className="text-sm font-medium">{analysis.summary}</p>
+                {analysis.popularity && analysis.popularity !== "알 수 없음" && (
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      analysis.popularity === "높음" ? "bg-amber-100 text-amber-700" :
+                      analysis.popularity === "보통" ? "bg-blue-100 text-blue-700" :
+                      "bg-gray-100 text-gray-600"
+                    }`}>
+                      유명도: {analysis.popularity}
+                    </span>
+                    {analysis.popularityNote && (
+                      <span className="text-xs text-muted-foreground">{analysis.popularityNote}</span>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* 전반적 평가 */}
+              {analysis.overallReview && (
+                <p className="text-sm text-muted-foreground italic">&ldquo;{analysis.overallReview}&rdquo;</p>
+              )}
 
               {/* 메뉴 분석 */}
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">예상 메뉴 분석</p>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">메뉴 분석</p>
                 <div className="space-y-1.5">
                   {analysis.estimatedMenus?.map((menu, i) => (
                     <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm ${
                       menu.risk === "danger" ? "bg-red-50" : menu.risk === "caution" ? "bg-amber-50" : "bg-green-50"
                     }`}>
-                      <span className="font-medium">{menu.name}</span>
-                      <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium">{menu.name}</span>
+                        {menu.price && <span className="ml-1.5 text-xs text-muted-foreground">{menu.price}</span>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
                         {menu.matchedUserAllergens.length > 0 ? (
                           menu.matchedUserAllergens.map((a, j) => (
                             <span key={j} className="rounded bg-red-200 px-1.5 py-0.5 text-[10px] text-red-800">{a}</span>
@@ -561,7 +587,12 @@ export default function RestaurantPage() {
       const res = await fetch("/api/restaurant/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurantName: restaurant.name, category: restaurant.category, userAllergens }),
+        body: JSON.stringify({
+          restaurantName: restaurant.name,
+          category: restaurant.category,
+          address: restaurant.roadAddress || restaurant.address,
+          userAllergens,
+        }),
       });
       const data = await res.json();
       if (data.success) {
