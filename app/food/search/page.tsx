@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Camera,
   Lightbulb,
+  AlertTriangle,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -602,15 +603,378 @@ function FoodSearchContent() {
 }
 
 export default function FoodSearchPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+  const ITEMS_PER_PAGE = 10;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [query, setQuery] = useState("");
+  const [allResults, setAllResults] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ✅ 초기 로드 시 캐시 복원
+  useEffect(() => {
+    const urlQuery = searchParams.get("q");
+
+    if (urlQuery) {
+      setQuery(urlQuery);
+
+      // ✅ 캐시된 결과 확인
+      const cacheKey = `search_cache_${urlQuery}`;
+      const cached = sessionStorage.getItem(cacheKey);
+
+      if (cached) {
+        console.log("✅ 캐시된 결과 사용:", urlQuery);
+        const cachedData = JSON.parse(cached);
+        setAllResults(cachedData.items);
+        setHasSearched(true);
+        setCurrentPage(cachedData.page || 1);
+      } else {
+        console.log("🔍 새로운 검색:", urlQuery);
+        performSearch(urlQuery);
       }
-    >
-      <FoodSearchContent />
-    </Suspense>
+    }
+  }, []); // ✅ 최초 1회만 실행
+
+  // ✅ 검색 실행 함수
+  const performSearch = async (searchQuery: string) => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      return;
+    }
+
+    setIsLoading(true);
+    setHasSearched(true);
+    setCurrentPage(1);
+
+    try {
+      const res = await fetch(
+        `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}`,
+      );
+      const data = await res.json();
+
+      if (data.success) {
+        const items = data.items || [];
+        setAllResults(items);
+
+        // ✅ 결과 캐싱
+        const cacheKey = `search_cache_${searchQuery.trim()}`;
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            items,
+            page: 1,
+            timestamp: Date.now(),
+          }),
+        );
+        sessionStorage.setItem("last_search_query", searchQuery.trim());
+      } else {
+        setAllResults([]);
+      }
+    } catch (error) {
+      console.error("❌ 검색 오류:", error);
+      setAllResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ✅ 검색 폼 제출
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!query || query.trim().length < 2) {
+      return;
+    }
+
+    // ✅ 같은 검색어면 API 호출 안 함
+    const urlQuery = searchParams.get("q");
+    if (urlQuery === query.trim()) {
+      console.log("⚠️ 같은 검색어 - 스킵");
+      return;
+    }
+
+    // ✅ URL 업데이트 후 검색
+    router.push(`/food/search?q=${encodeURIComponent(query.trim())}`);
+    performSearch(query.trim());
+  };
+
+  // ✅ 결과 클릭 (페이지 번호도 캐싱)
+  const handleResultClick = (foodCode: string) => {
+    const cacheKey = `search_cache_${query}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      const cachedData = JSON.parse(cached);
+      cachedData.page = currentPage;
+      sessionStorage.setItem(cacheKey, JSON.stringify(cachedData));
+    }
+
+    router.push(`/food/result/${foodCode}`);
+  };
+
+  // ✅ 페이지네이션
+  const totalPages = Math.ceil(allResults.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentResults = allResults.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <Header />
+
+      <main className="flex-1 pb-16 md:pb-0">
+        <div className="container mx-auto px-4 py-8">
+          {/* ✅ max-w 줄임: 4xl → 3xl */}
+          <div className="mx-auto max-w-3xl">
+            {/* 검색 폼 */}
+            <form onSubmit={handleSubmit} className="mb-8">
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="식품명을 입력하세요 (예: 초코파이, 바나나우유)"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="flex-1"
+                  autoFocus
+                />
+                <Button type="submit" disabled={isLoading}>
+                  <Search className="mr-2 h-4 w-4" />
+                  {isLoading ? "검색 중..." : "검색"}
+                </Button>
+              </div>
+            </form>
+
+            {/* 로딩 */}
+            {isLoading && (
+              <div className="text-center py-12">
+                <div className="mb-4 text-4xl">🔍</div>
+                <p className="text-lg font-medium">검색 중...</p>
+                <p className="text-sm text-muted-foreground">
+                  식품 정보를 찾고 있습니다
+                </p>
+              </div>
+            )}
+
+            {/* 검색 결과 */}
+            {!isLoading && hasSearched && (
+              <div>
+                {allResults.length > 0 ? (
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        총 <strong>{allResults.length}개</strong>의 결과
+                      </p>
+                      {totalPages > 1 && (
+                        <p className="text-sm text-muted-foreground">
+                          {currentPage} / {totalPages} 페이지
+                        </p>
+                      )}
+                    </div>
+
+                    {/* ✅ 결과 목록 - 여백 줄임 */}
+                    <div className="space-y-2">
+                      {currentResults.map((item) => {
+                        // ✅ 알레르기 위험 여부
+                        const isDangerous = item.hasAllergen;
+
+                        return (
+                          <Card
+                            key={item.foodCode}
+                            className={`cursor-pointer transition-all hover:shadow-md ${
+                              isDangerous
+                                ? "border-red-300 bg-red-50 hover:bg-red-100"
+                                : "hover:bg-muted/50"
+                            }`}
+                            onClick={() => handleResultClick(item.foodCode)}
+                          >
+                            <CardContent className="p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="mb-1.5 flex items-center gap-2 flex-wrap">
+                                    <h3
+                                      className={`font-semibold text-sm ${
+                                        isDangerous ? "text-red-900" : ""
+                                      }`}
+                                    >
+                                      {item.foodName}
+                                    </h3>
+
+                                    {/* 데이터 소스 배지 */}
+                                    {item.dataSource && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs shrink-0"
+                                      >
+                                        {item.dataSource === "db" && "DB"}
+                                        {item.dataSource === "openapi" &&
+                                          "식약처"}
+                                        {item.dataSource === "openfood" &&
+                                          "수입"}
+                                        {item.dataSource === "ai" && "AI"}
+                                      </Badge>
+                                    )}
+
+                                    {/* 매칭 이유 배지 */}
+                                    {item.matchReason && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs shrink-0"
+                                      >
+                                        {item.matchReason}
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {item.manufacturer && (
+                                    <p
+                                      className={`mb-1.5 text-xs ${
+                                        isDangerous
+                                          ? "text-red-700"
+                                          : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {item.manufacturer}
+                                    </p>
+                                  )}
+
+                                  {/* 알레르기 정보 */}
+                                  {item.allergens &&
+                                    item.allergens.length > 0 && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {item.allergens.map(
+                                          (allergen: string, idx: number) => (
+                                            <span
+                                              key={idx}
+                                              className={`rounded-full px-2 py-0.5 text-xs ${
+                                                isDangerous
+                                                  ? "bg-red-200 text-red-900 font-semibold"
+                                                  : "bg-orange-100 text-orange-700"
+                                              }`}
+                                            >
+                                              {allergen}
+                                            </span>
+                                          ),
+                                        )}
+                                      </div>
+                                    )}
+                                </div>
+
+                                {/* 안전 여부 아이콘 */}
+                                <div className="shrink-0">
+                                  {isDangerous ? (
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-200">
+                                      <AlertTriangle className="h-5 w-5 text-red-700" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100">
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+
+                    {/* ✅ 페이지네이션 */}
+                    {totalPages > 1 && (
+                      <div className="mt-6 flex items-center justify-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToPage(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        <div className="flex gap-1">
+                          {Array.from(
+                            { length: totalPages },
+                            (_, i) => i + 1,
+                          ).map((page) => {
+                            // ✅ 현재 페이지 ±2만 표시
+                            if (
+                              page === 1 ||
+                              page === totalPages ||
+                              (page >= currentPage - 2 &&
+                                page <= currentPage + 2)
+                            ) {
+                              return (
+                                <Button
+                                  key={page}
+                                  variant={
+                                    page === currentPage ? "default" : "outline"
+                                  }
+                                  size="sm"
+                                  onClick={() => goToPage(page)}
+                                  className="w-9"
+                                >
+                                  {page}
+                                </Button>
+                              );
+                            } else if (
+                              page === currentPage - 3 ||
+                              page === currentPage + 3
+                            ) {
+                              return (
+                                <span
+                                  key={page}
+                                  className="flex items-center px-2"
+                                >
+                                  ...
+                                </span>
+                              );
+                            }
+                            return null;
+                          })}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToPage(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="mb-4 text-4xl">🔍</div>
+                    <p className="text-lg font-medium">검색 결과가 없습니다</p>
+                    <p className="text-sm text-muted-foreground">
+                      다른 키워드로 검색해보세요
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 검색 전 안내 */}
+            {!hasSearched && !isLoading && (
+              <div className="text-center py-12">
+                <div className="mb-4 text-4xl">🔍</div>
+                <p className="text-lg font-medium">식품명을 검색하세요</p>
+                <p className="text-sm text-muted-foreground">
+                  알레르기 정보를 확인할 수 있습니다
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      <MobileNav />
+    </div>
   );
 }

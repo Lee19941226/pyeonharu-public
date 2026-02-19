@@ -535,7 +535,17 @@ export default function FoodResultPage() {
             <Button
               variant="ghost"
               className="mb-4"
-              onClick={() => router.back()}
+              onClick={() => {
+                // ✅ 검색 페이지로 직접 이동 (재검색 방지)
+                const searchQuery = sessionStorage.getItem("last_search_query");
+                if (searchQuery) {
+                  router.push(
+                    `/food/search?q=${encodeURIComponent(searchQuery)}`,
+                  );
+                } else {
+                  router.push("/food/search");
+                }
+              }}
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
               뒤로가기
