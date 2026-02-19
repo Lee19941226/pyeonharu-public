@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     .eq("user_id", user.id)
     .gte("recorded_at", startOfDay)
     .lte("recorded_at", endOfDay)
-    .order("recorded_at", { ascending: true })
+    .order("recorded_at", { ascending: false })
 
   if (error) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 })

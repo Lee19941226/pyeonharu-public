@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, MapPin, Camera, MessageSquare, User } from "lucide-react";
+import { Home, MapPin, Camera, Activity, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
@@ -55,18 +55,18 @@ export function MobileNav() {
           <Camera className="h-6 w-6" />
         </button>
 
-        {/* 커뮤니티 */}
+        {/* 식단관리 */}
         <Link
-          href="/community"
+          href="/diet"
           className={cn(
             "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
-            isActive("/community")
+            isActive("/diet")
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          <MessageSquare className="h-5 w-5" />
-          <span>커뮤니티</span>
+          <Activity className="h-5 w-5" />
+          <span>식단</span>
         </Link>
 
         {/* 마이페이지 */}
