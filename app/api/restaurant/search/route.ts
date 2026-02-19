@@ -183,6 +183,7 @@ export async function GET(req: NextRequest) {
               apiData = parsed
               break
             }
+            lastError = `${endpoint} ok but no body: keys=${Object.keys(parsed).join(",")}, raw=${apiText.slice(0, 300)}`
           } catch {
             // JSON 파싱 실패 시 다음 엔드포인트 시도
           }
@@ -265,6 +266,12 @@ export async function GET(req: NextRequest) {
       page: parseInt(page),
       restaurants,
       userAllergens,
+      debug: {
+        itemsRaw: items.length,
+        totalCount,
+        apiBodyKeys: apiData?.body ? Object.keys(apiData.body) : Object.keys(apiData),
+        firstItem: items[0] ? JSON.stringify(items[0]).slice(0, 300) : null,
+      },
     })
   } catch (error) {
     console.error("[Restaurant Search] Error:", error)
