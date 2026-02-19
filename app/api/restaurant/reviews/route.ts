@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import crypto from "crypto"
 
-// restaurant_key 생성: 이름+주소 → 해시
+// restaurant_key 생성: 이름+주소 → 해시 (프론트와 동일 로직)
 function makeRestaurantKey(name: string, address: string): string {
   const raw = `${name.trim()}::${address.trim()}`.toLowerCase()
-  return crypto.createHash("md5").update(raw).digest("hex")
+  let hash = 0
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash |= 0
+  }
+  return Math.abs(hash).toString(36)
 }
 
 // =============================================
@@ -54,7 +59,26 @@ export async function GET(req: NextRequest) {
       ratings[rKey] = { avg, count: ratingList.length }
     }
 
-    return NextResponse.json({ ratings })
+    // 현재 사용자의 리뷰도 함께 반환 (새로고침 시 "내 리뷰" 버튼 복원용)
+    const { data: { user } } = await supabase.auth.getUser()
+    let myReviews: Record<string, { id: string; rating: number; memo: string }> = {}
+    if (user) {
+      const { data: myData } = await supabase
+        .from("restaurant_reviews")
+        .select("id, restaurant_key, rating, memo")
+        .eq("user_id", user.id)
+        .in("restaurant_key", keyList)
+
+      for (const row of myData || []) {
+        myReviews[row.restaurant_key] = {
+          id: row.id,
+          rating: row.rating,
+          memo: row.memo || "",
+        }
+      }
+    }
+
+    return NextResponse.json({ ratings, myReviews })
   }
 
   // ── 단일 음식점 리뷰 목록 ──

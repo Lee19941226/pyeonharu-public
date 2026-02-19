@@ -603,6 +603,10 @@ export default function RestaurantPage() {
       if (data.ratings) {
         setRestaurantRatings(prev => ({ ...prev, ...data.ratings }));
       }
+      // ✅ 내 리뷰 복원 (새로고침 시 "내 리뷰" 버튼 유지)
+      if (data.myReviews) {
+        setMyReviews(prev => ({ ...prev, ...data.myReviews }));
+      }
     } catch {
       // 별점 조회 실패 무시
     }
