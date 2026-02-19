@@ -87,8 +87,8 @@ const RISK_CONFIG = {
 };
 
 // ── 반경 슬라이더 설정 ──
-const RADIUS_STEPS = [100, 300, 500, 1000, 3000, 5000]; // 미터 단위
-const RADIUS_LABELS = ["100m", "300m", "500m", "1km", "3km", "5km"];
+const RADIUS_STEPS = [100, 300, 500, 1000, 2000]; // 미터 단위
+const RADIUS_LABELS = ["100m", "300m", "500m", "1km", "2km"];
 const DEFAULT_RADIUS_INDEX = 3; // 1km 기본값
 
 function formatRadius(meters: number): string {
