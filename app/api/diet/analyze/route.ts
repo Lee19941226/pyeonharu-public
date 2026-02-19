@@ -25,6 +25,33 @@ export async function POST(req: NextRequest) {
     const base64 = Buffer.from(bytes).toString("base64")
     const mimeType = image.type || "image/jpeg"
 
+    // ─── 이미지를 Supabase Storage에 업로드 ───
+    let imageUrl: string | null = null
+    try {
+      const ext = image.name?.split(".").pop() || "jpg"
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("diet-images")
+        .upload(fileName, Buffer.from(bytes), {
+          contentType: mimeType,
+          upsert: false,
+        })
+
+      if (uploadError) {
+        console.error("[Diet Analyze] 이미지 업로드 실패:", uploadError)
+        // 업로드 실패해도 분석은 계속 진행
+      } else if (uploadData) {
+        const { data: urlData } = supabase.storage
+          .from("diet-images")
+          .getPublicUrl(uploadData.path)
+        imageUrl = urlData.publicUrl
+      }
+    } catch (uploadErr) {
+      console.error("[Diet Analyze] 이미지 업로드 오류:", uploadErr)
+      // 업로드 실패해도 분석은 계속 진행
+    }
+
     // GPT-4o Vision으로 분석
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -78,11 +105,12 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // DB에 저장
+    // DB에 저장 (image_url 포함)
     const { data: entry, error: insertError } = await supabase
       .from("diet_entries")
       .insert({
         user_id: user.id,
+        image_url: imageUrl,
         food_name: result.food_name,
         estimated_cal: result.estimated_cal,
         source: "ai",
@@ -106,6 +134,7 @@ export async function POST(req: NextRequest) {
         confidence: result.confidence,
         emoji: result.emoji,
         source: "ai",
+        image_url: imageUrl,
         recorded_at: entry.recorded_at,
       },
       disclaimer: "AI 추정 칼로리는 통상적인 값을 추측한 데이터이며, 실제와 차이가 있을 수 있습니다.",

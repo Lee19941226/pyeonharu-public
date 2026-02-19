@@ -86,6 +86,7 @@ interface DietEntry {
   source: "ai" | "manual"
   emoji: string
   ai_confidence: number | null
+  image_url: string | null
   recorded_at: string
 }
 
@@ -112,6 +113,7 @@ export default function DietPage() {
   const [manualCal, setManualCal] = useState("")
   const [showWarning, setShowWarning] = useState(false)
   const [warningShownToday, setWarningShownToday] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   // ─── Auth ───
   useEffect(() => {
@@ -423,33 +425,54 @@ export default function DietPage() {
                     >
                       <CardContent className="p-3">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">{entry.emoji}</span>
-                              <span className="text-sm font-medium truncate">
+                          {/* 왼쪽: 썸네일 + 정보 */}
+                          <div className="flex gap-3 flex-1 min-w-0">
+                            {/* 음식 사진 썸네일 또는 이모지 */}
+                            {entry.image_url ? (
+                              <button
+                                onClick={() => setPreviewImage(entry.image_url)}
+                                className="flex-shrink-0 overflow-hidden rounded-lg border border-border hover:border-primary/50 transition-colors"
+                              >
+                                <img
+                                  src={entry.image_url}
+                                  alt={entry.food_name}
+                                  className="h-12 w-12 object-cover"
+                                />
+                              </button>
+                            ) : (
+                              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-lg">
+                                {entry.emoji}
+                              </div>
+                            )}
+
+                            {/* 음식 정보 */}
+                            <div className="min-w-0">
+                              <span className="text-sm font-medium truncate block">
                                 {entry.food_name}
                               </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[11px] text-muted-foreground">
-                                {time}
-                              </span>
-                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${period.color}`}>
-                                {period.label}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] px-1.5 py-0 h-4 ${
-                                  entry.source === "ai"
-                                    ? "bg-purple-50 text-purple-600 border-purple-200"
-                                    : "bg-blue-50 text-blue-600 border-blue-200"
-                                }`}
-                              >
-                                {entry.source === "ai" ? "AI 추정" : "직접 입력"}
-                              </Badge>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <span className="text-[11px] text-muted-foreground">
+                                  {time}
+                                </span>
+                                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${period.color}`}>
+                                  {period.label}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] px-1.5 py-0 h-4 ${
+                                    entry.source === "ai"
+                                      ? "bg-purple-50 text-purple-600 border-purple-200"
+                                      : "bg-blue-50 text-blue-600 border-blue-200"
+                                  }`}
+                                >
+                                  {entry.source === "ai" ? "AI 추정" : "직접 입력"}
+                                </Badge>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+
+                          {/* 오른쪽: 칼로리 + 삭제 */}
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <span className={`text-sm font-bold ${isOver ? "text-red-600" : "text-primary"}`}>
                               {entry.estimated_cal}
                             </span>
@@ -620,6 +643,28 @@ export default function DietPage() {
                 이 알림은 1일 1회 표시됩니다
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 이미지 미리보기 모달 ─── */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={previewImage}
+              alt="음식 사진"
+              className="w-full rounded-xl object-contain max-h-[70vh]"
+            />
           </div>
         </div>
       )}
