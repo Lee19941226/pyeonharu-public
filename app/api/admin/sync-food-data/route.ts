@@ -10,77 +10,106 @@ export async function GET(req: NextRequest) {
 
     let pageNo = 1;
     let totalSynced = 0;
-    const maxPages = 2000; // 안전장치 (무한루프 방지)
+    const maxPages = 2000;
 
     console.log("🚀 식약처 데이터 동기화 시작...");
 
     while (pageNo <= maxPages) {
-      // 식약처 API 호출
-      const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
+      // ✅ 올바른 API: 품목제조정보
+      const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", pageNo.toString());
       url.searchParams.append("numOfRows", "500");
       url.searchParams.append("type", "json");
 
       console.log(`📊 페이지 ${pageNo} 조회 중...`);
-      console.log("🔗 요청 URL:", url.toString());
+
       const res = await fetch(url.toString());
-      console.log("📡 HTTP Status:", res.status);
       const data = await res.json();
-      console.log("📦 전체 응답:", JSON.stringify(data, null, 2));
-      console.log("📦 header:", data.header);
-      console.log("📦 body:", data.body);
-      console.log("📦 items 개수:", data.body?.items?.length || 0);
-      const items = data.body?.items || [];
+
+      // ✅ 응답 구조 확인
+      let items = [];
+      if (Array.isArray(data.body?.items)) {
+        items = data.body.items;
+      } else if (data.body?.items?.item) {
+        items = Array.isArray(data.body.items.item)
+          ? data.body.items.item
+          : [data.body.items.item];
+      }
+
+      console.log(`📦 페이지 ${pageNo}: ${items.length}개 발견`);
+
+      if (items.length > 0 && pageNo === 1) {
+        console.log(
+          "🔍 첫 번째 아이템 구조:",
+          JSON.stringify(items[0], null, 2),
+        );
+      }
 
       if (items.length === 0) {
         console.log("✅ 더 이상 데이터 없음, 동기화 완료!");
         break;
       }
+      // ✅ DB에 저장할 데이터 준비 (중복 제거)
+      const dataMap = new Map<string, any>();
 
-      // DB에 저장할 데이터 준비
-      const insertData = items
-        .filter((item: any) => item.BRCD_NO && item.PRDLST_NM)
-        .map((item: any) => {
-          // 알레르기 정보 수집
-          const allergens: string[] = [];
-          if (item.ALLERGY1) allergens.push(item.ALLERGY1);
-          if (item.ALLERGY2) allergens.push(item.ALLERGY2);
-          if (item.ALLERGY3) allergens.push(item.ALLERGY3);
-          if (item.ALLERGY4) allergens.push(item.ALLERGY4);
-          if (item.ALLERGY5) allergens.push(item.ALLERGY5);
-          if (item.ALLERGY6) allergens.push(item.ALLERGY6);
+      items.forEach((item: any) => {
+        const foodName = item.PRDCT_NM || item.PRDLST_NM;
+        const manufacturer = item.BUES_NM || item.BSSH_NM;
+        const barcode = item.BRCD_NO;
 
-          return {
-            food_code: item.BRCD_NO,
-            food_name: item.PRDLST_NM,
-            manufacturer: item.BSSH_NM || null,
-            allergens: allergens.filter(Boolean),
-            raw_materials: item.RAWMTRL_NM || null,
-            weight: item.CPCTY || null,
-            data_source: "openapi",
-            chosung: getChosung(item.PRDLST_NM),
-            created_at: new Date().toISOString(),
-          };
+        if (!barcode || !foodName) return;
+
+        // ✅ 이미 있으면 스킵 (첫 번째 것만 사용)
+        if (dataMap.has(barcode)) {
+          return;
+        }
+
+        dataMap.set(barcode, {
+          food_code: barcode,
+          food_name: foodName,
+          manufacturer: manufacturer || null,
+          allergens: [],
+          raw_materials: null,
+          weight: item.QNT || item.CPCTY || null,
+          data_source: "openapi",
+          chosung: getChosung(foodName),
+          created_at: new Date().toISOString(),
         });
-      console.log("💾 저장 시작:", insertData.length, "개");
-      // DB 저장
+      });
+
+      const insertData = Array.from(dataMap.values());
+
+      console.log(
+        `💾 페이지 ${pageNo}: ${items.length}개 중 ${insertData.length}개 저장 가능`,
+      );
+
+      if (insertData.length === 0) {
+        console.warn(`⚠️ 페이지 ${pageNo}: 저장할 데이터 없음 (필터링됨)`);
+        pageNo++;
+        continue;
+      }
+
+      console.log(`💾 페이지 ${pageNo}: ${insertData.length}개 저장 시작...`);
+
+      // ✅ DB 저장
       const { error } = await supabase
         .from("food_search_cache")
         .upsert(insertData, { onConflict: "food_code" });
 
       if (error) {
         console.error(`❌ 페이지 ${pageNo} 저장 실패:`, error);
+        // 에러 발생해도 계속 진행
       } else {
-        totalSynced += items.length;
+        totalSynced += insertData.length;
         console.log(
-          `✅ 페이지 ${pageNo}: ${items.length}개 저장 (누적: ${totalSynced}개)`,
+          `✅ 페이지 ${pageNo}: ${insertData.length}개 저장 완료 (누적: ${totalSynced}개)`,
         );
       }
 
       pageNo++;
 
-      // API 부하 방지 (1초 대기)
+      // API 부하 방지
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 

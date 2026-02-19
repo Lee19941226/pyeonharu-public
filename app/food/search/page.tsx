@@ -22,8 +22,33 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { SearchResult, SearchHistory } from "@/types/food";
+import type { SearchHistory } from "@/types/food";
 
+interface SearchResult {
+  foodCode: string;
+  foodName: string;
+  manufacturer: string;
+  allergens: string[];
+  hasAllergen: boolean;
+  searchType?: string;
+  dataSource?: string;
+  rawMaterials?: string;
+  weight?: string;
+  ingredients?: string[];
+  detectedIngredients?: string[];
+  nutritionInfo?: NutritionInfo;
+  matchedUserAllergens?: string[];
+  matchReason: string;
+}
+interface NutritionInfo {
+  calories?: string;
+  sodium?: string;
+  carbs?: string;
+  protein?: string;
+  fat?: string;
+  sugars?: string;
+  servingSize?: string;
+}
 const ITEMS_PER_PAGE = 10;
 
 const POPULAR_KEYWORDS = [
@@ -431,14 +456,38 @@ function FoodSearchContent() {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium truncate">
-                            {item.foodName}
-                          </h3>
+                          {/* ✅ 제품명 + 매칭 이유 배지 */}
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium truncate flex-1">
+                              {item.foodName}
+                            </h3>
+
+                            {/* ✅ 매칭 이유 배지 */}
+                            {item.matchReason && (
+                              <span
+                                className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                                  item.matchReason === "제품명"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : item.matchReason === "성분표"
+                                      ? "bg-orange-100 text-orange-700"
+                                      : item.matchReason === "초성"
+                                        ? "bg-green-100 text-green-700"
+                                        : item.matchReason === "기타"
+                                          ? "bg-gray-100 text-gray-600"
+                                          : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {item.matchReason}
+                              </span>
+                            )}
+                          </div>
+
                           {item.manufacturer && (
-                            <p className="text-sm text-muted-foreground truncate">
+                            <p className="text-sm text-muted-foreground truncate mt-1">
                               {item.manufacturer}
                             </p>
                           )}
+
                           <div className="mt-2 flex flex-wrap gap-1">
                             {item.allergens.slice(0, 3).map((allergen, idx) => (
                               <Badge

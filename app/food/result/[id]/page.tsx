@@ -548,10 +548,20 @@ export default function FoodResultPage() {
                 <h1 className="text-3xl font-bold">{result.foodName}</h1>
 
                 {result.dataSource && (
-                  <Badge variant="outline" className="text-xs">
-                    {result.dataSource === "database" && "DB"}
-                    {result.dataSource === "openapi" && "식약처 공식"}
-                    {result.dataSource === "ai" && "AI 분석"}
+                  <Badge
+                    variant={
+                      result.dataSource === "openapi"
+                        ? "default"
+                        : result.dataSource === "openfood"
+                          ? "secondary"
+                          : "outline"
+                    }
+                    className="text-xs"
+                  >
+                    {result.dataSource === "db" && "🗄️ DB"}
+                    {result.dataSource === "openapi" && "🏛️ 식약처"}
+                    {result.dataSource === "openfood" && "🌍 수입식품"}{" "}
+                    {result.dataSource === "ai" && "🤖 AI"}
                   </Badge>
                 )}
               </div>
@@ -614,6 +624,50 @@ export default function FoodResultPage() {
                 </Button>
               </div>
             </div>
+            {/* ✅ AI 생성 제품 경고 (조건부 표시) */}
+            {result.dataSource === "ai" && (
+              <Card className="mb-6 border-amber-300 bg-amber-50">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="mb-1 text-sm font-semibold text-amber-900">
+                        AI 추정 정보
+                      </h3>
+                      <p className="text-xs leading-relaxed text-amber-800">
+                        이 제품은 AI가 분석한 추정 정보입니다. 실제 제품과 다를
+                        수 있으므로
+                        <strong className="font-semibold">
+                          {" "}
+                          구매 전 제품 포장지를 반드시 확인
+                        </strong>
+                        하시거나 판매처에 직접 문의하시길 권장드립니다.
+                      </p>
+                      {!result.isSafe && (
+                        <p className="mt-2 text-xs font-medium text-amber-900">
+                          ⚠️ 알레르기가 있는 경우 특히 더 주의가 필요합니다.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {/* ✅ Open Food Facts 경고 */}
+            {result.dataSource === "openfood" && (
+              <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                <div className="flex items-center gap-2 text-xs text-blue-800">
+                  <Info className="h-4 w-4 shrink-0 text-blue-600" />
+                  <p className="leading-relaxed">
+                    <strong className="font-semibold">커뮤니티 정보:</strong>이
+                    정보는 오픈 데이터베이스에서 제공됩니다. 구매 전 제품
+                    포장지를 확인하세요.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* 안전 여부 카드 - 안전 */}
             {result.isSafe && (
               <Card className="mb-6 border-green-600 bg-green-50">
@@ -851,45 +905,150 @@ export default function FoodResultPage() {
                   📝 원재료명 및 함량
                 </h3>
 
-                {safeIngredients.length > 0 ? (
-                  // ✅ Open API 원재료 (상세) - 번호 매긴 리스트
-                  <div className="max-h-[600px] space-y-2 overflow-y-auto pr-2">
-                    {safeIngredients.map((ingredient, idx) => (
-                      <div key={idx} className="flex gap-3 text-sm">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 leading-relaxed">
-                          {ingredient}
-                        </span>
+                {(() => {
+                  // ✅ 1순위: ingredients 배열
+                  if (safeIngredients.length > 0) {
+                    return (
+                      <div className="max-h-[600px] space-y-2 overflow-y-auto pr-2">
+                        {safeIngredients.map((ingredient, idx) => (
+                          <div key={idx} className="flex gap-3 text-sm">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1 leading-relaxed">
+                              {ingredient}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  // ✅ 2순위: rawMaterials 파싱 (OpenAPI, Nutrition)
+                  if (result.rawMaterials && result.rawMaterials.length > 10) {
+                    const parsedIngredients = result.rawMaterials
+                      .split(/[,、]/) // 쉼표, 중점으로 분리
+                      .map((item) => item.trim())
+                      .filter((item) => item.length > 0);
+
+                    return (
+                      <div>
+                        <div className="mb-3 flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {result.dataSource === "openapi" && "식약처"}
+                            {result.dataSource === "nutrition" && "영양성분DB"}
+                            {result.dataSource === "db" && "DB"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {parsedIngredients.length}개 원재료
+                          </span>
+                        </div>
+                        <div className="max-h-[600px] space-y-2 overflow-y-auto pr-2">
+                          {parsedIngredients.map((ingredient, idx) => (
+                            <div key={idx} className="flex gap-3 text-sm">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-semibold text-green-700">
+                                {idx + 1}
+                              </span>
+                              <span className="flex-1 leading-relaxed">
+                                {ingredient}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ✅ 3순위: AI 감지 재료
+                  if (
+                    result.detectedIngredients &&
+                    result.detectedIngredients.length > 0
+                  ) {
+                    return (
+                      <div>
+                        <div className="mb-3 flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            AI 분석
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            주요 원재료만 표시
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {result.detectedIngredients.map((ingredient, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="secondary"
+                              className="px-3 py-1.5 text-sm"
+                            >
+                              {ingredient}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="mt-3 rounded-lg bg-blue-50 p-3">
+                          <p className="text-xs text-blue-700">
+                            💡 AI가 주요 원재료를 추출했어요. 전체 원재료는 제품
+                            포장을 확인하세요.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ✅ 4순위: 정보 없음
+                  return (
+                    <div className="rounded-lg bg-muted p-8 text-center">
+                      <div className="mb-2 text-4xl">📦</div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        원재료 정보가 제공되지 않습니다
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        제품 포장의 원재료명을 직접 확인하세요
+                      </p>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+            {/* 영양성분 정보 */}
+            {result.nutritionDetails && result.nutritionDetails.length > 0 && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                    🥗 영양성분
+                  </h3>
+
+                  {result.servingSize && (
+                    <div className="mb-4 rounded-lg bg-muted p-3">
+                      <p className="text-sm text-muted-foreground">
+                        1회 제공량: <strong>{result.servingSize}</strong>
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {result.nutritionDetails.map((nutrition, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-lg border bg-card p-3 text-center"
+                      >
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {nutrition.name}
+                        </p>
+                        <p className="mt-1 text-lg font-bold">
+                          {nutrition.content}
+                          {nutrition.unit && (
+                            <span className="ml-1 text-sm font-normal text-muted-foreground">
+                              {nutrition.unit}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     ))}
                   </div>
-                ) : result.detectedIngredients &&
-                  result.detectedIngredients.length > 0 ? (
-                  // ✅ AI 감지 재료 - 배지 형태
-                  <div>
-                    <p className="mb-3 text-sm text-muted-foreground">
-                      ✔ 주요 원재료
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {result.detectedIngredients.map((ingredient, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {ingredient}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  // ✅ 원재료 정보 없음
-                  <div className="rounded-lg bg-muted p-8 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      원재료 정보가 제공되지 않습니다
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
             {/* 대체 식품 추천 (위험할 때만 표시) */}
             {!result.isSafe &&
               result.alternatives &&

@@ -37,6 +37,7 @@ export interface FoodResult {
     severity: string;
   }>;
   ingredients: string[];
+  rawMaterials?: string;
   nutritionDetails?: Array<{
     name: string;
     content: string;
