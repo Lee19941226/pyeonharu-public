@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -32,6 +31,8 @@ import {
   MessageCircle,
   Eye,
   PenLine,
+  Scan,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +47,9 @@ import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { BookmarkButton } from "@/components/medical/bookmark-button";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-
+import { Html5Qrcode } from "html5-qrcode";
+import { toast } from "sonner";
+import { UploadSheet } from "@/components/food/upload-sheet";
 // ─── 드롭다운 전용 미니맵 (naver-map.tsx와 동일한 스크립트 로딩) ───
 function MiniNaverMap({
   lat,
@@ -553,7 +556,11 @@ export default function HomePage() {
   const [popularLikes, setPopularLikes] = useState<any[]>([]);
   const [popularViews, setPopularViews] = useState<any[]>([]);
   const [communityLoading, setCommunityLoading] = useState(true);
-
+  // 파일 업로드 관련
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showUploadSheet, setShowUploadSheet] = useState(false);
   // ★ 투어 가이드
   const [tourActive, setTourActive] = useState(false);
 
@@ -920,12 +927,131 @@ export default function HomePage() {
     searchMode === mode
       ? { borderColor: "#f59e0b", backgroundColor: "#fffbeb", color: "#b45309" }
       : { borderColor: "transparent", color: "#9ca3af" };
+  // ==========================================
+  // 사진 업로드 처리 (AI 분석)
+  // ==========================================
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 업로드 가능합니다");
+      return;
+    }
+
+    setIsProcessing(true);
+    toast.info("이미지 분석 중...");
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await fetch("/api/food/analyze-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.analysisId) {
+        // ✅ 분석 완료 → 결과 페이지로
+        toast.success("분석 완료!");
+        router.push(`/food/result/${data.analysisId}`);
+      } else {
+        toast.error(data.error || "분석에 실패했습니다");
+      }
+    } catch (error) {
+      console.error("이미지 분석 오류:", error);
+      toast.error("이미지 분석 중 오류가 발생했습니다");
+    } finally {
+      setIsProcessing(false);
+      // ✅ input 초기화
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // ==========================================
+  // 바코드 스캔 처리
+  // ==========================================
+  const handleBarcodeUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 업로드 가능합니다");
+      return;
+    }
+
+    setIsProcessing(true);
+    toast.info("바코드 인식 중...");
+
+    try {
+      // ✅ QR 코드 감지
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const imageData = e.target?.result as string;
+
+        try {
+          const html5QrCode = new Html5Qrcode("qr-reader-hidden");
+          const barcode = await html5QrCode.scanFile(file, false);
+
+          // ✅ 바코드 인식 성공
+          toast.success("바코드 인식 성공!");
+          router.push(`/food/result/${barcode}`);
+        } catch (error) {
+          // ✅ 바코드 없음 → AI 분석으로 전환
+          toast.error("바코드를 인식할 수 없습니다");
+          console.log("AI 분석으로 전환 필요");
+        } finally {
+          setIsProcessing(false);
+          if (barcodeInputRef.current) {
+            barcodeInputRef.current.value = "";
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("바코드 스캔 오류:", error);
+      toast.error("바코드 스캔 중 오류가 발생했습니다");
+      setIsProcessing(false);
+    }
+  };
+
+  // ==========================================
+  // 연속 스캔 모드 열기
+  // ==========================================
+  const handleContinuousScan = () => {
+    // ✅ 연속 스캔 페이지로 이동 (기존 동작 유지)
+    router.push("/food/camera?mode=continuous");
+  };
   // ─── Render ───
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* 숨겨진 파일 input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleImageUpload}
+      />
+      <input
+        ref={barcodeInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleBarcodeUpload}
+      />
+      <div id="qr-reader-hidden" className="hidden" />
       <Header />
-
       <main className="flex-1 pb-16 md:pb-0">
         <div className="mx-auto max-w-2xl space-y-3 px-4 py-4">
           {/* ═══ 1. 4탭 통합 검색 ═══ */}
@@ -983,12 +1109,13 @@ export default function HomePage() {
                       <Button
                         variant="outline"
                         className="gap-1.5 shrink-0"
-                        onClick={() => router.push("/food/camera")}
+                        onClick={() => setShowUploadSheet(true)}
                         data-tour="btn-camera"
                       >
                         <Camera className="h-4 w-4" />
                         사진 업로드
                       </Button>
+
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -1038,8 +1165,16 @@ export default function HomePage() {
                         </div>
                       </div>
                     )}
+                    {/* ✅ 업로드 선택 시트/모달 */}
+                    <UploadSheet
+                      open={showUploadSheet}
+                      onOpenChange={setShowUploadSheet}
+                    />
+                    {/* ✅ QR 리더 (숨김) */}
+                    <div id="qr-reader-hidden" className="hidden" />
                   </div>
                 )}
+
                 {searchMode === "symptom" && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">

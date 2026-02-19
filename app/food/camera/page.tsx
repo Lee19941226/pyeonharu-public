@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense, useCallback } from "react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,20 +15,21 @@ import {
   Clock,
   Image as ImageIcon,
   ShoppingCart,
+  Scan,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeScanner } from "html5-qrcode";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-export default function CameraPage() {
+function CameraPageContent() {
   const router = useRouter();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
+  const hasInitialized = useRef(false);
   // 최근 확인 제품
   const [recentProducts, setRecentProducts] = useState<any[]>([]);
 
@@ -37,15 +38,149 @@ export default function CameraPage() {
   const [scannedResults, setScannedResults] = useState<any[]>([]);
   const [currentResult, setCurrentResult] = useState<any>(null);
   const [showResultSheet, setShowResultSheet] = useState(false);
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode");
 
-  useEffect(() => {
-    // 최근 확인 제품 로드
-    const history = localStorage.getItem("food_check_history");
-    if (history) {
-      const parsed = JSON.parse(history);
-      setRecentProducts(parsed.slice(0, 5));
+  // ==========================================
+  // 웹캠 스캔 시작 (데스크탑)
+  // ==========================================
+  const startWebcamScan = useCallback(async () => {
+    try {
+      // ✅ DOM 엘리먼트 먼저 확인
+      const container = document.getElementById("qr-reader-webcam");
+      if (!container) {
+        console.error("❌ qr-reader-webcam 엘리먼트 없음");
+        return;
+      }
+
+      console.log("✅ qr-reader-webcam 엘리먼트 확인됨");
+
+      const html5QrCode = new Html5QrcodeScanner(
+        "qr-reader-webcam",
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          rememberLastUsedCamera: true,
+          showTorchButtonIfSupported: true,
+        },
+        false,
+      );
+
+      html5QrCode.render(
+        (decodedText) => {
+          html5QrCode.clear();
+          toast.success("바코드 인식 성공!");
+          router.push(`/food/result/${decodedText}`);
+        },
+        (errorMessage) => {
+          // 스캔 중
+        },
+      );
+
+      // ✅ 스타일 적용 (500ms 후)
+      setTimeout(() => {
+        const container = document.getElementById("qr-reader-webcam");
+        if (!container) return;
+
+        const buttons = container.querySelectorAll("button");
+        buttons.forEach((btn) => {
+          if (btn.textContent?.includes("Request Camera Permissions")) {
+            btn.textContent = "📷 카메라 권한 허용";
+            btn.style.cssText = `
+              padding: 14px 28px !important;
+              font-size: 16px !important;
+              font-weight: 600 !important;
+              background: hsl(var(--primary)) !important;
+              color: white !important;
+              border: none !important;
+              border-radius: 8px !important;
+              cursor: pointer !important;
+              width: 100% !important;
+              max-width: 300px !important;
+              margin: 0 auto !important;
+              display: block !important;
+            `;
+          }
+          if (btn.textContent?.includes("Stop Scanning")) {
+            btn.textContent = "⏹️ 스캔 중지";
+          }
+        });
+
+        const links = container.querySelectorAll("a");
+        links.forEach((link) => {
+          if (link.textContent?.includes("Scan an Image File")) {
+            link.textContent = "📁 파일에서 스캔하기";
+            link.style.cssText = `
+              font-size: 14px !important;
+              color: hsl(var(--primary)) !important;
+              text-decoration: underline !important;
+              display: block !important;
+              text-align: center !important;
+              margin-top: 12px !important;
+            `;
+          }
+        });
+
+        const spans = container.querySelectorAll("span");
+        spans.forEach((span) => {
+          if (span.textContent?.includes("Request Camera Permissions")) {
+            span.textContent = "카메라 권한을 허용해주세요";
+            span.style.cssText = `
+              font-size: 16px !important;
+              font-weight: 500 !important;
+              display: block !important;
+              text-align: center !important;
+              margin-bottom: 16px !important;
+            `;
+          }
+        });
+
+        console.log("✅ 웹캠 스타일 적용 완료");
+      }, 500);
+    } catch (error) {
+      console.error("웹캠 스캔 오류:", error);
+      toast.error("웹캠을 사용할 수 없습니다");
     }
-  }, []);
+  }, [router]);
+
+  // ==========================================
+  // ✅ useEffect 1: 웹캠 모드 (데스크탑)
+  // ==========================================
+  useEffect(() => {
+    if (mode === "webcam") {
+      console.log("✅ 웹캠 모드 감지");
+
+      // ✅ 100ms 딜레이 후 실행 (DOM 렌더링 대기)
+      const timer = setTimeout(() => {
+        startWebcamScan();
+      }, 100);
+
+      // ✅ Cleanup
+      return () => {
+        clearTimeout(timer);
+        console.log("🧹 웹캠 useEffect cleanup");
+      };
+    }
+  }, [mode, startWebcamScan]);
+
+  // ==========================================
+  // ✅ useEffect 2: 연속 스캔 모드 (모바일)
+  // ==========================================
+  useEffect(() => {
+    if (mode === "continuous" && !hasInitialized.current) {
+      console.log("✅ 연속 스캔 모드 활성화");
+      hasInitialized.current = true;
+      setContinuousMode(true);
+      setScannedResults([]);
+
+      // ✅ 0.5초 후 자동으로 카메라 열기
+      setTimeout(() => {
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+        }
+      }, 500);
+    }
+  }, [mode]);
 
   // ==========================================
   // 파일 업로드 (카메라 or 갤러리)
@@ -294,7 +429,128 @@ export default function CameraPage() {
       fileInputRef.current.value = "";
     }
   };
+  // ✅ 웹캠 스캔 모드
+  if (mode === "webcam") {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex-1 pb-16 md:pb-0">
+          <div className="container mx-auto px-4 py-8">
+            <div className="mx-auto max-w-2xl space-y-6">
+              {/* 헤더 */}
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <Scan className="h-8 w-8 text-primary" />
+                </div>
+                <h1 className="text-2xl font-bold">웹캠 바코드 스캔</h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  제품 바코드를 카메라에 비춰주세요
+                </p>
+              </div>
 
+              {/* 안내 카드 */}
+              <Card className="border-blue-200 bg-blue-50">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                      <Camera className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="mb-1 font-semibold text-blue-900">
+                        카메라 권한이 필요합니다
+                      </p>
+                      <p className="text-sm text-blue-800">
+                        브라우저에서 카메라 권한을 "허용"해주세요. 바코드를
+                        인식하는 데만 사용됩니다.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 웹캠 스캔 영역 */}
+              <Card>
+                <CardContent className="p-4">
+                  <div
+                    id="qr-reader-webcam"
+                    className="rounded-lg overflow-hidden"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* 사용 가이드 */}
+              <Card>
+                <CardContent className="p-4">
+                  <p className="mb-3 text-sm font-medium">📸 스캔 가이드</p>
+                  <ul className="space-y-2 text-xs text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                      <span>바코드를 카메라 중앙의 사각형 안에 위치</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                      <span>바코드가 선명하게 보이도록 거리 조절</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                      <span>조명이 충분한 곳에서 스캔</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <span>바코드가 인식되면 자동으로 결과 페이지로 이동</span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              {/* 버튼 */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => router.push("/")}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  취소
+                </Button>
+                <Button
+                  onClick={() => {
+                    // ✅ 파일 업로드로 전환
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = "image/*";
+                    input.onchange = async (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (!file) return;
+
+                      toast.info("바코드 인식 중...");
+                      try {
+                        const html5QrCode = new Html5Qrcode("qr-reader-hidden");
+                        const barcode = await html5QrCode.scanFile(file, false);
+                        toast.success("바코드 인식 성공!");
+                        router.push(`/food/result/${barcode}`);
+                      } catch {
+                        toast.error("바코드를 인식할 수 없습니다");
+                      }
+                    };
+                    input.click();
+                  }}
+                  variant="default"
+                  className="flex-1"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  파일 업로드
+                </Button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* 숨겨진 QR reader */}
+        <div id="qr-reader-hidden" className="hidden" />
+      </div>
+    );
+  }
   // ==========================================
   // 결과 하프시트 컴포넌트
   // ==========================================
@@ -504,6 +760,7 @@ export default function CameraPage() {
   // ==========================================
   // 렌더링: 메인 화면
   // ==========================================
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -713,5 +970,21 @@ export default function CameraPage() {
       {/* 하프시트 */}
       <ResultHalfSheet />
     </div>
+  );
+}
+export default function CameraPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">로딩 중...</p>
+          </div>
+        </div>
+      }
+    >
+      <CameraPageContent />
+    </Suspense>
   );
 }

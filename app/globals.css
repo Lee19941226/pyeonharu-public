@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -37,7 +37,7 @@
   --sidebar-accent-foreground: oklch(0.3 0.02 260);
   --sidebar-border: oklch(0.9 0.01 90);
   --sidebar-ring: oklch(0.55 0.18 160);
-  
+
   /* 편하루 커스텀 색상 */
   --medical: oklch(0.6 0.12 220);
   --fashion: oklch(0.7 0.15 50);
@@ -76,15 +76,19 @@
   --sidebar-accent-foreground: oklch(0.9 0.01 90);
   --sidebar-border: oklch(0.28 0.01 260);
   --sidebar-ring: oklch(0.6 0.16 160);
-  
+
   /* 편하루 커스텀 색상 다크 */
   --medical: oklch(0.65 0.1 220);
   --fashion: oklch(0.75 0.13 50);
 }
 
 @theme inline {
-  --font-sans: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans:
+    "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
+    system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
   --color-medical: var(--medical);
   --color-fashion: var(--fashion);
   --color-background: var(--background);
