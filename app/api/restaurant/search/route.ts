@@ -154,38 +154,54 @@ export async function GET(req: NextRequest) {
 
     // 2. 소상공인 상가정보 API - 반경 내 상가업소 조회
     let decodedKey = serviceKey
-    // 이중 인코딩 방지
     if (decodedKey.includes("%")) {
       try { decodedKey = decodeURIComponent(decodedKey) } catch { /* 원본 사용 */ }
     }
 
     const numOfRows = 100
-    const apiUrl = `https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius?ServiceKey=${encodeURIComponent(decodedKey)}&cy=${userLat}&cx=${userLng}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
+    // 엔드포인트: sdsc2 (신규) 또는 sdsc (구버전) 둘 다 시도
+    const endpoints = [
+      "https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius",
+      "https://apis.data.go.kr/B553077/api/open/sdsc/storeListInRadius",
+    ]
 
-    const apiRes = await fetch(apiUrl)
+    let apiData: any = null
+    let lastError = ""
 
-    if (!apiRes.ok) {
-      const errText = await apiRes.text()
-      console.error("[Restaurant Search] API 오류:", apiRes.status, errText)
-      return NextResponse.json({ 
-        error: "음식점 검색에 실패했습니다.",
-        debug: { status: apiRes.status, body: errText.slice(0, 500) }
-      }, { status: 500 })
+    for (const endpoint of endpoints) {
+      const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cy=${userLat}&cx=${userLng}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
+
+      try {
+        const apiRes = await fetch(apiUrl)
+        const apiText = await apiRes.text()
+
+        if (apiRes.ok) {
+          try {
+            const parsed = JSON.parse(apiText)
+            // 성공 응답 확인 (body가 있는지)
+            if (parsed?.body || parsed?.items) {
+              apiData = parsed
+              break
+            }
+          } catch {
+            // JSON 파싱 실패 시 다음 엔드포인트 시도
+          }
+        }
+        lastError = `${apiRes.status}: ${apiText.slice(0, 200)}`
+      } catch (err: any) {
+        lastError = err?.message || "fetch error"
+      }
     }
 
-    const apiText = await apiRes.text()
-    let apiData: any
-    try {
-      apiData = JSON.parse(apiText)
-    } catch {
+    if (!apiData) {
       return NextResponse.json({
-        error: "API 응답 파싱 실패",
-        debug: { body: apiText.slice(0, 500) }
+        error: "음식점 검색에 실패했습니다.",
+        debug: { lastError }
       }, { status: 500 })
     }
 
-    const items = apiData?.body?.items || []
-    const totalCount = apiData?.body?.totalCount || 0
+    const items = apiData?.body?.items || apiData?.items || []
+    const totalCount = apiData?.body?.totalCount || apiData?.totalCount || 0
 
     // 3. 음식점 데이터 변환 + 알레르기 매칭
     const seenNames = new Set<string>()
