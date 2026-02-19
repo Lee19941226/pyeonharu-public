@@ -170,8 +170,8 @@ export async function GET(req: NextRequest) {
     let debugResponses: any[] = []
 
     for (const endpoint of endpoints) {
-      // cx=경도, cy=위도 (API 문서 기준)
-      const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cx=${userLng}&cy=${userLat}&radius=${radius}&indsLclsCd=Q&numOfRows=${numOfRows}&pageNo=${page}&type=json`
+      // 테스트: indsLclsCd 필터 없이 + 다양한 파라미터 시도
+      const apiUrl = `${endpoint}?ServiceKey=${encodeURIComponent(decodedKey)}&cx=${userLng}&cy=${userLat}&radius=${radius}&numOfRows=${numOfRows}&pageNo=${page}&type=json`
 
       try {
         const apiRes = await fetch(apiUrl)
