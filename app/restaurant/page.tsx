@@ -26,6 +26,10 @@ import {
   Filter,
   Map,
   X,
+  Star,
+  MessageSquare,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -118,6 +122,190 @@ const CATEGORY_FILTERS: { label: string; emoji: string; keywords: string[] }[] =
   { label: "아시안", emoji: "🍜", keywords: ["태국식", "동남아식", "베트남식", "인도식", "멕시코식"] },
   { label: "기타", emoji: "🍴", keywords: ["뷔페", "도시락", "샐러드", "주점", "음료", "죽"] },
 ];
+
+// ═══════════════════════════════════════════
+// restaurant_key 생성 (이름+주소 → 해시)
+// ═══════════════════════════════════════════
+function makeRestaurantKey(name: string, address: string): string {
+  const raw = `${name.trim()}::${address.trim()}`.toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+// ═══════════════════════════════════════════
+// 별점 표시 컴포넌트
+// ═══════════════════════════════════════════
+function StarRating({
+  rating,
+  size = "sm",
+  interactive = false,
+  onChange,
+}: {
+  rating: number;
+  size?: "sm" | "md";
+  interactive?: boolean;
+  onChange?: (rating: number) => void;
+}) {
+  const [hoverRating, setHoverRating] = useState(0);
+  const displayRating = hoverRating || rating;
+  const sizeClass = size === "md" ? "h-6 w-6" : "h-3.5 w-3.5";
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          disabled={!interactive}
+          className={interactive ? "cursor-pointer hover:scale-110 transition-transform" : "cursor-default"}
+          onClick={() => interactive && onChange?.(star)}
+          onMouseEnter={() => interactive && setHoverRating(star)}
+          onMouseLeave={() => interactive && setHoverRating(0)}
+        >
+          <Star
+            className={`${sizeClass} ${
+              star <= displayRating
+                ? "fill-amber-400 text-amber-400"
+                : "fill-none text-gray-300"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// 리뷰 작성/수정 모달
+// ═══════════════════════════════════════════
+function ReviewModal({
+  open,
+  onClose,
+  restaurant,
+  existingReview,
+  onSubmit,
+  onDelete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  restaurant: { name: string; address: string; key: string } | null;
+  existingReview: { id: string; rating: number; memo: string } | null;
+  onSubmit: (rating: number, memo: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [rating, setRating] = useState(existingReview?.rating || 0);
+  const [memo, setMemo] = useState(existingReview?.memo || "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRating(existingReview?.rating || 0);
+      setMemo(existingReview?.memo || "");
+    }
+  }, [open, existingReview]);
+
+  if (!open || !restaurant) return null;
+
+  const handleSubmit = async () => {
+    if (rating === 0) {
+      toast.error("별점을 선택해주세요");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit(rating, memo);
+      onClose();
+    } catch {
+      // error handled in parent
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("리뷰를 삭제하시겠어요?")) return;
+    setIsSubmitting(true);
+    try {
+      await onDelete();
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl animate-in zoom-in-95">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold">
+            {existingReview ? "리뷰 수정" : "리뷰 작성"}
+          </h3>
+          <button onClick={onClose} className="rounded-full p-1 hover:bg-muted">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-muted-foreground">{restaurant.name}</p>
+
+        {/* 별점 선택 */}
+        <div className="mb-4">
+          <p className="mb-2 text-sm font-medium">별점</p>
+          <div className="flex items-center gap-3">
+            <StarRating rating={rating} size="md" interactive onChange={setRating} />
+            {rating > 0 && (
+              <span className="text-lg font-bold text-amber-500">{rating}.0</span>
+            )}
+          </div>
+        </div>
+
+        {/* 메모 */}
+        <div className="mb-5">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-sm font-medium">한줄 메모 (선택)</p>
+            <span className="text-xs text-muted-foreground">{memo.length}/100</span>
+          </div>
+          <textarea
+            value={memo}
+            onChange={(e) => setMemo(e.target.value.slice(0, 100))}
+            placeholder="이 음식점에 대한 한줄평을 남겨주세요"
+            className="w-full rounded-lg border p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+            rows={2}
+          />
+        </div>
+
+        {/* 버튼 */}
+        <div className="flex gap-2">
+          {existingReview && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              삭제
+            </Button>
+          )}
+          <div className="flex-1" />
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+            취소
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting || rating === 0}>
+            {isSubmitting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            {existingReview ? "수정" : "등록"}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
 
 // ═══════════════════════════════════════════
 // 인라인 미니 네이버 지도
@@ -269,6 +457,12 @@ export default function RestaurantPage() {
   // 인라인 지도
   const [mapOpenRestaurant, setMapOpenRestaurant] = useState<string | null>(null);
 
+  // ✅ 리뷰 관련
+  const [restaurantRatings, setRestaurantRatings] = useState<Record<string, { avg: number; count: number }>>({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<{ name: string; address: string; key: string } | null>(null);
+  const [myReviews, setMyReviews] = useState<Record<string, { id: string; rating: number; memo: string }>>({});
+
   // 초기화
   useEffect(() => {
     const init = async () => {
@@ -393,6 +587,111 @@ export default function RestaurantPage() {
 
   const toggleMap = (restaurantName: string) => {
     setMapOpenRestaurant(prev => prev === restaurantName ? null : restaurantName);
+  };
+
+  // ═══════════════════════════════════════════
+  // ✅ 리뷰: 평균 별점 일괄 조회
+  // ═══════════════════════════════════════════
+  const fetchRatings = useCallback(async (restaurantList: Restaurant[]) => {
+    if (restaurantList.length === 0) return;
+    const keys = restaurantList.map(r =>
+      makeRestaurantKey(r.name, r.roadAddress || r.address)
+    );
+    try {
+      const res = await fetch(`/api/restaurant/reviews?keys=${keys.join(",")}`);
+      const data = await res.json();
+      if (data.ratings) {
+        setRestaurantRatings(prev => ({ ...prev, ...data.ratings }));
+      }
+    } catch {
+      // 별점 조회 실패 무시
+    }
+  }, []);
+
+  useEffect(() => {
+    if (restaurants.length > 0) {
+      fetchRatings(restaurants);
+    }
+  }, [restaurants, fetchRatings]);
+
+  // ═══════════════════════════════════════════
+  // ✅ 리뷰: 모달 열기
+  // ═══════════════════════════════════════════
+  const openReviewModal = (restaurant: Restaurant) => {
+    if (!user) {
+      toast.error("로그인이 필요합니다", {
+        action: { label: "로그인", onClick: () => router.push("/login") },
+      });
+      return;
+    }
+    const key = makeRestaurantKey(restaurant.name, restaurant.roadAddress || restaurant.address);
+    setReviewTarget({
+      name: restaurant.name,
+      address: restaurant.roadAddress || restaurant.address,
+      key,
+    });
+    setReviewModalOpen(true);
+
+    // 내 기존 리뷰 조회
+    fetch(`/api/restaurant/reviews?key=${key}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.myReview) {
+          setMyReviews(prev => ({ ...prev, [key]: data.myReview }));
+        }
+      })
+      .catch(() => {});
+  };
+
+  // ═══════════════════════════════════════════
+  // ✅ 리뷰: 작성/수정
+  // ═══════════════════════════════════════════
+  const handleReviewSubmit = async (rating: number, memo: string) => {
+    if (!reviewTarget) return;
+    const res = await fetch("/api/restaurant/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: reviewTarget.name,
+        address: reviewTarget.address,
+        rating,
+        memo,
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast.success(myReviews[reviewTarget.key] ? "리뷰가 수정되었어요" : "리뷰가 등록되었어요!");
+      setMyReviews(prev => ({
+        ...prev,
+        [reviewTarget.key]: { id: data.review.id, rating: data.review.rating, memo: data.review.memo },
+      }));
+      fetchRatings(restaurants);
+    } else {
+      toast.error(data.error || "리뷰 저장에 실패했습니다");
+      throw new Error(data.error);
+    }
+  };
+
+  // ═══════════════════════════════════════════
+  // ✅ 리뷰: 삭제
+  // ═══════════════════════════════════════════
+  const handleReviewDelete = async () => {
+    if (!reviewTarget || !myReviews[reviewTarget.key]) return;
+    const res = await fetch(`/api/restaurant/reviews?id=${myReviews[reviewTarget.key].id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast.success("리뷰가 삭제되었어요");
+      setMyReviews(prev => {
+        const next = { ...prev };
+        delete next[reviewTarget.key];
+        return next;
+      });
+      fetchRatings(restaurants);
+    } else {
+      toast.error("삭제에 실패했습니다");
+    }
   };
 
   // ── 카테고리별 음식점 수 계산 ──
@@ -729,6 +1028,8 @@ export default function RestaurantPage() {
                   const analysis = aiAnalysis[restaurant.name];
                   const isAnalyzing = analyzingRestaurant === restaurant.name;
                   const isMapOpen = mapOpenRestaurant === restaurant.name;
+                  const rKey = makeRestaurantKey(restaurant.name, restaurant.roadAddress || restaurant.address);
+                  const ratingData = restaurantRatings[rKey];
 
                   return (
                     <Card
@@ -741,6 +1042,14 @@ export default function RestaurantPage() {
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold truncate">{restaurant.name}</h3>
                             <p className="text-xs text-muted-foreground">{restaurant.category}</p>
+                            {/* ✅ 평균 별점 표시 */}
+                            {ratingData && (
+                              <div className="mt-0.5 flex items-center gap-1">
+                                <StarRating rating={Math.round(ratingData.avg)} />
+                                <span className="text-xs font-semibold text-amber-600">{ratingData.avg.toFixed(1)}</span>
+                                <span className="text-[10px] text-muted-foreground">({ratingData.count})</span>
+                              </div>
+                            )}
                           </div>
                           <Badge variant={risk.badgeVariant} className={`ml-2 shrink-0 ${risk.badgeClass}`}>
                             <RiskIcon className="mr-1 h-3 w-3" />
@@ -772,6 +1081,18 @@ export default function RestaurantPage() {
                           >
                             {isSelected && !isAnalyzing ? <ChevronUp className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
                             AI 분석
+                          </Button>
+                          {/* ✅ 리뷰 버튼 */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1 text-xs"
+                            onClick={() => openReviewModal(restaurant)}
+                          >
+                            {myReviews[rKey]
+                              ? <><Pencil className="h-3.5 w-3.5" />내 리뷰</>
+                              : <><MessageSquare className="h-3.5 w-3.5" />리뷰</>
+                            }
                           </Button>
                           {restaurant.phone && (
                             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"
@@ -879,6 +1200,16 @@ export default function RestaurantPage() {
           </div>
         </div>
       </main>
+
+      {/* ✅ 리뷰 모달 */}
+      <ReviewModal
+        open={reviewModalOpen}
+        onClose={() => { setReviewModalOpen(false); setReviewTarget(null); }}
+        restaurant={reviewTarget}
+        existingReview={reviewTarget ? myReviews[reviewTarget.key] || null : null}
+        onSubmit={handleReviewSubmit}
+        onDelete={handleReviewDelete}
+      />
 
       <MobileNav />
     </div>
