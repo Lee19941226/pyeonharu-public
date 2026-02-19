@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
-
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,6 +41,8 @@ interface Restaurant {
   riskLevel: "safe" | "caution" | "danger";
   matchedAllergens: string[];
   categoryAllergens: string[];
+  distance?: string;
+  distanceKm?: number;
 }
 
 interface AIAnalysis {
@@ -95,39 +96,32 @@ export default function RestaurantPage() {
   const [locationName, setLocationName] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // AI 분석
-  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(
-    null,
-  );
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<Record<string, AIAnalysis>>({});
-  const [analyzingRestaurant, setAnalyzingRestaurant] = useState<string | null>(
-    null,
-  );
+  const [analyzingRestaurant, setAnalyzingRestaurant] = useState<string | null>(null);
 
   // 필터
-  const [riskFilter, setRiskFilter] = useState<
-    "all" | "safe" | "caution" | "danger"
-  >("all");
+  const [riskFilter, setRiskFilter] = useState<"all" | "safe" | "caution" | "danger">("all");
 
   // 초기화: 사용자 정보 + 위치
   useEffect(() => {
     const init = async () => {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("allergens")
-          .eq("id", user.id)
-          .single();
+        // ✅ user_allergies 테이블에서 알레르기 조회
+        const { data: allergyData } = await supabase
+          .from("user_allergies")
+          .select("allergen_name")
+          .eq("user_id", user.id);
 
-        if (profile?.allergens) {
-          setUserAllergens(profile.allergens);
+        if (allergyData && allergyData.length > 0) {
+          setUserAllergens(allergyData.map((a) => a.allergen_name));
         }
       }
 
@@ -147,8 +141,8 @@ export default function RestaurantPage() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        setUserCoords({ lat: latitude, lng: longitude });
 
-        // 역지오코딩으로 지역명 추출 (간단히 구현)
         try {
           const res = await fetch(
             `/api/restaurant/reverse-geocode?lat=${latitude}&lng=${longitude}`,
@@ -156,34 +150,41 @@ export default function RestaurantPage() {
           const data = await res.json();
           if (data.address) {
             setLocationName(data.address);
-            searchRestaurants(`${data.address} 음식점`);
+            // 시군구 단위로 검색
+            const searchAddr = data.sigungu || data.address;
+            searchRestaurants(`${searchAddr} 음식점`, latitude, longitude);
           } else {
-            // 역지오코딩 실패 시 기본 검색
             setLocationName("내 위치");
-            searchRestaurants("내주변 음식점");
+            searchRestaurants("내주변 음식점", latitude, longitude);
           }
         } catch {
           setLocationName("내 위치");
-          searchRestaurants("내주변 음식점");
+          searchRestaurants("내주변 음식점", latitude, longitude);
         }
       },
       () => {
-        // 위치 거부 시
         toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
       },
     );
   };
 
-  const searchRestaurants = async (query: string) => {
+  const searchRestaurants = async (query: string, lat?: number, lng?: number) => {
     if (!query.trim()) return;
 
     setIsLoading(true);
     setHasSearched(true);
 
     try {
-      const res = await fetch(
-        `/api/restaurant/search?query=${encodeURIComponent(query)}&display=20`,
-      );
+      let url = `/api/restaurant/search?query=${encodeURIComponent(query)}&display=20`;
+
+      // 사용자 좌표 전달
+      const coordLat = lat || userCoords?.lat;
+      const coordLng = lng || userCoords?.lng;
+      if (coordLat && coordLng) {
+        url += `&lat=${coordLat}&lng=${coordLng}`;
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success) {
@@ -212,7 +213,6 @@ export default function RestaurantPage() {
   const analyzeRestaurant = async (restaurant: Restaurant) => {
     const key = restaurant.name;
 
-    // 이미 분석된 결과가 있으면 토글만
     if (selectedRestaurant === key) {
       setSelectedRestaurant(null);
       return;
@@ -220,7 +220,6 @@ export default function RestaurantPage() {
 
     setSelectedRestaurant(key);
 
-    // 이미 캐시된 결과가 있으면 바로 표시
     if (aiAnalysis[key]) return;
 
     if (userAllergens.length === 0) {
@@ -301,7 +300,6 @@ export default function RestaurantPage() {
                 </Button>
               </div>
 
-              {/* 현재 위치 재검색 */}
               <Button
                 variant="outline"
                 size="sm"
@@ -336,13 +334,9 @@ export default function RestaurantPage() {
             {/* 내 알레르기 표시 */}
             {userAllergens.length > 0 && hasSearched && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">
-                  내 알레르기:
-                </span>
+                <span className="text-xs text-muted-foreground">내 알레르기:</span>
                 {userAllergens.map((a, i) => (
-                  <Badge key={i} variant="outline" className="text-xs">
-                    {a}
-                  </Badge>
+                  <Badge key={i} variant="outline" className="text-xs">{a}</Badge>
                 ))}
               </div>
             )}
@@ -351,25 +345,20 @@ export default function RestaurantPage() {
             {restaurants.length > 0 && userAllergens.length > 0 && (
               <div className="flex items-center gap-2">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                {(["all", "safe", "caution", "danger"] as const).map(
-                  (filter) => (
-                    <Button
-                      key={filter}
-                      variant={riskFilter === filter ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setRiskFilter(filter)}
-                    >
-                      {filter === "all" && `전체 (${restaurants.length})`}
-                      {filter === "safe" &&
-                        `✅ 안전 (${restaurants.filter((r) => r.riskLevel === "safe").length})`}
-                      {filter === "caution" &&
-                        `⚠️ 주의 (${restaurants.filter((r) => r.riskLevel === "caution").length})`}
-                      {filter === "danger" &&
-                        `🔴 위험 (${restaurants.filter((r) => r.riskLevel === "danger").length})`}
-                    </Button>
-                  ),
-                )}
+                {(["all", "safe", "caution", "danger"] as const).map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={riskFilter === filter ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setRiskFilter(filter)}
+                  >
+                    {filter === "all" && `전체 (${restaurants.length})`}
+                    {filter === "safe" && `✅ 안전 (${restaurants.filter((r) => r.riskLevel === "safe").length})`}
+                    {filter === "caution" && `⚠️ 주의 (${restaurants.filter((r) => r.riskLevel === "caution").length})`}
+                    {filter === "danger" && `🔴 위험 (${restaurants.filter((r) => r.riskLevel === "danger").length})`}
+                  </Button>
+                ))}
               </div>
             )}
 
@@ -415,15 +404,9 @@ export default function RestaurantPage() {
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                   <MapPin className="h-8 w-8 text-primary" />
                 </div>
-                <h2 className="mb-2 text-lg font-semibold">
-                  내 주변 음식점 알레르기 체크
-                </h2>
-                <p className="mb-1 text-sm text-muted-foreground">
-                  위치를 허용하면 주변 음식점을 자동으로 검색해요
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  또는 검색창에 지역명을 입력하세요
-                </p>
+                <h2 className="mb-2 text-lg font-semibold">내 주변 음식점 알레르기 체크</h2>
+                <p className="mb-1 text-sm text-muted-foreground">위치를 허용하면 주변 음식점을 자동으로 검색해요</p>
+                <p className="text-sm text-muted-foreground">또는 검색창에 지역명을 입력하세요</p>
               </div>
             )}
 
@@ -453,77 +436,45 @@ export default function RestaurantPage() {
                     className={`transition-all ${risk.cardBorder} ${isSelected ? "ring-2 ring-primary/30" : ""}`}
                   >
                     <CardContent className="p-4">
-                      {/* 메인 정보 */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold truncate">
-                              {restaurant.name}
-                            </h3>
-                            <Badge
-                              variant="outline"
-                              className="shrink-0 text-[10px]"
-                            >
-                              {restaurant.category}
-                            </Badge>
+                            <h3 className="font-semibold truncate">{restaurant.name}</h3>
+                            <Badge variant="outline" className="shrink-0 text-[10px]">{restaurant.category}</Badge>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
                             {restaurant.roadAddress || restaurant.address}
+                            {restaurant.distance && (
+                              <span className="ml-1.5 text-primary font-medium">{restaurant.distance}</span>
+                            )}
                           </p>
                         </div>
 
-                        {/* 위험도 배지 */}
                         {userAllergens.length > 0 && (
-                          <Badge
-                            className={`shrink-0 ${risk.badgeClass}`}
-                            variant={risk.badgeVariant}
-                          >
+                          <Badge className={`shrink-0 ${risk.badgeClass}`} variant={risk.badgeVariant}>
                             <RiskIcon className="h-3 w-3 mr-1" />
                             {risk.label}
                           </Badge>
                         )}
                       </div>
 
-                      {/* 매칭된 알레르기 */}
                       {restaurant.matchedAllergens.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {restaurant.matchedAllergens.map((a, i) => (
-                            <span
-                              key={i}
-                              className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700"
-                            >
-                              {a}
-                            </span>
+                            <span key={i} className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{a}</span>
                           ))}
                         </div>
                       )}
 
-                      {/* 액션 버튼 */}
                       <div className="mt-3 flex items-center gap-2">
                         {restaurant.phone && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs gap-1"
-                            onClick={() =>
-                              window.open(`tel:${restaurant.phone}`)
-                            }
-                          >
-                            <Phone className="h-3 w-3" />
-                            전화
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => window.open(`tel:${restaurant.phone}`)}>
+                            <Phone className="h-3 w-3" />전화
                           </Button>
                         )}
                         {restaurant.link && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs gap-1"
-                            onClick={() =>
-                              window.open(restaurant.link, "_blank")
-                            }
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            상세
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => window.open(restaurant.link, "_blank")}>
+                            <ExternalLink className="h-3 w-3" />상세
                           </Button>
                         )}
                         {userAllergens.length > 0 && (
@@ -534,17 +485,9 @@ export default function RestaurantPage() {
                             onClick={() => analyzeRestaurant(restaurant)}
                             disabled={isAnalyzing}
                           >
-                            {isAnalyzing ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3 w-3" />
-                            )}
+                            {isAnalyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                             AI 분석
-                            {isSelected ? (
-                              <ChevronUp className="h-3 w-3" />
-                            ) : (
-                              <ChevronDown className="h-3 w-3" />
-                            )}
+                            {isSelected ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                           </Button>
                         )}
                       </div>
@@ -552,55 +495,23 @@ export default function RestaurantPage() {
                       {/* AI 분석 결과 */}
                       {isSelected && analysis && (
                         <div className="mt-4 space-y-3 border-t pt-4">
-                          {/* 요약 */}
-                          <div
-                            className={`rounded-lg p-3 ${
-                              analysis.riskLevel === "safe"
-                                ? "bg-green-50"
-                                : analysis.riskLevel === "danger"
-                                  ? "bg-red-50"
-                                  : "bg-amber-50"
-                            }`}
-                          >
-                            <p className="text-sm font-medium">
-                              {analysis.summary}
-                            </p>
+                          <div className={`rounded-lg p-3 ${analysis.riskLevel === "safe" ? "bg-green-50" : analysis.riskLevel === "danger" ? "bg-red-50" : "bg-amber-50"}`}>
+                            <p className="text-sm font-medium">{analysis.summary}</p>
                           </div>
 
-                          {/* 추정 메뉴 */}
                           <div>
-                            <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                              📋 추정 메뉴 분석
-                            </p>
+                            <p className="mb-2 text-xs font-semibold text-muted-foreground">📋 추정 메뉴 분석</p>
                             <div className="space-y-1.5">
                               {analysis.estimatedMenus.map((menu, i) => (
-                                <div
-                                  key={i}
-                                  className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                                    menu.risk === "danger"
-                                      ? "bg-red-50"
-                                      : menu.risk === "caution"
-                                        ? "bg-amber-50"
-                                        : "bg-green-50"
-                                  }`}
-                                >
-                                  <span className="font-medium">
-                                    {menu.name}
-                                  </span>
+                                <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${menu.risk === "danger" ? "bg-red-50" : menu.risk === "caution" ? "bg-amber-50" : "bg-green-50"}`}>
+                                  <span className="font-medium">{menu.name}</span>
                                   <div className="flex items-center gap-1">
                                     {menu.matchedUserAllergens.length > 0 ? (
                                       menu.matchedUserAllergens.map((a, j) => (
-                                        <span
-                                          key={j}
-                                          className="rounded bg-red-200 px-1.5 py-0.5 text-[10px] text-red-800"
-                                        >
-                                          {a}
-                                        </span>
+                                        <span key={j} className="rounded bg-red-200 px-1.5 py-0.5 text-[10px] text-red-800">{a}</span>
                                       ))
                                     ) : (
-                                      <span className="text-[10px] text-green-700">
-                                        ✓ 안전
-                                      </span>
+                                      <span className="text-[10px] text-green-700">✓ 안전</span>
                                     )}
                                   </div>
                                 </div>
@@ -608,40 +519,25 @@ export default function RestaurantPage() {
                             </div>
                           </div>
 
-                          {/* 안전한 선택지 */}
-                          {analysis.safeOptions &&
-                            analysis.safeOptions.length > 0 && (
-                              <div className="rounded-lg bg-green-50 p-3">
-                                <p className="mb-1 text-xs font-semibold text-green-800">
-                                  ✅ 비교적 안전한 선택
-                                </p>
-                                <p className="text-sm text-green-700">
-                                  {analysis.safeOptions.join(", ")}
-                                </p>
-                              </div>
-                            )}
-
-                          {/* 팁 */}
-                          {analysis.tips && (
-                            <p className="text-xs text-muted-foreground">
-                              💡 {analysis.tips}
-                            </p>
+                          {analysis.safeOptions && analysis.safeOptions.length > 0 && (
+                            <div className="rounded-lg bg-green-50 p-3">
+                              <p className="mb-1 text-xs font-semibold text-green-800">✅ 비교적 안전한 선택</p>
+                              <p className="text-sm text-green-700">{analysis.safeOptions.join(", ")}</p>
+                            </div>
                           )}
 
-                          {/* 면책 */}
-                          <p className="text-[10px] text-muted-foreground/60">
-                            ⚠️ {analysis.disclaimer}
-                          </p>
+                          {analysis.tips && (
+                            <p className="text-xs text-muted-foreground">💡 {analysis.tips}</p>
+                          )}
+
+                          <p className="text-[10px] text-muted-foreground/60">⚠️ {analysis.disclaimer}</p>
                         </div>
                       )}
 
-                      {/* AI 분석 로딩 */}
                       {isSelected && isAnalyzing && (
                         <div className="mt-4 flex items-center justify-center gap-2 border-t pt-4">
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="text-sm text-muted-foreground">
-                            AI가 메뉴를 분석하고 있어요...
-                          </span>
+                          <span className="text-sm text-muted-foreground">AI가 메뉴를 분석하고 있어요...</span>
                         </div>
                       )}
                     </CardContent>

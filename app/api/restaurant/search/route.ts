@@ -52,24 +52,36 @@ function calculateRisk(
 
 // 네이버 카테고리 → 간단 카테고리 추출
 function extractCategory(fullCategory: string): string {
-  // "음식점>중국식" → "중국식"
   const parts = fullCategory.split(">")
   return parts[parts.length - 1].trim()
 }
 
 // 네이버 좌표 변환 (katec → 위경도 근사)
 function convertNaverCoord(mapx: string, mapy: string): { lat: number; lng: number } {
-  // 네이버 지역검색 API는 카텍좌표를 10자리로 반환
-  // 실제로는 경도/위도에 10^7을 곱한 값
   const lng = parseInt(mapx) / 10000000
   const lat = parseInt(mapy) / 10000000
   return { lat, lng }
+}
+
+// Haversine 거리 계산 (km)
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const query = searchParams.get("query") || ""
   const display = searchParams.get("display") || "20"
+  const userLat = parseFloat(searchParams.get("lat") || "0")
+  const userLng = parseFloat(searchParams.get("lng") || "0")
 
   if (!query) {
     return NextResponse.json({ error: "검색어가 필요합니다." }, { status: 400 })
@@ -90,14 +102,13 @@ export async function GET(req: NextRequest) {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("allergens")
-          .eq("id", user.id)
-          .single()
+        const { data: allergyData } = await supabase
+          .from("user_allergies")
+          .select("allergen_name")
+          .eq("user_id", user.id)
 
-        if (profile?.allergens) {
-          userAllergens = profile.allergens
+        if (allergyData && allergyData.length > 0) {
+          userAllergens = allergyData.map((a: any) => a.allergen_name)
         }
       }
     } catch {
@@ -123,7 +134,7 @@ export async function GET(req: NextRequest) {
     const naverData = await naverRes.json()
 
     // 3. 음식점 카테고리 필터 + 알레르기 매칭
-    const restaurants = (naverData.items || [])
+    let restaurants = (naverData.items || [])
       .filter((item: any) => item.category?.startsWith("음식점"))
       .map((item: any) => {
         const category = extractCategory(item.category || "")
@@ -135,6 +146,16 @@ export async function GET(req: NextRequest) {
 
         // HTML 태그 제거
         const cleanName = (item.title || "").replace(/<[^>]*>/g, "")
+
+        // 거리 계산 (사용자 좌표가 있으면)
+        let distance = ""
+        let distanceKm = 9999
+        if (userLat && userLng && lat && lng) {
+          distanceKm = haversine(userLat, userLng, lat, lng)
+          distance = distanceKm < 1
+            ? `${Math.round(distanceKm * 1000)}m`
+            : `${distanceKm.toFixed(1)}km`
+        }
 
         return {
           name: cleanName,
@@ -149,8 +170,15 @@ export async function GET(req: NextRequest) {
           riskLevel: risk.level,
           matchedAllergens: risk.matched,
           categoryAllergens,
+          distance,
+          distanceKm,
         }
       })
+
+    // 4. 사용자 좌표가 있으면 거리순 정렬
+    if (userLat && userLng) {
+      restaurants = restaurants.sort((a: any, b: any) => a.distanceKm - b.distanceKm)
+    }
 
     return NextResponse.json({
       success: true,
