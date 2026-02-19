@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -86,6 +86,16 @@ const RISK_CONFIG = {
   },
 };
 
+// ── 반경 슬라이더 설정 ──
+const RADIUS_STEPS = [100, 300, 500, 1000, 3000, 5000]; // 미터 단위
+const RADIUS_LABELS = ["100m", "300m", "500m", "1km", "3km", "5km"];
+const DEFAULT_RADIUS_INDEX = 3; // 1km 기본값
+
+function formatRadius(meters: number): string {
+  if (meters >= 1000) return `${meters / 1000}km`;
+  return `${meters}m`;
+}
+
 export default function RestaurantPage() {
   const router = useRouter();
 
@@ -99,6 +109,10 @@ export default function RestaurantPage() {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // 반경 상태
+  const [radiusIndex, setRadiusIndex] = useState(DEFAULT_RADIUS_INDEX);
+  const radius = RADIUS_STEPS[radiusIndex];
 
   // AI 분석
   const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null);
@@ -143,7 +157,6 @@ export default function RestaurantPage() {
         const { latitude, longitude } = position.coords;
         setUserCoords({ lat: latitude, lng: longitude });
 
-        // 역지오코딩으로 위치명 표시
         try {
           const res = await fetch(`/api/restaurant/reverse-geocode?lat=${latitude}&lng=${longitude}`);
           const data = await res.json();
@@ -152,8 +165,7 @@ export default function RestaurantPage() {
           setLocationName("내 위치");
         }
 
-        // 좌표 기반 바로 검색
-        searchRestaurants(latitude, longitude);
+        searchRestaurants(latitude, longitude, undefined, undefined, RADIUS_STEPS[radiusIndex]);
       },
       () => {
         toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
@@ -161,7 +173,7 @@ export default function RestaurantPage() {
     );
   };
 
-  const searchRestaurants = async (lat: number, lng: number, query?: string, page?: number) => {
+  const searchRestaurants = async (lat: number, lng: number, query?: string, page?: number, customRadius?: number) => {
     setIsLoading(true);
     setHasSearched(true);
 
@@ -169,7 +181,7 @@ export default function RestaurantPage() {
       const params = new URLSearchParams({
         lat: String(lat),
         lng: String(lng),
-        radius: "2000",
+        radius: String(customRadius ?? radius),
         page: String(page || 1),
       });
       if (query) params.append("query", query);
@@ -179,7 +191,6 @@ export default function RestaurantPage() {
 
       if (data.success) {
         if (page && page > 1) {
-          // 더보기: 기존에 추가
           setRestaurants(prev => [...prev, ...(data.restaurants || [])]);
         } else {
           setRestaurants(data.restaurants || []);
@@ -213,6 +224,15 @@ export default function RestaurantPage() {
     if (!userCoords) return;
     searchRestaurants(userCoords.lat, userCoords.lng, searchQuery.trim() || undefined, currentPage + 1);
   };
+
+  // 반경 변경 시 자동 재검색
+  const handleRadiusChange = useCallback((newIndex: number) => {
+    setRadiusIndex(newIndex);
+    if (userCoords && hasSearched) {
+      setCurrentPage(1);
+      searchRestaurants(userCoords.lat, userCoords.lng, searchQuery.trim() || undefined, 1, RADIUS_STEPS[newIndex]);
+    }
+  }, [userCoords, hasSearched, searchQuery]);
 
   const analyzeRestaurant = async (restaurant: Restaurant) => {
     const key = restaurant.name;
@@ -294,6 +314,73 @@ export default function RestaurantPage() {
               </Button>
             </div>
 
+            {/* ── 반경 슬라이더 ── */}
+            <div className="rounded-xl border bg-card p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">검색 반경</span>
+                <span className="rounded-full bg-primary/10 px-3 py-0.5 text-sm font-semibold text-primary">
+                  {formatRadius(radius)}
+                </span>
+              </div>
+
+              {/* 커스텀 슬라이더 */}
+              <div className="relative px-1">
+                {/* 트랙 배경 */}
+                <div className="relative h-2 w-full rounded-full bg-muted">
+                  {/* 활성 트랙 */}
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-150"
+                    style={{ width: `${(radiusIndex / (RADIUS_STEPS.length - 1)) * 100}%` }}
+                  />
+                </div>
+
+                {/* 스텝 마커 */}
+                <div className="absolute top-0 flex h-2 w-full items-center justify-between px-0">
+                  {RADIUS_STEPS.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleRadiusChange(i)}
+                      className={`h-2.5 w-2.5 rounded-full border-2 transition-all ${
+                        i <= radiusIndex
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/30 bg-background"
+                      }`}
+                      style={{ zIndex: 2 }}
+                    />
+                  ))}
+                </div>
+
+                {/* 네이티브 range input (투명 오버레이, 드래그 대응) */}
+                <input
+                  type="range"
+                  min={0}
+                  max={RADIUS_STEPS.length - 1}
+                  step={1}
+                  value={radiusIndex}
+                  onChange={(e) => handleRadiusChange(Number(e.target.value))}
+                  className="absolute top-1/2 left-0 h-8 w-full -translate-y-1/2 cursor-pointer opacity-0"
+                  style={{ zIndex: 3 }}
+                />
+              </div>
+
+              {/* 라벨 */}
+              <div className="mt-2.5 flex w-full justify-between px-0">
+                {RADIUS_LABELS.map((label, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleRadiusChange(i)}
+                    className={`text-[11px] transition-colors ${
+                      i === radiusIndex
+                        ? "font-semibold text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* 알레르기 미등록 안내 */}
             {userAllergens.length === 0 && hasSearched && (
               <Card className="border-blue-200 bg-blue-50">
@@ -349,7 +436,7 @@ export default function RestaurantPage() {
                   {locationName && (
                     <><MapPin className="inline h-3.5 w-3.5 mr-1" />{locationName}</>
                   )}
-                  {" · "}반경 2km · {filteredRestaurants.length}개 음식점
+                  {" · "}반경 {formatRadius(radius)} · {filteredRestaurants.length}개 음식점
                   {totalCount > restaurants.length && (
                     <span className="text-xs"> (전체 {totalCount}개)</span>
                   )}
@@ -385,7 +472,7 @@ export default function RestaurantPage() {
                 </div>
                 <h2 className="mb-2 text-lg font-semibold">내 주변 음식점 알레르기 체크</h2>
                 <p className="mb-1 text-sm text-muted-foreground">위치를 허용하면 주변 음식점을 자동으로 검색해요</p>
-                <p className="text-sm text-muted-foreground">반경 2km 내 음식점을 거리순으로 보여드려요</p>
+                <p className="text-sm text-muted-foreground">반경을 조절해서 원하는 범위를 설정하세요</p>
               </div>
             )}
 
@@ -395,7 +482,7 @@ export default function RestaurantPage() {
                 <p className="text-sm text-muted-foreground">
                   {riskFilter !== "all"
                     ? "해당 필터에 맞는 음식점이 없어요"
-                    : "음식점을 찾을 수 없어요. 다른 검색어를 시도해보세요"}
+                    : "음식점을 찾을 수 없어요. 반경을 넓히거나 다른 검색어를 시도해보세요"}
                 </p>
               </div>
             )}
@@ -415,57 +502,78 @@ export default function RestaurantPage() {
                     className={`transition-all ${risk.cardBorder} ${isSelected ? "ring-2 ring-primary/30" : ""}`}
                   >
                     <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2">
                             <h3 className="font-semibold truncate">{restaurant.name}</h3>
-                            <Badge variant="outline" className="shrink-0 text-[10px]">{restaurant.category}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {restaurant.roadAddress || restaurant.address}
                             {restaurant.distance && (
-                              <span className="ml-1.5 text-primary font-medium">{restaurant.distance}</span>
+                              <span className="shrink-0 text-xs text-muted-foreground">{restaurant.distance}</span>
                             )}
+                          </div>
+                          <p className="mt-0.5 text-sm text-muted-foreground">{restaurant.category}</p>
+                          <p className="mt-1 text-xs text-muted-foreground truncate">
+                            {restaurant.roadAddress || restaurant.address}
                           </p>
                         </div>
 
-                        {userAllergens.length > 0 && (
-                          <Badge className={`shrink-0 ${risk.badgeClass}`} variant={risk.badgeVariant}>
-                            <RiskIcon className="h-3 w-3 mr-1" />{risk.label}
-                          </Badge>
-                        )}
+                        <Badge
+                          variant={risk.badgeVariant}
+                          className={`shrink-0 ml-2 ${risk.badgeClass}`}
+                        >
+                          <RiskIcon className="mr-1 h-3 w-3" />
+                          {risk.label}
+                        </Badge>
                       </div>
 
+                      {/* 매칭된 알레르기 */}
                       {restaurant.matchedAllergens.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {restaurant.matchedAllergens.map((a, i) => (
-                            <span key={i} className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{a}</span>
+                            <span key={i} className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] text-red-700">
+                              {a}
+                            </span>
                           ))}
                         </div>
                       )}
 
+                      {/* 액션 버튼 */}
                       <div className="mt-3 flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          onClick={() => analyzeRestaurant(restaurant)}
+                        >
+                          {isSelected ? (
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                          AI 분석
+                        </Button>
                         {restaurant.phone && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => window.open(`tel:${restaurant.phone}`)}>
-                            <Phone className="h-3 w-3" />전화
-                          </Button>
-                        )}
-                        {restaurant.link && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => window.open(restaurant.link, "_blank")}>
-                            <ExternalLink className="h-3 w-3" />상세
-                          </Button>
-                        )}
-                        {userAllergens.length > 0 && (
                           <Button
-                            variant={isSelected ? "secondary" : "outline"}
+                            variant="ghost"
                             size="sm"
-                            className="h-7 text-xs gap-1 ml-auto"
-                            onClick={() => analyzeRestaurant(restaurant)}
-                            disabled={isAnalyzing}
+                            className="h-7 gap-1 text-xs"
+                            onClick={() => window.open(`tel:${restaurant.phone}`)}
                           >
-                            {isAnalyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                            AI 분석
-                            {isSelected ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            <Phone className="h-3.5 w-3.5" />
+                            전화
+                          </Button>
+                        )}
+                        {(restaurant.roadAddress || restaurant.address) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1 text-xs"
+                            onClick={() => {
+                              const addr = restaurant.roadAddress || restaurant.address;
+                              window.open(`https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name + " " + addr)}`);
+                            }}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            지도
                           </Button>
                         )}
                       </div>
@@ -473,14 +581,14 @@ export default function RestaurantPage() {
                       {/* AI 분석 결과 */}
                       {isSelected && analysis && (
                         <div className="mt-4 space-y-3 border-t pt-4">
-                          <div className={`rounded-lg p-3 ${analysis.riskLevel === "safe" ? "bg-green-50" : analysis.riskLevel === "danger" ? "bg-red-50" : "bg-amber-50"}`}>
+                          <div className="rounded-lg bg-muted/50 p-3">
                             <p className="text-sm font-medium">{analysis.summary}</p>
                           </div>
 
                           <div>
-                            <p className="mb-2 text-xs font-semibold text-muted-foreground">📋 추정 메뉴 분석</p>
+                            <p className="mb-2 text-xs font-semibold text-muted-foreground">예상 메뉴 분석</p>
                             <div className="space-y-1.5">
-                              {analysis.estimatedMenus.map((menu, i) => (
+                              {analysis.estimatedMenus?.map((menu, i) => (
                                 <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${menu.risk === "danger" ? "bg-red-50" : menu.risk === "caution" ? "bg-amber-50" : "bg-green-50"}`}>
                                   <span className="font-medium">{menu.name}</span>
                                   <div className="flex items-center gap-1">
