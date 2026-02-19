@@ -456,6 +456,10 @@ export default function RestaurantPage() {
   const [riskFilter, setRiskFilter] = useState<"all" | "safe" | "caution" | "danger">("all");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
+  // ✅ 기준 위치 직접 입력
+  const [addressInput, setAddressInput] = useState("");
+  const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
+
   // ✅ 리뷰 관련
   const [restaurantRatings, setRestaurantRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -603,6 +607,30 @@ export default function RestaurantPage() {
   };
 
   // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════
+  // ✅ 기준 위치 직접 입력으로 검색
+  // ═══════════════════════════════════════════
+  const searchByAddress = async () => {
+    if (!addressInput.trim()) return;
+    setIsGeocodingAddress(true);
+    try {
+      const res = await fetch(`/api/restaurant/geocode?q=${encodeURIComponent(addressInput.trim())}`);
+      const data = await res.json();
+      if (data.success) {
+        setUserCoords({ lat: data.lat, lng: data.lng });
+        setLocationName(data.name);
+        searchRestaurants(data.lat, data.lng, searchQuery.trim() || undefined, 1);
+        setAddressInput("");
+      } else {
+        toast.error(data.error || "해당 지역을 찾을 수 없어요");
+      }
+    } catch {
+      toast.error("주소 검색에 실패했습니다");
+    } finally {
+      setIsGeocodingAddress(false);
+    }
+  };
+
   // ✅ 리뷰: 평균 별점 일괄 조회
   // ═══════════════════════════════════════════
   const fetchRatings = useCallback(async (restaurantList: Restaurant[]) => {
@@ -810,6 +838,32 @@ export default function RestaurantPage() {
           </div>
         </div>
       )}
+
+      {/* 기준 위치 변경 */}
+      <div>
+        <p className="mb-2 text-xs font-semibold text-muted-foreground">기준 위치</p>
+        {locationName && (
+          <p className="mb-1.5 text-xs text-foreground font-medium truncate">📍 {locationName}</p>
+        )}
+        <div className="flex gap-1">
+          <Input
+            placeholder="시/구/동 (예: 강남, 판교)"
+            value={addressInput}
+            onChange={(e) => setAddressInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && searchByAddress()}
+            className="h-7 text-xs"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 text-xs px-2"
+            onClick={searchByAddress}
+            disabled={isGeocodingAddress || !addressInput.trim()}
+          >
+            {isGeocodingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "이동"}
+          </Button>
+        </div>
+      </div>
 
       {/* 반경 슬라이더 */}
       <div>
