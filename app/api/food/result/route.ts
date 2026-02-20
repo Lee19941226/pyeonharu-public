@@ -2,6 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 
+// ✅ 초성 추출 함수 추가
+function getChosung(str: string): string {
+  const CHO = [
+    "ㄱ",
+    "ㄲ",
+    "ㄴ",
+    "ㄴ",
+    "ㄷ",
+    "ㄸ",
+    "ㄹ",
+    "ㅁ",
+    "ㅂ",
+    "ㅃ",
+    "ㅅ",
+    "ㅆ",
+    "ㅇ",
+    "ㅈ",
+    "ㅉ",
+    "ㅊ",
+    "ㅋ",
+    "ㅌ",
+    "ㅍ",
+    "ㅎ",
+  ];
+  let result = "";
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i) - 44032;
+    if (code > -1 && code < 11172) {
+      result += CHO[Math.floor(code / 588)];
+    }
+  }
+  return result;
+}
+
 export async function GET(req: NextRequest) {
   // ✅ 변수 선언
   let productName = "제품";
@@ -16,7 +50,7 @@ export async function GET(req: NextRequest) {
   let crossContaminationRisks: any[] = [];
   let nutritionDetails: any[] = [];
   let nutrition = {};
-
+  let servingSize = "";
   try {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
@@ -53,7 +87,7 @@ export async function GET(req: NextRequest) {
     if (cachedData) {
       console.log("✅ DB 캐시에서 발견:", cachedData.food_name);
 
-      // ✅ 변수에 값 할당 (재선언 ❌)
+      // 변수에 값 할당 (재선언 ❌)
       productName = cachedData.food_name;
       manufacturer = cachedData.manufacturer || "정보없음";
       weight = cachedData.weight || "";
@@ -61,20 +95,27 @@ export async function GET(req: NextRequest) {
         (a: string) => a && a.trim().length > 0,
       );
 
-      // ✅ 원재료 파싱
+      // 원재료 파싱
       if (cachedData.raw_materials) {
         ingredients = cachedData.raw_materials
           .split(/[,\(\)]+/)
           .map((i: string) => i.trim())
           .filter((i: string) => i.length > 0);
       }
+      // 영양정보 추가
+      nutritionDetails = cachedData.nutrition_details || [];
+      servingSize = cachedData.serving_size || "";
+
+      console.log("📊 DB 캐시 영양정보:", nutritionDetails.length, "개");
       // ==========================================
-      // ✅ 데이터 보완 로직 (원재료 또는 알레르기 없을 때)
+      // 데이터 보완 로직 (원재료 또는 알레르기 없을 때)
       // ==========================================
       const needsEnrichment =
         !cachedData.raw_materials ||
         !cachedData.allergens ||
-        cachedData.allergens.length === 0;
+        cachedData.allergens.length === 0 ||
+        !cachedData.nutrition_details ||
+        cachedData.nutrition_details.length === 0;
 
       if (needsEnrichment && cachedData.data_source === "ai") {
         console.log("🔄 DB 데이터 불완전, AI로 보완 시작...");
@@ -167,6 +208,233 @@ JSON 형식으로만 응답:
           // 실패해도 기존 데이터로 계속 진행
         }
       }
+      // ✅✅ 추가: AI 제품 보완 후 Open API 스킵
+      if (cachedData.data_source === "ai") {
+        console.log("🤖 AI 제품이므로 Open API 호출 스킵");
+
+        // ✅ 사용자 알레르기와 매칭 (이 부분만 실행)
+        detectedAllergens = allergyNames
+          .map((allergen: string) => {
+            const match = userAllergens.find(
+              (ua) =>
+                allergen.includes(ua.allergen_name) ||
+                ua.allergen_name.includes(allergen),
+            );
+
+            if (match) {
+              return {
+                name: match.allergen_name,
+                amount: allergen,
+                severity: match.severity,
+                code: match.allergen_code,
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+        console.log("📊 AI 제품 정보:");
+        console.log("  - 원재료:", ingredients.length, "개");
+        console.log("  - 알레르기:", allergyNames.length, "개");
+        console.log("  - 위험 알레르기:", detectedAllergens.length, "개");
+      }
+      // ✅✅ 추가: Open API 데이터 보완
+      if (needsEnrichment && cachedData.data_source === "openapi") {
+        console.log("🔄 Open API 데이터 불완전, 재호출 시작...");
+        console.log(
+          `  - 원재료: ${cachedData.raw_materials ? "있음" : "없음"}`,
+        );
+        console.log(`  - 알레르기: ${cachedData.allergens?.length || 0}개`);
+        console.log(
+          `  - 영양정보: ${cachedData.nutrition_details?.length || 0}개`,
+        );
+
+        try {
+          const serviceKey = process.env.FOOD_API_KEY || "";
+          const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
+
+          // 병렬 API 호출
+          const [rawMaterialResult, allergyResult, nutritionResult] =
+            await Promise.allSettled([
+              // 원재료
+              (async () => {
+                if (cachedData.raw_materials) return [];
+                const url = new URL(`${baseUrl}/getFoodQrProdRawmtrl01`);
+                url.searchParams.append("serviceKey", serviceKey);
+                url.searchParams.append("pageNo", "1");
+                url.searchParams.append("numOfRows", "100");
+                url.searchParams.append("type", "json");
+                url.searchParams.append("brcd_no", code);
+                const response = await fetch(url.toString());
+                const data = await response.json();
+                return data.body?.items || [];
+              })(),
+
+              // 알레르기
+              (async () => {
+                if (cachedData.allergens && cachedData.allergens.length > 0)
+                  return [];
+                const url = new URL(`${baseUrl}/getFoodQrAllrgyInfo01`);
+                url.searchParams.append("serviceKey", serviceKey);
+                url.searchParams.append("pageNo", "1");
+                url.searchParams.append("numOfRows", "100");
+                url.searchParams.append("type", "json");
+                url.searchParams.append("brcd_no", code);
+                const response = await fetch(url.toString());
+                const data = await response.json();
+                return data.body?.items || [];
+              })(),
+
+              // 영양정보
+              (async () => {
+                if (
+                  cachedData.nutrition_details &&
+                  cachedData.nutrition_details.length > 0
+                )
+                  return [];
+                const url = new URL(`${baseUrl}/getFoodQrProdNsd01`);
+                url.searchParams.append("serviceKey", serviceKey);
+                url.searchParams.append("pageNo", "1");
+                url.searchParams.append("numOfRows", "50");
+                url.searchParams.append("type", "json");
+                url.searchParams.append("brcd_no", code);
+                const response = await fetch(url.toString());
+                const data = await response.json();
+                return data.body?.items || [];
+              })(),
+            ]);
+
+          const rawMaterialItems =
+            rawMaterialResult.status === "fulfilled"
+              ? rawMaterialResult.value
+              : [];
+          const allergyItems =
+            allergyResult.status === "fulfilled" ? allergyResult.value : [];
+          const nutritionItemsNew =
+            nutritionResult.status === "fulfilled" ? nutritionResult.value : [];
+
+          const updateData: any = {};
+
+          // 원재료 파싱
+          if (!cachedData.raw_materials && rawMaterialItems.length > 0) {
+            const rawText = rawMaterialItems[0].PRVW_CN || "";
+            if (rawText) {
+              updateData.raw_materials = rawText;
+
+              // 현재 세션에도 반영
+              function parseIngredients(text: string): string[] {
+                const items: string[] = [];
+                let current = "";
+                let depth = 0;
+                for (let i = 0; i < text.length; i++) {
+                  const char = text[i];
+                  if (char === "(" || char === "{" || char === "[") {
+                    depth++;
+                    current += char;
+                  } else if (char === ")" || char === "}" || char === "]") {
+                    depth--;
+                    current += char;
+                  } else if ((char === "," || char === "，") && depth === 0) {
+                    const trimmed = current.trim();
+                    if (trimmed) items.push(trimmed);
+                    current = "";
+                  } else {
+                    current += char;
+                  }
+                }
+                const trimmed = current.trim();
+                if (trimmed) items.push(trimmed);
+                return items;
+              }
+
+              ingredients = parseIngredients(rawText).slice(0, 30);
+            }
+          }
+
+          // 알레르기
+          if (
+            (!cachedData.allergens || cachedData.allergens.length === 0) &&
+            allergyItems.length > 0
+          ) {
+            const allergens = [
+              ...new Set(
+                allergyItems
+                  .map((item: any) => item.ALG_CSG_MTR_NM)
+                  .filter((name: string) => name && name.trim().length > 0),
+              ),
+            ];
+
+            if (allergens.length > 0) {
+              updateData.allergens = allergens;
+              allergyNames = allergens;
+            }
+          }
+
+          // 영양정보
+          if (
+            (!cachedData.nutrition_details ||
+              cachedData.nutrition_details.length === 0) &&
+            nutritionItemsNew.length > 0
+          ) {
+            const nutritionDetailsParsed = nutritionItemsNew
+              .map((item: any) => {
+                const name = item.NTRCN_NM || "";
+                const content = item.CNTNT || "";
+                const unit = item.UNIT || "";
+
+                if (
+                  name.includes("1회제공량") ||
+                  name.includes("제공량") ||
+                  name.includes("총내용량")
+                ) {
+                  return null;
+                }
+
+                return { name, content, unit };
+              })
+              .filter((item: any) => item && item.name && item.content);
+
+            if (nutritionDetailsParsed.length > 0) {
+              updateData.nutrition_details = nutritionDetailsParsed;
+              nutritionDetails = nutritionDetailsParsed;
+            }
+
+            // 1회 제공량
+            const servingSizeItem = nutritionItemsNew.find(
+              (item: any) =>
+                item.NTRCN_NM?.includes("1회제공량") ||
+                item.NTRCN_NM?.includes("제공량"),
+            );
+
+            if (servingSizeItem) {
+              const serving =
+                `${servingSizeItem.CNTNT || ""}${servingSizeItem.UNIT || ""}`.trim();
+              updateData.serving_size = serving;
+              servingSize = serving;
+            }
+          }
+
+          // DB 업데이트
+          if (Object.keys(updateData).length > 0) {
+            await supabase
+              .from("food_search_cache")
+              .update(updateData)
+              .eq("food_code", code);
+
+            console.log("✅ Open API 데이터 보완 완료:", {
+              원재료: updateData.raw_materials ? "보완됨" : "기존 유지",
+              알레르기: updateData.allergens
+                ? `${updateData.allergens.length}개 보완`
+                : "기존 유지",
+              영양정보: updateData.nutrition_details
+                ? `${updateData.nutrition_details.length}개 보완`
+                : "기존 유지",
+            });
+          }
+        } catch (enrichError) {
+          console.error("❌ Open API 데이터 보완 실패:", enrichError);
+        }
+      }
       // ✅ 사용자 알레르기와 매칭
       detectedAllergens = allergyNames
         .map((allergen: string) => {
@@ -194,9 +462,25 @@ JSON 형식으로만 응답:
       console.log("  - 위험 알레르기:", detectedAllergens.length, "개");
     }
 
-    // ✅ DB 캐시 없을 때만 Open API 조회
-    if (!cachedData) {
-      console.log("❌ DB 캐시 없음, Open API 조회 진행");
+    // ==========================================
+    // DB 캐시가 없거나 불완전할 때 Open API 조회
+    // ==========================================
+    const isIncomplete =
+      cachedData &&
+      cachedData.data_source === "openapi" &&
+      (!cachedData.raw_materials ||
+        !cachedData.allergens ||
+        cachedData.allergens.length === 0 ||
+        !cachedData.nutrition_details ||
+        cachedData.nutrition_details.length === 0);
+
+    //  AI 제품은 Open API 호출 스킵
+    if (!cachedData || isIncomplete) {
+      if (isIncomplete) {
+        console.log("🔄 DB 캐시 데이터 불완전, Open API로 보완");
+      } else {
+        console.log("❌ DB 캐시 없음, Open API 조회 진행");
+      }
 
       const serviceKey = process.env.FOOD_API_KEY || "";
       const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
@@ -302,32 +586,48 @@ JSON 형식으로만 응답:
       console.log(`  - 영양정보: ${nutritionItems.length}개`);
       console.log(`  - 주의사항: ${attentionInfo ? "✅" : "❌"}`);
       // ==========================================
-      // 영양정보 추출 (데이터 병합 섹션에 추가)
+      // 영양정보 추출 (수정)
       // ==========================================
+      console.log("📊 영양정보 원본 개수:", nutritionItems.length);
+
       // 1회 제공량 정보
-      const servingSize =
-        nutritionItems.length > 0
-          ? `${nutritionItems[0].NTRTN_INDCT_TCT}${nutritionItems[0].NTRTN_INDCT_TCD}`
-          : "";
+      const servingSizeItem = nutritionItems.find(
+        (item: any) =>
+          item.NTRCN_NM?.includes("1회제공량") ||
+          item.NTRCN_NM?.includes("제공량") ||
+          item.NTRCN_NM?.includes("총내용량"),
+      );
+
+      if (servingSizeItem) {
+        servingSize =
+          `${servingSizeItem.CNTNT || ""}${servingSizeItem.UNIT || ""}`.trim();
+      }
 
       console.log("📊 1회 제공량:", servingSize);
 
-      // 영양성분 목록
+      // 영양성분 목록 (필드명 수정)
       nutritionDetails = nutritionItems
         .map((item: any) => {
-          const name = item.NIRWMT_NM || "";
-          const content = item.CTA || "";
-          const unit = item.IGRD_UCD || "";
-          const percentage = item.NTRTN_RT || "";
+          const name = item.NTRCN_NM || "";
+          const content = item.CNTNT || "";
+          const unit = item.UNIT || "";
+
+          // 1회제공량은 제외
+          if (
+            name.includes("1회제공량") ||
+            name.includes("제공량") ||
+            name.includes("총내용량")
+          ) {
+            return null;
+          }
 
           return {
             name: name,
             content: content,
             unit: unit,
-            percentage: percentage,
           };
         })
-        .filter((item: any) => item.name && item.content);
+        .filter((item: any) => item && item.name && item.content);
 
       console.log("📊 파싱된 영양정보:", nutritionDetails.length, "개");
       if (nutritionDetails.length > 0) {
@@ -440,16 +740,8 @@ JSON 형식으로만 응답:
         return item ? parseFloat(item.CNTNT || "0") || 0 : 0;
       };
 
-      const servingSizeItem = nutritionItems.find(
-        (item: any) =>
-          item.NTRCN_NM?.includes("1회제공량") ||
-          item.NTRCN_NM?.includes("제공량"),
-      );
-
       nutrition = {
-        servingSize: servingSizeItem
-          ? `${servingSizeItem.CNTNT}${servingSizeItem.UNIT || ""}`
-          : "",
+        servingSize: servingSize || "",
         calories: getNutritionValue("열량"),
         sodium: getNutritionValue("나트륨"),
         carbs: getNutritionValue("탄수화물"),
@@ -710,7 +1002,47 @@ JSON 형식:
         console.error("❌ 대체품 추천 실패:", error);
       }
     }
+    // ==========================================
+    // Open API 데이터 → DB 캐시 저장
+    // ==========================================
+    if (!cachedData) {
+      console.log("💾 Open API 데이터를 DB에 저장 시작...");
 
+      try {
+        const { error: saveError } = await supabase
+          .from("food_search_cache")
+          .upsert(
+            {
+              food_code: code,
+              food_name: productName,
+              manufacturer: manufacturer || null,
+              allergens: allergyNames,
+              raw_materials: ingredients.join(", ") || null,
+              weight: weight || null,
+              nutrition_details:
+                nutritionDetails.length > 0 ? nutritionDetails : null,
+              serving_size: servingSize || null,
+              data_source: "openapi",
+              chosung: getChosung(productName),
+              created_at: new Date().toISOString(),
+            },
+            { onConflict: "food_code" },
+          );
+
+        if (saveError) {
+          console.error("❌ DB 저장 실패:", saveError);
+        } else {
+          console.log("✅ Open API 데이터 DB 저장 완료");
+          console.log("  - 제품명:", productName);
+          console.log("  - 원재료:", ingredients.length, "개");
+          console.log("  - 영양정보:", nutritionDetails.length, "개");
+          console.log("  - 1회제공량:", servingSize);
+        }
+      } catch (saveError) {
+        console.error("❌ DB 저장 중 오류:", saveError);
+        // 저장 실패해도 사용자에게는 데이터 반환
+      }
+    }
     // ==========================================
     // 최종 결과
     // ==========================================
@@ -728,10 +1060,12 @@ JSON 형식:
       detectedAllergens,
       ingredients: ingredients,
       nutrition: nutrition,
-      nutritionDetails: nutritionDetails,
+      nutritionDetails:
+        nutritionDetails.length > 0 ? nutritionDetails : undefined,
+      servingSize: servingSize || undefined,
       isSafe:
         detectedAllergens.length === 0 && crossContaminationRisks.length === 0,
-      hasNutritionInfo: nutritionItems.length > 0,
+      hasNutritionInfo: nutritionDetails.length > 0,
       dataSource: cachedData?.data_source || "openapi",
       alternatives: alternatives,
     };
