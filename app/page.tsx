@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -33,6 +33,7 @@ import {
   PenLine,
   Scan,
   Zap,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +51,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { Html5Qrcode } from "html5-qrcode";
 import { toast } from "sonner";
 import { UploadSheet } from "@/components/food/upload-sheet";
+
 // ─── 드롭다운 전용 미니맵 (naver-map.tsx와 동일한 스크립트 로딩) ───
 function MiniNaverMap({
   lat,
@@ -561,6 +563,7 @@ export default function HomePage() {
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUploadSheet, setShowUploadSheet] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   // ★ 투어 가이드
   const [tourActive, setTourActive] = useState(false);
 
@@ -1022,13 +1025,153 @@ export default function HomePage() {
       setIsProcessing(false);
     }
   };
+  // ==========================================
+  // ✅ 드래그 앤 드롭 핸들러
+  // ==========================================
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
 
-  // ==========================================
-  // 연속 스캔 모드 열기
-  // ==========================================
-  const handleContinuousScan = () => {
-    // ✅ 연속 스캔 페이지로 이동 (기존 동작 유지)
-    router.push("/food/camera?mode=continuous");
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 업로드 가능합니다");
+      return;
+    }
+
+    console.log("📁 파일:", file.name);
+
+    // 파일을 base64로 변환
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const imageData = event.target?.result as string;
+
+      try {
+        console.log("🔍 바코드 감지 시작...");
+        toast.info("바코드 확인 중...");
+
+        const html5QrCode = new Html5Qrcode("qr-reader-hidden");
+
+        // base64 → File 변환 (바코드 감지용)
+        const arr = imageData.split(",");
+        const mime = arr[0].match(/:(.*?);/)![1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const imageFile = new File([u8arr], "drop.jpg", { type: mime });
+
+        try {
+          const barcode = await html5QrCode.scanFile(imageFile, false);
+          console.log("✅ 바코드 발견:", barcode);
+          toast.success("바코드 인식 성공!");
+          router.push(`/food/result/${barcode}`);
+        } catch (barcodeError) {
+          console.log("❌ 바코드 없음, AI 분석 시작");
+          toast.info("AI가 성분표를 분석 중...");
+
+          try {
+            // ✅ 사용자 알레르기 가져오기
+            const supabase = createClient();
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            let userAllergens: string[] = [];
+
+            if (user) {
+              const { data } = await supabase
+                .from("user_allergies")
+                .select("allergen_name")
+                .eq("user_id", user.id);
+              if (data) {
+                userAllergens = data.map((item) => item.allergen_name);
+              }
+            }
+
+            console.log("🤖 AI 분석 API 호출...");
+
+            // ✅ base64만 추출 (data:image/jpeg;base64, 제거)
+            const base64Data = imageData.includes(",")
+              ? imageData.split(",")[1]
+              : imageData;
+
+            // ✅ JSON으로 전송
+            const response = await fetch("/api/food/analyze-image", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                imageBase64: base64Data,
+                userAllergens: userAllergens,
+              }),
+            });
+
+            console.log("📥 API 응답:", response.status);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("❌ API 에러:", errorText);
+              throw new Error(`API 에러: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log("✅ AI 분석 완료:", data);
+
+            if (data.success && data.foodCode) {
+              sessionStorage.setItem(
+                `ai_result_${data.foodCode}`,
+                JSON.stringify({
+                  foodCode: data.foodCode,
+                  productName: data.productName,
+                  manufacturer: data.manufacturer,
+                  weight: data.weight,
+                  allergens: data.allergens,
+                  hasUserAllergen: data.hasUserAllergen,
+                  matchedUserAllergens: data.matchedUserAllergens || [],
+                  ingredients: data.ingredients || [],
+                  rawMaterials: data.rawMaterials || "",
+                  nutritionInfo: data.nutritionInfo || null,
+                  dataSource: data.dataSource || "ai",
+                }),
+              );
+              toast.success("분석 완료!");
+              router.push(`/food/result/${data.foodCode}`);
+            } else {
+              toast.error(data.error || "분석에 실패했습니다");
+            }
+          } catch (aiError) {
+            console.error("❌ AI 분석 오류:", aiError);
+            toast.error(
+              aiError instanceof Error
+                ? aiError.message
+                : "분석 중 오류가 발생했습니다",
+            );
+          }
+        }
+      } catch (error) {
+        console.error("❌ 처리 오류:", error);
+        toast.error("이미지 처리 중 오류가 발생했습니다");
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error("❌ 파일 읽기 오류:", error);
+      toast.error("파일을 읽을 수 없습니다");
+    };
+
+    reader.readAsDataURL(file);
   };
   // ─── Render ───
   return (
@@ -1105,17 +1248,65 @@ export default function HomePage() {
                     <p className="text-sm text-muted-foreground">
                       음식 사진이나 이름으로 알레르기를 확인하세요
                     </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="gap-1.5 shrink-0"
-                        onClick={() => setShowUploadSheet(true)}
-                        data-tour="btn-camera"
-                      >
-                        <Camera className="h-4 w-4" />
-                        사진 업로드
-                      </Button>
 
+                    {/* ✅ 드래그 앤 드롭 영역 (별도) */}
+                    <Card
+                      className={`group transition-all ${
+                        isDragging
+                          ? "border-4 border-primary bg-primary/10 scale-[1.02]"
+                          : "border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/5"
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          {/* 아이콘 */}
+                          <div
+                            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                              isDragging
+                                ? "bg-primary/30 scale-110"
+                                : "bg-primary/10"
+                            } transition-all`}
+                          >
+                            {isDragging ? (
+                              <Upload className="h-6 w-6 text-primary animate-bounce" />
+                            ) : (
+                              <Camera className="h-6 w-6 text-primary" />
+                            )}
+                          </div>
+
+                          {/* 텍스트 */}
+                          <div className="flex-1">
+                            <p className="font-semibold text-sm">
+                              {isDragging
+                                ? "이미지를 놓으세요!"
+                                : "사진으로 빠르게 확인"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {isDragging
+                                ? "바코드 또는 성분표 이미지"
+                                : "이미지를 드래그하거나 버튼을 눌러 업로드"}
+                            </p>
+                          </div>
+
+                          {/* 버튼 */}
+                          {!isDragging && (
+                            <Button
+                              onClick={() => setShowUploadSheet(true)}
+                              size="sm"
+                            >
+                              <Camera className="mr-2 h-4 w-4" />
+                              업로드
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ✅ 검색창 (별도) */}
+                    <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -1130,9 +1321,12 @@ export default function HomePage() {
                       </div>
                       <Button onClick={handleFoodSearch}>검색</Button>
                     </div>
+
                     <p className="text-xs text-muted-foreground">
                       내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요
                     </p>
+
+                    {/* 최근 확인 */}
                     {user && recentChecks.length > 0 && (
                       <div className="border-t pt-3 -mx-4 px-4">
                         <div className="flex items-center justify-between mb-2">
@@ -1165,15 +1359,17 @@ export default function HomePage() {
                         </div>
                       </div>
                     )}
-                    {/* ✅ 업로드 선택 시트/모달 */}
-                    <UploadSheet
-                      open={showUploadSheet}
-                      onOpenChange={setShowUploadSheet}
-                    />
-                    {/* ✅ QR 리더 (숨김) */}
-                    <div id="qr-reader-hidden" className="hidden" />
                   </div>
                 )}
+
+                {/* ✅ 숨겨진 QR reader (맨 아래) */}
+                <div id="qr-reader-hidden" className="hidden" />
+
+                {/* ✅ 업로드 시트 (중복 제거) */}
+                <UploadSheet
+                  open={showUploadSheet}
+                  onOpenChange={setShowUploadSheet}
+                />
 
                 {searchMode === "symptom" && (
                   <div className="space-y-3">

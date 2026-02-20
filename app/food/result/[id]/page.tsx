@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
@@ -32,8 +32,18 @@ export default function FoodResultPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const lastLoadedIdRef = useRef<string | undefined>(null);
 
   useEffect(() => {
+    const id = Array.isArray(params.id) ? params.id[0] : params.id;
+
+    // 같은 ID면 스킵
+    if (lastLoadedIdRef.current === id) {
+      return;
+    }
+
+    // 새로운 ID 저장 후 로드
+    lastLoadedIdRef.current = id;
     loadFoodResult();
 
     // Kakao SDK 초기화
@@ -42,7 +52,7 @@ export default function FoodResultPage() {
         window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
       }
     }
-  }, [params.id, router]);
+  }, [params.id]);
 
   // ✅ result가 로드된 후에 즐겨찾기 확인
   useEffect(() => {
@@ -164,11 +174,10 @@ export default function FoodResultPage() {
               saveToHistory(data.result);
             }, 0);
 
-            return; // ✅ 성공 시 여기서 종료
+            return;
           }
         }
 
-        // ⚠️ API 응답은 왔지만 실패
         console.warn("⚠️ API 응답 실패:", response.status);
       } catch (apiError) {
         console.error("❌ API 호출 오류:", apiError);
