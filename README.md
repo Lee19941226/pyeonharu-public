@@ -22,3 +22,5 @@ npm install react-kakao-sdk
 
 2026-02-15 16:29 이용재
 npm install @vercel/og
+
+build
