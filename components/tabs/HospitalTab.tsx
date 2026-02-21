@@ -5,7 +5,8 @@ import { NaverMap } from "@/components/medical/naver-map";
 import { SearchFilters } from "@/components/medical/search-filters";
 import { PlaceList } from "@/components/medical/place-list";
 import { Button } from "@/components/ui/button";
-import { Map, List, Loader2, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Map, List, Loader2, RefreshCw, Search } from "lucide-react";
 
 export type PlaceType = "hospital" | "pharmacy";
 export type ViewMode = "map" | "list";
@@ -37,6 +38,7 @@ export default function HospitalTab() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // 현재 위치 가져오기
   useEffect(() => {
@@ -49,7 +51,6 @@ export default function HospitalTab() {
           });
         },
         () => {
-          // 기본 위치 (서울 시청)
           setUserLocation({ lat: 37.5665, lng: 126.978 });
         },
       );
@@ -58,11 +59,10 @@ export default function HospitalTab() {
     }
   }, []);
 
-  // 거리 계산 함수 (Haversine formula)
   const calculateDistance = useCallback(
     (lat1: number, lng1: number, lat2: number, lng2: number): number => {
       if (!lat2 || !lng2 || lat2 === 0 || lng2 === 0) return 9999;
-      const R = 6371; // 지구 반지름 (km)
+      const R = 6371;
       const dLat = ((lat2 - lat1) * Math.PI) / 180;
       const dLon = ((lng2 - lng1) * Math.PI) / 180;
       const a =
@@ -77,16 +77,13 @@ export default function HospitalTab() {
     [],
   );
 
-  // 영업 중 여부 확인
   const checkIsOpen = useCallback((): boolean => {
     const now = new Date();
     const hour = now.getHours();
-    const day = now.getDay(); // 0: 일요일
-    // 평일 9시~18시를 영업시간으로 가정 (일요일 제외)
+    const day = now.getDay();
     return day !== 0 && hour >= 9 && hour < 18;
   }, []);
 
-  // 병원/약국 데이터 가져오기
   const fetchPlaces = useCallback(async () => {
     if (!userLocation) return;
 
@@ -96,7 +93,6 @@ export default function HospitalTab() {
     try {
       const results: Place[] = [];
 
-      // 병원 데이터 가져오기
       if (placeType === "all" || placeType === "hospital") {
         try {
           const hospitalRes = await fetch(
@@ -104,9 +100,6 @@ export default function HospitalTab() {
           );
           if (hospitalRes.ok) {
             const hospitalData = await hospitalRes.json();
-            console.log("병원 API 응답:", hospitalData);
-
-            // API 응답 구조에 맞게 파싱
             const hospitalList =
               hospitalData.hospitals ||
               hospitalData.items ||
@@ -115,7 +108,6 @@ export default function HospitalTab() {
 
             if (Array.isArray(hospitalList)) {
               hospitalList.forEach((h: Record<string, unknown>) => {
-                // 좌표 추출 (다양한 필드명 대응)
                 const lat =
                   Number(h.YPos) ||
                   Number(h.yPos) ||
@@ -131,7 +123,6 @@ export default function HospitalTab() {
                   Number(h.wgs84Lon) ||
                   0;
 
-                // 좌표가 없으면 스킵
                 if (lat === 0 || lng === 0) return;
 
                 const dist = calculateDistance(
@@ -141,7 +132,6 @@ export default function HospitalTab() {
                   lng,
                 );
 
-                // 이름 추출
                 const name = String(
                   h.yadmNm ||
                     h.dutyName ||
@@ -187,7 +177,6 @@ export default function HospitalTab() {
         }
       }
 
-      // 약국 데이터 가져오기
       if (placeType === "all" || placeType === "pharmacy") {
         try {
           const pharmacyRes = await fetch(
@@ -195,8 +184,6 @@ export default function HospitalTab() {
           );
           if (pharmacyRes.ok) {
             const pharmacyData = await pharmacyRes.json();
-            console.log("약국 API 응답:", pharmacyData);
-
             const pharmacyList =
               pharmacyData.pharmacies ||
               pharmacyData.items ||
@@ -256,7 +243,6 @@ export default function HospitalTab() {
         }
       }
 
-      // 거리순 정렬
       results.sort((a, b) => {
         const distA = parseFloat(a.distance);
         const distB = parseFloat(b.distance);
@@ -276,22 +262,29 @@ export default function HospitalTab() {
     }
   }, [userLocation, placeType, calculateDistance, checkIsOpen]);
 
-  // 위치 또는 필터 변경 시 데이터 다시 가져오기
   useEffect(() => {
     if (userLocation) {
       fetchPlaces();
     }
   }, [userLocation, placeType, fetchPlaces]);
 
-  // 필터링된 장소
+  // 필터링: 영업 중 + 검색어
   const filteredPlaces = places.filter((place) => {
     if (showOpenOnly && !place.isOpen) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const nameMatch = place.name.toLowerCase().includes(q);
+      const addrMatch = place.address.toLowerCase().includes(q);
+      const deptMatch = place.departments?.some((d) =>
+        d.toLowerCase().includes(q),
+      );
+      if (!nameMatch && !addrMatch && !deptMatch) return false;
+    }
     return true;
   });
 
   return (
     <div className="w-full">
-
       <div className="flex-1">
         {/* Search Header */}
         <div className="border-b border-border bg-card">
@@ -310,6 +303,26 @@ export default function HospitalTab() {
                 새로고침
               </Button>
             </div>
+
+            {/* 검색창 */}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="병원, 약국, 진료과목 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-10 pl-10"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  지우기
+                </button>
+              )}
+            </div>
+
             <SearchFilters
               placeType={placeType}
               onPlaceTypeChange={setPlaceType}
@@ -374,7 +387,7 @@ export default function HospitalTab() {
             <div
               className={`md:w-96 md:overflow-auto md:border-l md:border-border ${
                 viewMode === "map" ? "hidden md:block" : ""
-              }`}
+              } ${filteredPlaces.length > 0 ? "md:h-[calc(100vh-180px)]" : ""}`}
             >
               {error && filteredPlaces.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center px-4">

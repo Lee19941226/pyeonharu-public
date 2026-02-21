@@ -475,7 +475,7 @@ export default function FoodTab({
 }) {
   const router = useRouter();
   const [foodInput, setFoodInput] = useState("");
-  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null | undefined>(undefined);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const [recentChecks, setRecentChecks] = useState<
@@ -582,6 +582,8 @@ export default function FoodTab({
   };
 
   const loadMealData = async () => {
+    // user === undefined: auth 아직 확인 안 됨 → 대기
+    if (user === undefined) return;
     if (!user) {
       setMealStatus("no-login");
       onProgress?.(50, "급식 확인 건너뜀");
