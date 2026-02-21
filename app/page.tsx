@@ -121,6 +121,11 @@ export default function HomePage() {
       next.add(activeTab);
       return next;
     });
+    // 지도 탭 전환 시 네이버맵 리사이즈 트리거
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
+    return () => clearTimeout(timer);
   }, [activeTab]);
 
   // ★ 투어 가이드
