@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { getChosung, normalizeChosungQuery } from "@/lib/utils/chosung";
+import { headers } from "next/headers";
 
 interface ProductScore {
   foodCode: string;
@@ -36,10 +37,23 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const normalizedQuery = query.toLowerCase().trim();
 
-    // 사용자 알레르기 정보
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    // ✅ IP 주소 및 User-Agent 가져오기
+    const headersList = await headers();
+
+    const ipAddress =
+      headersList.get("x-forwarded-for")?.split(",")[0] ||
+      headersList.get("x-real-ip") ||
+      "unknown";
+
+    const userAgent = headersList.get("user-agent") || "unknown";
+
+    console.log(ipAddress, userAgent);
+
+    // 사용자 알레르기 정보
     let userAllergens: string[] = [];
     if (user) {
       const { data: allergyData } = await supabase
@@ -724,7 +738,44 @@ JSON 배열 형식으로만 반환:
           }
         });
     }
+    // ==========================================
+    // 검색 기록 저장
+    // ==========================================
 
+    // 데이터 소스별 개수 집계
+    const dataSources = {
+      db: deduped.filter((r) => r.dataSource === "db").length,
+      openapi: deduped.filter((r) => r.dataSource === "openapi").length,
+      openfood: deduped.filter((r) => r.dataSource === "openfood").length,
+      ai: deduped.filter((r) => r.dataSource === "ai").length,
+    };
+
+    // 검색 로그 저장 (비동기, 응답 대기 안 함)
+    supabase
+      .from("food_search_logs")
+      .insert({
+        user_id: user?.id || null, // 비로그인 시 null
+        search_query: normalizedQuery,
+        result_count: deduped.length,
+        data_sources: dataSources,
+        searched_at: new Date().toISOString(),
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      })
+      .then(({ error }) => {
+        if (error) {
+          console.error("❌ 검색 로그 저장 실패:", error);
+        } else {
+          console.log(
+            `✅ 검색 로그 저장: ${normalizedQuery} (${deduped.length}개 결과)`,
+          );
+          if (user) {
+            console.log(`   사용자: ${user.email || user.id}`);
+          } else {
+            console.log(`   비로그인 (IP: ${ipAddress})`);
+          }
+        }
+      });
     // ==========================================
     // 반환
     // ==========================================
