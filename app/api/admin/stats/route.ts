@@ -53,58 +53,134 @@ export async function GET(request: Request) {
     // DAU - 오늘 활동한 고유 사용자
     const todayStart = startOfDay(now);
     const dauSets = await Promise.all([
-      supabase.from("food_scan_logs").select("user_id").gte("scanned_at", todayStart),
-      supabase.from("food_check_history").select("user_id").gte("checked_at", todayStart),
-      supabase.from("community_posts").select("user_id").gte("created_at", todayStart),
-      supabase.from("community_comments").select("user_id").gte("created_at", todayStart),
-      supabase.from("diet_entries").select("user_id").gte("created_at", todayStart),
-      supabase.from("food_search_history").select("user_id").gte("searched_at", todayStart),
+      supabase
+        .from("food_scan_logs")
+        .select("user_id")
+        .gte("scanned_at", todayStart),
+      supabase
+        .from("food_check_history")
+        .select("user_id")
+        .gte("checked_at", todayStart),
+      supabase
+        .from("community_posts")
+        .select("user_id")
+        .gte("created_at", todayStart),
+      supabase
+        .from("community_comments")
+        .select("user_id")
+        .gte("created_at", todayStart),
+      supabase
+        .from("diet_entries")
+        .select("user_id")
+        .gte("created_at", todayStart),
+      supabase
+        .from("food_search_logs")
+        .select("user_id")
+        .gte("searched_at", todayStart),
     ]);
     const dauUsers = new Set<string>();
-    dauSets.forEach((res) => res.data?.forEach((r) => r.user_id && dauUsers.add(r.user_id)));
+    dauSets.forEach((res) =>
+      res.data?.forEach((r) => r.user_id && dauUsers.add(r.user_id)),
+    );
     const dau = dauUsers.size;
 
     // WAU - 최근 7일
     const wauSets = await Promise.all([
-      supabase.from("food_scan_logs").select("user_id").gte("scanned_at", daysAgo(7)),
-      supabase.from("food_check_history").select("user_id").gte("checked_at", daysAgo(7)),
-      supabase.from("community_posts").select("user_id").gte("created_at", daysAgo(7)),
-      supabase.from("community_comments").select("user_id").gte("created_at", daysAgo(7)),
-      supabase.from("diet_entries").select("user_id").gte("created_at", daysAgo(7)),
-      supabase.from("food_search_history").select("user_id").gte("searched_at", daysAgo(7)),
+      supabase
+        .from("food_scan_logs")
+        .select("user_id")
+        .gte("scanned_at", daysAgo(7)),
+      supabase
+        .from("food_check_history")
+        .select("user_id")
+        .gte("checked_at", daysAgo(7)),
+      supabase
+        .from("community_posts")
+        .select("user_id")
+        .gte("created_at", daysAgo(7)),
+      supabase
+        .from("community_comments")
+        .select("user_id")
+        .gte("created_at", daysAgo(7)),
+      supabase
+        .from("diet_entries")
+        .select("user_id")
+        .gte("created_at", daysAgo(7)),
+      supabase
+        .from("food_search_logs")
+        .select("user_id")
+        .gte("searched_at", daysAgo(7)),
     ]);
     const wauUsers = new Set<string>();
-    wauSets.forEach((res) => res.data?.forEach((r) => r.user_id && wauUsers.add(r.user_id)));
+    wauSets.forEach((res) =>
+      res.data?.forEach((r) => r.user_id && wauUsers.add(r.user_id)),
+    );
     const wau = wauUsers.size;
 
     // MAU - 최근 30일
     const mauSets = await Promise.all([
-      supabase.from("food_scan_logs").select("user_id").gte("scanned_at", daysAgo(30)),
-      supabase.from("food_check_history").select("user_id").gte("checked_at", daysAgo(30)),
-      supabase.from("community_posts").select("user_id").gte("created_at", daysAgo(30)),
-      supabase.from("community_comments").select("user_id").gte("created_at", daysAgo(30)),
-      supabase.from("diet_entries").select("user_id").gte("created_at", daysAgo(30)),
-      supabase.from("food_search_history").select("user_id").gte("searched_at", daysAgo(30)),
+      supabase
+        .from("food_scan_logs")
+        .select("user_id")
+        .gte("scanned_at", daysAgo(30)),
+      supabase
+        .from("food_check_history")
+        .select("user_id")
+        .gte("checked_at", daysAgo(30)),
+      supabase
+        .from("community_posts")
+        .select("user_id")
+        .gte("created_at", daysAgo(30)),
+      supabase
+        .from("community_comments")
+        .select("user_id")
+        .gte("created_at", daysAgo(30)),
+      supabase
+        .from("diet_entries")
+        .select("user_id")
+        .gte("created_at", daysAgo(30)),
+      supabase
+        .from("food_search_logs")
+        .select("user_id")
+        .gte("searched_at", daysAgo(30)),
     ]);
     const mauUsers = new Set<string>();
-    mauSets.forEach((res) => res.data?.forEach((r) => r.user_id && mauUsers.add(r.user_id)));
+    mauSets.forEach((res) =>
+      res.data?.forEach((r) => r.user_id && mauUsers.add(r.user_id)),
+    );
     const mau = mauUsers.size;
 
     // ═══ 3. 일별 활성 사용자 추이 (DAU 트렌드) ═══
     const dauTrend: { date: string; dau: number }[] = [];
     // 최근 N일간 일별 DAU 계산 (food_scan_logs + food_check_history + community 활동 기반)
     const allActivityLogs = await Promise.all([
-      supabase.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", daysAgo(days)),
-      supabase.from("food_check_history").select("user_id, checked_at").gte("checked_at", daysAgo(days)),
-      supabase.from("community_posts").select("user_id, created_at").gte("created_at", daysAgo(days)),
-      supabase.from("community_comments").select("user_id, created_at").gte("created_at", daysAgo(days)),
-      supabase.from("diet_entries").select("user_id, created_at").gte("created_at", daysAgo(days)),
+      supabase
+        .from("food_scan_logs")
+        .select("user_id, scanned_at")
+        .gte("scanned_at", daysAgo(days)),
+      supabase
+        .from("food_check_history")
+        .select("user_id, checked_at")
+        .gte("checked_at", daysAgo(days)),
+      supabase
+        .from("community_posts")
+        .select("user_id, created_at")
+        .gte("created_at", daysAgo(days)),
+      supabase
+        .from("community_comments")
+        .select("user_id, created_at")
+        .gte("created_at", daysAgo(days)),
+      supabase
+        .from("diet_entries")
+        .select("user_id, created_at")
+        .gte("created_at", daysAgo(days)),
     ]);
 
     const dailyActiveMap: Record<string, Set<string>> = {};
     allActivityLogs.forEach((res) => {
       res.data?.forEach((r: any) => {
-        const ts = r.scanned_at || r.checked_at || r.created_at || r.searched_at;
+        const ts =
+          r.scanned_at || r.checked_at || r.created_at || r.searched_at;
         const date = ts?.slice(0, 10);
         if (date && r.user_id) {
           if (!dailyActiveMap[date]) dailyActiveMap[date] = new Set();
@@ -135,7 +211,7 @@ export async function GET(request: Request) {
       .gte("checked_at", daysAgo(days));
 
     const { count: totalSearches } = await supabase
-      .from("food_search_history")
+      .from("food_search_logs")
       .select("*", { count: "exact", head: true })
       .gte("searched_at", daysAgo(days));
 
@@ -145,7 +221,10 @@ export async function GET(request: Request) {
       .gte("created_at", daysAgo(days));
 
     // 일별 기능 사용량 (복합 차트용)
-    const featureTrend: Record<string, { scans: number; checks: number; searches: number; diet: number }> = {};
+    const featureTrend: Record<
+      string,
+      { scans: number; checks: number; searches: number; diet: number }
+    > = {};
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -154,16 +233,40 @@ export async function GET(request: Request) {
     }
 
     const [scanLogs, checkLogs, searchLogs, dietLogs] = await Promise.all([
-      supabase.from("food_scan_logs").select("scanned_at").gte("scanned_at", daysAgo(days)),
-      supabase.from("food_check_history").select("checked_at").gte("checked_at", daysAgo(days)),
-      supabase.from("food_search_history").select("searched_at").gte("searched_at", daysAgo(days)),
-      supabase.from("diet_entries").select("created_at").gte("created_at", daysAgo(days)),
+      supabase
+        .from("food_scan_logs")
+        .select("scanned_at")
+        .gte("scanned_at", daysAgo(days)),
+      supabase
+        .from("food_check_history")
+        .select("checked_at")
+        .gte("checked_at", daysAgo(days)),
+      supabase
+        .from("food_search_logs")
+        .select("searched_at")
+        .gte("searched_at", daysAgo(days)),
+      supabase
+        .from("diet_entries")
+        .select("created_at")
+        .gte("created_at", daysAgo(days)),
     ]);
 
-    scanLogs.data?.forEach((r) => { const d = r.scanned_at?.slice(0, 10); if (d && featureTrend[d]) featureTrend[d].scans++; });
-    checkLogs.data?.forEach((r) => { const d = r.checked_at?.slice(0, 10); if (d && featureTrend[d]) featureTrend[d].checks++; });
-    searchLogs.data?.forEach((r) => { const d = r.searched_at?.slice(0, 10); if (d && featureTrend[d]) featureTrend[d].searches++; });
-    dietLogs.data?.forEach((r) => { const d = r.created_at?.slice(0, 10); if (d && featureTrend[d]) featureTrend[d].diet++; });
+    scanLogs.data?.forEach((r) => {
+      const d = r.scanned_at?.slice(0, 10);
+      if (d && featureTrend[d]) featureTrend[d].scans++;
+    });
+    checkLogs.data?.forEach((r) => {
+      const d = r.checked_at?.slice(0, 10);
+      if (d && featureTrend[d]) featureTrend[d].checks++;
+    });
+    searchLogs.data?.forEach((r) => {
+      const d = r.searched_at?.slice(0, 10);
+      if (d && featureTrend[d]) featureTrend[d].searches++;
+    });
+    dietLogs.data?.forEach((r) => {
+      const d = r.created_at?.slice(0, 10);
+      if (d && featureTrend[d]) featureTrend[d].diet++;
+    });
 
     const featureTrendArray = Object.entries(featureTrend).map(([date, v]) => ({
       date,
@@ -190,7 +293,8 @@ export async function GET(request: Request) {
       .gte("created_at", daysAgo(days));
 
     // 일별 게시글/댓글 추이
-    const communityTrend: Record<string, { posts: number; comments: number }> = {};
+    const communityTrend: Record<string, { posts: number; comments: number }> =
+      {};
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -198,17 +302,31 @@ export async function GET(request: Request) {
     }
 
     const [postLogs, commentLogs] = await Promise.all([
-      supabase.from("community_posts").select("created_at").gte("created_at", daysAgo(days)),
-      supabase.from("community_comments").select("created_at").gte("created_at", daysAgo(days)),
+      supabase
+        .from("community_posts")
+        .select("created_at")
+        .gte("created_at", daysAgo(days)),
+      supabase
+        .from("community_comments")
+        .select("created_at")
+        .gte("created_at", daysAgo(days)),
     ]);
 
-    postLogs.data?.forEach((r) => { const d = r.created_at?.slice(0, 10); if (d && communityTrend[d]) communityTrend[d].posts++; });
-    commentLogs.data?.forEach((r) => { const d = r.created_at?.slice(0, 10); if (d && communityTrend[d]) communityTrend[d].comments++; });
+    postLogs.data?.forEach((r) => {
+      const d = r.created_at?.slice(0, 10);
+      if (d && communityTrend[d]) communityTrend[d].posts++;
+    });
+    commentLogs.data?.forEach((r) => {
+      const d = r.created_at?.slice(0, 10);
+      if (d && communityTrend[d]) communityTrend[d].comments++;
+    });
 
-    const communityTrendArray = Object.entries(communityTrend).map(([date, v]) => ({
-      date,
-      ...v,
-    }));
+    const communityTrendArray = Object.entries(communityTrend).map(
+      ([date, v]) => ({
+        date,
+        ...v,
+      }),
+    );
 
     // ═══ 6. 학교 등록 통계 ═══
     const { count: totalSchools } = await supabase
@@ -222,7 +340,8 @@ export async function GET(request: Request) {
 
     const schoolCounts: Record<string, number> = {};
     schoolRanking?.forEach((r) => {
-      if (r.school_name) schoolCounts[r.school_name] = (schoolCounts[r.school_name] || 0) + 1;
+      if (r.school_name)
+        schoolCounts[r.school_name] = (schoolCounts[r.school_name] || 0) + 1;
     });
     const topSchools = Object.entries(schoolCounts)
       .sort((a, b) => b[1] - a[1])
@@ -234,25 +353,41 @@ export async function GET(request: Request) {
     const weekAgoStart = daysAgo(8);
     const weekAgoEnd = daysAgo(7);
     const retentionBase = await Promise.all([
-      supabase.from("food_scan_logs").select("user_id").gte("scanned_at", weekAgoStart).lte("scanned_at", weekAgoEnd),
-      supabase.from("food_check_history").select("user_id").gte("checked_at", weekAgoStart).lte("checked_at", weekAgoEnd),
-      supabase.from("community_posts").select("user_id").gte("created_at", weekAgoStart).lte("created_at", weekAgoEnd),
+      supabase
+        .from("food_scan_logs")
+        .select("user_id")
+        .gte("scanned_at", weekAgoStart)
+        .lte("scanned_at", weekAgoEnd),
+      supabase
+        .from("food_check_history")
+        .select("user_id")
+        .gte("checked_at", weekAgoStart)
+        .lte("checked_at", weekAgoEnd),
+      supabase
+        .from("community_posts")
+        .select("user_id")
+        .gte("created_at", weekAgoStart)
+        .lte("created_at", weekAgoEnd),
     ]);
     const weekAgoUsers = new Set<string>();
-    retentionBase.forEach((res) => res.data?.forEach((r) => r.user_id && weekAgoUsers.add(r.user_id)));
+    retentionBase.forEach((res) =>
+      res.data?.forEach((r) => r.user_id && weekAgoUsers.add(r.user_id)),
+    );
 
     const returnedUsers = new Set<string>();
     if (weekAgoUsers.size > 0) {
       dauSets.forEach((res) => {
         res.data?.forEach((r) => {
-          if (r.user_id && weekAgoUsers.has(r.user_id)) returnedUsers.add(r.user_id);
+          if (r.user_id && weekAgoUsers.has(r.user_id))
+            returnedUsers.add(r.user_id);
         });
       });
     }
 
-    const retentionRate = weekAgoUsers.size > 0
-      ? Math.round((returnedUsers.size / weekAgoUsers.size) * 100)
-      : 0;
+    const retentionRate =
+      weekAgoUsers.size > 0
+        ? Math.round((returnedUsers.size / weekAgoUsers.size) * 100)
+        : 0;
 
     // ═══ 응답 ═══
     return NextResponse.json({
@@ -268,7 +403,10 @@ export async function GET(request: Request) {
       signups: {
         total: totalUsers || 0,
         recent: dailySignups?.length || 0,
-        trend: Object.entries(signupsByDate).map(([date, count]) => ({ date, count })),
+        trend: Object.entries(signupsByDate).map(([date, count]) => ({
+          date,
+          count,
+        })),
       },
       features: {
         scans: totalScans || 0,
@@ -292,9 +430,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Admin stats error:", error);
-    return NextResponse.json(
-      { error: "통계 조회 실패" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "통계 조회 실패" }, { status: 500 });
   }
 }
