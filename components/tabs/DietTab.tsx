@@ -57,8 +57,15 @@ function CircularProgress({ current, total, isOver, size = 80 }: { current: numb
 function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bmr: number; onDayClick?: (date: string) => void }) {
   const maxCal = bmr > 0 ? bmr : Math.max(...dailyStats.map((d) => d.totalCal), 1)
   const todayStr = new Date().toLocaleDateString("en-CA")
-  const showLabels = dailyStats.length <= 14
-  const BAR_MAX_H = 80 // px
+  const total = dailyStats.length
+  // 7일 이하: 매일, 8~14일: 짝수만, 15~31일: 5일 간격, 32+: 시작/끝/중간
+  const showLabel = (i: number) => {
+    if (total <= 7) return true
+    if (total <= 14) return i % 2 === 0 || i === total - 1
+    if (total <= 31) return i === 0 || i === total - 1 || i % 5 === 0
+    return i === 0 || i === total - 1 || i % 7 === 0
+  }
+  const BAR_MAX_H = 80
   return (
     <div>
       {bmr > 0 && (
@@ -67,7 +74,7 @@ function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bm
           <span className="text-[8px] text-red-400">BMR {bmr.toLocaleString()}</span>
         </div>
       )}
-      <div className="flex items-end gap-[2px]" style={{ height: BAR_MAX_H + (showLabels ? 16 : 0) }}>
+      <div className="flex items-end gap-[2px]" style={{ height: BAR_MAX_H + 16 }}>
         {dailyStats.map((d) => {
           const ratio = maxCal > 0 ? Math.min(d.totalCal / maxCal, 1.3) : 0
           const barH = d.totalCal > 0 ? Math.max(Math.round(ratio * BAR_MAX_H), 3) : 1
@@ -82,7 +89,7 @@ function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bm
               </div>
               <div className={`w-full rounded-t-sm transition-all duration-300 ${isOver ? "bg-red-400" : d.totalCal > 0 ? "bg-primary/70" : "bg-muted/40"} hover:opacity-80`}
                 style={{ height: `${barH}px` }} />
-              {showLabels && <span className={`text-[7px] leading-none mt-0.5 ${isTd ? "font-bold text-primary" : "text-muted-foreground/60"}`}>{dayDate.getDate()}</span>}
+              {showLabel(dailyStats.indexOf(d)) && <span className={`text-[7px] leading-none mt-0.5 ${isTd ? "font-bold text-primary" : "text-muted-foreground/60"}`}>{dayDate.getDate()}</span>}
             </div>
           )
         })}
