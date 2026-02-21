@@ -71,7 +71,7 @@ export default function AdminReportButton({ stats, period }: { stats: Stats | nu
 
       {/* ─── 모달 ─── */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4"
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto pt-16 pb-8 px-4"
           onClick={() => setShowModal(false)}>
           <div className="w-full max-w-3xl rounded-2xl bg-background shadow-2xl border"
             onClick={(e) => e.stopPropagation()}>
