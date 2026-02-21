@@ -111,9 +111,10 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
 ## 추천 규칙
 1. 알레르기 식품 절대 제외
 2. 최근 7일 자주 먹은 음식 피하기 (다양성)
-3. 남은 칼로리(${remainingCal}kcal)에 맞추기
+3. 남은 칼로리(${remainingCal}kcal)에 맞추기. 칼로리 초과 상태라도 현실적으로 먹을 수 있는 저칼로리 옵션 추천
 4. 주간 영양 패턴의 편중 보완
 5. 오늘 먹은 음식과의 맛 밸런스 고려
+6. **반드시 최소 3개, 최대 5개** 메뉴를 추천하세요. 칼로리 초과 상태여도 3개 이상 추천하되, 가벼운 음식 위주로 구성하세요
 
 ## 응답 형식 (JSON만, 코드블록 없이)
 {
@@ -147,7 +148,7 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
         { role: "user", content: prompt }
       ],
       temperature: 0.6,
-      max_tokens: 1500,
+      max_tokens: 2500,
     })
 
     let result: any
