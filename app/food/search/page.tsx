@@ -612,7 +612,10 @@ function FoodSearchPageInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-
+  const [searchProgress, setSearchProgress] = useState({
+    step: "",
+    progress: 0,
+  });
   // ✅ 초기 로드 시 캐시 복원
   useEffect(() => {
     const urlQuery = searchParams.get("q");
@@ -648,13 +651,29 @@ function FoodSearchPageInner() {
     setCurrentPage(1);
 
     try {
+      // ✅ 1단계: DB 검색
+      setSearchProgress({ step: "DB 캐시 검색 중...", progress: 25 });
+
       const res = await fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}`,
       );
+
+      // ✅ 2단계: API 처리 중
+      setSearchProgress({ step: "식약처 API 조회 중...", progress: 50 });
+
+      await new Promise((resolve) => setTimeout(resolve, 300)); // 사용자가 진행 상황 볼 수 있게 약간 딜레이
+
+      // ✅ 3단계: 데이터 파싱
+      setSearchProgress({ step: "검색 결과 정리 중...", progress: 75 });
+
       const data = await res.json();
 
       if (data.success) {
         const items = data.items || [];
+
+        // ✅ 4단계: 완료
+        setSearchProgress({ step: "완료!", progress: 100 });
+
         setAllResults(items);
 
         // ✅ 결과 캐싱
@@ -674,8 +693,12 @@ function FoodSearchPageInner() {
     } catch (error) {
       console.error("❌ 검색 오류:", error);
       setAllResults([]);
+      setSearchProgress({ step: "검색 실패", progress: 0 });
     } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        setIsLoading(false);
+        setSearchProgress({ step: "", progress: 0 });
+      }, 300);
     }
   };
 
@@ -776,7 +799,107 @@ function FoodSearchPageInner() {
                 </p>
               </div>
             )}
+            {/* 로딩 중 */}
+            {isLoading && (
+              <div className="space-y-6">
+                {/* 진행 상황 카드 */}
+                <Card className="border-primary/50 bg-primary/5">
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {/* 제목 */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                          <Search className="h-5 w-5 animate-pulse text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">검색 중...</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {searchProgress.step || "식품 정보를 찾고 있습니다"}
+                          </p>
+                        </div>
+                      </div>
 
+                      {/* 진행률 바 */}
+                      <div className="space-y-2">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div
+                            className="h-full bg-primary transition-all duration-500 ease-out"
+                            style={{ width: `${searchProgress.progress}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>진행률</span>
+                          <span className="font-medium">
+                            {searchProgress.progress}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 검색 단계 표시 */}
+                      <div className="grid grid-cols-4 gap-2">
+                        <div
+                          className={`text-center ${searchProgress.progress >= 25 ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          <div
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 25 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                          >
+                            {searchProgress.progress >= 25 ? "✓" : "1"}
+                          </div>
+                          <p className="text-xs">DB 검색</p>
+                        </div>
+                        <div
+                          className={`text-center ${searchProgress.progress >= 50 ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          <div
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 50 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                          >
+                            {searchProgress.progress >= 50 ? "✓" : "2"}
+                          </div>
+                          <p className="text-xs">API 조회</p>
+                        </div>
+                        <div
+                          className={`text-center ${searchProgress.progress >= 75 ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          <div
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 75 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                          >
+                            {searchProgress.progress >= 75 ? "✓" : "3"}
+                          </div>
+                          <p className="text-xs">데이터 정리</p>
+                        </div>
+                        <div
+                          className={`text-center ${searchProgress.progress >= 100 ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          <div
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 100 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                          >
+                            {searchProgress.progress >= 100 ? "✓" : "4"}
+                          </div>
+                          <p className="text-xs">완료</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Skeleton 결과 카드 */}
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 rounded-full bg-gray-200" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 w-3/4 rounded bg-gray-200" />
+                            <div className="h-3 w-1/2 rounded bg-gray-200" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* 검색 결과 */}
             {!isLoading && hasSearched && (
               <div>
