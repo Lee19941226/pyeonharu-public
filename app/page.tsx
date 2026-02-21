@@ -97,13 +97,11 @@ export default function HomePage() {
   const [mealSubTab, setMealSubTab] = useState<MealSubTab>("food");
   const [sickSubTab, setSickSubTab] = useState<SickSubTab>("symptom");
 
-  // 지도 없는 탭: 전부 미리 마운트 / 지도 탭: 클릭 시 마운트
   const [visited, setVisited] = useState<Set<string>>(
     new Set(["food", "restaurant", "diet", "medicine"]),
   );
   const activeTab = mainTab === "meal" ? mealSubTab : sickSubTab;
 
-  // ─── 초기 로딩 프로그레스 (실제 진행률 기반) ───
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadLabel, setLoadLabel] = useState("시작하는 중...");
@@ -305,12 +303,22 @@ export default function HomePage() {
       </div>
 
       <main className="flex-1 pb-16 md:pb-0">
-        {/* 지도 없는 탭: 미리 마운트 + display:none으로 상태 유지 */}
+        {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
         <div style={{ display: activeTab === "food" ? "block" : "none" }}>
-          <div className="container mx-auto px-4 pt-4">
-            <MealRecommend />
+          <div className="container mx-auto px-4 pt-3">
+            <div className="flex gap-4 justify-center">
+              {/* 좌측: FoodTab 본문 */}
+              <div className="w-full max-w-2xl">
+                <FoodTab onProgress={handleFoodTabProgress} />
+              </div>
+              {/* 우측: AI 추천 (데스크톱 lg+) */}
+              <div className="hidden lg:block w-[320px] shrink-0">
+                <div className="sticky top-[7.5rem]">
+                  <MealRecommend />
+                </div>
+              </div>
+            </div>
           </div>
-          <FoodTab onProgress={handleFoodTabProgress} />
         </div>
 
         <div style={{ display: activeTab === "restaurant" ? "block" : "none" }}>
@@ -322,7 +330,6 @@ export default function HomePage() {
         <div style={{ display: activeTab === "medicine" ? "block" : "none" }}>
           <MedicineTab />
         </div>
-        {/* 지도 사용 탭: 클릭 시 마운트 (display:none에서 지도 초기화 불가) */}
         {activeTab === "symptom" && <SymptomTab />}
         {activeTab === "hospital" && <HospitalTab />}
       </main>

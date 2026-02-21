@@ -18,30 +18,33 @@ export async function GET(req: NextRequest) {
 
     const allergenList = (allergies || []).map(a => a.allergen_name)
 
-    // 2. 오늘 식단 기록
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
+    // 2. 오늘 식단 기록 — KST 기준 (기존 /api/diet/entries와 동일)
+    const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split("T")[0]
+    const startOfDay = `${todayStr}T00:00:00+09:00`
+    const endOfDay = `${todayStr}T23:59:59+09:00`
 
     const { data: todayMeals } = await supabase
       .from("diet_entries")
       .select("food_name, estimated_cal, emoji, recorded_at")
       .eq("user_id", user.id)
-      .gte("recorded_at", todayStart.toISOString())
+      .gte("recorded_at", startOfDay)
+      .lte("recorded_at", endOfDay)
       .order("recorded_at", { ascending: true })
 
-    // 3. 최근 3일 식단 (반복 방지용)
-    const threeDaysAgo = new Date()
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    // 3. 최근 3일 식단 (반복 방지) — KST 기준
+    const threeDaysAgoDate = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    threeDaysAgoDate.setDate(threeDaysAgoDate.getDate() - 3)
+    const threeDaysAgoStr = threeDaysAgoDate.toISOString().split("T")[0]
 
     const { data: recentMeals } = await supabase
       .from("diet_entries")
       .select("food_name, estimated_cal")
       .eq("user_id", user.id)
-      .gte("recorded_at", threeDaysAgo.toISOString())
+      .gte("recorded_at", `${threeDaysAgoStr}T00:00:00+09:00`)
       .order("recorded_at", { ascending: false })
       .limit(30)
 
-    // 4. BMR 정보
+    // 4. BMR
     const { data: profile } = await supabase
       .from("profiles")
       .select("bmr, height, weight, age, gender")
@@ -52,35 +55,34 @@ export async function GET(req: NextRequest) {
     const todayCalories = (todayMeals || []).reduce((sum, m) => sum + (m.estimated_cal || 0), 0)
     const remainingCal = Math.max(bmr - todayCalories, 300)
 
-    // 5. 현재 시간 기반 식사 타입
-    const hour = new Date().getHours()
+    // 5. 식사 타입 (KST)
+    const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getHours()
     let mealType = "저녁"
-    if (hour < 10) mealType = "아침"
-    else if (hour < 15) mealType = "점심"
-    else if (hour < 18) mealType = "간식"
+    if (kstHour < 10) mealType = "아침"
+    else if (kstHour < 15) mealType = "점심"
+    else if (kstHour < 18) mealType = "간식"
 
     const recentFoodNames = [...new Set((recentMeals || []).map(m => m.food_name))].slice(0, 15)
     const todayFoodNames = (todayMeals || []).map(m => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`)
 
-    // 6. GPT-4o 추천
+    // 6. GPT-4o-mini 추천
     const prompt = `사용자 정보:
 - 알레르기: ${allergenList.length > 0 ? allergenList.join(", ") : "없음"}
 - 오늘 먹은 것: ${todayFoodNames.length > 0 ? todayFoodNames.join(", ") : "아직 없음"}
-- 오늘 섭취 칼로리: ${todayCalories}kcal / 목표: ${bmr}kcal
-- 남은 칼로리: 약 ${remainingCal}kcal
-- 최근 3일 먹은 음식: ${recentFoodNames.join(", ") || "기록 없음"}
-- 현재 식사 시간: ${mealType}
+- 오늘 섭취: ${todayCalories}kcal / 목표: ${bmr}kcal (잔여 ${remainingCal}kcal)
+- 최근 3일: ${recentFoodNames.join(", ") || "기록 없음"}
+- 식사: ${mealType}
 
-다음 ${mealType} 메뉴를 3개 추천해주세요.
+다음 ${mealType} 메뉴 3개를 추천하세요.
 
 규칙:
-1. 알레르기 식품은 절대 포함하지 마세요
-2. 최근 3일 내 먹은 음식은 피해주세요
-3. 남은 칼로리(${remainingCal}kcal)에 맞는 메뉴를 추천하세요
-4. 한국에서 흔히 먹는 실용적인 메뉴로 추천하세요
-5. 각 메뉴에 대해 배달 주문용 검색어와 간단 레시피를 포함하세요
+1. 알레르기 식품 절대 제외
+2. 최근 3일 먹은 음식 피하기
+3. 남은 칼로리(${remainingCal}kcal)에 맞추기
+4. 오늘 영양 편중 보완 (탄수화물 위주면 단백질 추천 등)
+5. 한국에서 흔한 실용적 메뉴
 
-반드시 아래 JSON 형식으로만 응답하세요 (마크다운 코드블록 없이):
+JSON만 응답 (코드블록 없이):
 {
   "mealType": "${mealType}",
   "recommendations": [
@@ -88,27 +90,21 @@ export async function GET(req: NextRequest) {
       "name": "메뉴명",
       "emoji": "이모지",
       "estimatedCal": 숫자,
-      "reason": "추천 이유 1줄",
-      "deliveryKeyword": "배달앱 검색어",
-      "recipe": {
-        "time": "조리시간",
-        "difficulty": "쉬움|보통|어려움",
-        "ingredients": ["재료1", "재료2"],
-        "steps": ["1단계", "2단계", "3단계"]
-      }
+      "reason": "영양 균형 기반 추천 이유 1줄",
+      "deliveryKeyword": "배달앱 검색어"
     }
   ],
-  "nutritionTip": "오늘 식단 기반 영양 팁 1줄"
+  "nutritionTip": "오늘 식단 영양 팁 1줄"
 }`
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "당신은 한국 식단 영양사입니다. 알레르기를 고려한 안전한 메뉴를 추천합니다. JSON으로만 응답하세요." },
+        { role: "system", content: "한국 식단 영양사. 알레르기 고려 안전 메뉴 추천. JSON만 응답." },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 800,
     })
 
     let result: any
