@@ -254,6 +254,7 @@ export default function HomePage() {
       </div>
 
       {/* ═══ 탭 콘텐츠 (방문한 탭만 마운트, 활성 탭만 표시) ═══ */}
+      {/* 지도 없는 탭: display:none으로 상태 유지 */}
       <main className="flex-1 pb-16 md:pb-0">
         <div style={{ display: activeTab === "food" ? "block" : "none" }}>
           {visited.has("food") && <FoodTab />}
@@ -264,15 +265,12 @@ export default function HomePage() {
         <div style={{ display: activeTab === "diet" ? "block" : "none" }}>
           {visited.has("diet") && <DietTab />}
         </div>
-        <div style={{ display: activeTab === "symptom" ? "block" : "none" }}>
-          {visited.has("symptom") && <SymptomTab />}
-        </div>
-        <div style={{ display: activeTab === "hospital" ? "block" : "none" }}>
-          {visited.has("hospital") && <HospitalTab />}
-        </div>
         <div style={{ display: activeTab === "medicine" ? "block" : "none" }}>
           {visited.has("medicine") && <MedicineTab />}
         </div>
+        {/* 지도 사용 탭: 활성 시에만 마운트 (display:none에서 지도 초기화 불가) */}
+        {activeTab === "symptom" && <SymptomTab />}
+        {activeTab === "hospital" && <HospitalTab />}
       </main>
 
       <Footer />
