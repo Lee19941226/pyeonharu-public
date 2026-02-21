@@ -153,7 +153,9 @@ export async function generateMetadata({
   ogImageUrl.searchParams.set("manufacturer", manufacturer || "");
 
   return {
-    title: `${productName} | 편하루`,
+    title: {
+      absolute: `편하루 - ${productName}`,
+    },
     description: isSafe
       ? `${productName} - 안전해요! 알레르기 성분이 없습니다`
       : `${productName} - 위험해요! ${allergens}`,

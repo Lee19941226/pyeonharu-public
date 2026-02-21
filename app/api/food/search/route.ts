@@ -11,7 +11,7 @@ interface ProductScore {
   hasAllergen: boolean;
   score: number;
   matchReason: string;
-  dataSource: "db" | "openapi" | "ai" | "openfood"; // ✅ "nutrition" 제거, "openfood" 추가
+  dataSource: "db" | "openapi" | "ai" | "openfood";
   ingredients?: string[];
   detectedIngredients?: string[];
   weight?: string;
@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get("q") || "";
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
-    // ❌ nutritionKey 삭제
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -56,8 +55,6 @@ export async function GET(req: NextRequest) {
     // 1단계: DB + OpenAPI + OpenFoodFacts 병렬 실행
     // ==========================================
     const [dbItems, openApiItems, openFoodItems] = await Promise.all([
-      // ✅ nutritionItems 제거
-
       // ── Source 1: DB 캐시 ──
       (async () => {
         try {
@@ -158,6 +155,8 @@ export async function GET(req: NextRequest) {
                     BRCD_NO: product.BRCD_NO,
                     PRDCT_NM: product.PRDCT_NM,
                     BUES_NM: product.BUES_NM,
+                    PRDLST_DCNTS: product.PRDLST_DCNTS,
+                    QNT: product.QNT,
                     ALLERGENS: [],
                   };
                 }
@@ -187,6 +186,8 @@ export async function GET(req: NextRequest) {
                   BRCD_NO: product.BRCD_NO,
                   PRDCT_NM: product.PRDCT_NM,
                   BUES_NM: product.BUES_NM,
+                  PRDLST_DCNTS: product.PRDLST_DCNTS,
+                  QNT: product.QNT,
                   ALLERGENS: allergens,
                 };
               } catch (err) {
@@ -198,6 +199,8 @@ export async function GET(req: NextRequest) {
                   BRCD_NO: product.BRCD_NO,
                   PRDCT_NM: product.PRDCT_NM,
                   BUES_NM: product.BUES_NM,
+                  PRDLST_DCNTS: product.PRDLST_DCNTS,
+                  QNT: product.QNT,
                   ALLERGENS: [],
                 };
               }
@@ -212,10 +215,8 @@ export async function GET(req: NextRequest) {
       })(),
 
       // ── Source 3: Open Food Facts (수입/글로벌 제품) ──
-      // ── Source 3: Open Food Facts (수입/글로벌 제품) ──
       (async () => {
         try {
-          // ✅ 한글 인코딩 처리
           const encodedQuery = encodeURIComponent(query);
 
           const offUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodedQuery}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,ingredients_text,allergens_tags,code,brands`;
@@ -242,7 +243,6 @@ export async function GET(req: NextRequest) {
 
           if (products.length === 0) return [];
 
-          // ✅ 디버깅: 제품 구조 확인
           console.log(
             "🔍 첫 번째 제품 구조:",
             JSON.stringify(products[0], null, 2),
@@ -252,12 +252,10 @@ export async function GET(req: NextRequest) {
           const aiPromises = products
             .slice(0, 5)
             .map(async (product: any, index: number) => {
-              // ✅ ingredients_text 없으면 스킵하지 말고 로그만
               if (!product.ingredients_text) {
                 console.warn(
                   `⚠️ [${index}] ${product.product_name}: 원재료 정보 없음`,
                 );
-                // ✅ 원재료 없어도 제품은 반환 (번역만)
                 return {
                   FOOD_CD: product.code || `off-${Date.now()}-${Math.random()}`,
                   FOOD_NM: product.product_name || "제품명 없음",
@@ -328,7 +326,6 @@ export async function GET(req: NextRequest) {
                 };
               } catch (err) {
                 console.error(`❌ [${index}] AI 번역/분석 실패:`, err);
-                // ✅ 실패 시 원문으로라도 반환
                 return {
                   FOOD_CD: product.code || `off-${Date.now()}-${Math.random()}`,
                   FOOD_NM: product.product_name,
@@ -359,7 +356,7 @@ export async function GET(req: NextRequest) {
     // ==========================================
     let aiItems: any[] = [];
     const totalResults =
-      dbItems.length + openApiItems.length + openFoodItems.length; // ✅ nutritionItems 제거
+      dbItems.length + openApiItems.length + openFoodItems.length;
 
     if (totalResults === 0) {
       console.log("🤖 결과 부족, AI 호출 시작...");
@@ -453,7 +450,7 @@ JSON 배열 형식으로만 반환:
 
     console.log(
       `📊 최종 검색 결과 - DB: ${dbItems.length}, 푸드QR: ${openApiItems.length}, OpenFood: ${openFoodItems.length}, AI: ${aiItems.length}`,
-    ); // ✅ 로그 수정
+    );
 
     // ==========================================
     // 통합 결과 생성 (우선순위 점수 포함)
@@ -544,6 +541,7 @@ JSON 배열 형식으로만 반환:
         score: score + 100,
         matchReason,
         dataSource: "openapi",
+        weight: item.PRDLST_DCNTS || item.QNT || "",
       });
     });
 
@@ -571,12 +569,10 @@ JSON 배열 형식으로만 반환:
         hasAllergen,
         score: offScore + 120,
         matchReason: "수입식품",
-        dataSource: "openfood", // ✅ 변경
+        dataSource: "openfood",
         rawMaterials: item.RAWMTRL_NM || "",
       });
     });
-
-    // ❌ nutritionItems 통합 로직 삭제
 
     // ── 4순위: AI 결과 (기본 점수 60) ──
     if (Array.isArray(aiItems)) {
@@ -622,6 +618,40 @@ JSON 배열 형식으로만 반환:
     );
 
     // ==========================================
+    // ✅ Open API 결과 → DB 캐시 저장 (NEW!)
+    // ==========================================
+    const openApiToCache = deduped.filter((r) => r.dataSource === "openapi");
+    if (openApiToCache.length > 0) {
+      console.log(
+        `💾 Open API 결과 ${openApiToCache.length}개 DB 캐시 저장 시작...`,
+      );
+
+      supabase
+        .from("food_search_cache")
+        .upsert(
+          openApiToCache.map((item) => ({
+            food_code: item.foodCode,
+            food_name: item.foodName,
+            manufacturer: item.manufacturer || null,
+            allergens: item.allergens || [],
+            raw_materials: null, // 검색 시점엔 원재료 없음
+            weight: item.weight || null,
+            data_source: "openapi",
+            chosung: getChosung(item.foodName),
+            created_at: new Date().toISOString(),
+          })),
+          { onConflict: "food_code" },
+        )
+        .then(({ error }) => {
+          if (error) {
+            console.error("❌ Open API 결과 DB 캐시 저장 실패:", error);
+          } else {
+            console.log("✅ Open API 결과 DB 캐시 저장 완료");
+          }
+        });
+    }
+
+    // ==========================================
     // AI 결과 → DB 캐시 저장
     // ==========================================
     const aiToCache = deduped.filter((r) => r.dataSource === "ai");
@@ -660,6 +690,7 @@ JSON 배열 형식으로만 반환:
           }
         });
     }
+
     // ==========================================
     // Open Food Facts 결과 → DB 캐시 저장
     // ==========================================
@@ -693,6 +724,7 @@ JSON 배열 형식으로만 반환:
           }
         });
     }
+
     // ==========================================
     // 반환
     // ==========================================
