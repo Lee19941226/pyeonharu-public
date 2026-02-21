@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@supabase/supabase-js";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-const supabaseAdmin = createServerClient(
+// 서버사이드 Supabase (service_role로 RLS 우회)
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
 const VALID_ROLES = ["user", "moderator", "admin", "super_admin"];
 
-// 요청자가 admin 이상인지 확인
+// 요청자의 role 확인
 async function getRequesterRole(userId: string): Promise<string | null> {
   const { data } = await supabaseAdmin
     .from("profiles")
@@ -18,6 +18,42 @@ async function getRequesterRole(userId: string): Promise<string | null> {
     .eq("id", userId)
     .single();
   return data?.role || null;
+}
+
+// 쿠키 기반 인증 (auth-helpers 없이)
+async function getAuthUser() {
+  const cookieStore = await cookies();
+  const accessToken =
+    cookieStore.get("sb-access-token")?.value ||
+    cookieStore.get(
+      `sb-${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split(".")[0]}-auth-token`,
+    )?.value;
+
+  if (!accessToken) {
+    // base64 인코딩된 auth 토큰 쿠키 확인
+    const allCookies = cookieStore.getAll();
+    const authCookie = allCookies.find((c) => c.name.includes("auth-token"));
+    if (authCookie) {
+      try {
+        const parsed = JSON.parse(authCookie.value);
+        const token = parsed?.access_token || parsed?.[0];
+        if (token) {
+          const {
+            data: { user },
+          } = await supabaseAdmin.auth.getUser(token);
+          return user;
+        }
+      } catch {
+        // JSON 파싱 실패 시 무시
+      }
+    }
+    return null;
+  }
+
+  const {
+    data: { user },
+  } = await supabaseAdmin.auth.getUser(accessToken);
+  return user;
 }
 
 // ─── GET: 사용자 목록 조회 ───
@@ -31,10 +67,9 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit;
 
     // 인증 확인
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
+    const user = await getAuthUser();
+    if (!user)
+      return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
     const requesterRole = await getRequesterRole(user.id);
     if (!requesterRole || !["admin", "super_admin"].includes(requesterRole)) {
@@ -44,33 +79,54 @@ export async function GET(request: Request) {
     // 사용자 목록 쿼리
     let query = supabaseAdmin
       .from("profiles")
-      .select("id, nickname, avatar_url, created_at, role, height, weight, age, gender", { count: "exact" });
+      .select(
+        "id, nickname, avatar_url, created_at, role, height, weight, age, gender",
+        { count: "exact" },
+      );
 
     if (search) {
-      query = query.or(`nickname.ilike.%${search}%,id.eq.${search.length === 36 ? search : "00000000-0000-0000-0000-000000000000"}`);
+      query = query.or(
+        `nickname.ilike.%${search}%,id.eq.${search.length === 36 ? search : "00000000-0000-0000-0000-000000000000"}`,
+      );
     }
     if (roleFilter && VALID_ROLES.includes(roleFilter)) {
       query = query.eq("role", roleFilter);
     }
 
-    const { data: users, count, error } = await query
+    const {
+      data: users,
+      count,
+      error,
+    } = await query
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
-    // 각 사용자의 추가 정보 (알레르기, 학교, 활동량)
+    // 각 사용자의 추가 정보
     const enrichedUsers = await Promise.all(
-      (users || []).map(async (user) => {
+      (users || []).map(async (u) => {
         const [allergies, schools, scanCount, postCount] = await Promise.all([
-          supabaseAdmin.from("user_allergies").select("allergen_name").eq("user_id", user.id),
-          supabaseAdmin.from("user_schools").select("school_name").eq("user_id", user.id),
-          supabaseAdmin.from("food_scan_logs").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-          supabaseAdmin.from("community_posts").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+          supabaseAdmin
+            .from("user_allergies")
+            .select("allergen_name")
+            .eq("user_id", u.id),
+          supabaseAdmin
+            .from("user_schools")
+            .select("school_name")
+            .eq("user_id", u.id),
+          supabaseAdmin
+            .from("food_scan_logs")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", u.id),
+          supabaseAdmin
+            .from("community_posts")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", u.id),
         ]);
 
         return {
-          ...user,
+          ...u,
           allergies: allergies.data?.map((a) => a.allergen_name) || [],
           schools: schools.data?.map((s) => s.school_name) || [],
           scanCount: scanCount.count || 0,
@@ -79,8 +135,10 @@ export async function GET(request: Request) {
       }),
     );
 
-    // auth.users에서 이메일 가져오기 (service_role)
-    const { data: { users: authUsers } } = await supabaseAdmin.auth.admin.listUsers({
+    // auth.users에서 이메일 가져오기
+    const {
+      data: { users: authUsers },
+    } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
     });
@@ -119,21 +177,25 @@ export async function PATCH(request: Request) {
     }
 
     // 인증 확인
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
+    const user = await getAuthUser();
+    if (!user)
+      return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
     const requesterRole = await getRequesterRole(user.id);
 
-    // 권한 체크
     if (requesterRole !== "super_admin") {
-      return NextResponse.json({ error: "super_admin만 등급 변경 가능" }, { status: 403 });
+      return NextResponse.json(
+        { error: "super_admin만 등급 변경 가능" },
+        { status: 403 },
+      );
     }
 
     // 자기 자신 등급 낮추기 방지
     if (targetUserId === user.id && newRole !== "super_admin") {
-      return NextResponse.json({ error: "본인의 super_admin 권한은 해제할 수 없습니다" }, { status: 400 });
+      return NextResponse.json(
+        { error: "본인의 super_admin 권한은 해제할 수 없습니다" },
+        { status: 400 },
+      );
     }
 
     // 등급 업데이트
