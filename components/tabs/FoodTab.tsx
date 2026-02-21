@@ -468,7 +468,11 @@ interface MySchool {
 }
 
 // ─── Component ───
-export default function FoodTab() {
+export default function FoodTab({
+  onProgress,
+}: {
+  onProgress?: (progress: number, label: string) => void;
+}) {
   const router = useRouter();
   const [foodInput, setFoodInput] = useState("");
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -499,10 +503,19 @@ export default function FoodTab() {
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // ─── 마운트 시 진행률 알림 ───
+  useEffect(() => {
+    onProgress?.(35, "화면 구성 중...");
+  }, []);
+
   // ─── Effects ───
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    onProgress?.(20, "로그인 확인 중...");
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      onProgress?.(30, "사용자 확인 완료");
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -542,6 +555,7 @@ export default function FoodTab() {
 
   const loadCommunityPosts = async () => {
     setCommunityLoading(true);
+    onProgress?.(75, "커뮤니티 불러오는 중...");
     try {
       const schoolRes = await fetch("/api/school/register");
       const schoolData = await schoolRes.json();
@@ -554,6 +568,7 @@ export default function FoodTab() {
         const data = await res.json();
         setCommunityPosts(data.posts || []);
       }
+      onProgress?.(85, "인기 게시글 불러오는 중...");
       const popRes = await fetch("/api/community?mode=popular");
       const popData = await popRes.json();
       setPopularLikes(popData.topLikes || []);
@@ -562,20 +577,24 @@ export default function FoodTab() {
       /* 무시 */
     } finally {
       setCommunityLoading(false);
+      onProgress?.(100, "완료!");
     }
   };
 
   const loadMealData = async () => {
     if (!user) {
       setMealStatus("no-login");
+      onProgress?.(50, "급식 확인 건너뜀");
       return;
     }
     setMealLoading(true);
+    onProgress?.(45, "급식 정보 불러오는 중...");
     try {
       const res = await fetch("/api/school/register");
       if (!res.ok) {
         setMealStatus("no-school");
         setMealLoading(false);
+        onProgress?.(55, "학교 정보 없음");
         return;
       }
       const data = await res.json();
@@ -584,8 +603,10 @@ export default function FoodTab() {
       if (schools.length === 0) {
         setMealStatus("no-school");
         setMealLoading(false);
+        onProgress?.(55, "등록된 학교 없음");
         return;
       }
+      onProgress?.(55, "급식 메뉴 분석 중...");
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const results: { school: MySchool; meals: MealData[] }[] = [];
       for (const school of schools) {
@@ -601,9 +622,11 @@ export default function FoodTab() {
       }
       setAllSchoolMeals(results);
       setMealStatus("loaded");
+      onProgress?.(65, "급식 정보 완료");
     } catch (e) {
       console.error("급식 로드 실패:", e);
       setMealStatus("no-school");
+      onProgress?.(55, "급식 로드 실패");
     } finally {
       setMealLoading(false);
     }
@@ -641,7 +664,6 @@ export default function FoodTab() {
       const data = await response.json();
 
       if (data.success && data.analysisId) {
-        // ✅ 분석 완료 → 결과 페이지로
         toast.success("분석 완료!");
         router.push(`/food/result/${data.analysisId}`);
       } else {
@@ -652,16 +674,11 @@ export default function FoodTab() {
       toast.error("이미지 분석 중 오류가 발생했습니다");
     } finally {
       setIsProcessing(false);
-      // ✅ input 초기화
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     }
   };
-
-  // ==========================================
-  // 바코드 스캔 처리
-  // ==========================================
 
   const handleBarcodeUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -678,7 +695,6 @@ export default function FoodTab() {
     toast.info("바코드 인식 중...");
 
     try {
-      // ✅ QR 코드 감지
       const reader = new FileReader();
       reader.onload = async (e) => {
         const imageData = e.target?.result as string;
@@ -687,11 +703,9 @@ export default function FoodTab() {
           const html5QrCode = new Html5Qrcode("qr-reader-hidden");
           const barcode = await html5QrCode.scanFile(file, false);
 
-          // ✅ 바코드 인식 성공
           toast.success("바코드 인식 성공!");
           router.push(`/food/result/${barcode}`);
         } catch (error) {
-          // ✅ 바코드 없음 → AI 분석으로 전환
           toast.error("바코드를 인식할 수 없습니다");
           console.log("AI 분석으로 전환 필요");
         } finally {
@@ -708,8 +722,6 @@ export default function FoodTab() {
       setIsProcessing(false);
     }
   };
-  // ==========================================
-  // ✅ 드래그 앤 드롭 핸들러
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -733,7 +745,6 @@ export default function FoodTab() {
 
     console.log("📁 파일:", file.name);
 
-    // 파일을 base64로 변환
     const reader = new FileReader();
     reader.onload = async (event) => {
       const imageData = event.target?.result as string;
@@ -744,7 +755,6 @@ export default function FoodTab() {
 
         const html5QrCode = new Html5Qrcode("qr-reader-hidden");
 
-        // base64 → File 변환 (바코드 감지용)
         const arr = imageData.split(",");
         const mime = arr[0].match(/:(.*?);/)![1];
         const bstr = atob(arr[1]);
@@ -765,7 +775,6 @@ export default function FoodTab() {
           toast.info("AI가 성분표를 분석 중...");
 
           try {
-            // ✅ 사용자 알레르기 가져오기
             const supabase = createClient();
             const {
               data: { user },
@@ -784,12 +793,10 @@ export default function FoodTab() {
 
             console.log("🤖 AI 분석 API 호출...");
 
-            // ✅ base64만 추출 (data:image/jpeg;base64, 제거)
             const base64Data = imageData.includes(",")
               ? imageData.split(",")[1]
               : imageData;
 
-            // ✅ JSON으로 전송
             const response = await fetch("/api/food/analyze-image", {
               method: "POST",
               headers: {
@@ -1093,10 +1100,19 @@ export default function FoodTab() {
         {/* ═══ 3. 커뮤니티 ═══ */}
         <div className="pt-1 space-y-4">
           <div>
-            <div className="mb-2">
+            {/* ✅ 글쓰기 버튼을 "학교 수정 →"과 동일한 레이아웃으로 */}
+            <div className="flex items-center justify-between pt-1 mb-3">
               <p className="text-sm font-medium text-muted-foreground">
                 💬 내 학교 최신글
               </p>
+              {user && (
+                <button
+                  onClick={() => router.push("/community/write")}
+                  className="text-xs text-muted-foreground hover:text-primary"
+                >
+                  글쓰기 →
+                </button>
+              )}
             </div>
             {communityLoading ? (
               <div className="space-y-2">
@@ -1129,14 +1145,6 @@ export default function FoodTab() {
             ) : (
               <Card className="border shadow-none overflow-hidden">
                 <CardContent className="p-0">
-                  {user && (
-                    <button
-                      onClick={() => router.push("/community/write")}
-                      className="flex w-full items-center justify-center gap-1.5 border-b py-2.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
-                    >
-                      <PenLine className="h-3 w-3" /> 글쓰기
-                    </button>
-                  )}
                   {communityPosts.map((post, i) => (
                     <div
                       key={post.id}
