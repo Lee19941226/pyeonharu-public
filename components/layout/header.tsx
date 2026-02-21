@@ -11,9 +11,8 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
-  Home,
   UtensilsCrossed,
-  Activity,
+  HeartPulse,
   Camera,
   MapPin,
   HelpCircle,
@@ -21,6 +20,11 @@ import {
   School,
   BarChart3,
   MessageSquare,
+  Activity,
+  Stethoscope,
+  Building2,
+  Pill,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +36,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 
-export function Header() {
+interface HeaderProps {
+  mainTab?: "meal" | "sick";
+  onMainTabChange?: (tab: "meal" | "sick") => void;
+}
+
+export function Header({ mainTab, onMainTabChange }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -119,8 +128,8 @@ export function Header() {
   };
 
   const isLoggedIn = isLoaded && nickname !== null;
-
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  const isHome = pathname === "/";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -135,41 +144,45 @@ export function Header() {
           <span className="text-xl font-bold text-foreground">편하루</span>
         </Link>
 
-        {/* 상단 탭 (Desktop) */}
-        <nav className="hidden md:flex items-center gap-1 ml-6">
-          <Link
-            href="/"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              pathname === "/"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            <Home className="h-4 w-4" />홈
-          </Link>
-          <Link
-            href="/restaurant"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              pathname.startsWith("/restaurant")
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            <UtensilsCrossed className="h-4 w-4" />
-            음식점
-          </Link>
-          <Link
-            href="/diet"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              pathname.startsWith("/diet")
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            <Activity className="h-4 w-4" />
-            식단관리
-          </Link>
-        </nav>
+        {/* ═══ 데스크톱 메인 탭 (2탭) ═══ */}
+        {isHome && onMainTabChange && (
+          <nav className="hidden md:flex items-center gap-1 ml-6">
+            <button
+              onClick={() => onMainTabChange("meal")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                mainTab === "meal"
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <UtensilsCrossed className="h-4 w-4" />
+              식사
+            </button>
+            <button
+              onClick={() => onMainTabChange("sick")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                mainTab === "sick"
+                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <HeartPulse className="h-4 w-4" />
+              아파요
+            </button>
+          </nav>
+        )}
+
+        {/* 비홈 페이지에서는 기본 네비 */}
+        {!isHome && (
+          <nav className="hidden md:flex items-center gap-1 ml-6">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              <UtensilsCrossed className="h-4 w-4" />홈
+            </Link>
+          </nav>
+        )}
 
         {/* Desktop — 로그인/프로필 */}
         <div className="hidden items-center gap-2 md:flex">
@@ -246,14 +259,12 @@ export function Header() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════
-          Mobile Menu — full overlay
-          ═══════════════════════════════════════════════ */}
+      {/* ═══ Mobile Menu ═══ */}
       {isMobileMenuOpen && (
         <div className="fixed inset-x-0 top-16 bottom-0 z-40 border-t bg-background md:hidden overflow-y-auto">
           <div className="container mx-auto px-4 py-4">
 
-            {/* ── 사용자 프로필 영역 ── */}
+            {/* 사용자 프로필 영역 */}
             {isLoggedIn ? (
               <div className="mb-4 flex items-center gap-3 rounded-xl bg-muted/60 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -275,7 +286,7 @@ export function Header() {
               </Link>
             )}
 
-            {/* ── 주요 메뉴 (Quick Actions) ── */}
+            {/* 주요 메뉴 */}
             <div className="mb-4">
               <p className="mb-2 text-xs font-medium text-muted-foreground px-1">주요 기능</p>
               <div className="grid grid-cols-2 gap-2">
@@ -293,48 +304,22 @@ export function Header() {
                   </div>
                 </Link>
                 <Link
-                  href="/diet"
+                  href="/community"
                   onClick={closeMobileMenu}
                   className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10">
-                    <Activity className="h-4.5 w-4.5 text-orange-600" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
+                    <MessageSquare className="h-4.5 w-4.5 text-violet-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">식단 관리</p>
-                    <p className="text-[10px] text-muted-foreground">칼로리/영양</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/restaurant"
-                  onClick={closeMobileMenu}
-                  className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
-                    <UtensilsCrossed className="h-4.5 w-4.5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">음식점</p>
-                    <p className="text-[10px] text-muted-foreground">알레르기 매칭</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/search"
-                  onClick={closeMobileMenu}
-                  className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10">
-                    <MapPin className="h-4.5 w-4.5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">병원/약국</p>
-                    <p className="text-[10px] text-muted-foreground">주변 검색</p>
+                    <p className="text-sm font-medium">커뮤니티</p>
+                    <p className="text-[10px] text-muted-foreground">급식톡</p>
                   </div>
                 </Link>
               </div>
             </div>
 
-            {/* ── 서비스 메뉴 ── */}
+            {/* 서비스 메뉴 */}
             <div className="mb-4">
               <p className="mb-2 text-xs font-medium text-muted-foreground px-1">서비스</p>
               <div className="space-y-0.5">
@@ -344,38 +329,22 @@ export function Header() {
                   className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted transition-colors"
                 >
                   <School className="h-4.5 w-4.5 text-muted-foreground" />
-                  <span>학교 급식 확인</span>
+                  <span>학교 급식 관리</span>
                 </Link>
                 <Link
-                  href="/food/profile"
-                  onClick={closeMobileMenu}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted transition-colors"
-                >
-                  <ShieldCheck className="h-4.5 w-4.5 text-muted-foreground" />
-                  <span>내 알레르기 정보</span>
-                </Link>
-                <Link
-                  href="/weekly-report"
+                  href="/reports"
                   onClick={closeMobileMenu}
                   className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted transition-colors"
                 >
                   <BarChart3 className="h-4.5 w-4.5 text-muted-foreground" />
                   <span>주간 안전 리포트</span>
                 </Link>
-                <Link
-                  href="/community"
-                  onClick={closeMobileMenu}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted transition-colors"
-                >
-                  <MessageSquare className="h-4.5 w-4.5 text-muted-foreground" />
-                  <span>커뮤니티</span>
-                </Link>
               </div>
             </div>
 
-            {/* ── 계정/설정 메뉴 ── */}
+            {/* 계정 메뉴 */}
             {isLoggedIn && (
-              <div className="mb-4">
+              <div className="mb-4 border-t pt-3">
                 <p className="mb-2 text-xs font-medium text-muted-foreground px-1">내 계정</p>
                 <div className="space-y-0.5">
                   <Link
@@ -408,7 +377,7 @@ export function Header() {
               </div>
             )}
 
-            {/* ── 고객지원 ── */}
+            {/* 고객지원 */}
             <div className="border-t pt-3">
               <div className="flex gap-3">
                 <Link
