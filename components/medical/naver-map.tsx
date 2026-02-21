@@ -10,7 +10,6 @@ declare global {
   }
 }
 
-// 기존 symptom 페이지에서 사용하는 마커 타입
 export interface MapMarker {
   id: string;
   lat: number;
@@ -20,14 +19,11 @@ export interface MapMarker {
 }
 
 interface NaverMapProps {
-  // 기존 symptom 페이지용 props
   markers?: MapMarker[];
   center?: { lat: number; lng: number };
   zoom?: number;
   fitBounds?: boolean;
   onMarkerClick?: (id: string) => void;
-
-  // search 페이지용 props (하위 호환)
   places?: Array<{
     id: string;
     name: string;
@@ -37,8 +33,6 @@ interface NaverMapProps {
   }>;
   selectedPlace?: { id: string; lat: number; lng: number } | null;
   onSelectPlace?: (place: unknown) => void;
-
-  // 공통 props
   userLocation?: { lat: number; lng: number } | null;
   height?: string;
 }
@@ -58,11 +52,11 @@ export function NaverMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const markerDataRef = useRef<any[]>([]);
   const userMarkerRef = useRef<any>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 네이버 지도 스크립트 로드
   useEffect(() => {
     const NAVER_CLIENT_ID =
       process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "4q5sd2kb26";
@@ -87,11 +81,9 @@ export function NaverMap({
     document.head.appendChild(script);
   }, []);
 
-  // 중심 좌표 계산
   const centerLat = center?.lat ?? userLocation?.lat ?? 37.5665;
   const centerLng = center?.lng ?? userLocation?.lng ?? 126.978;
 
-  // 지도 초기화
   useEffect(() => {
     if (!isMapLoaded || !mapRef.current || !window.naver) return;
 
@@ -114,7 +106,6 @@ export function NaverMap({
     );
   }, [isMapLoaded, centerLat, centerLng, zoom]);
 
-  // 사용자 위치 마커
   useEffect(() => {
     if (
       !mapInstanceRef.current ||
@@ -150,6 +141,101 @@ export function NaverMap({
     });
   }, [userLocation, isMapLoaded]);
 
+  // ─── 마커 아이콘 생성 헬퍼 ───
+  const createMarkerIcon = useCallback(
+    (
+      item: any,
+      index: number,
+      isSelected: boolean,
+    ) => {
+      const isRecommended = "isAiRecommended" in item && item.isAiRecommended;
+      const isPharmacy = "type" in item && item.type === "pharmacy";
+
+      // 선택 상태에 따라 색상/크기 변경
+      const size = isSelected ? 44 : 32;
+      const fontSize = isSelected ? 15 : 12;
+      const labelFontSize = isSelected ? 13 : 11;
+      const labelFontWeight = isSelected ? 700 : 500;
+
+      let bgColor: string;
+      if (isSelected) {
+        bgColor = "#ef4444"; // 선택 시 빨간색
+      } else if (isRecommended) {
+        bgColor = "#22c55e";
+      } else if (isPharmacy) {
+        bgColor = "#3b82f6";
+      } else {
+        bgColor = "#22c55e";
+      }
+
+      const borderColor = isSelected ? "#fbbf24" : "white";
+      const borderWidth = isSelected ? 3 : 2;
+      const shadow = isSelected
+        ? "0 4px 14px rgba(239,68,68,0.5)"
+        : "0 2px 8px rgba(0,0,0,0.3)";
+      const zIndex = isSelected ? 100 : 1;
+      const animation = isSelected
+        ? "animation: markerBounce 0.5s ease-out;"
+        : "";
+
+      return {
+        content: `
+          <style>
+            @keyframes markerBounce {
+              0% { transform: scale(0.8) translateY(8px); }
+              50% { transform: scale(1.1) translateY(-4px); }
+              100% { transform: scale(1) translateY(0); }
+            }
+          </style>
+          <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: ${zIndex};
+            ${animation}
+          ">
+            <div style="
+              width: ${size}px;
+              height: ${size}px;
+              background: ${bgColor};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: ${shadow};
+              border: ${borderWidth}px solid ${borderColor};
+              cursor: pointer;
+              color: white;
+              font-size: ${fontSize}px;
+              font-weight: bold;
+              transition: all 0.2s ease;
+            ">
+              ${isRecommended ? "★" : index + 1}
+            </div>
+            <div style="
+              margin-top: 4px;
+              padding: ${isSelected ? "3px 8px" : "2px 6px"};
+              background: ${isSelected ? bgColor : "white"};
+              color: ${isSelected ? "white" : "black"};
+              border-radius: 4px;
+              font-size: ${labelFontSize}px;
+              font-weight: ${labelFontWeight};
+              box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+              white-space: nowrap;
+              max-width: ${isSelected ? "140px" : "100px"};
+              overflow: hidden;
+              text-overflow: ellipsis;
+            ">
+              ${item.label || ""}
+            </div>
+          </div>
+        `,
+        anchor: new window.naver.maps.Point(size / 2, size + 20),
+      };
+    },
+    [],
+  );
+
   // 마커 업데이트
   useEffect(() => {
     if (!mapInstanceRef.current || !window.naver || !isMapLoaded) return;
@@ -169,6 +255,8 @@ export function NaverMap({
             type: p.type,
           }));
 
+    markerDataRef.current = markerData;
+
     if (markerData.length === 0) return;
 
     const bounds = new window.naver.maps.LatLngBounds(
@@ -182,60 +270,13 @@ export function NaverMap({
       const position = new window.naver.maps.LatLng(item.lat, item.lng);
       bounds.extend(position);
 
-      const isRecommended = "isAiRecommended" in item && item.isAiRecommended;
-      const isPharmacy = "type" in item && item.type === "pharmacy";
-      const bgColor = isRecommended
-        ? "#22c55e"
-        : isPharmacy
-          ? "#3b82f6"
-          : "#22c55e";
+      const isSelected = selectedPlace?.id === item.id;
 
       const marker = new window.naver.maps.Marker({
         position,
         map: mapInstanceRef.current!,
-        icon: {
-          content: `
-            <div style="
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-            ">
-              <div style="
-                width: 32px;
-                height: 32px;
-                background: ${bgColor};
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                border: 2px solid white;
-                cursor: pointer;
-                color: white;
-                font-size: 12px;
-                font-weight: bold;
-              ">
-                ${isRecommended ? "★" : index + 1}
-              </div>
-              <div style="
-                margin-top: 4px;
-                padding: 2px 6px;
-                background: white;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: 500;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-                white-space: nowrap;
-                max-width: 100px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-              ">
-                ${item.label || ""}
-              </div>
-            </div>
-          `,
-          anchor: new window.naver.maps.Point(16, 50),
-        },
+        icon: createMarkerIcon(item, index, isSelected),
+        zIndex: isSelected ? 100 : 1,
       });
 
       window.naver.maps.Event.addListener(marker, "click", () => {
@@ -268,11 +309,13 @@ export function NaverMap({
   }, [
     markers,
     places,
+    selectedPlace,
     onMarkerClick,
     onSelectPlace,
     isMapLoaded,
     fitBounds,
     userLocation,
+    createMarkerIcon,
   ]);
 
   // 선택된 장소 변경 시 지도 이동
@@ -283,9 +326,14 @@ export function NaverMap({
     mapInstanceRef.current.panTo(
       new window.naver.maps.LatLng(selectedPlace.lat, selectedPlace.lng),
     );
+
+    // 줌 레벨도 가까이
+    const currentZoom = mapInstanceRef.current.getZoom();
+    if (currentZoom < 15) {
+      mapInstanceRef.current.setZoom(16, true);
+    }
   }, [selectedPlace]);
 
-  // 현재 위치로 이동
   const handleMoveToCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) return;
 
@@ -344,7 +392,6 @@ export function NaverMap({
     >
       <div ref={mapRef} className="h-full w-full" />
 
-      {/* 현재 위치 버튼 */}
       <Button
         variant="secondary"
         size="icon"
