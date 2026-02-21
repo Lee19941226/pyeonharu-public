@@ -1,65 +1,64 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoginModal } from "@/components/auth/login-modal";
+import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import {
   Building2,
   Cross,
-  ChevronLeft,
-  Heart,
   Bookmark,
-  MapPin,
-  Phone,
+  Heart,
   Trash2,
-  Utensils, // ✅ 음식 아이콘 추가
+  Utensils,
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { FoodBookmark } from "@/types/food";
+
 interface HospitalBookmark {
   id: string;
-  name: string;
-  address: string;
-  phone: string;
-  category: string;
-  lat: number;
-  lng: number;
-  createdAt: string;
+  hospital_id: string;
+  hospital_name: string;
+  hospital_address: string;
+  hospital_phone: string;
+  created_at: string;
 }
 
 interface PharmacyBookmark {
   id: string;
-  name: string;
-  address: string;
-  phone: string;
-  category: string;
-  lat: number;
-  lng: number;
-  createdAt: string;
+  pharmacy_id: string;
+  pharmacy_name: string;
+  pharmacy_address: string;
+  pharmacy_phone: string;
+  created_at: string;
+}
+
+interface FoodBookmark {
+  id: string;
+  food_code: string;
+  food_name: string;
+  manufacturer: string;
+  is_safe: boolean;
+  created_at: string;
 }
 
 export default function BookmarksPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [bookmarkLoading, setBookmarkLoading] = useState(true);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
-  // ✅ 탭 state 수정 - food 추가
   const [tab, setTab] = useState<"hospital" | "pharmacy" | "food">("hospital");
-
   const [hospitals, setHospitals] = useState<HospitalBookmark[]>([]);
   const [pharmacies, setPharmacies] = useState<PharmacyBookmark[]>([]);
-  const [foods, setFoods] = useState<FoodBookmark[]>([]); // ✅ 음식 state 추가
+  const [foods, setFoods] = useState<FoodBookmark[]>([]);
 
   useEffect(() => {
     checkUser();
@@ -80,11 +79,10 @@ export default function BookmarksPage() {
   const loadBookmarks = async () => {
     setBookmarkLoading(true);
     try {
-      // ✅ 병원/약국/음식 모두 로드
       const [hospitalRes, pharmacyRes, foodRes] = await Promise.all([
         fetch("/api/bookmarks?type=hospital"),
         fetch("/api/bookmarks?type=pharmacy"),
-        fetch("/api/food/favorites"), // ✅ 음식 API 추가
+        fetch("/api/food/favorites"),
       ]);
 
       if (hospitalRes.ok) {
@@ -97,44 +95,61 @@ export default function BookmarksPage() {
         setPharmacies(pharmacyData.bookmarks || []);
       }
 
-      // ✅ 음식 즐겨찾기 로드
       if (foodRes.ok) {
         const foodData = await foodRes.json();
+        console.log("✅ 음식 즐겨찾기:", foodData.favorites);
         setFoods(foodData.favorites || []);
       }
+    } catch (error) {
+      console.error("❌ 즐겨찾기 로드 실패:", error);
     } finally {
       setBookmarkLoading(false);
     }
   };
 
+  // ✅ 삭제 함수 수정
   const handleRemove = async (
     type: "hospital" | "pharmacy" | "food",
     itemId: string,
   ) => {
-    if (type === "food") {
-      // ✅ 음식 삭제
-      const res = await fetch(`/api/food/favorites?code=${itemId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setFoods((prev) => prev.filter((f) => f.foodCode !== itemId));
-      }
-    } else {
-      // 병원/약국 삭제
-      const res = await fetch(`/api/bookmarks?type=${type}&id=${itemId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        if (type === "hospital") {
-          setHospitals((prev) => prev.filter((h) => h.id !== itemId));
+    console.log(`🗑️ 삭제 요청: type=${type}, id=${itemId}`);
+
+    try {
+      if (type === "food") {
+        const res = await fetch(`/api/food/favorites?code=${itemId}`, {
+          method: "DELETE",
+        });
+
+        if (res.ok) {
+          setFoods((prev) => prev.filter((f) => f.food_code !== itemId));
+          console.log("✅ 음식 삭제 성공");
         } else {
-          setPharmacies((prev) => prev.filter((p) => p.id !== itemId));
+          const error = await res.json();
+          console.error("❌ 삭제 실패:", error);
+        }
+      } else {
+        const res = await fetch(`/api/bookmarks?type=${type}&id=${itemId}`, {
+          method: "DELETE",
+        });
+
+        if (res.ok) {
+          if (type === "hospital") {
+            setHospitals((prev) =>
+              prev.filter((h) => h.hospital_id !== itemId),
+            );
+          } else {
+            setPharmacies((prev) =>
+              prev.filter((p) => p.pharmacy_id !== itemId),
+            );
+          }
         }
       }
+    } catch (error) {
+      console.error("❌ 삭제 중 오류:", error);
     }
   };
 
-  // 로딩 중...
+  // 로딩 중
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
@@ -169,7 +184,7 @@ export default function BookmarksPage() {
     );
   }
 
-  // ✅ 현재 탭 아이템
+  // 현재 탭 아이템
   const currentItems =
     tab === "hospital" ? hospitals : tab === "pharmacy" ? pharmacies : foods;
 
@@ -180,7 +195,7 @@ export default function BookmarksPage() {
       <main className="flex-1 pb-16 md:pb-0">
         <div className="container mx-auto px-4 py-6">
           <div className="mx-auto max-w-2xl">
-            {/* ✅ 헤더 */}
+            {/* 헤더 */}
             <div className="mb-4 flex items-center justify-between">
               <h1 className="text-2xl font-bold">즐겨찾기</h1>
               <Link
@@ -191,7 +206,7 @@ export default function BookmarksPage() {
               </Link>
             </div>
 
-            {/* ✅ 3개 탭 */}
+            {/* 3개 탭 */}
             <div className="mb-4 flex gap-2">
               <Button
                 variant={tab === "hospital" ? "default" : "outline"}
@@ -209,7 +224,6 @@ export default function BookmarksPage() {
                 <Cross className="mr-2 h-4 w-4" />
                 약국 ({pharmacies.length})
               </Button>
-              {/* ✅ 음식 탭 추가 */}
               <Button
                 variant={tab === "food" ? "default" : "outline"}
                 onClick={() => setTab("food")}
@@ -245,54 +259,40 @@ export default function BookmarksPage() {
                     : "병원/약국 상세 페이지에서 ♡ 버튼을 눌러 추가하세요"}
                 </p>
                 <Button asChild>
-                  <Link href={tab === "food" ? "/food" : "/search"}>
-                    {tab === "food" ? "식품 검색" : "검색하러 가기"}
+                  <Link href={tab === "food" ? "/food/search" : "/search"}>
+                    {tab === "food" ? "식품 검색" : "병원/약국 찾기"}
                   </Link>
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
-                {/* ✅ 병원/약국 목록 */}
-                {tab !== "food" &&
-                  currentItems.map((item: any) => (
-                    <Card key={item.id} className="group">
+              <div className="space-y-3">
+                {/* ✅ 병원 목록 */}
+                {tab === "hospital" &&
+                  (currentItems as HospitalBookmark[]).map((item) => (
+                    <Card key={item.id}>
                       <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Link
-                                href={`/${tab}/${item.id}`}
-                                className="font-medium hover:text-primary hover:underline"
-                              >
-                                {item.name}
-                              </Link>
-                              {item.category && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px]"
-                                >
-                                  {item.category}
-                                </Badge>
-                              )}
-                            </div>
-                            {item.address && (
-                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                {item.address}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold">
+                              {item.hospital_name}
+                            </h3>
+                            {item.hospital_address && (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {item.hospital_address}
                               </p>
                             )}
-                            {item.phone && (
-                              <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {item.phone}
+                            {item.hospital_phone && (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {item.hospital_phone}
                               </p>
                             )}
                           </div>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleRemove(tab, item.id)}
+                            onClick={() =>
+                              handleRemove("hospital", item.hospital_id)
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -301,69 +301,104 @@ export default function BookmarksPage() {
                     </Card>
                   ))}
 
-                {/* ✅ 음식 목록 */}
+                {/* ✅ 약국 목록 */}
+                {tab === "pharmacy" &&
+                  (currentItems as PharmacyBookmark[]).map((item) => (
+                    <Card key={item.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold">
+                              {item.pharmacy_name}
+                            </h3>
+                            {item.pharmacy_address && (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {item.pharmacy_address}
+                              </p>
+                            )}
+                            {item.pharmacy_phone && (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {item.pharmacy_phone}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              handleRemove("pharmacy", item.pharmacy_id)
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                {/* ✅ 음식 목록 - food_code 사용 */}
                 {tab === "food" &&
-                  foods.map((item) => (
+                  (currentItems as FoodBookmark[]).map((item) => (
                     <Card
                       key={item.id}
-                      className="cursor-pointer transition-all hover:shadow-md"
+                      className="cursor-pointer hover:bg-muted/50"
                       onClick={() =>
-                        router.push(`/food/result/${item.foodCode}`)
+                        router.push(`/food/result/${item.food_code}`)
                       }
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          {/* 안전 여부 아이콘 */}
-                          <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                              item.isSafe
-                                ? "bg-green-100 text-green-600"
-                                : "bg-red-100 text-red-600"
-                            }`}
-                          >
-                            {item.isSafe ? (
-                              <CheckCircle className="h-5 w-5" />
-                            ) : (
-                              <AlertCircle className="h-5 w-5" />
-                            )}
-                          </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                                item.is_safe
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {item.is_safe ? (
+                                <CheckCircle className="h-5 w-5" />
+                              ) : (
+                                <AlertCircle className="h-5 w-5" />
+                              )}
+                            </div>
 
-                          {/* 제품 정보 */}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium truncate">
-                              {item.foodName}
-                            </h3>
-                            {item.manufacturer && (
-                              <p className="text-sm text-muted-foreground truncate">
-                                {item.manufacturer}
-                              </p>
-                            )}
-                            <div className="mt-1 flex items-center gap-2">
-                              <span
-                                className={`text-xs px-2 py-0.5 rounded-full ${
-                                  item.isSafe
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-red-100 text-red-700"
-                                }`}
-                              >
-                                {item.isSafe ? "안전" : "주의"}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(item.createdAt).toLocaleDateString(
-                                  "ko-KR",
-                                )}
-                              </span>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-semibold truncate">
+                                {item.food_name}
+                              </h3>
+                              {item.manufacturer && (
+                                <p className="text-sm text-muted-foreground truncate">
+                                  {item.manufacturer}
+                                </p>
+                              )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <span
+                                  className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    item.is_safe
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-red-100 text-red-700"
+                                  }`}
+                                >
+                                  {item.is_safe ? "안전" : "주의"}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(item.created_at).toLocaleDateString(
+                                    "ko-KR",
+                                  )}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          {/* 삭제 버튼 */}
+                          {/* ✅ 삭제 버튼 - food_code 사용 */}
                           <Button
                             variant="ghost"
                             size="icon"
                             className="shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleRemove("food", item.foodCode);
+                              handleRemove("food", item.food_code);
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
