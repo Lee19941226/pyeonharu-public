@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import {
   Sparkles, Store, Flame, Youtube, TrendingDown, TrendingUp,
-  ChevronDown, ChevronUp, MapPin, Loader2, BarChart3,
+  ChevronDown, ChevronUp, Loader2, BarChart3,
   UtensilsCrossed, AlertTriangle, Bike, Salad, Scale, Shuffle
 } from "lucide-react"
 
@@ -280,13 +280,6 @@ export default function MealRecommend() {
                         ))}
                       </div>
                     </div>
-
-                    <a
-                      href={`/?tab=restaurant&q=${encodeURIComponent(rec.deliveryKeyword)}`}
-                      className="flex items-center justify-center gap-1 rounded-lg border border-dashed py-1.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
-                    >
-                      <MapPin className="h-3 w-3" /> 근처 음식점 찾기
-                    </a>
 
                     {/* 유튜브 레시피 */}
                     <a
