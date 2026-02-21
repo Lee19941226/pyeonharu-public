@@ -32,8 +32,8 @@ function getExercise(overCal: number) {
   ]
 }
 
-function CircularProgress({ current, total, isOver, size = 160 }: { current: number; total: number; isOver: boolean; size?: number }) {
-  const stroke = size > 120 ? 10 : 7
+function CircularProgress({ current, total, isOver, size = 80 }: { current: number; total: number; isOver: boolean; size?: number }) {
+  const stroke = 7
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
   const pct = total > 0 ? Math.min(current / total, 2) : 0
@@ -47,8 +47,8 @@ function CircularProgress({ current, total, isOver, size = 160 }: { current: num
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`font-extrabold ${isOver ? "text-red-600" : "text-primary"} ${size > 120 ? "text-2xl" : "text-lg"}`}>{current.toLocaleString()}</span>
-        <span className={`text-muted-foreground ${size > 120 ? "text-[10px]" : "text-[9px]"}`}>/ {total > 0 ? total.toLocaleString() : "미설정"} kcal</span>
+        <span className={`text-lg font-extrabold ${isOver ? "text-red-600" : "text-primary"}`}>{current.toLocaleString()}</span>
+        <span className="text-[9px] text-muted-foreground">/ {total > 0 ? total.toLocaleString() : "-"}</span>
       </div>
     </div>
   )
@@ -57,62 +57,36 @@ function CircularProgress({ current, total, isOver, size = 160 }: { current: num
 function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bmr: number; onDayClick?: (date: string) => void }) {
   const maxCal = bmr > 0 ? bmr : Math.max(...dailyStats.map((d) => d.totalCal), 1)
   const todayStr = new Date().toLocaleDateString("en-CA")
-  const showDate = dailyStats.length <= 14
+  const showLabels = dailyStats.length <= 14
   return (
-    <div className="space-y-1">
+    <div>
       {bmr > 0 && (
-        <div className="flex items-center gap-1.5 mb-0.5">
+        <div className="flex items-center gap-1 mb-0.5">
           <div className="flex-1 border-t border-dashed border-red-300" />
-          <span className="text-[8px] text-red-400 shrink-0">BMR {bmr.toLocaleString()}</span>
+          <span className="text-[8px] text-red-400">BMR {bmr.toLocaleString()}</span>
         </div>
       )}
-      <div className="flex items-end gap-[2px] h-24">
+      <div className="flex items-end gap-[2px] h-20">
         {dailyStats.map((d) => {
           const pct = maxCal > 0 ? Math.min((d.totalCal / maxCal) * 100, 130) : 0
           const height = d.totalCal > 0 ? Math.max(pct, 3) : 1
           const isOver = bmr > 0 && d.totalCal > bmr
           const dayDate = new Date(d.date + "T12:00:00")
-          const dayLabel = dayDate.toLocaleDateString("ko-KR", { weekday: "narrow" })
-          const dayNum = dayDate.getDate()
           const isTd = d.date === todayStr
           return (
             <div key={d.date} className={`flex-1 flex flex-col items-center gap-0 group relative ${onDayClick ? "cursor-pointer" : ""}`}
               onClick={() => onDayClick?.(d.date)}>
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-[8px] px-1 py-0.5 rounded whitespace-nowrap z-10 pointer-events-none">
-                {d.totalCal > 0 ? `${d.totalCal.toLocaleString()}kcal` : "-"}
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-[8px] px-1 py-0.5 rounded whitespace-nowrap z-10 pointer-events-none">
+                {d.totalCal > 0 ? `${d.totalCal.toLocaleString()}` : "-"}
               </div>
-              <div className={`w-full rounded-t-sm transition-all duration-300 ${isOver ? "bg-red-400" : d.totalCal > 0 ? "bg-primary/70" : "bg-muted/40"} ${onDayClick ? "hover:opacity-80" : ""}`}
+              <div className={`w-full rounded-t-sm transition-all duration-300 ${isOver ? "bg-red-400" : d.totalCal > 0 ? "bg-primary/70" : "bg-muted/40"} hover:opacity-80`}
                 style={{ height: `${height}%`, minHeight: d.totalCal > 0 ? "2px" : "1px" }} />
-              {showDate && <span className={`text-[7px] leading-none mt-0.5 ${isTd ? "font-bold text-primary" : "text-muted-foreground"}`}>{dayLabel}</span>}
-              {showDate && <span className={`text-[6px] leading-none ${isTd ? "font-bold text-primary" : "text-muted-foreground/40"}`}>{dayNum}</span>}
+              {showLabels && <span className={`text-[7px] leading-none mt-0.5 ${isTd ? "font-bold text-primary" : "text-muted-foreground/60"}`}>{dayDate.getDate()}</span>}
             </div>
           )
         })}
       </div>
     </div>
-  )
-}
-
-function CalorieAnalysisCard({ totalCal, bmr, overAmount }: { totalCal: number; bmr: number; overAmount: number }) {
-  return (
-    <Card className="border-red-200 bg-red-50/50">
-      <CardContent className="p-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-[9px] font-bold">AI</div>
-          <p className="text-xs font-bold text-red-600">칼로리 초과 분석</p>
-        </div>
-        <div className="rounded-md bg-white border-l-2 border-red-500 p-2">
-          <p className="text-[11px]">총 <strong className="text-red-600">{totalCal.toLocaleString()}kcal</strong> · BMR 대비 <strong className="text-red-600">+{overAmount.toLocaleString()}kcal</strong></p>
-        </div>
-        <div className="grid grid-cols-4 gap-1">
-          {getExercise(overAmount).map((ex) => (
-            <div key={ex.name} className="flex flex-col items-center rounded bg-green-50 py-1 text-[10px]">
-              <span>{ex.emoji}</span><span className="font-bold text-primary">{ex.mins}분</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -135,11 +109,10 @@ export default function DietTab() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"))
 
-  // 대시보드 기간
   const [rangePreset, setRangePreset] = useState<RangePreset>("7d")
   const [customStart, setCustomStart] = useState("")
   const [customEnd, setCustomEnd] = useState("")
-  const [showCustomPicker, setShowCustomPicker] = useState(false)
+  const [showCustom, setShowCustom] = useState(false)
   const [dashData, setDashData] = useState<{ stats: DailyStat[]; summary: ReportSummary } | null>(null)
   const [dashLoading, setDashLoading] = useState(false)
 
@@ -152,7 +125,6 @@ export default function DietTab() {
 
   useEffect(() => { supabase.auth.getUser().then(({ data: { user } }) => { setUser(user); if (!user) setIsLoading(false) }) }, [])
 
-  // 일일
   const loadEntries = useCallback(async () => {
     if (!user) return; setIsLoading(true)
     try {
@@ -168,32 +140,25 @@ export default function DietTab() {
   }, [user, date, warningShownToday])
   useEffect(() => { if (user) loadEntries() }, [user, date, loadEntries])
 
-  // 대시보드 기간 계산
   const getDashRange = useCallback(() => {
-    const today = new Date()
-    const todayStr = today.toLocaleDateString("en-CA")
+    const today = new Date(); const todayStr = today.toLocaleDateString("en-CA")
     if (rangePreset === "custom" && customStart && customEnd) return { start: customStart, end: customEnd }
     const days = rangePreset === "7d" ? 7 : rangePreset === "14d" ? 14 : 30
-    const start = new Date(today); start.setDate(start.getDate() - days + 1)
-    return { start: start.toLocaleDateString("en-CA"), end: todayStr }
+    const s = new Date(today); s.setDate(s.getDate() - days + 1)
+    return { start: s.toLocaleDateString("en-CA"), end: todayStr }
   }, [rangePreset, customStart, customEnd])
 
-  // 대시보드 로드
   const loadDashboard = useCallback(async () => {
     if (!user) return; setDashLoading(true)
     try {
       const { start, end } = getDashRange()
       const res = await fetch(`/api/diet/report?type=custom&startDate=${start}&endDate=${end}`)
       const data = await res.json()
-      if (data.success) {
-        setDashData({ stats: data.dailyStats, summary: data.summary })
-        if (data.bmr) setBmr(data.bmr)
-      }
+      if (data.success) { setDashData({ stats: data.dailyStats, summary: data.summary }); if (data.bmr) setBmr(data.bmr) }
     } catch {} finally { setDashLoading(false) }
   }, [user, getDashRange])
   useEffect(() => { if (user) loadDashboard() }, [user, loadDashboard])
 
-  // handlers
   const handlePhotoAnalyze = async (file: File) => {
     setIsAnalyzing(true)
     try {
@@ -208,7 +173,7 @@ export default function DietTab() {
     try {
       const res = await fetch("/api/diet/entries", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ food_name: manualName.trim(), estimated_cal: parseInt(manualCal) }) }); const data = await res.json()
-      if (data.success) { toast.success(`📝 ${manualName} (${manualCal}kcal) 추가!`); setManualName(""); setManualCal(""); setShowManualInput(false); loadEntries(); loadDashboard() }
+      if (data.success) { toast.success(`📝 ${manualName} (${manualCal}kcal)`); setManualName(""); setManualCal(""); setShowManualInput(false); loadEntries(); loadDashboard() }
       else toast.error(data.error)
     } catch { toast.error("저장 실패") }
   }
@@ -218,20 +183,12 @@ export default function DietTab() {
       if (data.success) { toast.success("삭제됨"); loadEntries(); loadDashboard() }
     } catch { toast.error("삭제 실패") }
   }
-  const moveDate = (offset: number) => {
-    const d = new Date(date); d.setDate(d.getDate() + offset)
-    setDate(d.toLocaleDateString("en-CA")); setWarningShownToday(false)
-  }
+  const moveDate = (offset: number) => { const d = new Date(date); d.setDate(d.getDate() + offset); setDate(d.toLocaleDateString("en-CA")); setWarningShownToday(false) }
 
   const isToday = date === new Date().toLocaleDateString("en-CA")
   const isOver = bmr > 0 && totalCal > bmr
   const overAmount = isOver ? totalCal - bmr : 0
-
-  const getRangeLabel = () => {
-    const { start, end } = getDashRange()
-    const s = new Date(start + "T12:00:00"); const e = new Date(end + "T12:00:00")
-    return `${s.getMonth()+1}/${s.getDate()} ~ ${e.getMonth()+1}/${e.getDate()}`
-  }
+  const getRangeLabel = () => { const { start, end } = getDashRange(); const s = new Date(start+"T12:00:00"); const e = new Date(end+"T12:00:00"); return `${s.getMonth()+1}/${s.getDate()} ~ ${e.getMonth()+1}/${e.getDate()}` }
 
   if (!isLoading && !user) return (
     <div className="w-full"><div className="text-center space-y-4 px-4 py-12">
@@ -245,242 +202,278 @@ export default function DietTab() {
   return (
     <div className="w-full">
       <div className="container mx-auto px-4 py-3">
+        <div className="flex gap-5 justify-center">
 
-        {/* ═══ 상단 대시보드 ═══ */}
-        {user && (
-          <div className="max-w-2xl mx-auto mb-4 space-y-2">
-            {/* 기간 선택 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex rounded-md bg-muted p-0.5 text-[11px]">
-                {(["7d", "14d", "30d"] as RangePreset[]).map((p) => (
-                  <button key={p} onClick={() => { setRangePreset(p); setShowCustomPicker(false) }}
-                    className={`px-2.5 py-1 rounded-sm transition-all ${rangePreset === p && !showCustomPicker ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}>
-                    {p === "7d" ? "7일" : p === "14d" ? "14일" : "30일"}
-                  </button>
-                ))}
-                <button onClick={() => { setRangePreset("custom"); setShowCustomPicker(true) }}
-                  className={`px-2.5 py-1 rounded-sm transition-all flex items-center gap-1 ${showCustomPicker ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}>
-                  <Calendar className="h-3 w-3" />기간
-                </button>
+          {/* ═══ 좌측: 일일 기록 ═══ */}
+          <div className="w-full max-w-md space-y-3">
+            {/* 날짜 네비게이션 */}
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveDate(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">
+                  {new Date(date+"T12:00:00").toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"})}
+                </p>
+                <h1 className="text-base font-bold">{isToday ? "오늘의 식단" : "지난 기록"}</h1>
               </div>
-              <span className="text-[10px] text-muted-foreground">{getRangeLabel()}</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveDate(1)} disabled={isToday}><ChevronRight className="h-4 w-4" /></Button>
             </div>
 
-            {/* 커스텀 기간 선택 */}
-            {showCustomPicker && (
-              <div className="flex items-center gap-2 text-xs">
-                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-                  className="border rounded px-2 py-1 text-xs bg-background" />
-                <span className="text-muted-foreground">~</span>
-                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-                  className="border rounded px-2 py-1 text-xs bg-background" />
-                <Button size="sm" variant="outline" className="h-7 text-xs px-2"
-                  disabled={!customStart || !customEnd}
-                  onClick={() => { setRangePreset("custom"); loadDashboard() }}>
-                  조회
+            {bmr === 0 && !isLoading && (
+              <Card className="border-dashed border-primary/50">
+                <CardContent className="p-3 text-center space-y-1">
+                  <Info className="h-5 w-5 text-primary mx-auto" />
+                  <p className="text-xs font-medium">기초대사량을 설정해주세요</p>
+                  <Button size="sm" className="h-7 text-xs" onClick={() => router.push("/mypage")}>마이페이지에서 설정</Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 오늘 요약 — 모바일용 (lg 이상에서는 우측 패널에 표시) */}
+            <div className="lg:hidden">
+              <Card>
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3">
+                    <CircularProgress current={totalCal} total={bmr} isOver={isOver} size={70} />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">섭취</span><span className={`font-bold ${isOver?"text-red-600":""}`}>{totalCal.toLocaleString()}</span></div>
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">BMR</span><span className="font-bold">{bmr>0?bmr.toLocaleString():"-"}</span></div>
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">{isOver?"초과":"남은"}</span>
+                        <span className={`font-bold ${isOver?"text-red-600":"text-primary"}`}>{bmr>0?(isOver?`+${overAmount.toLocaleString()}`:(bmr-totalCal).toLocaleString()):"-"}</span></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {isToday && (
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1 gap-1.5 text-xs h-9 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => cameraInputRef.current?.click()} disabled={isAnalyzing}>
+                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                  {isAnalyzing ? "분석중" : "촬영"}
                 </Button>
+                <Button variant="outline" className="flex-1 gap-1.5 text-xs h-9 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => fileInputRef.current?.click()} disabled={isAnalyzing}>
+                  <ImageIcon className="h-3.5 w-3.5" />앨범
+                </Button>
+                <Button className="flex-1 gap-1.5 text-xs h-9" onClick={() => setShowManualInput(true)}>
+                  <PenLine className="h-3.5 w-3.5" />직접 입력
+                </Button>
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f)handlePhotoAnalyze(f);e.target.value=""}} />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f)handlePhotoAnalyze(f);e.target.value=""}} />
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-              {/* 오늘 요약 (2col) */}
-              <Card className="md:col-span-2">
+            {isAnalyzing && (
+              <Card className="border-primary/30 bg-primary/5"><CardContent className="p-3 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" /><p className="text-xs">AI가 음식을 분석 중...</p>
+              </CardContent></Card>
+            )}
+
+            {/* 초과 카드 */}
+            {isOver && entries.length > 0 && (
+              <Card className="border-red-200 bg-red-50/50">
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white text-[8px] font-bold">AI</div>
+                    <p className="text-xs font-bold text-red-600">칼로리 초과 · +{overAmount.toLocaleString()}kcal</p>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {getExercise(overAmount).map((ex) => (
+                      <div key={ex.name} className="flex flex-col items-center rounded bg-green-50 py-1 text-[10px]">
+                        <span>{ex.emoji}</span><span className="font-bold text-primary">{ex.mins}분</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold flex items-center gap-1">📋 {isToday?"오늘":"이 날"} 먹은 것들</h2>
+              <span className="text-[9px] text-muted-foreground">00시 리셋</span>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-2">{[...Array(3)].map((_,i)=><Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
+            ) : entries.length === 0 ? (
+              <div className="py-8 text-center"><p className="text-xs text-muted-foreground">아직 기록이 없어요</p></div>
+            ) : (
+              <div className="space-y-1.5">
+                {entries.map((entry, idx) => {
+                  const period = getTimePeriod(entry.recorded_at)
+                  const time = new Date(entry.recorded_at).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false})
+                  return (
+                    <Card key={entry.id} className={`transition-all ${isOver&&idx===entries.length-1?"border-red-200":""}`}>
+                      <CardContent className="p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex gap-2 flex-1 min-w-0">
+                            {entry.image_url ? (
+                              <button onClick={()=>setPreviewImage(entry.image_url)} className="flex-shrink-0 overflow-hidden rounded-lg border hover:border-primary/50">
+                                <img src={entry.image_url} alt={entry.food_name} className="h-10 w-10 object-cover" />
+                              </button>
+                            ) : (
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm">{entry.emoji}</div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-xs font-medium truncate block">{entry.food_name}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[10px] text-muted-foreground">{time}</span>
+                                <Badge variant="outline" className={`text-[9px] px-1 py-0 h-3.5 ${period.color}`}>{period.label}</Badge>
+                                <Badge variant="outline" className={`text-[9px] px-1 py-0 h-3.5 ${entry.source==="ai"?"bg-purple-50 text-purple-600 border-purple-200":"bg-blue-50 text-blue-600 border-blue-200"}`}>
+                                  {entry.source==="ai"?"AI":"직접"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className={`text-xs font-bold ${isOver?"text-red-600":"text-primary"}`}>{entry.estimated_cal}</span>
+                            {isToday && <button onClick={()=>handleDelete(entry.id,entry.food_name)} className="text-muted-foreground hover:text-red-500 p-0.5"><Trash2 className="h-3 w-3" /></button>}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ═══ 우측: 대시보드 (데스크톱 fixed) ═══ */}
+          <div className="hidden lg:block">
+            <div className="sticky top-20 w-72 space-y-2.5">
+
+              {/* 오늘 요약 */}
+              <Card>
                 <CardContent className="p-3">
                   <div className="flex items-center gap-1.5 mb-2"><Flame className="h-3.5 w-3.5 text-orange-500" /><span className="text-xs font-bold">오늘</span></div>
                   <div className="flex items-center gap-3">
-                    <CircularProgress current={totalCal} total={bmr} isOver={isOver} size={80} />
+                    <CircularProgress current={totalCal} total={bmr} isOver={isOver} size={72} />
                     <div className="flex-1 space-y-1">
-                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">섭취</span><span className={`font-bold ${isOver ? "text-red-600" : ""}`}>{totalCal.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">BMR</span><span className="font-bold">{bmr > 0 ? bmr.toLocaleString() : "-"}</span></div>
-                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">{isOver ? "초과" : "남은"}</span>
-                        <span className={`font-bold ${isOver ? "text-red-600" : "text-primary"}`}>{bmr > 0 ? (isOver ? `+${overAmount.toLocaleString()}` : (bmr-totalCal).toLocaleString()) : "-"}</span>
-                      </div>
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">섭취</span><span className={`font-bold ${isOver?"text-red-600":""}`}>{totalCal.toLocaleString()}</span></div>
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">BMR</span><span className="font-bold">{bmr>0?bmr.toLocaleString():"-"}</span></div>
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">{isOver?"초과":"남은"}</span>
+                        <span className={`font-bold ${isOver?"text-red-600":"text-primary"}`}>{bmr>0?(isOver?`+${overAmount.toLocaleString()}`:(bmr-totalCal).toLocaleString()):"-"}</span></div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* 바 차트 (3col) */}
-              <Card className="md:col-span-3">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-1.5 mb-2"><BarChart3 className="h-3.5 w-3.5 text-primary" /><span className="text-xs font-bold">칼로리 추이</span></div>
-                  {dashLoading ? <Skeleton className="h-24 w-full rounded" /> :
-                    dashData?.stats?.length ? <BarChart dailyStats={dashData.stats} bmr={bmr} onDayClick={(d) => setDate(d)} /> :
-                    <div className="h-24 flex items-center justify-center text-xs text-muted-foreground">데이터 없음</div>}
+              {/* 기간 선택 */}
+              <Card>
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex rounded-md bg-muted p-0.5 text-[10px]">
+                      {(["7d","14d","30d"] as RangePreset[]).map((p) => (
+                        <button key={p} onClick={()=>{setRangePreset(p);setShowCustom(false)}}
+                          className={`px-2 py-1 rounded-sm transition-all ${rangePreset===p&&!showCustom?"bg-background shadow-sm font-medium":"text-muted-foreground hover:text-foreground"}`}>
+                          {p==="7d"?"7일":p==="14d"?"14일":"30일"}
+                        </button>
+                      ))}
+                      <button onClick={()=>{setRangePreset("custom");setShowCustom(!showCustom)}}
+                        className={`px-2 py-1 rounded-sm transition-all flex items-center gap-0.5 ${showCustom?"bg-background shadow-sm font-medium":"text-muted-foreground hover:text-foreground"}`}>
+                        <Calendar className="h-2.5 w-2.5" />기간
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground">{getRangeLabel()}</p>
+
+                  {showCustom && (
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <input type="date" value={customStart} onChange={(e)=>setCustomStart(e.target.value)}
+                        className="border rounded px-1.5 py-0.5 text-[10px] bg-background w-[105px]" />
+                      <span className="text-muted-foreground">~</span>
+                      <input type="date" value={customEnd} onChange={(e)=>setCustomEnd(e.target.value)}
+                        className="border rounded px-1.5 py-0.5 text-[10px] bg-background w-[105px]" />
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                        disabled={!customStart||!customEnd} onClick={loadDashboard}>조회</Button>
+                    </div>
+                  )}
+
+                  {/* 바 차트 */}
+                  {dashLoading ? <Skeleton className="h-20 w-full rounded" /> :
+                    dashData?.stats?.length ? <BarChart dailyStats={dashData.stats} bmr={bmr} onDayClick={(d)=>setDate(d)} /> :
+                    <div className="h-20 flex items-center justify-center text-[10px] text-muted-foreground">데이터 없음</div>}
                 </CardContent>
               </Card>
-            </div>
 
-            {/* 통계 요약 */}
-            {dashData?.summary && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Card><CardContent className="p-2.5 text-center">
-                  <p className="text-[9px] text-muted-foreground">일 평균</p>
-                  <p className="text-sm font-bold text-primary">{dashData.summary.avgCal.toLocaleString()}<span className="text-[9px] font-normal text-muted-foreground ml-0.5">kcal</span></p>
-                </CardContent></Card>
-                <Card><CardContent className="p-2.5 text-center">
-                  <p className="text-[9px] text-muted-foreground">기록한 날</p>
-                  <p className="text-sm font-bold">{dashData.summary.daysWithData}<span className="text-[9px] font-normal text-muted-foreground ml-0.5">/ {dashData.summary.totalDays}일</span></p>
-                </CardContent></Card>
-                {bmr > 0 && (
-                  <Card><CardContent className={`p-2.5 text-center ${dashData.summary.overDays > 0 ? "bg-red-50/50" : "bg-green-50/50"}`}>
-                    <p className="text-[9px] text-muted-foreground">초과한 날</p>
-                    <p className={`text-sm font-bold ${dashData.summary.overDays > 0 ? "text-red-600" : "text-green-600"}`}>{dashData.summary.overDays}일</p>
-                  </CardContent></Card>
-                )}
-                {dashData.summary.topFoods.length > 0 && (
-                  <Card><CardContent className="p-2.5">
-                    <p className="text-[9px] text-muted-foreground mb-0.5">자주 먹은 음식</p>
-                    {dashData.summary.topFoods.slice(0, 3).map((f, i) => (
-                      <div key={f.name} className="flex items-center gap-1 text-[9px]">
-                        <span className="text-muted-foreground">{i+1}.</span>
-                        <span className="truncate flex-1">{f.name}</span>
-                        <span className="text-muted-foreground shrink-0">{f.count}회</span>
+              {/* 통계 */}
+              {dashData?.summary && (
+                <Card>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5 text-yellow-500" /><span className="text-xs font-bold">통계</span></div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-muted-foreground">일 평균</span>
+                        <span className="font-medium text-primary">{dashData.summary.avgCal.toLocaleString()} kcal</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-muted-foreground">기록한 날</span>
+                        <span className="font-medium">{dashData.summary.daysWithData} / {dashData.summary.totalDays}일</span>
+                      </div>
+                      {bmr > 0 && (
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-muted-foreground">초과한 날</span>
+                          <span className={`font-medium ${dashData.summary.overDays>0?"text-red-600":"text-green-600"}`}>
+                            {dashData.summary.overDays}일 {dashData.summary.overDays===0&&"✓"}
+                          </span>
+                        </div>
+                      )}
+                      {dashData.summary.maxDay && dashData.summary.maxDay.totalCal > 0 && (
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-muted-foreground">최대 섭취</span>
+                          <span className="font-medium">{dashData.summary.maxDay.totalCal.toLocaleString()} kcal</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 자주 먹은 음식 */}
+              {dashData?.summary?.topFoods?.length ? (
+                <Card>
+                  <CardContent className="p-3 space-y-1.5">
+                    <div className="flex items-center gap-1.5"><Utensils className="h-3.5 w-3.5 text-primary" /><span className="text-xs font-bold">자주 먹은 음식</span></div>
+                    {dashData.summary.topFoods.slice(0,5).map((f,i)=>(
+                      <div key={f.name} className="flex items-center gap-1.5 text-[11px]">
+                        <span className="text-muted-foreground w-3">{i+1}</span>
+                        <span className="flex-1 truncate">{f.name}</span>
+                        <span className="text-muted-foreground">{f.count}회</span>
                       </div>
                     ))}
-                  </CardContent></Card>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ═══ 일일 기록 ═══ */}
-        <div className="max-w-lg mx-auto space-y-3">
-          {/* 구분선 */}
-          <div className="border-t pt-3" />
-
-          {/* 날짜 네비게이션 */}
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveDate(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="text-center">
-              <p className="text-[10px] text-muted-foreground">
-                {new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
-              </p>
-              <h1 className="text-base font-bold">{isToday ? "오늘의 식단" : "지난 기록"}</h1>
+                  </CardContent>
+                </Card>
+              ) : null}
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveDate(1)} disabled={isToday}><ChevronRight className="h-4 w-4" /></Button>
           </div>
 
-          {bmr === 0 && !isLoading && (
-            <Card className="border-dashed border-primary/50">
-              <CardContent className="p-3 text-center space-y-1.5">
-                <Info className="h-5 w-5 text-primary mx-auto" />
-                <p className="text-xs font-medium">기초대사량을 설정해주세요</p>
-                <Button size="sm" className="h-7 text-xs" onClick={() => router.push("/mypage")}>마이페이지에서 설정</Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {isToday && (
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 gap-1.5 text-xs h-9 border-primary/30 text-primary hover:bg-primary/5"
-                onClick={() => cameraInputRef.current?.click()} disabled={isAnalyzing}>
-                {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-                {isAnalyzing ? "분석중" : "촬영"}
-              </Button>
-              <Button variant="outline" className="flex-1 gap-1.5 text-xs h-9 border-primary/30 text-primary hover:bg-primary/5"
-                onClick={() => fileInputRef.current?.click()} disabled={isAnalyzing}>
-                <ImageIcon className="h-3.5 w-3.5" />앨범
-              </Button>
-              <Button className="flex-1 gap-1.5 text-xs h-9" onClick={() => setShowManualInput(true)}>
-                <PenLine className="h-3.5 w-3.5" />직접 입력
-              </Button>
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
-                onChange={(e) => { const f=e.target.files?.[0]; if(f) handlePhotoAnalyze(f); e.target.value="" }} />
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                onChange={(e) => { const f=e.target.files?.[0]; if(f) handlePhotoAnalyze(f); e.target.value="" }} />
-            </div>
-          )}
-
-          {isAnalyzing && (
-            <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="p-3 flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <p className="text-xs">AI가 음식을 분석하고 있어요...</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {isOver && entries.length > 0 && <CalorieAnalysisCard totalCal={totalCal} bmr={bmr} overAmount={overAmount} />}
-
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold flex items-center gap-1">📋 {isToday ? "오늘" : "이 날"} 먹은 것들</h2>
-            <span className="text-[9px] text-muted-foreground">00시 리셋</span>
+          {/* 모바일 대시보드 (하단) */}
+          <div className="lg:hidden fixed bottom-16 right-3 z-30">
+            {/* 모바일에서는 간단한 플로팅 버튼으로 대시보드 접근은 스크롤로 대체 */}
           </div>
 
-          {isLoading ? (
-            <div className="space-y-2">{[...Array(3)].map((_,i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}</div>
-          ) : entries.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-xs text-muted-foreground">아직 기록이 없어요</p>
-              {isToday && <p className="text-[10px] text-muted-foreground mt-1">사진을 찍거나 직접 입력해보세요</p>}
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {entries.map((entry, idx) => {
-                const period = getTimePeriod(entry.recorded_at)
-                const time = new Date(entry.recorded_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
-                return (
-                  <Card key={entry.id} className={`transition-all ${isOver && idx === entries.length-1 ? "border-red-200" : ""}`}>
-                    <CardContent className="p-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex gap-2.5 flex-1 min-w-0">
-                          {entry.image_url ? (
-                            <button onClick={() => setPreviewImage(entry.image_url)}
-                              className="flex-shrink-0 overflow-hidden rounded-lg border hover:border-primary/50 transition-colors">
-                              <img src={entry.image_url} alt={entry.food_name} className="h-10 w-10 object-cover" />
-                            </button>
-                          ) : (
-                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm">{entry.emoji}</div>
-                          )}
-                          <div className="min-w-0">
-                            <span className="text-xs font-medium truncate block">{entry.food_name}</span>
-                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                              <span className="text-[10px] text-muted-foreground">{time}</span>
-                              <Badge variant="outline" className={`text-[9px] px-1 py-0 h-3.5 ${period.color}`}>{period.label}</Badge>
-                              <Badge variant="outline" className={`text-[9px] px-1 py-0 h-3.5 ${entry.source === "ai" ? "bg-purple-50 text-purple-600 border-purple-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
-                                {entry.source === "ai" ? "AI" : "직접"}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span className={`text-xs font-bold ${isOver ? "text-red-600" : "text-primary"}`}>{entry.estimated_cal}</span>
-                          {isToday && (
-                            <button onClick={() => handleDelete(entry.id, entry.food_name)} className="text-muted-foreground hover:text-red-500 transition-colors p-0.5">
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        </div>{/* flex gap 끝 */}
       </div>
 
       {/* 직접 입력 모달 */}
       {showManualInput && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowManualInput(false)}>
-          <div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={()=>setShowManualInput(false)}>
+          <div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4" onClick={(e)=>e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div><h3 className="text-lg font-bold">칼로리 직접 입력</h3><p className="text-xs text-muted-foreground">정확한 칼로리를 알고 있다면</p></div>
-              <button onClick={() => setShowManualInput(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+              <button onClick={()=>setShowManualInput(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-3">
               <div><label className="text-xs font-medium text-muted-foreground">음식 이름</label>
-                <Input placeholder="예: 빅맥 세트" value={manualName} onChange={(e) => setManualName(e.target.value)} className="mt-1" /></div>
+                <Input placeholder="예: 빅맥 세트" value={manualName} onChange={(e)=>setManualName(e.target.value)} className="mt-1" /></div>
               <div><label className="text-xs font-medium text-muted-foreground">칼로리 (kcal)</label>
-                <Input type="number" placeholder="예: 950" value={manualCal} onChange={(e) => setManualCal(e.target.value)} className="mt-1" /></div>
+                <Input type="number" placeholder="예: 950" value={manualCal} onChange={(e)=>setManualCal(e.target.value)} className="mt-1" /></div>
             </div>
             <div className="rounded-lg bg-blue-50 p-2.5"><p className="text-xs text-blue-700">💡 메뉴에 칼로리가 표기된 경우 직접 입력하면 더 정확해요.</p></div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowManualInput(false)}>취소</Button>
-              <Button className="flex-[2]" disabled={!manualName.trim() || !manualCal || parseInt(manualCal) <= 0} onClick={handleManualSubmit}>등록하기</Button>
+              <Button variant="outline" className="flex-1" onClick={()=>setShowManualInput(false)}>취소</Button>
+              <Button className="flex-[2]" disabled={!manualName.trim()||!manualCal||parseInt(manualCal)<=0} onClick={handleManualSubmit}>등록</Button>
             </div>
           </div>
         </div>
@@ -492,23 +485,18 @@ export default function DietTab() {
           <div className="w-full max-w-sm rounded-2xl bg-background overflow-hidden">
             <div className="bg-gradient-to-b from-red-100 to-red-50 p-5 text-center">
               <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white text-lg">⚠️</div>
-              <h3 className="text-base font-extrabold text-red-600">칼로리 초과 주의</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                오늘 <strong className="text-red-600">{totalCal.toLocaleString()}kcal</strong> · BMR 대비 <strong className="text-red-600">+{overAmount.toLocaleString()}kcal</strong>
-              </p>
+              <h3 className="text-base font-extrabold text-red-600">칼로리 초과</h3>
+              <p className="text-xs text-muted-foreground mt-1">오늘 <strong className="text-red-600">{totalCal.toLocaleString()}</strong> · BMR 대비 <strong className="text-red-600">+{overAmount.toLocaleString()}</strong></p>
             </div>
-            <div className="p-3 space-y-2">
-              <p className="text-xs font-bold">초과분 소모 운동</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {getExercise(overAmount).map((ex) => (
-                  <div key={ex.name} className="flex flex-col items-center rounded-lg bg-green-50 py-1.5 text-[10px]">
-                    <span>{ex.emoji}</span><span className="font-bold text-primary">{ex.mins}분</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <div className="p-3"><div className="grid grid-cols-4 gap-1.5">
+              {getExercise(overAmount).map((ex) => (
+                <div key={ex.name} className="flex flex-col items-center rounded-lg bg-green-50 py-1.5 text-[10px]">
+                  <span>{ex.emoji}</span><span className="font-bold text-primary">{ex.mins}분</span>
+                </div>
+              ))}
+            </div></div>
             <div className="px-3 pb-3">
-              <Button className="w-full h-9 text-sm" onClick={() => setShowWarning(false)}>확인</Button>
+              <Button className="w-full h-9 text-sm" onClick={()=>setShowWarning(false)}>확인</Button>
               <p className="text-center text-[9px] text-muted-foreground mt-1.5">1일 1회 표시</p>
             </div>
           </div>
@@ -517,9 +505,9 @@ export default function DietTab() {
 
       {/* 이미지 미리보기 */}
       {previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewImage(null)}>
-          <div className="relative max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setPreviewImage(null)} className="absolute -top-10 right-0 text-white hover:text-gray-300"><X className="h-6 w-6" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={()=>setPreviewImage(null)}>
+          <div className="relative max-w-md w-full" onClick={(e)=>e.stopPropagation()}>
+            <button onClick={()=>setPreviewImage(null)} className="absolute -top-10 right-0 text-white hover:text-gray-300"><X className="h-6 w-6" /></button>
             <img src={previewImage} alt="음식 사진" className="w-full rounded-xl object-contain max-h-[70vh]" />
           </div>
         </div>
