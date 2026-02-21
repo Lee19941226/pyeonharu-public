@@ -58,6 +58,7 @@ function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bm
   const maxCal = bmr > 0 ? bmr : Math.max(...dailyStats.map((d) => d.totalCal), 1)
   const todayStr = new Date().toLocaleDateString("en-CA")
   const showLabels = dailyStats.length <= 14
+  const BAR_MAX_H = 80 // px
   return (
     <div>
       {bmr > 0 && (
@@ -66,21 +67,21 @@ function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bm
           <span className="text-[8px] text-red-400">BMR {bmr.toLocaleString()}</span>
         </div>
       )}
-      <div className="flex items-end gap-[2px] h-20">
+      <div className="flex items-end gap-[2px]" style={{ height: BAR_MAX_H + (showLabels ? 16 : 0) }}>
         {dailyStats.map((d) => {
-          const pct = maxCal > 0 ? Math.min((d.totalCal / maxCal) * 100, 130) : 0
-          const height = d.totalCal > 0 ? Math.max(pct, 3) : 1
+          const ratio = maxCal > 0 ? Math.min(d.totalCal / maxCal, 1.3) : 0
+          const barH = d.totalCal > 0 ? Math.max(Math.round(ratio * BAR_MAX_H), 3) : 1
           const isOver = bmr > 0 && d.totalCal > bmr
           const dayDate = new Date(d.date + "T12:00:00")
           const isTd = d.date === todayStr
           return (
-            <div key={d.date} className={`flex-1 flex flex-col items-center gap-0 group relative ${onDayClick ? "cursor-pointer" : ""}`}
+            <div key={d.date} className={`flex-1 flex flex-col items-center justify-end gap-0 group relative ${onDayClick ? "cursor-pointer" : ""}`}
               onClick={() => onDayClick?.(d.date)}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-[8px] px-1 py-0.5 rounded whitespace-nowrap z-10 pointer-events-none">
                 {d.totalCal > 0 ? `${d.totalCal.toLocaleString()}` : "-"}
               </div>
               <div className={`w-full rounded-t-sm transition-all duration-300 ${isOver ? "bg-red-400" : d.totalCal > 0 ? "bg-primary/70" : "bg-muted/40"} hover:opacity-80`}
-                style={{ height: `${height}%`, minHeight: d.totalCal > 0 ? "2px" : "1px" }} />
+                style={{ height: `${barH}px` }} />
               {showLabels && <span className={`text-[7px] leading-none mt-0.5 ${isTd ? "font-bold text-primary" : "text-muted-foreground/60"}`}>{dayDate.getDate()}</span>}
             </div>
           )
