@@ -110,6 +110,19 @@ export default function HomePage() {
   const [mealSubTab, setMealSubTab] = useState<MealSubTab>("food");
   const [sickSubTab, setSickSubTab] = useState<SickSubTab>("symptom");
 
+  // 한 번이라도 방문한 탭만 마운트 (lazy mount)
+  const [visited, setVisited] = useState<Set<string>>(new Set(["food"]));
+  const activeTab = mainTab === "meal" ? mealSubTab : sickSubTab;
+
+  useEffect(() => {
+    setVisited((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
+
   // ★ 투어 가이드
   const [tourActive, setTourActive] = useState(false);
 
@@ -154,29 +167,6 @@ export default function HomePage() {
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("pyeonharu_tour_done", "true");
-    }
-  };
-
-  // ─── 현재 서브탭 렌더링 ───
-  const renderContent = () => {
-    if (mainTab === "meal") {
-      switch (mealSubTab) {
-        case "restaurant":
-          return <RestaurantTab />;
-        case "food":
-          return <FoodTab />;
-        case "diet":
-          return <DietTab />;
-      }
-    } else {
-      switch (sickSubTab) {
-        case "symptom":
-          return <SymptomTab />;
-        case "hospital":
-          return <HospitalTab />;
-        case "medicine":
-          return <MedicineTab />;
-      }
     }
   };
 
@@ -258,9 +248,26 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ═══ 탭 콘텐츠 ═══ */}
+      {/* ═══ 탭 콘텐츠 (방문한 탭만 마운트, 활성 탭만 표시) ═══ */}
       <main className="flex-1 pb-16 md:pb-0">
-        {renderContent()}
+        <div style={{ display: activeTab === "food" ? "block" : "none" }}>
+          {visited.has("food") && <FoodTab />}
+        </div>
+        <div style={{ display: activeTab === "restaurant" ? "block" : "none" }}>
+          {visited.has("restaurant") && <RestaurantTab />}
+        </div>
+        <div style={{ display: activeTab === "diet" ? "block" : "none" }}>
+          {visited.has("diet") && <DietTab />}
+        </div>
+        <div style={{ display: activeTab === "symptom" ? "block" : "none" }}>
+          {visited.has("symptom") && <SymptomTab />}
+        </div>
+        <div style={{ display: activeTab === "hospital" ? "block" : "none" }}>
+          {visited.has("hospital") && <HospitalTab />}
+        </div>
+        <div style={{ display: activeTab === "medicine" ? "block" : "none" }}>
+          {visited.has("medicine") && <MedicineTab />}
+        </div>
       </main>
 
       <Footer />
