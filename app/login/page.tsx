@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
+import { MobileNav } from "@/components/layout/mobile-nav";
 
 function LoginContent() {
   const router = useRouter();
@@ -287,7 +288,6 @@ function LoginContent() {
           </CardFooter>
         </Card>
       </main>
-
       {/* Footer */}
       <footer className="border-t border-border py-4">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
@@ -302,6 +302,7 @@ function LoginContent() {
           에 동의하는 것으로 간주됩니다.
         </div>
       </footer>
+      <MobileNav /> {/* ← 추가 */}
     </div>
   );
 }

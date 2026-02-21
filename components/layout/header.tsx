@@ -264,7 +264,10 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       </div>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 border-t bg-background md:hidden overflow-y-auto">
+        <div
+          className="fixed inset-x-0 top-16 bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
+          style={{ height: "calc(100vh - 4rem)" }}
+        >
           <div className="container mx-auto px-4 py-4">
             {isLoggedIn ? (
               <div className="mb-4 flex items-center gap-3 rounded-xl bg-muted/60 p-4">

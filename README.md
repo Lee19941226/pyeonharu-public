@@ -26,3 +26,24 @@ npm install @vercel/og
 2026-02-16 01:27 이진원
 npm install dompurify
 npm install -D @types/dompurify
+
+# 1. 편하루 프로젝트로 이동
+
+cd C:\Users\ljw94\Desktop\편하루프로젝트폴더
+
+# 2. Capacitor 설치
+
+npm install @capacitor/core @capacitor/cli
+
+# 3. Capacitor 초기화
+
+npx cap init "편하루" "com.pyeonharu.app" --web-dir=out
+
+# 4. Android 플랫폼 추가
+
+npm install @capacitor/android
+npx cap add android
+
+# 5. out 폴더 + 더미 index.html 생성
+
+mkdir out
