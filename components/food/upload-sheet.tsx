@@ -11,6 +11,7 @@ import { Camera, Upload, Scan } from "lucide-react";
 import { toast } from "sonner";
 import { useDevice } from "@/lib/hooks/use-device";
 import { Html5Qrcode } from "html5-qrcode";
+import { createClient } from "@/lib/supabase/client";
 
 interface UploadSheetProps {
   open: boolean;
@@ -66,22 +67,62 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
           toast.success("바코드 인식 성공!");
           router.push(`/food/result/${barcode}`);
         } catch (error) {
-          // ❌ 바코드 없음 → AI 분석
+          // ❌ 바코드 없음 → AI 분석 (JSON + base64로 전송)
           console.log("바코드 없음, AI 분석 시작");
           toast.info("AI가 성분표를 분석 중...");
 
           try {
-            const formData = new FormData();
-            formData.append("image", file);
+            // 사용자 알레르기 가져오기
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            let userAllergens: string[] = [];
+
+            if (user) {
+              const { data } = await supabase
+                .from("user_allergies")
+                .select("allergen_name")
+                .eq("user_id", user.id);
+              if (data) {
+                userAllergens = data.map((item) => item.allergen_name);
+              }
+            }
+
+            // base64만 추출 (data:image/jpeg;base64, 제거)
+            const base64Data = imageData.includes(",")
+              ? imageData.split(",")[1]
+              : imageData;
 
             const response = await fetch("/api/food/analyze-image", {
               method: "POST",
-              body: formData,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageBase64: base64Data,
+                userAllergens: userAllergens,
+              }),
             });
 
             const data = await response.json();
 
-            if (data.success && data.analysisId) {
+            if (data.success && data.foodCode) {
+              sessionStorage.setItem(
+                `ai_result_${data.foodCode}`,
+                JSON.stringify({
+                  foodCode: data.foodCode,
+                  productName: data.productName,
+                  manufacturer: data.manufacturer,
+                  weight: data.weight,
+                  allergens: data.allergens,
+                  hasUserAllergen: data.hasUserAllergen,
+                  matchedUserAllergens: data.matchedUserAllergens || [],
+                  ingredients: data.ingredients || [],
+                  rawMaterials: data.rawMaterials || "",
+                  nutritionInfo: data.nutritionInfo || null,
+                  dataSource: data.dataSource || "ai",
+                }),
+              );
+              toast.success("분석 완료!");
+              router.push(`/food/result/${data.foodCode}`);
+            } else if (data.success && data.analysisId) {
               toast.success("분석 완료!");
               router.push(`/food/result/${data.analysisId}`);
             } else {

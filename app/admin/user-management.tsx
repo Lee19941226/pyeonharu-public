@@ -6,6 +6,14 @@ import {
   Crown, User, Mail, School, ScanLine, MessageSquare, AlertTriangle,
   Check, X, Loader2, Filter,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+// 토큰 가져오기 헬퍼
+async function getAccessToken() {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token || "";
+}
 
 interface UserData {
   id: string;
@@ -79,7 +87,9 @@ export default function UserManagement() {
         ...(search && { search }),
         ...(roleFilter && { role: roleFilter }),
       });
-      const res = await fetch(`/api/admin/users?${params}`);
+      const res = await fetch(`/api/admin/users?${params}`, {
+        headers: { Authorization: `Bearer ${await getAccessToken()}` },
+      });
       if (res.ok) {
         setData(await res.json());
       }
@@ -106,7 +116,10 @@ export default function UserManagement() {
     try {
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await getAccessToken()}`,
+        },
         body: JSON.stringify({
           targetUserId: confirmDialog.userId,
           newRole: confirmDialog.newRole,
