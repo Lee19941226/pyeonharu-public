@@ -9,11 +9,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "편하루 - 알레르기 있어도 편안한 메뉴 선택 | 식품 알레르기 확인",
+    default: "편하루 - 식사를 편하게",
     template: "%s | 편하루",
   },
   description:
-    "알레르기가 있어도 편안하게 메뉴를 고를 수 있게. 바코드·사진 한 번이면 알레르기 확인 5초. 급식 알레르기 자동 체크, 내 주변 맛집 알레르기 매칭, AI 증상 분석까지.",
+    "식사를 편하게. 바코드·사진 한 번이면 알레르기 확인 5초. 급식 알레르기 자동 체크, 내 주변 맛집 매칭, 칼로리 관리, AI 증상 분석까지.",
   keywords: [
     "식품 알레르기 확인",
     "바코드 알레르기 체크",
@@ -32,16 +32,14 @@ export const metadata: Metadata = {
   authors: [{ name: "편하루" }],
   creator: "편하루",
   publisher: "편하루",
-  metadataBase: new URL(
-    "https://www.pyeonharu.com",
-  ),
+  metadataBase: new URL("https://www.pyeonharu.com"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "편하루 - 알레르기 있어도 편안한 메뉴 선택",
+    title: "편하루 - 식사를 편하게",
     description:
-      "바코드·사진으로 알레르기 확인, 급식 체크, 내 주변 맛집 매칭, AI 증상 분석. 편안한 하루의 식사.",
+      "바코드·사진으로 알레르기 확인, 급식 체크, 맛집 매칭, 칼로리 관리까지. 편안한 하루의 식사.",
     type: "website",
     locale: "ko_KR",
     siteName: "편하루",
