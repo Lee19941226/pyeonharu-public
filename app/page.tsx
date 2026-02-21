@@ -28,23 +28,52 @@ import SymptomTab from "@/components/tabs/SymptomTab";
 import HospitalTab from "@/components/tabs/HospitalTab";
 import MedicineTab from "@/components/tabs/MedicineTab";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
+import MealRecommend from "@/components/meal-recommend";
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
 type SickSubTab = "symptom" | "hospital" | "medicine";
 
-function TabButton({ active, onClick, icon: Icon, label, color }: { active: boolean; onClick: () => void; icon: React.ElementType; label: string; color: string }) {
+function TabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  color,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+  color: string;
+}) {
   return (
-    <button onClick={onClick} className={`flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all relative ${active ? `${color} after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[3px] after:rounded-full after:bg-current` : "text-muted-foreground hover:text-foreground"}`}>
+    <button
+      onClick={onClick}
+      className={`flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all relative ${active ? `${color} after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[3px] after:rounded-full after:bg-current` : "text-muted-foreground hover:text-foreground"}`}
+    >
       <Icon className="h-5 w-5" />
       {label}
     </button>
   );
 }
 
-function SubTabButton({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: React.ElementType; label: string }) {
+function SubTabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+}) {
   return (
-    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all relative whitespace-nowrap cursor-pointer ${active ? "text-foreground after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full after:bg-primary" : "text-muted-foreground hover:text-foreground"}`}>
+    <button
+      onClick={onClick}
+      className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all relative whitespace-nowrap cursor-pointer ${active ? "text-foreground after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full after:bg-primary" : "text-muted-foreground hover:text-foreground"}`}
+    >
       <Icon className="h-4 w-4" />
       {label}
     </button>
@@ -80,10 +109,13 @@ export default function HomePage() {
   const [loadLabel, setLoadLabel] = useState("시작하는 중...");
   const [isFadingOut, setIsFadingOut] = useState(false);
 
-  const handleFoodTabProgress = useCallback((progress: number, label: string) => {
-    setLoadProgress((prev) => Math.min(Math.max(prev, progress), 100));
-    setLoadLabel(label);
-  }, []);
+  const handleFoodTabProgress = useCallback(
+    (progress: number, label: string) => {
+      setLoadProgress((prev) => Math.min(Math.max(prev, progress), 100));
+      setLoadLabel(label);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (loadProgress >= 100 && isInitialLoading) {
@@ -110,7 +142,9 @@ export default function HomePage() {
       next.add(activeTab);
       return next;
     });
-    const timer = setTimeout(() => { window.dispatchEvent(new Event("resize")); }, 100);
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
     return () => clearTimeout(timer);
   }, [activeTab]);
 
@@ -119,7 +153,9 @@ export default function HomePage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
@@ -151,8 +187,12 @@ export default function HomePage() {
     if (user) {
       try {
         const supabase = createClient();
-        await supabase.auth.updateUser({ data: { onboarding_completed: true } });
-      } catch { /* 무시 */ }
+        await supabase.auth.updateUser({
+          data: { onboarding_completed: true },
+        });
+      } catch {
+        /* 무시 */
+      }
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("pyeonharu_tour_done", "true");
@@ -162,19 +202,30 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {isInitialLoading && (
-        <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${isFadingOut ? "opacity-0" : "opacity-100"}`}>
+        <div
+          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${isFadingOut ? "opacity-0" : "opacity-100"}`}
+        >
           <div className="flex flex-col items-center gap-6">
             <PyeonharuLogo size="lg" />
             <div className="w-72">
               <div className="mb-2 flex items-center justify-between px-0.5">
-                <span className="text-xs text-muted-foreground truncate max-w-[180px]">{loadLabel}</span>
-                <span className="text-sm font-bold tabular-nums text-primary">{loadProgress}%</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                  {loadLabel}
+                </span>
+                <span className="text-sm font-bold tabular-nums text-primary">
+                  {loadProgress}%
+                </span>
               </div>
               <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out" style={{ width: `${loadProgress}%` }} />
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out"
+                  style={{ width: `${loadProgress}%` }}
+                />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">안전한 식사를 준비하고 있어요 🍽️</p>
+            <p className="text-xs text-muted-foreground">
+              안전한 식사를 준비하고 있어요 🍽️
+            </p>
           </div>
         </div>
       )}
@@ -183,25 +234,70 @@ export default function HomePage() {
 
       <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
         <div className="flex">
-          <TabButton active={mainTab === "meal"} onClick={() => setMainTab("meal")} icon={UtensilsCrossed} label="식사" color="text-amber-600" />
-          <TabButton active={mainTab === "sick"} onClick={() => setMainTab("sick")} icon={HeartPulse} label="아파요" color="text-rose-600" />
+          <TabButton
+            active={mainTab === "meal"}
+            onClick={() => setMainTab("meal")}
+            icon={UtensilsCrossed}
+            label="식사"
+            color="text-amber-600"
+          />
+          <TabButton
+            active={mainTab === "sick"}
+            onClick={() => setMainTab("sick")}
+            icon={HeartPulse}
+            label="아파요"
+            color="text-rose-600"
+          />
         </div>
       </div>
 
       <div className="sticky top-[7.5rem] md:top-16 z-30 bg-background border-b">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-center overflow-x-auto scrollbar-hide" data-tour="search-tabs">
+          <div
+            className="flex items-center justify-center overflow-x-auto scrollbar-hide"
+            data-tour="search-tabs"
+          >
             {mainTab === "meal" ? (
               <>
-                <SubTabButton active={mealSubTab === "food"} onClick={() => setMealSubTab("food")} icon={ShieldCheck} label="식품" />
-                <SubTabButton active={mealSubTab === "restaurant"} onClick={() => setMealSubTab("restaurant")} icon={Store} label="음식점" />
-                <SubTabButton active={mealSubTab === "diet"} onClick={() => setMealSubTab("diet")} icon={Activity} label="식단관리" />
+                <SubTabButton
+                  active={mealSubTab === "food"}
+                  onClick={() => setMealSubTab("food")}
+                  icon={ShieldCheck}
+                  label="식품"
+                />
+                <SubTabButton
+                  active={mealSubTab === "restaurant"}
+                  onClick={() => setMealSubTab("restaurant")}
+                  icon={Store}
+                  label="음식점"
+                />
+                <SubTabButton
+                  active={mealSubTab === "diet"}
+                  onClick={() => setMealSubTab("diet")}
+                  icon={Activity}
+                  label="식단관리"
+                />
               </>
             ) : (
               <>
-                <SubTabButton active={sickSubTab === "symptom"} onClick={() => setSickSubTab("symptom")} icon={Stethoscope} label="증상" />
-                <SubTabButton active={sickSubTab === "hospital"} onClick={() => setSickSubTab("hospital")} icon={Building2} label="병원" />
-                <SubTabButton active={sickSubTab === "medicine"} onClick={() => setSickSubTab("medicine")} icon={Pill} label="약" />
+                <SubTabButton
+                  active={sickSubTab === "symptom"}
+                  onClick={() => setSickSubTab("symptom")}
+                  icon={Stethoscope}
+                  label="증상"
+                />
+                <SubTabButton
+                  active={sickSubTab === "hospital"}
+                  onClick={() => setSickSubTab("hospital")}
+                  icon={Building2}
+                  label="병원"
+                />
+                <SubTabButton
+                  active={sickSubTab === "medicine"}
+                  onClick={() => setSickSubTab("medicine")}
+                  icon={Pill}
+                  label="약"
+                />
               </>
             )}
           </div>
@@ -211,8 +307,12 @@ export default function HomePage() {
       <main className="flex-1 pb-16 md:pb-0">
         {/* 지도 없는 탭: 미리 마운트 + display:none으로 상태 유지 */}
         <div style={{ display: activeTab === "food" ? "block" : "none" }}>
+          <div className="container mx-auto px-4 pt-4">
+            <MealRecommend />
+          </div>
           <FoodTab onProgress={handleFoodTabProgress} />
         </div>
+
         <div style={{ display: activeTab === "restaurant" ? "block" : "none" }}>
           <RestaurantTab />
         </div>
@@ -229,7 +329,11 @@ export default function HomePage() {
 
       <Footer />
       <MobileNav mainTab={mainTab} onMainTabChange={setMainTab} />
-      <LoginModal open={loginModalOpen} onOpenChange={setLoginModalOpen} onSuccess={() => router.refresh()} />
+      <LoginModal
+        open={loginModalOpen}
+        onOpenChange={setLoginModalOpen}
+        onSuccess={() => router.refresh()}
+      />
       <OnboardingTour active={tourActive} onFinish={handleTourFinish} />
     </div>
   );
