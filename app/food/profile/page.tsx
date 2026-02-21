@@ -388,7 +388,11 @@ export default function AllergyProfilePage() {
       }
 
       toast.success("알레르기 정보가 저장되었습니다");
-      router.push("/food");
+
+      router.push("/mypage");
+      router.refresh();
+
+      window.dispatchEvent(new CustomEvent("allergiesUpdated"));
     } catch (error) {
       console.error(error);
       toast.error("알레르기 정보 저장 중 오류가 발생했습니다");

@@ -34,6 +34,7 @@ import type {
   RecentProduct,
   FoodFavorite,
 } from "@/types/food";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -122,10 +123,48 @@ function FoodMainContent() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  const loadUserAllergies = async () => {
+    const supabase = createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setUserAllergens([]);
+      return;
+    }
+
+    const { data: allergyData } = await supabase
+      .from("user_allergies")
+      .select("allergen_name")
+      .eq("user_id", user.id);
+
+    if (allergyData) {
+      setUserAllergens(
+        allergyData.map(
+          (item: { allergen_name: string }) => item.allergen_name,
+        ),
+      );
+    }
+  };
   useEffect(() => {
     loadSearchHistory();
     loadRecentProducts();
     checkLoginStatus();
+    loadUserAllergies();
+    // ✅ 알레르기 업데이트 이벤트 리스너 추가
+    const handleAllergiesUpdate = () => {
+      console.log("🔄 알레르기 정보 업데이트됨, 재로드...");
+      checkLoginStatus(); // 기존 함수 재호출
+    };
+
+    window.addEventListener("allergiesUpdated", handleAllergiesUpdate);
+
+    // ✅ cleanup 함수 (컴포넌트 언마운트 시 이벤트 제거)
+    return () => {
+      window.removeEventListener("allergiesUpdated", handleAllergiesUpdate);
+    };
   }, []);
 
   const checkLoginStatus = async () => {
