@@ -42,6 +42,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import UserManagement from "./user-management";
+import AdminReportButton from "./admin-report-button";
 
 // ─── Admin Tab ───
 type AdminTab = "dashboard" | "users";
@@ -281,6 +282,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-2">
             {activeTab === "dashboard" && (
               <>
+                <AdminReportButton stats={stats} period={period} />
                 {/* 기간 선택 */}
                 <div className="flex items-center gap-1 rounded-lg border bg-card p-0.5">
                   {[7, 14, 30, 90].map((d) => (
