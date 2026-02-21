@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import {
   UtensilsCrossed,
@@ -21,7 +21,7 @@ import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-// ─── 탭 컴포넌트 (lazy) ───
+// ─── 탭 컴포넌트 ───
 import FoodTab from "@/components/tabs/FoodTab";
 import RestaurantTab from "@/components/tabs/RestaurantTab";
 import DietTab from "@/components/tabs/DietTab";
@@ -114,6 +114,41 @@ export default function HomePage() {
   const [visited, setVisited] = useState<Set<string>>(new Set(["food"]));
   const activeTab = mainTab === "meal" ? mealSubTab : sickSubTab;
 
+  // ─── 초기 로딩 프로그레스 (실제 진행률 기반) ───
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loadLabel, setLoadLabel] = useState("시작하는 중...");
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
+  // FoodTab → page.tsx 진행률 콜백 (항상 증가만 허용)
+  const handleFoodTabProgress = useCallback((progress: number, label: string) => {
+    setLoadProgress((prev) => {
+      const next = Math.max(prev, progress);
+      return Math.min(next, 100);
+    });
+    setLoadLabel(label);
+  }, []);
+
+  // 100% 도달 시 페이드아웃 → 제거
+  useEffect(() => {
+    if (loadProgress >= 100 && isInitialLoading) {
+      setIsFadingOut(true);
+      const timer = setTimeout(() => setIsInitialLoading(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [loadProgress, isInitialLoading]);
+
+  // 안전장치: 8초 후에도 안 끝나면 강제 완료
+  useEffect(() => {
+    const fallback = setTimeout(() => {
+      if (isInitialLoading) {
+        setLoadProgress(100);
+        setLoadLabel("완료!");
+      }
+    }, 8000);
+    return () => clearTimeout(fallback);
+  }, [isInitialLoading]);
+
   useEffect(() => {
     setVisited((prev) => {
       if (prev.has(activeTab)) return prev;
@@ -121,7 +156,6 @@ export default function HomePage() {
       next.add(activeTab);
       return next;
     });
-    // 지도 탭 전환 시 네이버맵 리사이즈 트리거
     const timer = setTimeout(() => {
       window.dispatchEvent(new Event("resize"));
     }, 100);
@@ -141,6 +175,12 @@ export default function HomePage() {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // 페이지 마운트 시 초기 진행률
+  useEffect(() => {
+    setLoadProgress(10);
+    setLoadLabel("페이지 준비 중...");
   }, []);
 
   // ★ 투어 가이드 트리거
@@ -177,6 +217,47 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* ═══ 초기 로딩 프로그레스 바 (실제 진행률 기반) ═══ */}
+      {isInitialLoading && (
+        <div
+          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${
+            isFadingOut ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className="flex flex-col items-center gap-6">
+            {/* 로고 */}
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary shadow-lg">
+                <span className="text-2xl font-bold text-primary-foreground">편</span>
+              </div>
+              <span className="text-2xl font-bold text-foreground">편하루</span>
+            </div>
+
+            {/* 프로그레스 바 */}
+            <div className="w-72">
+              <div className="mb-2 flex items-center justify-between px-0.5">
+                <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                  {loadLabel}
+                </span>
+                <span className="text-sm font-bold tabular-nums text-primary">
+                  {loadProgress}%
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out"
+                  style={{ width: `${loadProgress}%` }}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              안전한 식사를 준비하고 있어요 🍽️
+            </p>
+          </div>
+        </div>
+      )}
+
       <Header
         mainTab={mainTab}
         onMainTabChange={setMainTab}
@@ -254,10 +335,9 @@ export default function HomePage() {
       </div>
 
       {/* ═══ 탭 콘텐츠 (방문한 탭만 마운트, 활성 탭만 표시) ═══ */}
-      {/* 지도 없는 탭: display:none으로 상태 유지 */}
       <main className="flex-1 pb-16 md:pb-0">
         <div style={{ display: activeTab === "food" ? "block" : "none" }}>
-          {visited.has("food") && <FoodTab />}
+          {visited.has("food") && <FoodTab onProgress={handleFoodTabProgress} />}
         </div>
         <div style={{ display: activeTab === "restaurant" ? "block" : "none" }}>
           {visited.has("restaurant") && <RestaurantTab />}
@@ -268,7 +348,6 @@ export default function HomePage() {
         <div style={{ display: activeTab === "medicine" ? "block" : "none" }}>
           {visited.has("medicine") && <MedicineTab />}
         </div>
-        {/* 지도 사용 탭: 활성 시에만 마운트 (display:none에서 지도 초기화 불가) */}
         {activeTab === "symptom" && <SymptomTab />}
         {activeTab === "hospital" && <HospitalTab />}
       </main>
