@@ -17,41 +17,41 @@ export async function POST(req: NextRequest) {
     const { stats, period } = await req.json()
     if (!stats) return NextResponse.json({ error: "통계 데이터 필요" }, { status: 400 })
 
-    const prompt = `Here are the operational metrics for Pyeonharu (food allergy management web app) over the last ${period} days. Analyze in English.
+    const prompt = `다음은 편하루(식품 알레르기 관리 웹앱)의 최근 ${period}일간 운영 지표입니다. 한국어로 분석해주세요.
 
-## User Overview
-- Total Users: ${stats.overview.totalUsers}
-- DAU: ${stats.overview.dau}, WAU: ${stats.overview.wau}, MAU: ${stats.overview.mau}
-- Retention Rate: ${stats.overview.retentionRate}%, Stickiness: ${stats.overview.stickiness}%
+## 사용자 개요
+- 전체 가입자: ${stats.overview.totalUsers}명
+- DAU: ${stats.overview.dau}명, WAU: ${stats.overview.wau}명, MAU: ${stats.overview.mau}명
+- 리텐션율: ${stats.overview.retentionRate}%, 스티키니스: ${stats.overview.stickiness}%
 
-## Signup Trend (Recent ${period}d: ${stats.signups.recent} new)
+## 가입 추이 (최근 ${period}일 신규: ${stats.signups.recent}명)
 ${JSON.stringify(stats.signups.trend.slice(-7))}
 
-## Feature Usage (${period}d)
-- Barcode Scans: ${stats.features.scans}, Safety Checks: ${stats.features.checks}
-- Food Search: ${stats.features.searches}, Diet Entries: ${stats.features.dietEntries}
+## 기능 사용 (${period}일)
+- 바코드 스캔: ${stats.features.scans}회, 안전 확인: ${stats.features.checks}회
+- 음식 검색: ${stats.features.searches}회, 식단 기록: ${stats.features.dietEntries}회
 
-## Community
-- Posts: total ${stats.community.totalPosts} / recent ${stats.community.recentPosts}
-- Comments: total ${stats.community.totalComments} / recent ${stats.community.recentComments}
+## 커뮤니티
+- 게시글: 전체 ${stats.community.totalPosts}개 / 최근 ${stats.community.recentPosts}개
+- 댓글: 전체 ${stats.community.totalComments}개 / 최근 ${stats.community.recentComments}개
 
-## Schools: ${stats.schools.total}, Top: ${JSON.stringify(stats.schools.topSchools.slice(0,5))}
-## DAU Trend: ${JSON.stringify(stats.dauTrend.slice(-7))}`
+## 학교: ${stats.schools.total}개, TOP: ${JSON.stringify(stats.schools.topSchools.slice(0,5))}
+## DAU 추이: ${JSON.stringify(stats.dauTrend.slice(-7))}`
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: `You are a web service operations analyst. Pyeonharu is a Korean food allergy management and diet tracking web app.
-Analyze the given metrics and respond ONLY in pure JSON (no markdown code blocks). ALL text must be in ENGLISH:
+        { role: "system", content: `당신은 웹 서비스 운영 분석 전문가입니다. 편하루(Pyeonharu)는 식품 알레르기 관리 및 식단 관리 웹앱입니다.
+주어진 지표 데이터를 분석하여 JSON으로만 응답하세요 (마크다운 코드블록 없이 순수 JSON). 모든 텍스트는 반드시 한국어로 작성:
 {
-  "overall_grade": "A~F letter grade",
-  "overall_summary": "2-3 sentence overall assessment in English",
-  "metrics_analysis": {"metric_name": "interpretation in English"},
-  "strengths": ["strength1 in English", "strength2"],
-  "improvements": [{"issue": "problem in English", "recommendation": "solution in English"}],
-  "community_health": "community health summary in English",
-  "feature_usage": "feature usage analysis in English",
-  "action_items": [{"priority": "high|medium|low", "action": "action in English", "expected_impact": "impact in English"}]
+  "overall_grade": "A~F 등급",
+  "overall_summary": "2~3문장 종합 평가 (한국어)",
+  "metrics_analysis": {"지표명": "해석 (한국어)"},
+  "strengths": ["강점1 (한국어)"],
+  "improvements": [{"issue": "문제점 (한국어)", "recommendation": "개선안 (한국어)"}],
+  "community_health": "커뮤니티 건전성 요약 (한국어)",
+  "feature_usage": "기능 활용도 분석 (한국어)",
+  "action_items": [{"priority": "high|medium|low", "action": "액션 (한국어)", "expected_impact": "기대효과 (한국어)"}]
 }` },
         { role: "user", content: prompt }
       ],

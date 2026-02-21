@@ -23,4 +23,6 @@ npm install react-kakao-sdk
 2026-02-15 16:29 이용재
 npm install @vercel/og
 
-build
+2026-02-16 01:27 이진원
+npm install dompurify
+npm install -D @types/dompurify
