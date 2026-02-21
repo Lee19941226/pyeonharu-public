@@ -582,7 +582,6 @@ export default function FoodTab({
   };
 
   const loadMealData = async () => {
-    // user === undefined: auth 아직 확인 안 됨 → 대기
     if (user === undefined) return;
     if (!user) {
       setMealStatus("no-login");
@@ -640,6 +639,7 @@ export default function FoodTab({
       router.push(`/can-i-eat?q=${encodeURIComponent(foodInput)}`);
   };
 
+  // ✅ 수정: FormData → JSON+base64
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -655,30 +655,82 @@ export default function FoodTab({
     toast.info("이미지 분석 중...");
 
     try {
-      const formData = new FormData();
-      formData.append("image", file);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const imageData = e.target?.result as string;
 
-      const response = await fetch("/api/food/analyze-image", {
-        method: "POST",
-        body: formData,
-      });
+        try {
+          // 사용자 알레르기 가져오기
+          const supabase = createClient();
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          let userAllergens: string[] = [];
 
-      const data = await response.json();
+          if (currentUser) {
+            const { data } = await supabase
+              .from("user_allergies")
+              .select("allergen_name")
+              .eq("user_id", currentUser.id);
+            if (data) {
+              userAllergens = data.map((item) => item.allergen_name);
+            }
+          }
 
-      if (data.success && data.analysisId) {
-        toast.success("분석 완료!");
-        router.push(`/food/result/${data.analysisId}`);
-      } else {
-        toast.error(data.error || "분석에 실패했습니다");
-      }
+          // base64만 추출 (data:image/jpeg;base64, 제거)
+          const base64Data = imageData.includes(",")
+            ? imageData.split(",")[1]
+            : imageData;
+
+          const response = await fetch("/api/food/analyze-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageBase64: base64Data,
+              userAllergens: userAllergens,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success && data.foodCode) {
+            sessionStorage.setItem(
+              `ai_result_${data.foodCode}`,
+              JSON.stringify({
+                foodCode: data.foodCode,
+                productName: data.productName,
+                manufacturer: data.manufacturer,
+                weight: data.weight,
+                allergens: data.allergens,
+                hasUserAllergen: data.hasUserAllergen,
+                matchedUserAllergens: data.matchedUserAllergens || [],
+                ingredients: data.ingredients || [],
+                rawMaterials: data.rawMaterials || "",
+                nutritionInfo: data.nutritionInfo || null,
+                dataSource: data.dataSource || "ai",
+              }),
+            );
+            toast.success("분석 완료!");
+            router.push(`/food/result/${data.foodCode}`);
+          } else if (data.success && data.analysisId) {
+            toast.success("분석 완료!");
+            router.push(`/food/result/${data.analysisId}`);
+          } else {
+            toast.error(data.error || "분석에 실패했습니다");
+          }
+        } catch (error) {
+          console.error("이미지 분석 오류:", error);
+          toast.error("이미지 분석 중 오류가 발생했습니다");
+        } finally {
+          setIsProcessing(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+        }
+      };
+      reader.readAsDataURL(file);
     } catch (error) {
       console.error("이미지 분석 오류:", error);
       toast.error("이미지 분석 중 오류가 발생했습니다");
-    } finally {
       setIsProcessing(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -1102,7 +1154,6 @@ export default function FoodTab({
         {/* ═══ 3. 커뮤니티 ═══ */}
         <div className="pt-1 space-y-4">
           <div>
-            {/* ✅ 글쓰기 버튼을 "학교 수정 →"과 동일한 레이아웃으로 */}
             <div className="flex items-center justify-between pt-1 mb-3">
               <p className="text-sm font-medium text-muted-foreground">
                 💬 내 학교 최신글
