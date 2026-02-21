@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "로그인 필요" }, { status: 401 })
 
-    // 1. 사용자 알레르기
+    // ─── 1. 사용자 알레르기 ───
     const { data: allergies } = await supabase
       .from("user_allergies")
       .select("allergen_name, severity")
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const allergenList = (allergies || []).map(a => a.allergen_name)
 
-    // 2. 오늘 식단 기록 — KST 기준 (기존 /api/diet/entries와 동일)
+    // ─── 2. 오늘 식단 (KST) ───
     const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split("T")[0]
     const startOfDay = `${todayStr}T00:00:00+09:00`
     const endOfDay = `${todayStr}T23:59:59+09:00`
@@ -31,20 +31,20 @@ export async function GET(req: NextRequest) {
       .lte("recorded_at", endOfDay)
       .order("recorded_at", { ascending: true })
 
-    // 3. 최근 3일 식단 (반복 방지) — KST 기준
-    const threeDaysAgoDate = new Date(Date.now() + 9 * 60 * 60 * 1000)
-    threeDaysAgoDate.setDate(threeDaysAgoDate.getDate() - 3)
-    const threeDaysAgoStr = threeDaysAgoDate.toISOString().split("T")[0]
+    // ─── 3. 최근 7일 식단 (주간 패턴) ───
+    const weekAgo = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    const weekAgoStr = weekAgo.toISOString().split("T")[0]
 
-    const { data: recentMeals } = await supabase
+    const { data: weeklyMeals } = await supabase
       .from("diet_entries")
-      .select("food_name, estimated_cal")
+      .select("food_name, estimated_cal, recorded_at")
       .eq("user_id", user.id)
-      .gte("recorded_at", `${threeDaysAgoStr}T00:00:00+09:00`)
+      .gte("recorded_at", `${weekAgoStr}T00:00:00+09:00`)
       .order("recorded_at", { ascending: false })
-      .limit(30)
+      .limit(100)
 
-    // 4. BMR
+    // ─── 4. BMR ───
     const { data: profile } = await supabase
       .from("profiles")
       .select("bmr, height, weight, age, gender")
@@ -53,58 +53,101 @@ export async function GET(req: NextRequest) {
 
     const bmr = profile?.bmr || 2000
     const todayCalories = (todayMeals || []).reduce((sum, m) => sum + (m.estimated_cal || 0), 0)
-    const remainingCal = Math.max(bmr - todayCalories, 300)
+    const remainingCal = Math.max(bmr - todayCalories, 0)
 
-    // 5. 식사 타입 (KST)
+    // ─── 5. 식사 타입 (KST) ───
     const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getHours()
     let mealType = "저녁"
     if (kstHour < 10) mealType = "아침"
     else if (kstHour < 15) mealType = "점심"
     else if (kstHour < 18) mealType = "간식"
 
-    const recentFoodNames = [...new Set((recentMeals || []).map(m => m.food_name))].slice(0, 15)
+    // ─── 6. 주간 분석 데이터 가공 ───
     const todayFoodNames = (todayMeals || []).map(m => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`)
+    const recentFoodNames = [...new Set((weeklyMeals || []).map(m => m.food_name))].slice(0, 20)
 
-    // 6. GPT-4o-mini 추천
-    const prompt = `사용자 정보:
-- 알레르기: ${allergenList.length > 0 ? allergenList.join(", ") : "없음"}
-- 오늘 먹은 것: ${todayFoodNames.length > 0 ? todayFoodNames.join(", ") : "아직 없음"}
-- 오늘 섭취: ${todayCalories}kcal / 목표: ${bmr}kcal (잔여 ${remainingCal}kcal)
-- 최근 3일: ${recentFoodNames.join(", ") || "기록 없음"}
-- 식사: ${mealType}
+    // 주간 음식 빈도
+    const foodFreq: Record<string, number> = {}
+    ;(weeklyMeals || []).forEach(m => {
+      foodFreq[m.food_name] = (foodFreq[m.food_name] || 0) + 1
+    })
+    const topFoods = Object.entries(foodFreq)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, count]) => `${name}(${count}회)`)
 
-다음 ${mealType} 메뉴 3개를 추천하세요.
+    // 주간 일별 칼로리
+    const dailyCals: Record<string, number> = {}
+    ;(weeklyMeals || []).forEach(m => {
+      const kst = new Date(new Date(m.recorded_at).getTime() + 9 * 60 * 60 * 1000)
+      const key = kst.toISOString().split("T")[0]
+      dailyCals[key] = (dailyCals[key] || 0) + (m.estimated_cal || 0)
+    })
+    const dailyCalArr = Object.entries(dailyCals).sort(([a], [b]) => a.localeCompare(b))
+    const weekAvgCal = dailyCalArr.length > 0
+      ? Math.round(dailyCalArr.reduce((s, [, c]) => s + c, 0) / dailyCalArr.length)
+      : 0
+    const overDays = dailyCalArr.filter(([, c]) => bmr > 0 && c > bmr).length
 
-규칙:
+    // ─── 7. GPT-4o-mini 추천 (근거 체인 포함) ───
+    const prompt = `당신은 한국 식단 영양사입니다. 아래 데이터를 분석하고, 각 근거를 명시한 메뉴 추천을 해주세요.
+
+## 사용자 데이터
+
+**알레르기**: ${allergenList.length > 0 ? allergenList.join(", ") : "없음"}
+
+**오늘 섭취 내역**:
+${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
+- 합계: ${todayCalories}kcal / 목표: ${bmr}kcal / 잔여: ${remainingCal}kcal
+
+**주간 패턴 (최근 7일)**:
+- 자주 먹은 음식: ${topFoods.join(", ") || "기록 없음"}
+- 일평균 칼로리: ${weekAvgCal}kcal
+- 목표 초과 일수: ${overDays}일/7일
+- 일별 칼로리: ${dailyCalArr.map(([d, c]) => `${d.slice(5)}:${c}kcal`).join(", ") || "없음"}
+
+**현재**: ${mealType} 시간
+
+## 추천 규칙
 1. 알레르기 식품 절대 제외
-2. 최근 3일 먹은 음식 피하기
+2. 최근 7일 자주 먹은 음식 피하기 (다양성)
 3. 남은 칼로리(${remainingCal}kcal)에 맞추기
-4. 오늘 영양 편중 보완 (탄수화물 위주면 단백질 추천 등)
-5. 한국에서 흔한 실용적 메뉴
+4. 주간 영양 패턴의 편중 보완
+5. 오늘 먹은 음식과의 맛 밸런스 고려
 
-JSON만 응답 (코드블록 없이):
+## 응답 형식 (JSON만, 코드블록 없이)
 {
   "mealType": "${mealType}",
+  "analysis": {
+    "calorieSituation": "오늘 칼로리 상황 1줄 (예: 이미 4,408kcal 섭취로 목표 초과, 가벼운 식사 필요)",
+    "weeklyPattern": "주간 패턴 분석 1줄 (예: 햄버거·버거를 7일간 9회 섭취, 패스트푸드 편중 심각)",
+    "nutritionGap": "부족한 영양소 1줄 (예: 식이섬유·비타민 부족, 단백질 과다)"
+  },
   "recommendations": [
     {
       "name": "메뉴명",
       "emoji": "이모지",
       "estimatedCal": 숫자,
-      "reason": "영양 균형 기반 추천 이유 1줄",
+      "reasoning": {
+        "taste": "오늘 먹은 것 기반 입맛 근거 (예: 점심에 기름진 버거를 먹었으니 담백한 맛이 어울립니다)",
+        "calorie": "칼로리 근거 (예: 잔여 0kcal이므로 100kcal 이하 초경량 식사)",
+        "nutrition": "주간 영양 근거 (예: 7일간 채소 섭취 거의 없어 식이섬유 보충 필요)",
+        "variety": "다양성 근거 (예: 최근 한식을 안 먹었으므로 한식 추천)"
+      },
       "deliveryKeyword": "배달앱 검색어"
     }
   ],
-  "nutritionTip": "오늘 식단 영양 팁 1줄"
+  "nutritionTip": "종합 영양 조언 1줄"
 }`
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "한국 식단 영양사. 알레르기 고려 안전 메뉴 추천. JSON만 응답." },
+        { role: "system", content: "한국 식단 영양사. 데이터 기반 근거를 명확히 제시하는 메뉴 추천. JSON만 응답." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.7,
-      max_tokens: 800,
+      temperature: 0.6,
+      max_tokens: 1500,
     })
 
     let result: any
@@ -112,7 +155,12 @@ JSON만 응답 (코드블록 없이):
       const raw = (completion.choices[0]?.message?.content || "{}").replace(/```json\n?|```/g, "").trim()
       result = JSON.parse(raw)
     } catch {
-      result = { mealType, recommendations: [], nutritionTip: "추천을 생성하지 못했습니다." }
+      result = {
+        mealType,
+        analysis: { calorieSituation: "", weeklyPattern: "", nutritionGap: "" },
+        recommendations: [],
+        nutritionTip: "추천을 생성하지 못했습니다."
+      }
     }
 
     return NextResponse.json({
@@ -124,6 +172,9 @@ JSON만 응답 (코드블록 없이):
         remainingCalories: remainingCal,
         allergens: allergenList,
         todayMeals: todayFoodNames,
+        weeklyAvgCal: weekAvgCal,
+        weeklyOverDays: overDays,
+        weeklyTopFoods: topFoods,
       }
     })
   } catch (error: any) {
