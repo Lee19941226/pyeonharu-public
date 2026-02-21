@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { Loader2, Sparkles, X, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Zap } from "lucide-react"
 
 interface Stats {
@@ -69,8 +70,8 @@ export default function AdminReportButton({ stats, period }: { stats: Stats | nu
           (<><Sparkles className="h-4 w-4" />AI 리포트</>)}
       </button>
 
-      {/* ─── 모달 ─── */}
-      {showModal && (
+      {/* ─── 모달 (Portal) ─── */}
+      {showModal && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto pt-16 pb-8 px-4"
           onClick={() => setShowModal(false)}>
           <div className="w-full max-w-3xl rounded-2xl bg-background shadow-2xl border"
@@ -225,7 +226,8 @@ export default function AdminReportButton({ stats, period }: { stats: Stats | nu
               </div>
             ) : null}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
