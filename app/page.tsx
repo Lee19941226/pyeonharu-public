@@ -27,6 +27,7 @@ import DietTab from "@/components/tabs/DietTab";
 import SymptomTab from "@/components/tabs/SymptomTab";
 import HospitalTab from "@/components/tabs/HospitalTab";
 import MedicineTab from "@/components/tabs/MedicineTab";
+import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
@@ -163,12 +164,7 @@ export default function HomePage() {
       {isInitialLoading && (
         <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${isFadingOut ? "opacity-0" : "opacity-100"}`}>
           <div className="flex flex-col items-center gap-6">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary shadow-lg">
-                <span className="text-2xl font-bold text-primary-foreground">편</span>
-              </div>
-              <span className="text-2xl font-bold text-foreground">편하루</span>
-            </div>
+            <PyeonharuLogo size="lg" />
             <div className="w-72">
               <div className="mb-2 flex items-center justify-between px-0.5">
                 <span className="text-xs text-muted-foreground truncate max-w-[180px]">{loadLabel}</span>

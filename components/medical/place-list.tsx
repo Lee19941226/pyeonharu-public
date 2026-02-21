@@ -91,7 +91,7 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
           >
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="mb-2 flex items-center gap-2">
                     {place.type === "hospital" ? (
                       <div className={cn(
@@ -124,7 +124,7 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
                         <Phone className="h-3 w-3 shrink-0" />
                         <a
                           href={`tel:${place.phone}`}
-                          className="hover:text-primary hover:underline"
+                          className="truncate hover:text-primary hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {place.phone}
@@ -133,7 +133,7 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
                     )}
                     <p className="flex items-center gap-1">
                       <Clock className="h-3 w-3 shrink-0" />
-                      {place.openTime} - {place.closeTime}
+                      <span className="truncate">{place.openTime} - {place.closeTime}</span>
                     </p>
                   </div>
 
