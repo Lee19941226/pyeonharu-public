@@ -31,6 +31,8 @@ export default function FoodResultPage() {
   const [result, setResult] = useState<FoodResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const lastLoadedIdRef = useRef<string | undefined>(null);
 
@@ -60,7 +62,36 @@ export default function FoodResultPage() {
       checkFavorite();
     }
   }, [result]);
+  useEffect(() => {
+    const getUserInfo = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
+      if (user) {
+        setIsLoggedIn(true);
+
+        // ✅ profiles 테이블에서 nickname 가져오기
+        const { data: profile } = await supabase
+          .from("profiles") // ← user_profiles가 아니라 profiles
+          .select("nickname")
+          .eq("id", user.id) // ← user_id가 아니라 id
+          .single();
+
+        if (profile?.nickname) {
+          setUserName(profile.nickname);
+        } else {
+          // 닉네임 없으면 이메일에서 추출
+          setUserName(user.email?.split("@")[0] || "회원");
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
+    };
+
+    getUserInfo();
+  }, []);
   const shareToKakao = () => {
     if (!result || !window.Kakao) {
       toast.error("카카오톡 공유를 사용할 수 없습니다");
@@ -135,9 +166,57 @@ export default function FoodResultPage() {
   const loadFoodResult = async () => {
     try {
       setIsLoading(true);
+
       const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
       console.log("🔍 결과 로드 시작:", id);
+
+      // ==========================================
+      // 0단계: 빠른 캐시 확인 (즉시 표시)
+      // ==========================================
+      const cacheKey = `food_quick_${id}`;
+      const quickCache = sessionStorage.getItem(cacheKey);
+
+      if (quickCache) {
+        const cached = JSON.parse(quickCache);
+
+        // 5분 이내 캐시만 사용
+        if (Date.now() - cached.timestamp < 300000) {
+          console.log("⚡ 빠른 캐시 사용 - 즉시 표시");
+
+          const quickResult: FoodResult = {
+            foodCode: cached.foodCode,
+            foodName: cached.foodName,
+            manufacturer: cached.manufacturer || "",
+            weight: cached.weight || "",
+            allergens: cached.allergens || [],
+            userAllergens: [],
+            detectedAllergens: (cached.matchedUserAllergens || []).map(
+              (a: string) => ({
+                name: a,
+                amount: "",
+                severity: "medium" as const,
+                code: "",
+              }),
+            ),
+            ingredients: cached.ingredients || [],
+            isSafe: !cached.hasAllergen,
+            dataSource: cached.dataSource || "db",
+            alternatives: [],
+            nutritionDetails: undefined,
+            servingSize: undefined,
+            hasNutritionInfo: false,
+          };
+
+          setResult(quickResult);
+          setIsLoading(false);
+
+          if (id) {
+            fetchDetailedInfo(id);
+          }
+          return;
+        }
+      }
 
       // ==========================================
       // 1단계: 무조건 API 우선 호출 (AI든 일반이든)
@@ -291,6 +370,41 @@ export default function FoodResultPage() {
       setIsLoading(false);
     }
   };
+  const fetchDetailedInfo = async (id: string) => {
+    if (!id) return;
+    try {
+      console.log("🔄 백그라운드에서 상세 정보 로딩...");
+
+      const response = await fetch(`/api/food/result?code=${id}`, {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log("✅ 상세 정보 추가 완료");
+
+          setResult((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  nutritionDetails: data.result.nutritionDetails,
+                  servingSize: data.result.servingSize,
+                  hasNutritionInfo: data.result.hasNutritionInfo,
+                  alternatives: data.result.alternatives,
+                }
+              : data.result,
+          );
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ 상세 정보 로드 실패 (무시):", error);
+    }
+  };
+
+  useEffect(() => {
+    loadFoodResult();
+  }, [params.id]);
   const saveToHistory = async (result: FoodResult) => {
     // ✅ result가 없으면 바로 리턴
     if (!result) {
@@ -695,16 +809,33 @@ export default function FoodResultPage() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
                       <CheckCircle className="h-6 w-6 text-green-600" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h2 className="text-lg font-bold text-green-900">
                         안전합니다!
                       </h2>
-                      <p className="text-sm text-green-700">
-                        귀하의 알레르기 성분이 포함되지 않았습니다
-                      </p>
-                      <p className="text-sm text-green-700">
-                        안심하고 드셔도 좋습니다
-                      </p>
+                      {isLoggedIn ? (
+                        <>
+                          <p className="text-sm text-green-700">
+                            {userName ? `${userName}님의` : ""} 알레르기 성분이
+                            포함되지 않았습니다
+                          </p>
+                          <p className="text-sm text-green-700">
+                            안심하고 드셔도 좋습니다
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-green-700">
+                            확인된 알레르기 성분이 없습니다
+                          </p>
+                          <Link
+                            href="/food/profile"
+                            className="text-sm text-green-600 underline hover:text-green-800"
+                          >
+                            내 알레르기 정보를 등록하고 정확하게 확인하세요 →
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -718,35 +849,53 @@ export default function FoodResultPage() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/20">
                       <AlertTriangle className="h-6 w-6 text-destructive" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h2 className="text-lg font-bold text-destructive">
-                        주의! 알레르기 위험
+                        ⚠️ 주의! 알레르기 위험
                       </h2>
-                      <p className="text-sm text-destructive/80">
+                      <p className="text-sm text-destructive/80 font-medium">
                         {safeDetectedAllergens
                           .filter((a) => a && a.name)
                           .map((a) => a.name)
                           .join(", ")}{" "}
                         함유
                       </p>
-                      <p className="text-sm text-destructive/80">
-                        귀하의 알레르기와 일치합니다
-                      </p>
+                      {isLoggedIn ? (
+                        <p className="text-sm text-destructive/80">
+                          {userName ? `${userName}님의` : ""} 알레르기와
+                          일치합니다
+                        </p>
+                      ) : (
+                        <p className="text-sm text-destructive/80">
+                          주의가 필요한 알레르기 성분입니다
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex gap-2">
-                    <Link href="/" className="flex-1">
+                    <Link href="/hospital" className="flex-1">
                       <Button className="w-full" variant="destructive">
                         <MapPin className="mr-2 h-4 w-4" />
                         병원 찾기
                       </Button>
                     </Link>
-                    <Link href={`/food/guide/${params.id}`} className="flex-1">
-                      <Button className="w-full" variant="outline">
-                        💊 대처법
-                      </Button>
-                    </Link>
+                    {isLoggedIn ? (
+                      <Link
+                        href={`/food/guide/${params.id}`}
+                        className="flex-1"
+                      >
+                        <Button className="w-full" variant="outline">
+                          💊 대처법
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href="/food/profile" className="flex-1">
+                        <Button className="w-full" variant="outline">
+                          🔐 내 정보 등록
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>

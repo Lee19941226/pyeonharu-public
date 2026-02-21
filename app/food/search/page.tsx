@@ -701,12 +701,29 @@ function FoodSearchPageInner() {
 
   // ✅ 결과 클릭 (페이지 번호도 캐싱)
   const handleResultClick = (foodCode: string) => {
-    const cacheKey = `search_cache_${query}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      const cachedData = JSON.parse(cached);
-      cachedData.page = currentPage;
-      sessionStorage.setItem(cacheKey, JSON.stringify(cachedData));
+    const item = allResults.find((r) => r.foodCode === foodCode);
+
+    if (item) {
+      // ✅ 검색 결과를 sessionStorage에 저장
+      const cacheKey = `food_quick_${foodCode}`;
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          foodCode: item.foodCode,
+          foodName: item.foodName,
+          manufacturer: item.manufacturer,
+          allergens: item.allergens,
+          hasAllergen: item.hasAllergen,
+          matchedUserAllergens: item.matchedUserAllergens,
+          dataSource: item.dataSource,
+          rawMaterials: item.rawMaterials,
+          weight: item.weight,
+          ingredients: item.ingredients,
+          timestamp: Date.now(), // 캐시 시간
+        }),
+      );
+
+      console.log("💾 빠른 캐시 저장:", foodCode);
     }
 
     router.push(`/food/result/${foodCode}`);
