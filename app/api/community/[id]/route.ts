@@ -181,6 +181,24 @@ export async function PUT(
 
   const body = await req.json();
   const { title, content, imageUrls } = body;
+  if (!title?.trim() || !content?.trim()) {
+    return NextResponse.json(
+      { error: "필수 항목을 모두 입력해주세요." },
+      { status: 400 },
+    );
+  }
+  if (title.trim().length > 100) {
+    return NextResponse.json(
+      { error: "제목은 100자 이내로 입력해주세요." },
+      { status: 400 },
+    );
+  }
+  if (content.trim().length > 5000) {
+    return NextResponse.json(
+      { error: "내용은 5000자 이내로 입력해주세요." },
+      { status: 400 },
+    );
+  }
 
   const { data, error } = await supabase
     .from("community_posts")
