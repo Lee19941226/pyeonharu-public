@@ -41,7 +41,6 @@ public class MainActivity extends BridgeActivity {
                 if (filePathCallback == null) return;
 
                 if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    // 앨범에서 선택한 경우
                     Uri dataUri = result.getData().getData();
                     if (dataUri != null) {
                         filePathCallback.onReceiveValue(new Uri[]{dataUri});
@@ -49,7 +48,6 @@ public class MainActivity extends BridgeActivity {
                         filePathCallback.onReceiveValue(null);
                     }
                 } else if (result.getResultCode() == RESULT_OK && cameraPhotoUri != null) {
-                    // 카메라로 촬영한 경우
                     filePathCallback.onReceiveValue(new Uri[]{cameraPhotoUri});
                 } else {
                     filePathCallback.onReceiveValue(null);
@@ -61,33 +59,25 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // 권한 요청 (위치 + 카메라)
-        List<String> permissionsNeeded = new ArrayList<>();
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
-            permissionsNeeded.add(Manifest.permission.ACCESS_COARSE_LOCATION);
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            permissionsNeeded.add(Manifest.permission.CAMERA);
-        }
-
-        if (!permissionsNeeded.isEmpty()) {
-            ActivityCompat.requestPermissions(this,
-                permissionsNeeded.toArray(new String[0]),
-                PERMISSION_REQUEST);
-        }
     }
 
     @Override
     public void onStart() {
         super.onStart();
 
+        // 권한 요청
+        requestAllPermissions();
+
         WebView webView = getBridge().getWebView();
+
+        // WebView 설정: 팝업/리다이렉트가 WebView 안에서 처리되도록
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+        webView.getSettings().setSupportMultipleWindows(false);
+        webView.getSettings().setDomStorageEnabled(true);
+        webView.getSettings().setUserAgentString(
+            webView.getSettings().getUserAgentString() + " PyeonharuApp"
+        );
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -97,20 +87,14 @@ public class MainActivity extends BridgeActivity {
 
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback, FileChooserParams fileChooserParams) {
-                // 이전 콜백이 있으면 취소 처리
                 if (filePathCallback != null) {
                     filePathCallback.onReceiveValue(null);
                 }
                 filePathCallback = callback;
 
-                // capture 속성 확인
-                boolean isCaptureEnabled = false;
-                if (fileChooserParams.isCaptureEnabled()) {
-                    isCaptureEnabled = true;
-                }
+                boolean isCaptureEnabled = fileChooserParams.isCaptureEnabled();
 
                 if (isCaptureEnabled) {
-                    // capture="environment" → 카메라만 열기
                     Intent cameraIntent = createCameraIntent();
                     if (cameraIntent != null) {
                         fileChooserLauncher.launch(cameraIntent);
@@ -119,7 +103,6 @@ public class MainActivity extends BridgeActivity {
                         filePathCallback = null;
                     }
                 } else {
-                    // capture 없음 → 앨범만 열기
                     Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
                     galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
                     galleryIntent.setType("image/*");
@@ -130,19 +113,25 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // URL 라우팅
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
 
-                // Google OAuth → 시스템 브라우저
+                // ★ 앱 도메인 → WebView 안에서 처리 (OAuth 콜백 포함)
+                if (url.startsWith("https://www.pyeonharu.com") || url.startsWith("https://pyeonharu.com")) {
+                    return false; // WebView가 처리
+                }
+
+                // ★ OAuth 로그인 페이지들 → WebView 안에서 처리
+                // Google, Kakao, Naver 로그인 페이지를 WebView에서 직접 열어야
+                // 로그인 완료 후 redirectTo가 WebView 안에서 자연스럽게 처리됨
                 if (url.contains("accounts.google.com") ||
-                    url.contains("oauth") ||
-                    url.contains("nid.naver.com")) {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    startActivity(intent);
-                    return true;
+                    url.contains("kauth.kakao.com") ||
+                    url.contains("accounts.kakao.com") ||
+                    url.contains("nid.naver.com") ||
+                    url.contains("supabase.co")) {
+                    return false; // WebView가 처리
                 }
 
                 // 전화 걸기
@@ -153,7 +142,7 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 // 네이버맵 등 외부 앱
-                if (url.startsWith("intent:") || url.startsWith("nmap://")) {
+                if (url.startsWith("intent:") || url.startsWith("nmap://") || url.startsWith("kakaomap://")) {
                     try {
                         Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
                         if (intent.resolveActivity(getPackageManager()) != null) {
@@ -167,6 +156,13 @@ public class MainActivity extends BridgeActivity {
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                    return true;
+                }
+
+                // 기타 외부 URL → 외부 브라우저
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    startActivity(intent);
                     return true;
                 }
 
@@ -203,5 +199,43 @@ public class MainActivity extends BridgeActivity {
         String imageFileName = "PYEONHARU_" + timeStamp + "_";
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         return File.createTempFile(imageFileName, ".jpg", storageDir);
+    }
+
+    private boolean permissionsRequested = false;
+
+    private void requestAllPermissions() {
+        if (permissionsRequested) return;
+        permissionsRequested = true;
+
+        List<String> permissionsNeeded = new ArrayList<>();
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            permissionsNeeded.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.CAMERA);
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
+                    != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.READ_MEDIA_IMAGES);
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            }
+        }
+
+        if (!permissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(this,
+                permissionsNeeded.toArray(new String[0]),
+                PERMISSION_REQUEST);
+        }
     }
 }
