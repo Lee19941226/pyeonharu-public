@@ -35,9 +35,26 @@ function getChosung(str: string): string {
   }
   return result;
 }
+async function fetchWithTimeout(url: string, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.json();
+  } catch (error: any) {
+    if (error.name === "AbortError") {
+      console.error(`식약처 API 타임아웃 (${timeoutMs}ms): ${url}`);
+    } else {
+      console.error("식약처 API 오류:", error);
+    }
+    return null; // null로 반환해서 호출부에서 구분 가능
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 export async function GET(req: NextRequest) {
-  // ✅ 변수 선언
   let productName = "제품";
   let manufacturer = "";
   let weight = "";
@@ -265,8 +282,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("numOfRows", "100");
                 url.searchParams.append("type", "json");
                 url.searchParams.append("brcd_no", code);
-                const response = await fetch(url.toString());
-                const data = await response.json();
+                const data = await fetchWithTimeout(url.toString());
                 return data.body?.items || [];
               })(),
 
@@ -280,8 +296,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("numOfRows", "100");
                 url.searchParams.append("type", "json");
                 url.searchParams.append("brcd_no", code);
-                const response = await fetch(url.toString());
-                const data = await response.json();
+                const data = await fetchWithTimeout(url.toString());
                 return data.body?.items || [];
               })(),
 
@@ -298,8 +313,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("numOfRows", "50");
                 url.searchParams.append("type", "json");
                 url.searchParams.append("brcd_no", code);
-                const response = await fetch(url.toString());
-                const data = await response.json();
+                const data = await fetchWithTimeout(url.toString());
                 return data.body?.items || [];
               })(),
             ]);
@@ -504,8 +518,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("numOfRows", "1");
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
-          const response = await fetch(url.toString());
-          const data = await response.json();
+          const data = await fetchWithTimeout(url.toString());
           return data.body?.items?.[0] || null;
         })(),
 
@@ -517,8 +530,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("numOfRows", "100");
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
-          const response = await fetch(url.toString());
-          const data = await response.json();
+          const data = await fetchWithTimeout(url.toString());
           return data.body?.items || [];
         })(),
 
@@ -530,8 +542,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("numOfRows", "100");
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
-          const response = await fetch(url.toString());
-          const data = await response.json();
+          const data = await fetchWithTimeout(url.toString());
           return data.body?.items || [];
         })(),
 
@@ -543,8 +554,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("numOfRows", "50");
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
-          const response = await fetch(url.toString());
-          const data = await response.json();
+          const data = await fetchWithTimeout(url.toString());
           return data.body?.items || [];
         })(),
 
@@ -556,8 +566,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("numOfRows", "1");
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
-          const response = await fetch(url.toString());
-          const data = await response.json();
+          const data = await fetchWithTimeout(url.toString());
           return data.body?.items?.[0] || null;
         })(),
       ]);

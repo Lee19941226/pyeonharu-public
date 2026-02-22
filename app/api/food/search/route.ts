@@ -18,7 +18,32 @@ interface ProductScore {
   weight?: string;
   rawMaterials?: string;
 }
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 8000,
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.json();
+  } catch (error: any) {
+    if (error.name === "AbortError") {
+      console.error(`API 타임아웃 (${timeoutMs}ms): ${url}`);
+    } else {
+      console.error("API 오류:", error);
+    }
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
@@ -129,16 +154,13 @@ export async function GET(req: NextRequest) {
 
           console.log("🔗 푸드QR API 호출:", searchUrl.toString());
 
-          const searchRes = await fetch(searchUrl.toString(), {
+          const searchData = await fetchWithTimeout(searchUrl.toString(), {
             cache: "no-store",
-            headers: {
-              "Cache-Control": "no-cache",
-            },
+            headers: { "Cache-Control": "no-cache" },
           });
-          const searchData = await searchRes.json();
-
           let productItems = [];
-          if (Array.isArray(searchData.body?.items)) {
+          if (searchData === null) {
+          } else if (Array.isArray(searchData.body?.items)) {
             productItems = searchData.body.items;
           } else if (searchData.body?.items?.item) {
             productItems = Array.isArray(searchData.body.items.item)
@@ -162,23 +184,17 @@ export async function GET(req: NextRequest) {
                 allergyUrl.searchParams.append("type", "json");
                 allergyUrl.searchParams.append("brcd_no", product.BRCD_NO);
 
-                const allergyRes = await fetch(allergyUrl.toString());
+                const allergyData = await fetchWithTimeout(
+                  allergyUrl.toString(),
+                );
 
-                if (allergyRes.status === 401 || allergyRes.status === 403) {
-                  return {
-                    BRCD_NO: product.BRCD_NO,
-                    PRDCT_NM: product.PRDCT_NM,
-                    BUES_NM: product.BUES_NM,
-                    PRDLST_DCNTS: product.PRDLST_DCNTS,
-                    QNT: product.QNT,
-                    ALLERGENS: [],
-                  };
-                }
-
-                const allergyData = await allergyRes.json();
+                // if (allergyRes.status === 401 ...) 블록 삭제
+                // const allergyData = await allergyRes.json() 삭제
 
                 let allergyItems = [];
-                if (Array.isArray(allergyData.body?.items)) {
+                if (allergyData === null) {
+                  // 타임아웃 or 오류 시 빈 배열로 처리
+                } else if (Array.isArray(allergyData.body?.items)) {
                   allergyItems = allergyData.body.items;
                 } else if (allergyData.body?.items?.item) {
                   allergyItems = Array.isArray(allergyData.body.items.item)
@@ -238,20 +254,14 @@ export async function GET(req: NextRequest) {
           console.log("🌍 Open Food Facts 검색:", query);
           console.log("🔗 URL:", offUrl);
 
-          const res = await fetch(offUrl, {
+          const offData = await fetchWithTimeout(offUrl, {
             cache: "no-store",
             headers: {
               "User-Agent": "pyeonharu-allergy-app",
             },
           });
 
-          if (!res.ok) {
-            console.error("❌ Open Food Facts 에러:", res.status);
-            return [];
-          }
-
-          const data = await res.json();
-          const products = data.products || [];
+          const products = offData?.products || [];
 
           console.log(`🌍 Open Food Facts: ${products.length}개 발견`);
 
