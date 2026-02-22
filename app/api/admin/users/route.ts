@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,25 +9,39 @@ const supabaseAdmin = createClient(
 
 const VALID_ROLES = ["user", "moderator", "admin", "super_admin"];
 
-async function getRequesterRole(userId: string): Promise<string | null> {
-  const { data } = await supabaseAdmin
+// ─── 공통 인증 헬퍼 ───
+async function getAuthorizedUser(minRole: "admin" | "super_admin") {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return { user: null, profile: null, error: "인증 필요", status: 401 };
+
+  const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("role")
-    .eq("id", userId)
+    .eq("id", user.id)
     .single();
-  return data?.role || null;
-}
 
-async function getAuthUser(request: Request) {
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  const token = authHeader.replace("Bearer ", "");
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-  return user;
+  if (!profile)
+    return { user: null, profile: null, error: "프로필 없음", status: 403 };
+
+  const allowedRoles =
+    minRole === "super_admin" ? ["super_admin"] : ["admin", "super_admin"];
+
+  if (!allowedRoles.includes(profile.role)) {
+    return { user: null, profile: null, error: "권한 없음", status: 403 };
+  }
+
+  return { user, profile, error: null, status: 200 };
 }
 
 export async function GET(request: Request) {
   try {
+    const { user, profile, error, status } = await getAuthorizedUser("admin");
+    if (error) return NextResponse.json({ error }, { status });
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
@@ -34,38 +49,51 @@ export async function GET(request: Request) {
     const roleFilter = searchParams.get("role") || "";
     const offset = (page - 1) * limit;
 
-    const user = await getAuthUser(request);
-    if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
-
-    const requesterRole = await getRequesterRole(user.id);
-    if (!requesterRole || !["admin", "super_admin"].includes(requesterRole)) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-    }
-
     let query = supabaseAdmin
       .from("profiles")
-      .select("id, nickname, avatar_url, created_at, role, height, weight, age, gender", { count: "exact" });
+      .select(
+        "id, nickname, avatar_url, created_at, role, height, weight, age, gender",
+        { count: "exact" },
+      );
 
     if (search) {
-      query = query.or(`nickname.ilike.%${search}%,id.eq.${search.length === 36 ? search : "00000000-0000-0000-0000-000000000000"}`);
+      query = query.or(
+        `nickname.ilike.%${search}%,id.eq.${search.length === 36 ? search : "00000000-0000-0000-0000-000000000000"}`,
+      );
     }
     if (roleFilter && VALID_ROLES.includes(roleFilter)) {
       query = query.eq("role", roleFilter);
     }
 
-    const { data: users, count, error } = await query
+    const {
+      data: users,
+      count,
+      error: queryError,
+    } = await query
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (error) throw error;
+    if (queryError) throw queryError;
 
     const enrichedUsers = await Promise.all(
       (users || []).map(async (u) => {
         const [allergies, schools, scanCount, postCount] = await Promise.all([
-          supabaseAdmin.from("user_allergies").select("allergen_name").eq("user_id", u.id),
-          supabaseAdmin.from("user_schools").select("school_name").eq("user_id", u.id),
-          supabaseAdmin.from("food_scan_logs").select("*", { count: "exact", head: true }).eq("user_id", u.id),
-          supabaseAdmin.from("community_posts").select("*", { count: "exact", head: true }).eq("user_id", u.id),
+          supabaseAdmin
+            .from("user_allergies")
+            .select("allergen_name")
+            .eq("user_id", u.id),
+          supabaseAdmin
+            .from("user_schools")
+            .select("school_name")
+            .eq("user_id", u.id),
+          supabaseAdmin
+            .from("food_scan_logs")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", u.id),
+          supabaseAdmin
+            .from("community_posts")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", u.id),
         ]);
         return {
           ...u,
@@ -77,7 +105,9 @@ export async function GET(request: Request) {
       }),
     );
 
-    const { data: { users: authUsers } } = await supabaseAdmin.auth.admin.listUsers({
+    const {
+      data: { users: authUsers },
+    } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
     });
@@ -107,6 +137,11 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    // super_admin만 등급 변경 가능
+    const { user, profile, error, status } =
+      await getAuthorizedUser("super_admin");
+    if (error) return NextResponse.json({ error }, { status });
+
     const body = await request.json();
     const { targetUserId, newRole } = body;
 
@@ -114,24 +149,19 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
     }
 
-    const user = await getAuthUser(request);
-    if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
-
-    const requesterRole = await getRequesterRole(user.id);
-    if (requesterRole !== "super_admin") {
-      return NextResponse.json({ error: "super_admin만 등급 변경 가능" }, { status: 403 });
+    if (targetUserId === user!.id && newRole !== "super_admin") {
+      return NextResponse.json(
+        { error: "본인의 super_admin 권한은 해제할 수 없습니다" },
+        { status: 400 },
+      );
     }
 
-    if (targetUserId === user.id && newRole !== "super_admin") {
-      return NextResponse.json({ error: "본인의 super_admin 권한은 해제할 수 없습니다" }, { status: 400 });
-    }
-
-    const { error } = await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update({ role: newRole })
       .eq("id", targetUserId);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     return NextResponse.json({ success: true, targetUserId, newRole });
   } catch (error) {
