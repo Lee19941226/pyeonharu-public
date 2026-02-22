@@ -8,6 +8,17 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: NextRequest) {
+  // ─── 인증 체크 추가 ───
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json(
+      { success: false, error: "로그인이 필요합니다." },
+      { status: 401 },
+    );
+  }
   try {
     const { imageBase64, userAllergens } = await req.json();
 
