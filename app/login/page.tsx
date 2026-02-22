@@ -59,20 +59,8 @@ function LoginContent() {
 
     try {
       if (provider === "naver") {
-        // 네이버는 Supabase 미지원 → 직접 OAuth URL 이동
-        const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
-        if (!NAVER_CLIENT_ID) {
-          setError("네이버 로그인 설정 오류입니다.");
-          setIsOAuthLoading(null);
-          return;
-        }
-        const REDIRECT_URI = `${window.location.origin}/api/auth/naver/callback`;
-        const STATE = Math.random().toString(36).substring(7);
-
-        sessionStorage.setItem("naver_oauth_state", STATE);
-
-        const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${STATE}`;
-        window.location.href = naverAuthUrl;
+        // 네이버는 Supabase 미지원 → 서버 라우트로 처리
+        window.location.href = `/api/auth/naver`;
         return;
       }
 
