@@ -27,6 +27,8 @@ npm install @vercel/og
 npm install dompurify
 npm install -D @types/dompurify
 
+---
+
 # 1. 편하루 프로젝트로 이동
 
 cd C:\Users\ljw94\Desktop\편하루프로젝트폴더
@@ -47,3 +49,5 @@ npx cap add android
 # 5. out 폴더 + 더미 index.html 생성
 
 mkdir out
+
+빈 커밋
