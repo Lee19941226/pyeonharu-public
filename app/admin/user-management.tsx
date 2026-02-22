@@ -2,18 +2,25 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Search, ChevronLeft, ChevronRight, Shield, ShieldCheck, ShieldAlert,
-  Crown, User, Mail, School, ScanLine, MessageSquare, AlertTriangle,
-  Check, X, Loader2, Filter,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Crown,
+  User,
+  Mail,
+  School,
+  ScanLine,
+  MessageSquare,
+  AlertTriangle,
+  Check,
+  X,
+  Loader2,
+  Filter,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-// 토큰 가져오기 헬퍼
-async function getAccessToken() {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || "";
-}
 
 interface UserData {
   id: string;
@@ -41,10 +48,30 @@ interface UsersResponse {
 }
 
 const ROLES = [
-  { value: "user", label: "일반 사용자", icon: User, color: "text-gray-600 bg-gray-100" },
-  { value: "moderator", label: "모더레이터", icon: Shield, color: "text-blue-600 bg-blue-100" },
-  { value: "admin", label: "관리자", icon: ShieldCheck, color: "text-amber-600 bg-amber-100" },
-  { value: "super_admin", label: "슈퍼 관리자", icon: Crown, color: "text-red-600 bg-red-100" },
+  {
+    value: "user",
+    label: "일반 사용자",
+    icon: User,
+    color: "text-gray-600 bg-gray-100",
+  },
+  {
+    value: "moderator",
+    label: "모더레이터",
+    icon: Shield,
+    color: "text-blue-600 bg-blue-100",
+  },
+  {
+    value: "admin",
+    label: "관리자",
+    icon: ShieldCheck,
+    color: "text-amber-600 bg-amber-100",
+  },
+  {
+    value: "super_admin",
+    label: "슈퍼 관리자",
+    icon: Crown,
+    color: "text-red-600 bg-red-100",
+  },
 ];
 
 function getRoleInfo(role: string) {
@@ -55,7 +82,9 @@ function RoleBadge({ role }: { role: string }) {
   const info = getRoleInfo(role);
   const Icon = info.icon;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${info.color}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${info.color}`}
+    >
       <Icon className="h-3 w-3" />
       {info.label}
     </span>
@@ -87,9 +116,7 @@ export default function UserManagement() {
         ...(search && { search }),
         ...(roleFilter && { role: roleFilter }),
       });
-      const res = await fetch(`/api/admin/users?${params}`, {
-        headers: { Authorization: `Bearer ${await getAccessToken()}` },
-      });
+      const res = await fetch(`/api/admin/users?${params}`);
       if (res.ok) {
         setData(await res.json());
       }
@@ -118,7 +145,6 @@ export default function UserManagement() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({
           targetUserId: confirmDialog.userId,
@@ -167,12 +193,17 @@ export default function UserManagement() {
           <Filter className="h-4 w-4 text-muted-foreground" />
           <select
             value={roleFilter}
-            onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setPage(1);
+            }}
             className="h-10 rounded-lg border bg-card px-3 text-sm outline-none"
           >
             <option value="">전체 등급</option>
             {ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
             ))}
           </select>
         </div>
@@ -181,9 +212,13 @@ export default function UserManagement() {
       {/* 통계 바 */}
       {data && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span>전체 <strong className="text-foreground">{data.total}</strong>명</span>
+          <span>
+            전체 <strong className="text-foreground">{data.total}</strong>명
+          </span>
           <span>·</span>
-          <span>페이지 {data.page} / {data.totalPages}</span>
+          <span>
+            페이지 {data.page} / {data.totalPages}
+          </span>
         </div>
       )}
 
@@ -203,10 +238,16 @@ export default function UserManagement() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">사용자</th>
-                <th className="px-4 py-3 text-left font-medium hidden md:table-cell">이메일</th>
+                <th className="px-4 py-3 text-left font-medium hidden md:table-cell">
+                  이메일
+                </th>
                 <th className="px-4 py-3 text-left font-medium">등급</th>
-                <th className="px-4 py-3 text-center font-medium hidden lg:table-cell">활동</th>
-                <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">가입일</th>
+                <th className="px-4 py-3 text-center font-medium hidden lg:table-cell">
+                  활동
+                </th>
+                <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">
+                  가입일
+                </th>
                 <th className="px-4 py-3 text-center font-medium">등급 변경</th>
               </tr>
             </thead>
@@ -220,32 +261,48 @@ export default function UserManagement() {
                         {/* 메인 행 */}
                         <div
                           className="flex items-center border-b cursor-pointer hover:bg-muted/30 transition-colors"
-                          onClick={() => setExpandedUser(isExpanded ? null : user.id)}
+                          onClick={() =>
+                            setExpandedUser(isExpanded ? null : user.id)
+                          }
                         >
                           <div className="flex-1 flex items-center gap-3 px-4 py-3 min-w-[160px]">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
                               {user.nickname?.charAt(0) || "?"}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-medium truncate">{user.nickname || "이름 없음"}</p>
-                              <p className="text-[10px] text-muted-foreground truncate md:hidden">{user.email}</p>
+                              <p className="font-medium truncate">
+                                {user.nickname || "이름 없음"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground truncate md:hidden">
+                                {user.email}
+                              </p>
                             </div>
                           </div>
                           <div className="px-4 py-3 hidden md:block min-w-[180px]">
-                            <p className="text-muted-foreground truncate text-xs">{user.email}</p>
+                            <p className="text-muted-foreground truncate text-xs">
+                              {user.email}
+                            </p>
                           </div>
                           <div className="px-4 py-3 min-w-[120px]">
                             <RoleBadge role={user.role || "user"} />
                           </div>
                           <div className="px-4 py-3 text-center hidden lg:block min-w-[100px]">
                             <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-                              <span title="스캔"><ScanLine className="inline h-3 w-3" /> {user.scanCount}</span>
-                              <span title="게시글"><MessageSquare className="inline h-3 w-3" /> {user.postCount}</span>
+                              <span title="스캔">
+                                <ScanLine className="inline h-3 w-3" />{" "}
+                                {user.scanCount}
+                              </span>
+                              <span title="게시글">
+                                <MessageSquare className="inline h-3 w-3" />{" "}
+                                {user.postCount}
+                              </span>
                             </div>
                           </div>
                           <div className="px-4 py-3 hidden lg:block min-w-[100px]">
                             <p className="text-xs text-muted-foreground">
-                              {new Date(user.created_at).toLocaleDateString("ko-KR")}
+                              {new Date(user.created_at).toLocaleDateString(
+                                "ko-KR",
+                              )}
                             </p>
                           </div>
                           <div className="px-4 py-3 min-w-[140px]">
@@ -267,7 +324,9 @@ export default function UserManagement() {
                               className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                             >
                               {ROLES.map((r) => (
-                                <option key={r.value} value={r.value}>{r.label}</option>
+                                <option key={r.value} value={r.value}>
+                                  {r.label}
+                                </option>
                               ))}
                             </select>
                           </div>
@@ -278,26 +337,60 @@ export default function UserManagement() {
                           <div className="border-b bg-muted/20 px-4 py-3 space-y-2 text-xs">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <div>
-                                <span className="text-muted-foreground">UUID</span>
-                                <p className="font-mono text-[10px] truncate">{user.id}</p>
+                                <span className="text-muted-foreground">
+                                  UUID
+                                </span>
+                                <p className="font-mono text-[10px] truncate">
+                                  {user.id}
+                                </p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">신체정보</span>
-                                <p>{user.height ? `${user.height}cm` : "-"} / {user.weight ? `${user.weight}kg` : "-"} / {user.age ? `${user.age}세` : "-"} / {user.gender || "-"}</p>
+                                <span className="text-muted-foreground">
+                                  신체정보
+                                </span>
+                                <p>
+                                  {user.height ? `${user.height}cm` : "-"} /{" "}
+                                  {user.weight ? `${user.weight}kg` : "-"} /{" "}
+                                  {user.age ? `${user.age}세` : "-"} /{" "}
+                                  {user.gender || "-"}
+                                </p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">학교</span>
-                                <p>{user.schools.length > 0 ? user.schools.join(", ") : "미등록"}</p>
+                                <span className="text-muted-foreground">
+                                  학교
+                                </span>
+                                <p>
+                                  {user.schools.length > 0
+                                    ? user.schools.join(", ")
+                                    : "미등록"}
+                                </p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">알레르기</span>
-                                <p>{user.allergies.length > 0 ? user.allergies.join(", ") : "미등록"}</p>
+                                <span className="text-muted-foreground">
+                                  알레르기
+                                </span>
+                                <p>
+                                  {user.allergies.length > 0
+                                    ? user.allergies.join(", ")
+                                    : "미등록"}
+                                </p>
                               </div>
                             </div>
                             <div className="flex gap-3 pt-1 lg:hidden">
-                              <span><ScanLine className="inline h-3 w-3" /> 스캔 {user.scanCount}회</span>
-                              <span><MessageSquare className="inline h-3 w-3" /> 게시글 {user.postCount}개</span>
-                              <span>가입: {new Date(user.created_at).toLocaleDateString("ko-KR")}</span>
+                              <span>
+                                <ScanLine className="inline h-3 w-3" /> 스캔{" "}
+                                {user.scanCount}회
+                              </span>
+                              <span>
+                                <MessageSquare className="inline h-3 w-3" />{" "}
+                                게시글 {user.postCount}개
+                              </span>
+                              <span>
+                                가입:{" "}
+                                {new Date(user.created_at).toLocaleDateString(
+                                  "ko-KR",
+                                )}
+                              </span>
                             </div>
                           </div>
                         )}
@@ -330,7 +423,9 @@ export default function UserManagement() {
                 key={p}
                 onClick={() => setPage(p)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                  p === page ? "bg-primary text-primary-foreground" : "border hover:bg-muted"
+                  p === page
+                    ? "bg-primary text-primary-foreground"
+                    : "border hover:bg-muted"
                 }`}
               >
                 {p}
@@ -349,8 +444,14 @@ export default function UserManagement() {
 
       {/* 등급 변경 확인 다이얼로그 */}
       {confirmDialog && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setConfirmDialog(null)}>
-          <div className="mx-4 w-full max-w-md rounded-xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl bg-card p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
                 <AlertTriangle className="h-5 w-5 text-amber-600" />
@@ -359,7 +460,10 @@ export default function UserManagement() {
             </div>
             <div className="mb-6 space-y-3">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">{confirmDialog.userName}</strong>님의 등급을 변경합니다.
+                <strong className="text-foreground">
+                  {confirmDialog.userName}
+                </strong>
+                님의 등급을 변경합니다.
               </p>
               <div className="flex items-center gap-3">
                 <RoleBadge role={confirmDialog.currentRole} />
@@ -369,7 +473,10 @@ export default function UserManagement() {
               {confirmDialog.newRole === "super_admin" && (
                 <div className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs text-red-700">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>슈퍼 관리자는 모든 사용자의 등급을 변경할 수 있습니다. 신중하게 부여해주세요.</p>
+                  <p>
+                    슈퍼 관리자는 모든 사용자의 등급을 변경할 수 있습니다.
+                    신중하게 부여해주세요.
+                  </p>
                 </div>
               )}
             </div>
@@ -385,7 +492,11 @@ export default function UserManagement() {
                 disabled={changingRole !== null}
                 className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {changingRole ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {changingRole ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
                 변경
               </button>
             </div>
