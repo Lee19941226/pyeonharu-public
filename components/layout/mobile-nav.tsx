@@ -17,6 +17,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       data-tour="bottom-nav"
     >
       <div className="mx-auto flex h-16 max-w-md items-center justify-around">
@@ -26,9 +27,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             onClick={() => onMainTabChange("meal")}
             className={cn(
               "flex flex-col items-center gap-1 px-4 py-2 text-[11px] transition-colors",
-              mainTab === "meal"
-                ? "text-amber-600"
-                : "text-muted-foreground",
+              mainTab === "meal" ? "text-amber-600" : "text-muted-foreground",
             )}
           >
             <UtensilsCrossed className="h-5 w-5" />
@@ -50,9 +49,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             onClick={() => onMainTabChange("sick")}
             className={cn(
               "flex flex-col items-center gap-1 px-4 py-2 text-[11px] transition-colors",
-              mainTab === "sick"
-                ? "text-rose-600"
-                : "text-muted-foreground",
+              mainTab === "sick" ? "text-rose-600" : "text-muted-foreground",
             )}
           >
             <HeartPulse className="h-5 w-5" />
