@@ -177,6 +177,8 @@ function FoodMainContent() {
       loadFavorites();
       loadUserAllergens();
       loadRecentProducts();
+    } else {
+      setIsLoggedIn(false); // 로그아웃 시 상태 초기화
     }
   };
 
