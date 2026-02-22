@@ -4,6 +4,30 @@ import { getChosung } from "@/lib/utils/chosung";
 
 export async function GET(req: NextRequest) {
   try {
+    // ✅ Cron Secret 또는 관리자 인증 체크 추가
+    const authHeader = req.headers.get("authorization");
+    const cronSecret = process.env.CRON_SECRET;
+
+    // Vercel Cron 또는 직접 호출 모두 검증
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      // 관리자 로그인 체크로 fallback
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user)
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (!profile || !["admin", "super_admin"].includes(profile.role)) {
+        return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+      }
+    }
+
     const supabase = await createClient();
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
