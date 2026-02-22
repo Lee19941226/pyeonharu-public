@@ -57,25 +57,50 @@ function LoginContent() {
     setIsOAuthLoading(provider);
     setError(null);
 
-    const supabase = createClient();
+    try {
+      if (provider === "naver") {
+        // 네이버는 Supabase 미지원 → 직접 OAuth URL 이동
+        const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
+        if (!NAVER_CLIENT_ID) {
+          setError("네이버 로그인 설정 오류입니다.");
+          setIsOAuthLoading(null);
+          return;
+        }
+        const REDIRECT_URI = `${window.location.origin}/api/auth/naver/callback`;
+        const STATE = Math.random().toString(36).substring(7);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: provider as any,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+        sessionStorage.setItem("naver_oauth_state", STATE);
 
-    if (error) {
-      setError(`${provider} 로그인에 실패했습니다. 다시 시도해주세요.`);
+        const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${STATE}`;
+        window.location.href = naverAuthUrl;
+        return;
+      }
+
+      // Google, Kakao → Supabase OAuth
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setError(`${provider} 로그인에 실패했습니다. 다시 시도해주세요.`);
+        setIsOAuthLoading(null);
+      }
+    } catch {
+      setError("로그인 중 오류가 발생했습니다.");
       setIsOAuthLoading(null);
     }
   };
+
   useEffect(() => {
     if (reason === "scan_limit") {
       setShowScanLimitBanner(true);
     }
   }, [reason]);
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
@@ -302,7 +327,7 @@ function LoginContent() {
           에 동의하는 것으로 간주됩니다.
         </div>
       </footer>
-      <MobileNav /> {/* ← 추가 */}
+      <MobileNav />
     </div>
   );
 }
