@@ -7,7 +7,10 @@ export async function POST(req: NextRequest) {
 
     // ✅ 관리자 권한 체크 제거 (또는 API 키 체크로 변경)
     const { authorization } = Object.fromEntries(req.headers);
-    const apiKey = process.env.ADMIN_API_KEY || "your-secret-key";
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "서버 설정 오류" }, { status: 500 });
+    }
 
     if (authorization !== `Bearer ${apiKey}`) {
       return NextResponse.json({ error: "인증 필요" }, { status: 401 });

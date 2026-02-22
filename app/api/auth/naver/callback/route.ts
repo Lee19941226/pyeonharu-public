@@ -85,8 +85,8 @@ export async function GET(request: Request) {
       .digest("hex");
 
     // 기존 사용자 확인
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find((u) => u.email === email);
+    const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = userList?.users?.find((u) => u.email === email);
 
     if (existingUser) {
       const isNaverUser = existingUser.user_metadata?.provider === "naver";
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
       }
 
       // 비밀번호 업데이트
-      await (supabaseAdmin.auth.admin as any).updateUser(existingUser.id, {
+      await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
         password: naverPassword,
       });
     } else {
