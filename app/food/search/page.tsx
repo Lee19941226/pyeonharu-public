@@ -628,14 +628,17 @@ function FoodSearchPageInner() {
       const cached = sessionStorage.getItem(cacheKey);
 
       if (cached) {
-        console.log("✅ 캐시된 결과 사용:", urlQuery);
         const cachedData = JSON.parse(cached);
-        setAllResults(cachedData.items);
-        setHasSearched(true);
-        setCurrentPage(cachedData.page || 1);
-      } else {
-        console.log("🔍 새로운 검색:", urlQuery);
-        performSearch(urlQuery);
+        const isExpired = Date.now() - cachedData.timestamp > 5 * 60 * 1000; // 5분
+
+        if (!isExpired) {
+          setAllResults(cachedData.items);
+          setHasSearched(true);
+          setCurrentPage(cachedData.page || 1);
+        } else {
+          sessionStorage.removeItem(cacheKey);
+          performSearch(urlQuery);
+        }
       }
     }
   }, []); // ✅ 최초 1회만 실행
