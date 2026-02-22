@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const query = searchParams.get("q") || "";
+    const phase = searchParams.get("phase") || "full";
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
 
@@ -89,7 +90,74 @@ export async function GET(req: NextRequest) {
         userAllergens = allergyData.map((item) => item.allergen_name);
       }
     }
+    if (phase === "1") {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userAllergyData = user
+        ? await supabase
+            .from("user_allergies")
+            .select("allergen_name")
+            .eq("user_id", user.id)
+        : { data: [] };
+      const userAllergens = (userAllergyData.data || []).map(
+        (a: any) => a.allergen_name,
+      );
 
+      try {
+        const isChosungQuery = /^[ㄱ-ㅎ\s]+$/.test(query);
+        let dbItems: any[] = [];
+
+        if (isChosungQuery) {
+          const normalizedChosung = normalizeChosungQuery(query);
+          const { data } = await supabase
+            .from("food_search_cache")
+            .select("*")
+            .ilike("chosung", `%${normalizedChosung}%`)
+            .limit(30);
+          dbItems = data || [];
+        } else {
+          const { data } = await supabase
+            .from("food_search_cache")
+            .select("*")
+            .or(
+              `food_name.ilike.%${normalizedQuery}%,raw_materials.ilike.%${normalizedQuery}%`,
+            )
+            .limit(30);
+          dbItems = data || [];
+        }
+
+        const items = dbItems.map((item: any) => {
+          const hasAllergen = (item.allergens || []).some((a: string) =>
+            userAllergens.some(
+              (ua: string) => a.includes(ua) || ua.includes(a),
+            ),
+          );
+          return {
+            foodCode: item.food_code,
+            foodName: item.food_name,
+            manufacturer: item.manufacturer || "",
+            allergens: item.allergens || [],
+            hasAllergen,
+            score: 200,
+            matchReason: "제품명",
+            dataSource: "db",
+            rawMaterials: item.raw_materials || "",
+            weight: item.weight || "",
+          };
+        });
+
+        return NextResponse.json({
+          success: true,
+          items,
+          totalCount: items.length,
+          hasMore: true, // 외부 API 결과 더 있을 수 있음을 알림
+        });
+      } catch {
+        return NextResponse.json({ success: true, items: [], hasMore: true });
+      }
+    }
     // ==========================================
     // 1단계: DB + OpenAPI + OpenFoodFacts 병렬 실행
     // ==========================================

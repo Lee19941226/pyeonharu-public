@@ -85,6 +85,7 @@ function FoodMainContent() {
     danger: 0,
     percentage: 0,
   });
+  const abortControllerRef = useRef<AbortController | null>(null);
   // useEffect - URL 쿼리 파라미터 감지
   useEffect(() => {
     const urlQuery = searchParams.get("q");
@@ -328,21 +329,42 @@ function FoodMainContent() {
 
   const performSearch = async (searchQuery: string) => {
     if (searchQuery.length < 2) return;
+
+    // 이전 요청 취소
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setIsLoading(true);
     setHasSearched(true);
 
     try {
-      const response = await fetch(
-        `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
+      // ✅ 1단계: DB만 빠르게 (0.1~0.3초)
+      const phase1Res = await fetch(
+        `/api/food/search?q=${encodeURIComponent(searchQuery)}&phase=1`,
+        { signal },
       );
-      const data = await response.json();
+      const phase1Data = await phase1Res.json();
 
-      if (data.success && data.items && data.items.length > 0) {
-        setResults(data.items);
+      if (phase1Data.items?.length > 0) {
+        setResults(phase1Data.items);
+        setCurrentPage(1);
+        setIsLoading(false); // ✅ 로딩 먼저 해제해서 DB 결과 즉시 표시
+      }
+
+      // ✅ 2단계: 외부 API 전체 검색 (백그라운드, 3~5초)
+      const phase2Res = await fetch(
+        `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
+        { signal },
+      );
+      const phase2Data = await phase2Res.json();
+
+      if (phase2Data.success && phase2Data.items?.length > 0) {
+        setResults(phase2Data.items); // 전체 결과로 교체
         setCurrentPage(1);
         saveSearchHistory(searchQuery);
-      } else {
-        // ✅ handleSearch에 있던 AI fallback 로직 이동
+      } else if (phase1Data.items?.length === 0) {
+        // DB도 없고 외부 API도 없으면 AI fallback
         toast.info("등록된 제품이 없습니다. AI로 분석 중...");
 
         try {
@@ -350,8 +372,8 @@ function FoodMainContent() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query: searchQuery }),
+            signal,
           });
-
           const aiData = await aiResponse.json();
 
           if (aiData.success) {
@@ -397,12 +419,14 @@ function FoodMainContent() {
             setResults([]);
             toast.error("제품을 찾을 수 없습니다");
           }
-        } catch {
+        } catch (aiError: any) {
+          if (aiError.name === "AbortError") return;
           setResults([]);
           toast.error("AI 분석 중 오류가 발생했습니다");
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") return; // 취소된 요청은 무시
       console.error("Search error:", error);
       setResults([]);
       toast.error("검색 중 오류가 발생했습니다");
