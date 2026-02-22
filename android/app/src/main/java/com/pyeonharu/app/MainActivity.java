@@ -15,6 +15,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -62,22 +63,30 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        // Chrome Custom Tab에서 돌아올 때 딥링크 처리
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith("https://www.pyeonharu.com")) {
+                WebView webView = getBridge().getWebView();
+                webView.loadUrl(url);
+            }
+        }
+    }
+
+    @Override
     public void onStart() {
         super.onStart();
 
-        // 권한 요청
         requestAllPermissions();
 
         WebView webView = getBridge().getWebView();
 
-        // WebView 설정: 팝업/리다이렉트가 WebView 안에서 처리되도록
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         webView.getSettings().setSupportMultipleWindows(false);
         webView.getSettings().setDomStorageEnabled(true);
-        webView.getSettings().setUserAgentString(
-            webView.getSettings().getUserAgentString() + " PyeonharuApp"
-        );
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -118,20 +127,24 @@ public class MainActivity extends BridgeActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
 
-                // ★ 앱 도메인 → WebView 안에서 처리 (OAuth 콜백 포함)
-                if (url.startsWith("https://www.pyeonharu.com") || url.startsWith("https://pyeonharu.com")) {
-                    return false; // WebView가 처리
+                // ★ Google OAuth → Chrome Custom Tab (WebView에서 차단됨)
+                if (url.contains("accounts.google.com")) {
+                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
+                    customTabsIntent.launchUrl(MainActivity.this, Uri.parse(url));
+                    return true;
                 }
 
-                // ★ OAuth 로그인 페이지들 → WebView 안에서 처리
-                // Google, Kakao, Naver 로그인 페이지를 WebView에서 직접 열어야
-                // 로그인 완료 후 redirectTo가 WebView 안에서 자연스럽게 처리됨
-                if (url.contains("accounts.google.com") ||
-                    url.contains("kauth.kakao.com") ||
+                // ★ 앱 도메인 → WebView 안에서 처리
+                if (url.startsWith("https://www.pyeonharu.com") || url.startsWith("https://pyeonharu.com")) {
+                    return false;
+                }
+
+                // ★ Kakao, Naver, Supabase OAuth → WebView 안에서 처리
+                if (url.contains("kauth.kakao.com") ||
                     url.contains("accounts.kakao.com") ||
                     url.contains("nid.naver.com") ||
                     url.contains("supabase.co")) {
-                    return false; // WebView가 처리
+                    return false;
                 }
 
                 // 전화 걸기
