@@ -142,10 +142,10 @@ function SymptomContent() {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
           }),
-        () => setUserLocation({ lat: 37.3595, lng: 126.9354 }), // 군포 기본값
+        () => setUserLocation({ lat: 37.5665, lng: 126.978 }), // 서울 기본값
       );
     } else {
-      setUserLocation({ lat: 37.3595, lng: 126.9354 });
+      setUserLocation({ lat: 37.5665, lng: 126.978 });
     }
   }, []);
 
@@ -198,7 +198,7 @@ function SymptomContent() {
         setResult(data);
 
         // 공공데이터 API로 주변 병원 검색
-        const loc = userLocation || { lat: 37.3595, lng: 126.9354 };
+        const loc = userLocation || { lat: 37.5665, lng: 126.978 };
         const nearbyHospitals = await fetchNearbyHospitals(
           loc.lat,
           loc.lng,
