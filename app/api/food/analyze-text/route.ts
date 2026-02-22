@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-
+import { createClient } from "@/lib/supabase/server";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "로그인이 필요합니다." },
+        { status: 401 },
+      );
+    }
     const { query } = await req.json();
 
     console.log("🔍 AI 텍스트 분석:", query);
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
