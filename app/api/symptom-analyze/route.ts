@@ -1,16 +1,67 @@
-import { NextRequest, NextResponse } from "next/server"
-
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 export async function POST(req: NextRequest) {
   try {
-    const { symptom } = await req.json()
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const headersList = await headers();
 
-    if (!symptom || typeof symptom !== "string" || !symptom.trim()) {
-      return NextResponse.json({ error: "증상을 입력해주세요." }, { status: 400 })
+    // ─── Rate Limit 체크 ───
+    const today = new Date().toISOString().split("T")[0];
+    let identifier: string;
+    let dailyLimit: number;
+
+    if (user) {
+      // 로그인 사용자: user_id 기반, 하루 20회
+      identifier = `user:${user.id}:${today}`;
+      dailyLimit = 20;
+    } else {
+      // 비로그인: IP 기반, 하루 5회
+      const ip =
+        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        headersList.get("x-real-ip") ||
+        "unknown";
+      identifier = `ip:${ip}:${today}`;
+      dailyLimit = 5;
     }
 
-    const apiKey = process.env.OPENAI_API_KEY
+    const { count } = await supabase
+      .from("symptom_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", identifier);
+
+    if ((count || 0) >= dailyLimit) {
+      return NextResponse.json(
+        {
+          error: user
+            ? `하루 분석 한도(${dailyLimit}회)를 초과했습니다.`
+            : `일일 무료 분석 횟수(${dailyLimit}회)를 초과했습니다. 로그인하시면 더 많이 사용할 수 있습니다.`,
+        },
+        { status: 429 },
+      );
+    }
+
+    // ─── 카운트 증가 ───
+    await supabase.from("symptom_rate_limits").insert({ identifier });
+
+    const { symptom } = await req.json();
+
+    if (!symptom || typeof symptom !== "string" || !symptom.trim()) {
+      return NextResponse.json(
+        { error: "증상을 입력해주세요." },
+        { status: 400 },
+      );
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "OpenAI API 키가 설정되지 않았습니다." }, { status: 500 })
+      return NextResponse.json(
+        { error: "OpenAI API 키가 설정되지 않았습니다." },
+        { status: 500 },
+      );
     }
 
     const systemPrompt = `당신은 한국의 의료 안내 AI 어시스턴트 "편하루 AI"입니다.
@@ -56,7 +107,7 @@ export async function POST(req: NextRequest) {
 - 위험한 증상(가슴 통증, 호흡곤란, 심한 출혈 등)이면 emergencyLevel을 "emergency"로 설정하고 응급의학과를 최우선 추천
 - 빠른 병원 방문이 필요한 경우 emergencyLevel을 "urgent"로 설정
 - visitTip은 해당 진료과 방문 시 의사에게 전달하면 좋을 정보를 알려주세요
-- 최근 유행하는 질환(독감, 코로나 등)이 의심되면 healthAdvice에 관련 경고를 포함하세요`
+- 최근 유행하는 질환(독감, 코로나 등)이 의심되면 healthAdvice에 관련 경고를 포함하세요`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -73,24 +124,39 @@ export async function POST(req: NextRequest) {
         temperature: 0.3,
         max_tokens: 700,
       }),
-    })
+    });
 
     if (!response.ok) {
-      console.error("OpenAI API error:", await response.json().catch(() => ({})))
-      return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 502 })
+      console.error(
+        "OpenAI API error:",
+        await response.json().catch(() => ({})),
+      );
+      return NextResponse.json(
+        { error: "AI 분석 중 오류가 발생했습니다." },
+        { status: 502 },
+      );
     }
 
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      return NextResponse.json({ error: "AI 응답을 받지 못했습니다." }, { status: 502 })
+      return NextResponse.json(
+        { error: "AI 응답을 받지 못했습니다." },
+        { status: 502 },
+      );
     }
 
-    const cleaned = content.replace(/```json\s?/g, "").replace(/```/g, "").trim()
-    return NextResponse.json(JSON.parse(cleaned))
+    const cleaned = content
+      .replace(/```json\s?/g, "")
+      .replace(/```/g, "")
+      .trim();
+    return NextResponse.json(JSON.parse(cleaned));
   } catch (error) {
-    console.error("Symptom analyze error:", error)
-    return NextResponse.json({ error: "분석 중 오류가 발생했습니다." }, { status: 500 })
+    console.error("Symptom analyze error:", error);
+    return NextResponse.json(
+      { error: "분석 중 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 }
