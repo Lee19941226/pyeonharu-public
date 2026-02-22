@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   UtensilsCrossed,
@@ -28,50 +28,30 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
   const router = useRouter();
   const isHome = pathname === "/";
 
-  // 카메라/앨범 선택 시트
   const [showSheet, setShowSheet] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const albumInputRef = useRef<HTMLInputElement>(null);
-
-  // 버튼 클릭 → 선택 시트 열기
   const openSheet = (mode: CameraMode) => {
     setCameraMode(mode);
     setShowSheet(true);
   };
 
-  // 카메라 선택
-  const handleCameraClick = () => {
-    setShowSheet(false);
-    setTimeout(() => cameraInputRef.current?.click(), 100);
-  };
-
-  // 앨범 선택
-  const handleAlbumClick = () => {
-    setShowSheet(false);
-    setTimeout(() => albumInputRef.current?.click(), 100);
-  };
-
-  // 파일 선택 후 처리
   const handleFileSelected = async (file: File) => {
     if (!cameraMode) return;
+    setShowSheet(false);
     setIsProcessing(true);
 
     try {
       if (cameraMode === "allergy") {
-        // ── 안전확인: 바코드/AI 분석 ──
         toast.info("사진 분석 중...");
 
-        // base64 변환
         const base64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.readAsDataURL(file);
         });
 
-        // 바코드 감지 시도
         try {
           const { Html5Qrcode } = await import("html5-qrcode");
           const html5QrCode = new Html5Qrcode("qr-reader-nav-hidden");
@@ -87,7 +67,6 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           toast.success("바코드 인식 성공!");
           router.push(`/food/result/${barcode}`);
         } catch {
-          // 바코드 없음 → AI 분석
           toast.info("AI가 성분표를 분석 중...");
           const { createClient } = await import("@/lib/supabase/client");
           const supabase = createClient();
@@ -109,10 +88,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           const res = await fetch("/api/food/ai-analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              image: base64Data,
-              userAllergens,
-            }),
+            body: JSON.stringify({ image: base64Data, userAllergens }),
           });
           const data = await res.json();
 
@@ -124,7 +100,6 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           }
         }
       } else {
-        // ── 식단관리: 음식 촬영 → 자동 등록 ──
         const fd = new FormData();
         fd.append("image", file);
         const res = await fetch("/api/diet/analyze", {
@@ -158,7 +133,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
         data-tour="bottom-nav"
       >
         <div className="mx-auto flex h-16 max-w-md items-center justify-around">
-          {/* 식사(홈) */}
+          {/* 1. 식사(홈) */}
           {isHome && onMainTabChange ? (
             <button
               onClick={() => onMainTabChange("meal")}
@@ -180,55 +155,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             </Link>
           )}
 
-          {/* ── 안전확인 카메라 ── */}
-          <button
-            onClick={() => openSheet("allergy")}
-            disabled={isProcessing}
-            className={cn(
-              "relative -mt-5 flex h-13 w-13 items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
-              isProcessing && cameraMode === "allergy"
-                ? "bg-primary/70 text-primary-foreground"
-                : pathname.startsWith("/food")
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-primary/90 text-primary-foreground",
-            )}
-            aria-label="식품 안전 확인"
-          >
-            {isProcessing && cameraMode === "allergy" ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <Camera className="h-6 w-6" />
-            )}
-            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 shadow-sm">
-              <ShieldCheck className="h-3 w-3 text-white" />
-            </div>
-          </button>
-
-          {/* ── 식단관리 카메라 ── */}
-          <button
-            onClick={() => openSheet("diet")}
-            disabled={isProcessing}
-            className={cn(
-              "relative -mt-5 flex h-13 w-13 items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
-              isProcessing && cameraMode === "diet"
-                ? "bg-orange-300 text-white"
-                : pathname.startsWith("/diet")
-                  ? "bg-orange-500 text-white"
-                  : "bg-orange-400 text-white",
-            )}
-            aria-label="식단 관리 촬영"
-          >
-            {isProcessing && cameraMode === "diet" ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <Camera className="h-6 w-6" />
-            )}
-            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 shadow-sm text-[8px] font-bold text-white">
-              🍽️
-            </div>
-          </button>
-
-          {/* 아파요 */}
+          {/* 2. 아파요 */}
           {isHome && onMainTabChange ? (
             <button
               onClick={() => onMainTabChange("sick")}
@@ -250,7 +177,55 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             </Link>
           )}
 
-          {/* 즐겨찾기 */}
+          {/* 3. 안전확인 카메라 (중앙 왼쪽) */}
+          <button
+            onClick={() => openSheet("allergy")}
+            disabled={isProcessing}
+            className={cn(
+              "relative -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
+              isProcessing && cameraMode === "allergy"
+                ? "bg-primary/70 text-primary-foreground"
+                : pathname.startsWith("/food")
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary/90 text-primary-foreground",
+            )}
+            aria-label="식품 안전 확인"
+          >
+            {isProcessing && cameraMode === "allergy" ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <Camera className="h-6 w-6" />
+            )}
+            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 shadow-sm">
+              <ShieldCheck className="h-3 w-3 text-white" />
+            </div>
+          </button>
+
+          {/* 4. 식단관리 카메라 (중앙 오른쪽) */}
+          <button
+            onClick={() => openSheet("diet")}
+            disabled={isProcessing}
+            className={cn(
+              "relative -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
+              isProcessing && cameraMode === "diet"
+                ? "bg-orange-300 text-white"
+                : pathname.startsWith("/diet")
+                  ? "bg-orange-500 text-white"
+                  : "bg-orange-400 text-white",
+            )}
+            aria-label="식단 관리 촬영"
+          >
+            {isProcessing && cameraMode === "diet" ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <Camera className="h-6 w-6" />
+            )}
+            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 shadow-sm text-[8px] font-bold text-white">
+              🍽️
+            </div>
+          </button>
+
+          {/* 5. 즐겨찾기 */}
           <Link
             href="/bookmarks"
             className={cn(
@@ -264,7 +239,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             <span>즐겨찾기</span>
           </Link>
 
-          {/* 마이페이지 */}
+          {/* 6. 마이페이지 */}
           <Link
             href="/mypage"
             className={cn(
@@ -292,31 +267,6 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
         </div>
       </nav>
 
-      {/* ── hidden input들 ── */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFileSelected(f);
-          e.target.value = "";
-        }}
-      />
-      <input
-        ref={albumInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFileSelected(f);
-          e.target.value = "";
-        }}
-      />
-
       {/* 바코드 스캔용 hidden div */}
       <div id="qr-reader-nav-hidden" className="hidden" />
 
@@ -333,7 +283,6 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 시트 핸들 */}
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
 
             <div className="text-center">
@@ -351,10 +300,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
 
             <div className="space-y-2">
               {/* 카메라 촬영 */}
-              <button
-                onClick={handleCameraClick}
-                className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors"
-              >
+              <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
                   <Camera className="h-5 w-5 text-primary" />
                 </div>
@@ -366,13 +312,21 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
                       : "음식을 바로 촬영"}
                   </p>
                 </div>
-              </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileSelected(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
 
               {/* 앨범에서 선택 */}
-              <button
-                onClick={handleAlbumClick}
-                className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors"
-              >
+              <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10">
                   <ImageIcon className="h-5 w-5 text-orange-500" />
                 </div>
@@ -384,10 +338,19 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
                       : "저장된 음식 사진 선택"}
                   </p>
                 </div>
-              </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileSelected(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             </div>
 
-            {/* 취소 */}
             <button
               onClick={() => setShowSheet(false)}
               className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
