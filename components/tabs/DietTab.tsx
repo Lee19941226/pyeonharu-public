@@ -755,7 +755,7 @@ export default function DietTab() {
                                   {entry.estimated_cal}
                                 </span>
                                 {isToday && (
-                                  <Pencil className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover/cal:opacity-100 transition-opacity" />
+                                  <Pencil className="h-2.5 w-2.5 text-muted-foreground/50" />
                                 )}
                               </button>
                             )}
