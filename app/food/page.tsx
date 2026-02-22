@@ -330,58 +330,19 @@ function FoodMainContent() {
     if (searchQuery.length < 2) return;
     setIsLoading(true);
     setHasSearched(true);
-    try {
-      const response = await fetch(
-        `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
-      );
-      const data = await response.json();
-      if (data.success) {
-        setResults(data.items);
-        setCurrentPage(1);
-        saveSearchHistory(searchQuery);
-      } else {
-        setResults([]);
-      }
-    } catch (error) {
-      console.error("Search error:", error);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateURL = (searchQuery: string) => {
-    if (searchQuery) {
-      router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
-        scroll: false,
-      });
-    } else {
-      router.push("/food", { scroll: false });
-    }
-  };
-
-  const handleSearch = async (searchQuery: string) => {
-    if (searchQuery.length < 2) return;
-    setIsLoading(true);
-    setHasSearched(true);
-    router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
-      scroll: false,
-    });
 
     try {
-      // ✅ Open API 검색
       const response = await fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery)}`,
       );
       const data = await response.json();
 
       if (data.success && data.items && data.items.length > 0) {
-        // ✅ 검색 결과 있음
         setResults(data.items);
         setCurrentPage(1);
         saveSearchHistory(searchQuery);
       } else {
-        // ✅ 검색 결과 없음 → AI 분석 시도
+        // ✅ handleSearch에 있던 AI fallback 로직 이동
         toast.info("등록된 제품이 없습니다. AI로 분석 중...");
 
         try {
@@ -394,7 +355,6 @@ function FoodMainContent() {
           const aiData = await aiResponse.json();
 
           if (aiData.success) {
-            // sessionStorage에 저장
             const aiResultId = `ai-text-${Date.now()}`;
             sessionStorage.setItem(
               `ai_result_${aiResultId}`,
@@ -412,7 +372,6 @@ function FoodMainContent() {
               }),
             );
 
-            // ✅ 검색 결과로 표시
             setResults([
               {
                 foodCode: aiResultId,
@@ -433,14 +392,12 @@ function FoodMainContent() {
             ]);
             setCurrentPage(1);
             saveSearchHistory(searchQuery);
-
             toast.success("AI 분석 완료!");
           } else {
             setResults([]);
             toast.error("제품을 찾을 수 없습니다");
           }
-        } catch (aiError) {
-          console.error("AI 분석 오류:", aiError);
+        } catch {
           setResults([]);
           toast.error("AI 분석 중 오류가 발생했습니다");
         }
@@ -451,6 +408,16 @@ function FoodMainContent() {
       toast.error("검색 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const updateURL = (searchQuery: string) => {
+    if (searchQuery) {
+      router.push(`/food?q=${encodeURIComponent(searchQuery)}`, {
+        scroll: false,
+      });
+    } else {
+      router.push("/food", { scroll: false });
     }
   };
 
