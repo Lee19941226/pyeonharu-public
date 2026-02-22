@@ -24,6 +24,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { SearchHistory } from "@/types/food";
+import { toast } from "sonner";
 
 interface SearchResult {
   foodCode: string;
@@ -41,6 +42,7 @@ interface SearchResult {
   matchedUserAllergens?: string[];
   matchReason: string;
 }
+
 interface NutritionInfo {
   calories?: string;
   sodium?: string;
@@ -616,6 +618,7 @@ function FoodSearchPageInner() {
     step: "",
     progress: 0,
   });
+  const abortControllerRef = useRef<AbortController | null>(null);
   // ✅ 초기 로드 시 캐시 복원
   useEffect(() => {
     const urlQuery = searchParams.get("q");
@@ -643,43 +646,52 @@ function FoodSearchPageInner() {
     }
   }, []); // ✅ 최초 1회만 실행
 
-  // ✅ 검색 실행 함수
   const performSearch = async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.trim().length < 2) {
-      return;
-    }
+    if (!searchQuery || searchQuery.trim().length < 2) return;
+
+    // 이전 요청 취소
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     setIsLoading(true);
     setHasSearched(true);
     setCurrentPage(1);
 
     try {
-      // ✅ 1단계: DB 검색
+      // ✅ 1단계: DB만 빠르게
       setSearchProgress({ step: "DB 캐시 검색 중...", progress: 25 });
 
-      const res = await fetch(
-        `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}`,
+      const phase1Res = await fetch(
+        `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}&phase=1`,
+        { signal },
       );
+      const phase1Data = await phase1Res.json();
 
-      // ✅ 2단계: API 처리 중
+      if (phase1Data.items?.length > 0) {
+        setAllResults(phase1Data.items);
+        setIsLoading(false); // ✅ DB 결과 즉시 표시
+      }
+
+      // ✅ 2단계: 외부 API 전체 검색 (백그라운드)
       setSearchProgress({ step: "식약처 API 조회 중...", progress: 50 });
 
-      await new Promise((resolve) => setTimeout(resolve, 300)); // 사용자가 진행 상황 볼 수 있게 약간 딜레이
+      const phase2Res = await fetch(
+        `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}`,
+        { signal },
+      );
 
-      // ✅ 3단계: 데이터 파싱
       setSearchProgress({ step: "검색 결과 정리 중...", progress: 75 });
 
-      const data = await res.json();
+      const phase2Data = await phase2Res.json();
 
-      if (data.success) {
-        const items = data.items || [];
+      if (phase2Data.success) {
+        const items = phase2Data.items || [];
 
-        // ✅ 4단계: 완료
         setSearchProgress({ step: "완료!", progress: 100 });
-
         setAllResults(items);
 
-        // ✅ 결과 캐싱
+        // ✅ 캐싱
         const cacheKey = `search_cache_${searchQuery.trim()}`;
         sessionStorage.setItem(
           cacheKey,
@@ -690,10 +702,11 @@ function FoodSearchPageInner() {
           }),
         );
         sessionStorage.setItem("last_search_query", searchQuery.trim());
-      } else {
+      } else if (phase1Data.items?.length === 0) {
         setAllResults([]);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") return;
       console.error("❌ 검색 오류:", error);
       setAllResults([]);
       setSearchProgress({ step: "검색 실패", progress: 0 });
