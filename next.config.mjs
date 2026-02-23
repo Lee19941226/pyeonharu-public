@@ -74,7 +74,7 @@ const nextConfig = {
               "default-src 'self'",
 
               // 스크립트: self + 카카오SDK + 네이버지도 + 인라인(Next.js 필수)
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://www.googletagmanager.com https://va.vercel-scripts.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://www.googletagmanager.com https://va.vercel-scripts.com",
 
               // 스타일: self + 인라인(Tailwind)
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
@@ -87,14 +87,15 @@ const nextConfig = {
               // API 호출 허용 도메인
               [
                 "connect-src 'self'",
-                "https://*.supabase.co", // Supabase DB/Auth
-                "wss://*.supabase.co", // Supabase Realtime
-                "https://apis.data.go.kr", // 식약처 공공 API
-                "https://world.openfoodfacts.org", // OpenFoodFacts
-                "https://api.openai.com", // OpenAI
-                "https://dapi.kakao.com", // 카카오 API
-                "https://openapi.map.naver.com", // 네이버 지도
-                "https://naveropenapi.apigw.ntruss.com", // 네이버 클라우드
+                "https://*.supabase.co",
+                "wss://*.supabase.co",
+                "https://apis.data.go.kr",
+                "https://world.openfoodfacts.org",
+                "https://api.openai.com",
+                "https://dapi.kakao.com",
+                "https://openapi.map.naver.com",
+                "https://oapi.map.naver.com", // ← 이거 추가
+                "https://naveropenapi.apigw.ntruss.com",
                 "https://vitals.vercel-insights.com",
                 "https://va.vercel-scripts.com",
                 "https://cdn.jsdelivr.net",
