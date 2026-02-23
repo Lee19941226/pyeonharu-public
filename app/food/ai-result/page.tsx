@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
 
 interface AIAnalysisResult {
   productName?: string;
@@ -288,6 +289,8 @@ export default function AIResultPage() {
       <Header />
 
       <main className="flex-1 pb-6">
+        {/* ✅ AI 결과 상단 경고 배너 */}
+        <AllergenDisclaimer dataSource="ai" variant="banner" />
         <div className="container mx-auto px-4 py-6">
           <div className="mx-auto max-w-2xl space-y-4">
             {/* 제품 정보 */}
@@ -475,14 +478,7 @@ export default function AIResultPage() {
             </div>
 
             {/* 안내 메시지 */}
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="p-3">
-                <p className="text-xs text-blue-900">
-                  💡 AI 분석은 참고용이며, 정확한 정보는 제품 성분표를 직접
-                  확인하세요.
-                </p>
-              </CardContent>
-            </Card>
+            <AllergenDisclaimer dataSource="ai" isDangerous={!isSafe} />
           </div>
         </div>
       </main>

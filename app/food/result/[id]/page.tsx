@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
   CheckCircle,
-  Share2,
   Heart,
   MapPin,
   Info,
@@ -24,6 +23,7 @@ import { getAllergenInfo } from "@/lib/allergen-info";
 import type { AllergenInfo } from "@/lib/allergen-info";
 import { createClient } from "@/lib/supabase/client";
 import { FoodResult } from "@/types/food";
+import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
 
 export default function FoodResultPage() {
   const params = useParams();
@@ -154,7 +154,7 @@ export default function FoodResultPage() {
           title,
           description,
           imageUrl: ogImageUrl.toString(),
-          imageWidth: 800, // ✅ 카카오 권장 크기 명시
+          imageWidth: 800,
           imageHeight: 400,
           link: {
             mobileWebUrl: shareUrl,
@@ -665,7 +665,10 @@ export default function FoodResultPage() {
       <Header />
 
       <main className="flex-1 pb-16 md:pb-0">
-        <div className="container mx-auto px-4 py-8">
+        {result && (
+          <AllergenDisclaimer dataSource={result.dataSource} variant="banner" />
+        )}
+        <div className="container mx-auto px-4 py-6">
           <div className="mx-auto max-w-4xl">
             {/* 뒤로가기 버튼 */}
             <Button
@@ -792,27 +795,15 @@ export default function FoodResultPage() {
                         하시거나 판매처에 직접 문의하시길 권장드립니다.
                       </p>
                       {!result.isSafe && (
-                        <p className="mt-2 text-xs font-medium text-amber-900">
-                          ⚠️ 알레르기가 있는 경우 특히 더 주의가 필요합니다.
-                        </p>
+                        <AllergenDisclaimer
+                          dataSource={result.dataSource}
+                          isDangerous={!result.isSafe}
+                        />
                       )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            )}
-            {/* ✅ Open Food Facts 경고 */}
-            {result.dataSource === "openfood" && (
-              <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-                <div className="flex items-center gap-2 text-xs text-blue-800">
-                  <Info className="h-4 w-4 shrink-0 text-blue-600" />
-                  <p className="leading-relaxed">
-                    <strong className="font-semibold">커뮤니티 정보:</strong>이
-                    정보는 오픈 데이터베이스에서 제공됩니다. 구매 전 제품
-                    포장지를 확인하세요.
-                  </p>
-                </div>
-              </div>
             )}
             {/* 안전 여부 카드 - 안전 */}
             {result.isSafe && (
