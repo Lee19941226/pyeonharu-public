@@ -98,7 +98,6 @@ export default function FoodResultPage() {
       return;
     }
 
-    // localhost 체크
     if (
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1"
@@ -112,28 +111,51 @@ export default function FoodResultPage() {
 
     const isSafe = result.isSafe;
     const allergenText =
-      !isSafe && result.detectedAllergens && result.detectedAllergens.length > 0
+      !isSafe && result.detectedAllergens?.length > 0
         ? result.detectedAllergens.map((a: any) => a.name).join(", ")
         : "";
 
-    const shareUrl = `${window.location.origin}/food/result/${result.foodCode}?shared=kakao`;
+    const isAiResult =
+      result.foodCode?.startsWith("ai-") || result.dataSource === "ai";
+    const isBarcodeResult =
+      result.dataSource === "barcode" || result.dataSource === "openapi";
 
-    // 동적 OG 이미지 URL
+    // ✅ AI/바코드 결과: URL은 편하루 홈으로 (sessionStorage는 공유 불가)
+    // ✅ 일반 검색 결과: 실제 결과 페이지 URL
+    const shareUrl = isAiResult
+      ? `${window.location.origin}/food`
+      : `${window.location.origin}/food/result/${result.foodCode}`;
+
+    const source = isAiResult ? "ai" : isBarcodeResult ? "barcode" : "";
+
     const ogImageUrl = new URL(`${window.location.origin}/api/og`);
     ogImageUrl.searchParams.set("name", result.foodName);
     ogImageUrl.searchParams.set("safe", isSafe.toString());
     ogImageUrl.searchParams.set("allergens", allergenText);
     ogImageUrl.searchParams.set("manufacturer", result.manufacturer || "");
+    ogImageUrl.searchParams.set("source", source);
+
+    const title = isAiResult
+      ? `[AI 분석] ${result.foodName}`
+      : `${result.foodName} 알레르기 정보`;
+
+    const description = isSafe
+      ? `✅ 안전해요! 알레르기 성분이 없습니다\n${isAiResult ? "편하루에서 직접 확인해보세요" : "자세한 성분 정보 확인하기"}`
+      : `⚠️ 주의! ${allergenText} 성분이 포함되어 있습니다\n${isAiResult ? "편하루에서 직접 확인해보세요" : "자세한 정보 확인하기"}`;
+
+    const buttonTitle = isAiResult
+      ? "편하루에서 직접 검색하기"
+      : "전체 성분 보기";
 
     try {
       window.Kakao.Share.sendDefault({
         objectType: "feed",
         content: {
-          title: `${result.foodName}`,
-          description: isSafe
-            ? `🟢 안전해요! 알레르기 성분이 없습니다`
-            : `🔴 위험해요! ${allergenText}`,
+          title,
+          description,
           imageUrl: ogImageUrl.toString(),
+          imageWidth: 800, // ✅ 카카오 권장 크기 명시
+          imageHeight: 400,
           link: {
             mobileWebUrl: shareUrl,
             webUrl: shareUrl,
@@ -141,26 +163,17 @@ export default function FoodResultPage() {
         },
         buttons: [
           {
-            title: "상세 보기",
+            title: buttonTitle,
             link: {
               mobileWebUrl: shareUrl,
               webUrl: shareUrl,
             },
           },
-          {
-            title: "내 알레르기 확인하기",
-            link: {
-              mobileWebUrl: window.location.origin,
-              webUrl: window.location.origin,
-            },
-          },
         ],
       });
-
-      toast.success("카카오톡 공유 완료!");
     } catch (error) {
-      console.error("카카오톡 공유 오류:", error);
-      toast.error("카카오톡 공유에 실패했습니다");
+      console.error("카카오 공유 실패:", error);
+      toast.error("공유에 실패했습니다");
     }
   };
   const loadFoodResult = async () => {

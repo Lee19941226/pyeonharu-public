@@ -6,205 +6,203 @@ export const runtime = "edge";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-
-    // URL 파라미터에서 정보 추출
     const productName = searchParams.get("name") || "제품명 없음";
     const isSafe = searchParams.get("safe") === "true";
     const allergens = searchParams.get("allergens") || "";
     const manufacturer = searchParams.get("manufacturer") || "";
+    const dataSource = searchParams.get("source") || ""; // ✅ AI/QR 구분용 추가
+
+    const bgColor = isSafe ? "#f0fdf4" : "#fef2f2";
+    const accentColor = isSafe ? "#16a34a" : "#dc2626";
+    const statusText = isSafe ? "✅ 안전해요" : "⚠️ 주의하세요";
+    const statusBg = isSafe ? "#dcfce7" : "#fee2e2";
 
     return new ImageResponse(
       <div
         style={{
-          height: "100%",
           width: "100%",
+          height: "100%",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: isSafe ? "#f0fdf4" : "#fef2f2",
-          backgroundImage: isSafe
-            ? "radial-gradient(circle at 25px 25px, #22c55e 2%, transparent 0%), radial-gradient(circle at 75px 75px, #22c55e 2%, transparent 0%)"
-            : "radial-gradient(circle at 25px 25px, #ef4444 2%, transparent 0%), radial-gradient(circle at 75px 75px, #ef4444 2%, transparent 0%)",
-          backgroundSize: "100px 100px",
+          backgroundColor: bgColor,
+          fontFamily: "sans-serif",
         }}
       >
-        {/* 로고/브랜드 */}
+        {/* 상단 헤더 */}
         <div
           style={{
-            position: "absolute",
-            top: 40,
-            left: 40,
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            justifyContent: "space-between",
+            padding: "24px 36px 16px",
+            backgroundColor: accentColor,
           }}
         >
-          <div
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 12,
-              backgroundColor: "#10b981",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 28,
-              color: "white",
-            }}
-          >
-            편
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                backgroundColor: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 22,
+                fontWeight: 900,
+                color: accentColor,
+              }}
+            >
+              편
+            </div>
+            <span style={{ fontSize: 26, fontWeight: 700, color: "white" }}>
+              편하루
+            </span>
           </div>
-          <div
-            style={{
-              fontSize: 32,
-              fontWeight: 700,
-              color: "#1f2937",
-            }}
-          >
-            편하루
-          </div>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.8)" }}>
+            알레르기 안심 식품 정보
+          </span>
         </div>
 
-        {/* 메인 카드 */}
+        {/* 메인 컨텐츠 */}
         <div
           style={{
+            flex: 1,
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            padding: 60,
-            backgroundColor: "white",
-            borderRadius: 24,
-            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-            maxWidth: 800,
-            margin: "0 60px",
+            padding: "24px 36px",
+            gap: 28,
           }}
         >
-          {/* 상태 아이콘 */}
-          <div
-            style={{
-              fontSize: 120,
-              marginBottom: 20,
-            }}
-          >
-            {isSafe ? "🟢" : "🔴"}
-          </div>
-
-          {/* 제품명 */}
-          <div
-            style={{
-              fontSize: 56,
-              fontWeight: 700,
-              color: "#1f2937",
-              marginBottom: 16,
-              textAlign: "center",
-            }}
-          >
-            {productName}
-          </div>
-
-          {/* 제조사 */}
-          {manufacturer && (
-            <div
-              style={{
-                fontSize: 28,
-                color: "#6b7280",
-                marginBottom: 32,
-              }}
-            >
-              {manufacturer}
-            </div>
-          )}
-
-          {/* 상태 텍스트 */}
+          {/* 상태 뱃지 */}
           <div
             style={{
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              gap: 12,
-              padding: "20px 40px",
-              backgroundColor: isSafe ? "#dcfce7" : "#fee2e2",
-              borderRadius: 16,
-              marginBottom: 20,
+              justifyContent: "center",
+              width: 120,
+              height: 120,
+              borderRadius: 60,
+              backgroundColor: statusBg,
+              border: `3px solid ${accentColor}`,
+              flexShrink: 0,
             }}
           >
-            <div
-              style={{
-                fontSize: 48,
-                fontWeight: 700,
-                color: isSafe ? "#15803d" : "#dc2626",
-              }}
-            >
-              {isSafe ? "안전해요!" : "위험해요!"}
-            </div>
+            <span style={{ fontSize: 48 }}>{isSafe ? "✅" : "⚠️"}</span>
           </div>
 
-          {/* 알레르기 정보 */}
-          {!isSafe && allergens && (
+          {/* 제품 정보 */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              flex: 1,
+            }}
+          >
+            {/* 상태 텍스트 */}
             <div
               style={{
                 display: "flex",
-                flexDirection: "column",
                 alignItems: "center",
-                gap: 12,
+                backgroundColor: statusBg,
+                borderRadius: 8,
+                padding: "4px 14px",
+                width: "fit-content",
               }}
             >
-              <div
-                style={{
-                  fontSize: 28,
-                  color: "#991b1b",
-                  fontWeight: 600,
-                }}
+              <span
+                style={{ fontSize: 18, fontWeight: 700, color: accentColor }}
               >
-                ⚠️ 알레르기 성분
-              </div>
-              <div
-                style={{
-                  fontSize: 32,
-                  color: "#dc2626",
-                  fontWeight: 700,
-                }}
-              >
-                {allergens}
-              </div>
+                {statusText}
+              </span>
             </div>
-          )}
 
-          {isSafe && (
-            <div
+            {/* 제품명 */}
+            <span
               style={{
-                fontSize: 28,
-                color: "#15803d",
+                fontSize: productName.length > 14 ? 26 : 32,
+                fontWeight: 800,
+                color: "#111827",
+                lineHeight: 1.2,
               }}
             >
-              알레르기 성분이 없습니다
-            </div>
-          )}
+              {productName.length > 20
+                ? productName.slice(0, 20) + "…"
+                : productName}
+            </span>
+
+            {/* 제조사 */}
+            {manufacturer && (
+              <span style={{ fontSize: 18, color: "#6b7280" }}>
+                {manufacturer}
+              </span>
+            )}
+
+            {/* 알레르기 정보 */}
+            {!isSafe && allergens && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {allergens
+                  .split(",")
+                  .slice(0, 3)
+                  .map((a, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        fontSize: 15,
+                        backgroundColor: "#fecaca",
+                        color: "#991b1b",
+                        borderRadius: 6,
+                        padding: "2px 10px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {a.trim()}
+                    </span>
+                  ))}
+                {allergens.split(",").length > 3 && (
+                  <span style={{ fontSize: 15, color: "#991b1b" }}>
+                    외 {allergens.split(",").length - 3}개
+                  </span>
+                )}
+              </div>
+            )}
+
+            {isSafe && (
+              <span style={{ fontSize: 16, color: "#15803d" }}>
+                내 알레르기 성분이 없습니다
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* 하단 CTA */}
+        {/* 하단 */}
         <div
           style={{
-            position: "absolute",
-            bottom: 40,
             display: "flex",
-            fontSize: 24,
-            color: "#6b7280",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "10px 36px",
+            backgroundColor: "rgba(0,0,0,0.05)",
           }}
         >
-          내 알레르기도 확인하러 가기 →
+          <span style={{ fontSize: 14, color: "#9ca3af" }}>
+            {dataSource === "ai"
+              ? "🤖 AI 분석 결과"
+              : dataSource === "barcode"
+                ? "📷 바코드 스캔 결과"
+                : "🔍 식품 검색 결과"}
+          </span>
+          <span style={{ fontSize: 14, color: "#9ca3af" }}>pyeonharu.com</span>
         </div>
       </div>,
       {
-        width: 1200,
-        height: 630,
+        width: 800,
+        height: 400,
       },
     );
-  } catch (e: any) {
-    console.log(`${e.message}`);
-    return new Response(`Failed to generate the image`, {
-      status: 500,
-    });
+  } catch (e) {
+    return new Response("OG 이미지 생성 실패", { status: 500 });
   }
 }
