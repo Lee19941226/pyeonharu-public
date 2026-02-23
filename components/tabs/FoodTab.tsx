@@ -555,17 +555,26 @@ export default function FoodTab({
     setCommunityLoading(true);
     onProgress?.(75, "커뮤니티 불러오는 중...");
     try {
-      const schoolRes = await fetch("/api/school/register");
-      const schoolData = await schoolRes.json();
-      const schools = schoolData.schools || [];
-      if (schools.length > 0) {
-        const codes = schools.map((s: any) => s.school_code).join(",");
-        const res = await fetch(
-          `/api/community?schoolCodes=${codes}&sort=latest&limit=10`,
-        );
-        const data = await res.json();
-        setCommunityPosts(data.posts || []);
+      // 로그인된 경우에만 학교 커뮤니티 로드
+      const supabase = createClient();
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+
+      if (currentUser) {
+        const schoolRes = await fetch("/api/school/register");
+        const schoolData = await schoolRes.json();
+        const schools = schoolData.schools || [];
+        if (schools.length > 0) {
+          const codes = schools.map((s: any) => s.school_code).join(",");
+          const res = await fetch(
+            `/api/community?schoolCodes=${codes}&sort=latest&limit=10`,
+          );
+          const data = await res.json();
+          setCommunityPosts(data.posts || []);
+        }
       }
+
       onProgress?.(85, "인기 게시글 불러오는 중...");
       const popRes = await fetch("/api/community?mode=popular");
       const popData = await popRes.json();
