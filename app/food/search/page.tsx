@@ -743,27 +743,44 @@ function FoodSearchPageInner() {
     const item = allResults.find((r) => r.foodCode === foodCode);
 
     if (item) {
-      // ✅ 검색 결과를 sessionStorage에 저장
       const cacheKey = `food_quick_${foodCode}`;
-      saveAiResult(foodCode, {
-        productName: aiResult.foodName,
-        manufacturer: aiResult.manufacturer || "",
-        weight: aiResult.weight || "",
-        detectedIngredients: aiResult.detectedIngredients || [],
-        allergens: aiResult.allergens || [],
-        hasUserAllergen: aiResult.hasAllergen || false,
-        matchedUserAllergens: aiResult.matchedUserAllergens || [],
-        dataSource: "ai",
-        rawMaterials: aiResult.rawMaterials || "",
-        nutritionInfo: aiResult.nutritionInfo || null,
-        ingredients: aiResult.ingredients || aiResult.detectedIngredients || [],
-      });
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          foodCode: item.foodCode,
+          foodName: item.foodName,
+          manufacturer: item.manufacturer,
+          allergens: item.allergens,
+          hasAllergen: item.hasAllergen,
+          matchedUserAllergens: item.matchedUserAllergens,
+          dataSource: item.dataSource,
+          rawMaterials: item.rawMaterials,
+          weight: item.weight,
+          ingredients: item.ingredients,
+          timestamp: Date.now(),
+        }),
+      );
 
-      console.log("💾 빠른 캐시 저장:", foodCode);
+      // ✅ AI 결과인 경우 localStorage에도 저장 (aiResult → item으로 수정)
+      if (foodCode.startsWith("ai-")) {
+        saveAiResult(foodCode, {
+          productName: item.foodName,
+          manufacturer: item.manufacturer || "",
+          weight: item.weight || "",
+          detectedIngredients: item.detectedIngredients || [],
+          allergens: item.allergens || [],
+          hasUserAllergen: item.hasAllergen || false,
+          matchedUserAllergens: item.matchedUserAllergens || [],
+          dataSource: "ai",
+          rawMaterials: item.rawMaterials || "",
+          nutritionInfo: item.nutritionInfo || null,
+          ingredients: item.ingredients || item.detectedIngredients || [],
+        });
+      }
     }
-    timestamp: (Date.now(), router.push(`/food/result/${foodCode}`));
-  };
 
+    router.push(`/food/result/${foodCode}`);
+  };
   // ✅ 페이지네이션
   const totalPages = Math.ceil(allResults.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
