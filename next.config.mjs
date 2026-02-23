@@ -73,36 +73,38 @@ const nextConfig = {
               // 기본: self만
               "default-src 'self'",
 
-              // 스크립트: self + 카카오SDK + 네이버지도 + 인라인(Next.js 필수)
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://www.googletagmanager.com https://va.vercel-scripts.com",
+              // 스크립트: self + 카카오SDK + 네이버지도 + Google 애드센스 + 인라인(Next.js 필수)
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://www.googletagmanager.com https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
 
               // 스타일: self + 인라인(Tailwind)
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 
-              // 이미지: self + Supabase + Google + 카카오 + data URI
-              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com",
+              // 이미지: self + Supabase + Google + 카카오 + 애드센스 + data URI
+              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com",
 
               // 폰트: self
               "font-src 'self' data: https://cdn.jsdelivr.net",
               // API 호출 허용 도메인
               [
                 "connect-src 'self'",
-                "https://*.supabase.co",
-                "wss://*.supabase.co",
-                "https://apis.data.go.kr",
-                "https://world.openfoodfacts.org",
-                "https://api.openai.com",
-                "https://dapi.kakao.com",
-                "https://openapi.map.naver.com",
-                "https://oapi.map.naver.com", // ← 이거 추가
-                "https://naveropenapi.apigw.ntruss.com",
+                "https://*.supabase.co", // Supabase DB/Auth
+                "wss://*.supabase.co", // Supabase Realtime
+                "https://apis.data.go.kr", // 식약처 공공 API
+                "https://world.openfoodfacts.org", // OpenFoodFacts
+                "https://api.openai.com", // OpenAI
+                "https://dapi.kakao.com", // 카카오 API
+                "https://openapi.map.naver.com", // 네이버 지도
+                "https://oapi.map.naver.com", // 네이버 지도
+                "https://naveropenapi.apigw.ntruss.com", // 네이버 클라우드
                 "https://vitals.vercel-insights.com",
                 "https://va.vercel-scripts.com",
                 "https://cdn.jsdelivr.net",
+                "https://pagead2.googlesyndication.com", // Google 애드센스
+                "https://www.googleadservices.com", // Google 애드센스
               ].join(" "),
 
-              // iframe: 카카오 로그인 팝업
-              "frame-src 'self' https://accounts.kakao.com https://kauth.kakao.com",
+              // iframe: 카카오 로그인 팝업 + Google 애드센스
+              "frame-src 'self' https://accounts.kakao.com https://kauth.kakao.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
 
               // 미디어: self + blob (카메라)
               "media-src 'self' blob:",
