@@ -7,10 +7,7 @@ import {
   Camera,
   Lock,
   ChevronRight,
-  UtensilsCrossed,
   Loader2,
-  CheckCircle,
-  XCircle,
   ShieldCheck,
   ShieldAlert,
   GraduationCap,
@@ -19,7 +16,6 @@ import {
   Heart,
   MessageCircle,
   Eye,
-  PenLine,
   Upload,
   ChevronDown,
   UtensilsCrossed as MealIcon,
@@ -35,7 +31,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { Html5Qrcode } from "html5-qrcode";
 import { toast } from "sonner";
 import { UploadSheet } from "@/components/food/upload-sheet";
-
+import { resizeImageForAI } from "@/lib/utils/image-resize";
 // ─── 드롭다운 전용 미니맵 ───
 function MiniNaverMap({
   lat,
@@ -639,7 +635,6 @@ export default function FoodTab({
       router.push(`/can-i-eat?q=${encodeURIComponent(foodInput)}`);
   };
 
-  // ✅ 수정: FormData → JSON+base64
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -655,82 +650,60 @@ export default function FoodTab({
     toast.info("이미지 분석 중...");
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const imageData = e.target?.result as string;
+      // ✅ 리사이즈 먼저
+      const { base64: base64Data, wasResized } = await resizeImageForAI(file);
+      if (wasResized) console.log("[FoodTab] 이미지 리사이즈 완료");
 
-        try {
-          // 사용자 알레르기 가져오기
-          const supabase = createClient();
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          let userAllergens: string[] = [];
+      const supabase = createClient();
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+      let userAllergens: string[] = [];
 
-          if (currentUser) {
-            const { data } = await supabase
-              .from("user_allergies")
-              .select("allergen_name")
-              .eq("user_id", currentUser.id);
-            if (data) {
-              userAllergens = data.map((item) => item.allergen_name);
-            }
-          }
+      if (currentUser) {
+        const { data } = await supabase
+          .from("user_allergies")
+          .select("allergen_name")
+          .eq("user_id", currentUser.id);
+        if (data) userAllergens = data.map((item) => item.allergen_name);
+      }
 
-          // base64만 추출 (data:image/jpeg;base64, 제거)
-          const base64Data = imageData.includes(",")
-            ? imageData.split(",")[1]
-            : imageData;
+      const response = await fetch("/api/food/analyze-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
+      });
 
-          const response = await fetch("/api/food/analyze-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageBase64: base64Data,
-              userAllergens: userAllergens,
-            }),
-          });
+      const data = await response.json();
 
-          const data = await response.json();
-
-          if (data.success && data.foodCode) {
-            sessionStorage.setItem(
-              `ai_result_${data.foodCode}`,
-              JSON.stringify({
-                foodCode: data.foodCode,
-                productName: data.productName,
-                manufacturer: data.manufacturer,
-                weight: data.weight,
-                allergens: data.allergens,
-                hasUserAllergen: data.hasUserAllergen,
-                matchedUserAllergens: data.matchedUserAllergens || [],
-                ingredients: data.ingredients || [],
-                rawMaterials: data.rawMaterials || "",
-                nutritionInfo: data.nutritionInfo || null,
-                dataSource: data.dataSource || "ai",
-              }),
-            );
-            toast.success("분석 완료!");
-            router.push(`/food/result/${data.foodCode}`);
-          } else if (data.success && data.analysisId) {
-            toast.success("분석 완료!");
-            router.push(`/food/result/${data.analysisId}`);
-          } else {
-            toast.error(data.error || "분석에 실패했습니다");
-          }
-        } catch (error) {
-          console.error("이미지 분석 오류:", error);
-          toast.error("이미지 분석 중 오류가 발생했습니다");
-        } finally {
-          setIsProcessing(false);
-          if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-          }
-        }
-      };
-      reader.readAsDataURL(file);
+      if (data.success && data.foodCode) {
+        sessionStorage.setItem(
+          `ai_result_${data.foodCode}`,
+          JSON.stringify({
+            foodCode: data.foodCode,
+            productName: data.productName,
+            manufacturer: data.manufacturer,
+            weight: data.weight,
+            allergens: data.allergens,
+            hasUserAllergen: data.hasUserAllergen,
+            matchedUserAllergens: data.matchedUserAllergens || [],
+            ingredients: data.ingredients || [],
+            rawMaterials: data.rawMaterials || "",
+            nutritionInfo: data.nutritionInfo || null,
+            dataSource: data.dataSource || "ai",
+          }),
+        );
+        toast.success("분석 완료!");
+        router.push(`/food/result/${data.foodCode}`);
+      } else {
+        toast.error(data.error || "분석에 실패했습니다");
+      }
     } catch (error) {
       console.error("이미지 분석 오류:", error);
       toast.error("이미지 분석 중 오류가 발생했습니다");
+    } finally {
       setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -829,49 +802,30 @@ export default function FoodTab({
           toast.info("AI가 성분표를 분석 중...");
 
           try {
+            // ✅ 원본 File에서 직접 리사이즈 (drop된 file 변수 사용)
+            const { base64: base64Data } = await resizeImageForAI(file);
+
             const supabase = createClient();
             const {
-              data: { user },
+              data: { user: currentUser },
             } = await supabase.auth.getUser();
             let userAllergens: string[] = [];
 
-            if (user) {
+            if (currentUser) {
               const { data } = await supabase
                 .from("user_allergies")
                 .select("allergen_name")
-                .eq("user_id", user.id);
-              if (data) {
-                userAllergens = data.map((item) => item.allergen_name);
-              }
+                .eq("user_id", currentUser.id);
+              if (data) userAllergens = data.map((item) => item.allergen_name);
             }
-
-            console.log("🤖 AI 분석 API 호출...");
-
-            const base64Data = imageData.includes(",")
-              ? imageData.split(",")[1]
-              : imageData;
 
             const response = await fetch("/api/food/analyze-image", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                imageBase64: base64Data,
-                userAllergens: userAllergens,
-              }),
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
             });
 
-            console.log("📥 API 응답:", response.status);
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error("❌ API 에러:", errorText);
-              throw new Error(`API 에러: ${response.status}`);
-            }
-
             const data = await response.json();
-            console.log("✅ AI 분석 완료:", data);
 
             if (data.success && data.foodCode) {
               sessionStorage.setItem(
@@ -897,11 +851,7 @@ export default function FoodTab({
             }
           } catch (aiError) {
             console.error("❌ AI 분석 오류:", aiError);
-            toast.error(
-              aiError instanceof Error
-                ? aiError.message
-                : "분석 중 오류가 발생했습니다",
-            );
+            toast.error("분석 중 오류가 발생했습니다");
           }
         }
       } catch (error) {
@@ -1292,8 +1242,8 @@ export default function FoodTab({
                 </div>
               </div>
             )}
-          </div>
         </div>
+      </div>
 
       {/* 로그인 모달 */}
       <LoginModal
@@ -1303,10 +1253,7 @@ export default function FoodTab({
       />
 
       {/* 업로드 시트 */}
-      <UploadSheet
-        open={showUploadSheet}
-        onOpenChange={setShowUploadSheet}
-      />
+      <UploadSheet open={showUploadSheet} onOpenChange={setShowUploadSheet} />
     </div>
   );
 }

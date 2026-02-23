@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { useDevice } from "@/lib/hooks/use-device";
 import { Html5Qrcode } from "html5-qrcode";
 import { createClient } from "@/lib/supabase/client";
-
+import { resizeImageForAI } from "@/lib/utils/image-resize";
 interface UploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,14 +67,18 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
           toast.success("바코드 인식 성공!");
           router.push(`/food/result/${barcode}`);
         } catch (error) {
-          // ❌ 바코드 없음 → AI 분석 (JSON + base64로 전송)
+          // ❌ 바코드 없음 → AI 분석
           console.log("바코드 없음, AI 분석 시작");
           toast.info("AI가 성분표를 분석 중...");
 
           try {
-            // 사용자 알레르기 가져오기
+            // ✅ 원본 file에서 직접 리사이즈
+            const { base64: base64Data } = await resizeImageForAI(file);
+
             const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
             let userAllergens: string[] = [];
 
             if (user) {
@@ -82,23 +86,13 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
                 .from("user_allergies")
                 .select("allergen_name")
                 .eq("user_id", user.id);
-              if (data) {
-                userAllergens = data.map((item) => item.allergen_name);
-              }
+              if (data) userAllergens = data.map((item) => item.allergen_name);
             }
-
-            // base64만 추출 (data:image/jpeg;base64, 제거)
-            const base64Data = imageData.includes(",")
-              ? imageData.split(",")[1]
-              : imageData;
 
             const response = await fetch("/api/food/analyze-image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                imageBase64: base64Data,
-                userAllergens: userAllergens,
-              }),
+              body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
             });
 
             const data = await response.json();
@@ -122,9 +116,6 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
               );
               toast.success("분석 완료!");
               router.push(`/food/result/${data.foodCode}`);
-            } else if (data.success && data.analysisId) {
-              toast.success("분석 완료!");
-              router.push(`/food/result/${data.analysisId}`);
             } else {
               toast.error(data.error || "분석에 실패했습니다");
             }

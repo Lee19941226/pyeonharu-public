@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { resizeImageForAI } from "@/lib/utils/image-resize";
 
 type CameraMode = "allergy" | "diet" | null;
 
@@ -68,35 +69,59 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           router.push(`/food/result/${barcode}`);
         } catch {
           toast.info("AI가 성분표를 분석 중...");
-          const { createClient } = await import("@/lib/supabase/client");
-          const supabase = createClient();
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          let userAllergens: string[] = [];
-          if (user) {
-            const { data } = await supabase
-              .from("user_allergies")
-              .select("allergen_name")
-              .eq("user_id", user.id);
-            if (data) userAllergens = data.map((item) => item.allergen_name);
-          }
 
-          const base64Data = base64.includes(",")
-            ? base64.split(",")[1]
-            : base64;
-          const res = await fetch("/api/food/ai-analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image: base64Data, userAllergens }),
-          });
-          const data = await res.json();
+          try {
+            // ✅ 원본 file에서 직접 리사이즈
+            const { base64: base64Data } = await resizeImageForAI(file);
 
-          if (data.success || data.result) {
-            localStorage.setItem("ai_analysis_result", JSON.stringify(data));
-            router.push("/food/ai-result");
-          } else {
-            toast.error(data.error || "분석에 실패했습니다");
+            const { createClient } = await import("@/lib/supabase/client");
+            const supabase = createClient();
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            let userAllergens: string[] = [];
+
+            if (user) {
+              const { data } = await supabase
+                .from("user_allergies")
+                .select("allergen_name")
+                .eq("user_id", user.id);
+              if (data) userAllergens = data.map((item) => item.allergen_name);
+            }
+
+            const response = await fetch("/api/food/analyze-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.foodCode) {
+              const { default: nextRouter } = await import("next/navigation");
+              sessionStorage.setItem(
+                `ai_result_${data.foodCode}`,
+                JSON.stringify({
+                  foodCode: data.foodCode,
+                  productName: data.productName,
+                  manufacturer: data.manufacturer,
+                  weight: data.weight,
+                  allergens: data.allergens,
+                  hasUserAllergen: data.hasUserAllergen,
+                  matchedUserAllergens: data.matchedUserAllergens || [],
+                  ingredients: data.ingredients || [],
+                  rawMaterials: data.rawMaterials || "",
+                  nutritionInfo: data.nutritionInfo || null,
+                  dataSource: data.dataSource || "ai",
+                }),
+              );
+              toast.success("분석 완료!");
+              router.push(`/food/result/${data.foodCode}`);
+            } else {
+              toast.error(data.error || "분석에 실패했습니다");
+            }
+          } catch (aiError) {
+            toast.error("분석 중 오류가 발생했습니다");
           }
         }
       } else {
