@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -19,16 +16,16 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  BookOpen,
   Shield,
   CheckCircle2,
   X,
-  Zap,
   Check,
   ChevronRight,
-  Circle,
   Loader2,
   Save,
+  AlertTriangle,
+  Zap,
+  Circle,
 } from "lucide-react";
 import { AllergenDetailModal } from "@/components/allergen-detail-modal";
 import {
@@ -38,7 +35,6 @@ import {
 import { Allergen } from "@/types/food";
 
 const ALLERGENS: Allergen[] = [
-  // 곡물류
   {
     code: "wheat",
     name: "밀",
@@ -57,8 +53,6 @@ const ALLERGENS: Allergen[] = [
     severity: "high",
     commonNames: ["소바"],
   },
-
-  // 유제품 & 계란
   {
     code: "milk",
     name: "우유",
@@ -77,8 +71,6 @@ const ALLERGENS: Allergen[] = [
     severity: "high",
     commonNames: ["난황", "난백", "전란"],
   },
-
-  // 갑각류 & 어패류
   {
     code: "shrimp",
     name: "새우",
@@ -95,76 +87,62 @@ const ALLERGENS: Allergen[] = [
     description: "게, 게장, 게살",
     category: "갑각류·어패류",
     severity: "high",
-    commonNames: ["꽃게", "대게", "킹크랩"],
-  },
-  {
-    code: "mackerel",
-    name: "고등어",
-    emoji: "🐟",
-    description: "고등어, 고등어조림, 고등어구이",
-    category: "갑각류·어패류",
-    severity: "medium",
+    commonNames: ["꽃게", "대게"],
   },
   {
     code: "squid",
     name: "오징어",
     emoji: "🦑",
-    description: "오징어, 건오징어, 오징어젓",
+    description: "오징어, 오징어 가공품",
     category: "갑각류·어패류",
     severity: "medium",
   },
   {
-    code: "shellfish",
+    code: "mackerel",
+    name: "고등어",
+    emoji: "🐟",
+    description: "고등어, 고등어 통조림",
+    category: "갑각류·어패류",
+    severity: "medium",
+  },
+  {
+    code: "clam",
     name: "조개류",
     emoji: "🦪",
-    description: "굴, 전복, 홍합, 바지락, 모시조개",
+    description: "굴, 홍합, 전복, 바지락",
     category: "갑각류·어패류",
-    severity: "high",
-    commonNames: ["굴", "전복", "홍합", "바지락"],
+    severity: "medium",
   },
-
-  // 견과류
   {
     code: "peanut",
     name: "땅콩",
     emoji: "🥜",
-    description: "땅콩, 땅콩버터, 땅콩기름",
+    description: "땅콩, 땅콩버터, 땅콩과자",
     category: "견과류",
     severity: "high",
-    commonNames: ["피넛"],
+    commonNames: ["피넛", "아라키스"],
   },
   {
     code: "walnut",
     name: "호두",
-    emoji: "🌰",
-    description: "호두, 호두과자, 호두파이",
+    emoji: "🪨",
+    description: "호두, 호두과자",
     category: "견과류",
     severity: "high",
   },
   {
     code: "pine_nut",
     name: "잣",
-    emoji: "🌲",
-    description: "잣, 잣죽, 잣국수",
+    emoji: "🌰",
+    description: "잣, 잣죽",
     category: "견과류",
     severity: "medium",
   },
   {
-    code: "tree_nuts",
-    name: "기타 견과류",
-    emoji: "🥥",
-    description: "아몬드, 캐슈넛, 피스타치오, 마카다미아",
-    category: "견과류",
-    severity: "high",
-    commonNames: ["아몬드", "캐슈넛", "피스타치오"],
-  },
-
-  // 과일 & 채소
-  {
     code: "peach",
     name: "복숭아",
     emoji: "🍑",
-    description: "복숭아, 천도복숭아, 복숭아주스",
+    description: "복숭아, 복숭아 주스, 통조림",
     category: "과일·채소",
     severity: "medium",
   },
@@ -172,41 +150,15 @@ const ALLERGENS: Allergen[] = [
     code: "tomato",
     name: "토마토",
     emoji: "🍅",
-    description: "토마토, 토마토소스, 케첩",
-    category: "과일·채소",
-    severity: "low",
-  },
-  {
-    code: "kiwi",
-    name: "키위",
-    emoji: "🥝",
-    description: "키위, 키위주스",
+    description: "토마토, 케첩, 토마토소스",
     category: "과일·채소",
     severity: "medium",
   },
-  {
-    code: "mango",
-    name: "망고",
-    emoji: "🥭",
-    description: "망고, 망고주스, 망고푸딩",
-    category: "과일·채소",
-    severity: "medium",
-  },
-  {
-    code: "orange",
-    name: "오렌지",
-    emoji: "🍊",
-    description: "오렌지, 오렌지주스, 귤",
-    category: "과일·채소",
-    severity: "low",
-  },
-
-  // 육류
   {
     code: "pork",
     name: "돼지고기",
-    emoji: "🥓",
-    description: "돼지고기, 삼겹살, 햄, 소시지",
+    emoji: "🥩",
+    description: "돼지고기, 햄, 소시지, 베이컨",
     category: "육류",
     severity: "medium",
   },
@@ -214,7 +166,7 @@ const ALLERGENS: Allergen[] = [
     code: "beef",
     name: "쇠고기",
     emoji: "🥩",
-    description: "쇠고기, 소고기, 육포",
+    description: "쇠고기, 불고기, 갈비",
     category: "육류",
     severity: "medium",
   },
@@ -226,8 +178,6 @@ const ALLERGENS: Allergen[] = [
     category: "육류",
     severity: "medium",
   },
-
-  // 기타
   {
     code: "soy",
     name: "대두",
@@ -256,20 +206,58 @@ const ALLERGENS: Allergen[] = [
   },
 ];
 
+const COMMON_ALLERGENS = [
+  "milk",
+  "egg",
+  "peanut",
+  "shrimp",
+  "wheat",
+  "soy",
+  "crab",
+  "walnut",
+];
+
+const SEVERITY_OPTIONS = [
+  {
+    value: "low",
+    label: "가벼움",
+    color: "bg-yellow-100 text-yellow-700 border-yellow-300",
+  },
+  {
+    value: "medium",
+    label: "보통",
+    color: "bg-orange-100 text-orange-700 border-orange-300",
+  },
+  {
+    value: "high",
+    label: "심각",
+    color: "bg-red-100 text-red-700 border-red-300",
+  },
+];
+
+const CATEGORY_META: Record<string, { icon: string; color: string }> = {
+  곡물: { icon: "🌾", color: "bg-amber-100 text-amber-700" },
+  "유제품·계란": { icon: "🥛", color: "bg-blue-100 text-blue-700" },
+  "갑각류·어패류": { icon: "🦐", color: "bg-cyan-100 text-cyan-700" },
+  견과류: { icon: "🥜", color: "bg-orange-100 text-orange-700" },
+  "과일·채소": { icon: "🍑", color: "bg-green-100 text-green-700" },
+  육류: { icon: "🥩", color: "bg-red-100 text-red-700" },
+  기타: { icon: "⚗️", color: "bg-purple-100 text-purple-700" },
+};
+
 export default function AllergyProfilePage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [severity, setSeverity] = useState<Record<string, string>>({});
+  const [savedSelected, setSavedSelected] = useState<Set<string>>(new Set());
+  const [savedSeverity, setSavedSeverity] = useState<Record<string, string>>(
+    {},
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [showCompactView, setShowCompactView] = useState(false);
-  // 카테고리별 표시 개수 관리
-  const [categoryShowCount, setCategoryShowCount] = useState<
-    Record<string, number>
-  >({});
-  const ITEMS_PER_PAGE = 5;
-
-  // 모달 상태
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedAllergenDetail, setSelectedAllergenDetail] =
     useState<DetailedAllergenInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -277,23 +265,37 @@ export default function AllergyProfilePage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // ✅ 변경 사항 감지
+  const hasChanges = (() => {
+    if (selected.size !== savedSelected.size) return true;
+    for (const code of selected) {
+      if (!savedSelected.has(code)) return true;
+      if ((severity[code] || "medium") !== (savedSeverity[code] || "medium"))
+        return true;
+    }
+    return false;
+  })();
+
+  // ✅ 완성도 계산 (전체 22개 기준)
+  const completionPercent = Math.round(
+    (selected.size / ALLERGENS.length) * 100,
+  );
+
   useEffect(() => {
     loadUserAllergens();
-
-    // 초기 카테고리별 표시 개수 설정
-
-    const initialCounts: Record<string, number> = {};
-    categories.forEach((cat) => {
-      initialCounts[cat] = ITEMS_PER_PAGE;
-    });
-    setCategoryShowCount(initialCounts);
+    // 기본으로 첫 카테고리 열기
+    setExpandedCategories(new Set(["유제품·계란", "곡물", "갑각류·어패류"]));
   }, []);
 
   const loadUserAllergens = async () => {
+    setIsPageLoading(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setIsPageLoading(false);
+      return;
+    }
 
     const { data } = await supabase
       .from("user_allergies")
@@ -301,15 +303,19 @@ export default function AllergyProfilePage() {
       .eq("user_id", user.id);
 
     if (data) {
-      const codes = new Set(data.map((item) => item.allergen_code));
-      setSelected(codes);
-
+      const codes = new Set(
+        data.map((item: any) => item.allergen_code as string),
+      );
       const severityMap: Record<string, string> = {};
-      data.forEach((item) => {
+      data.forEach((item: any) => {
         severityMap[item.allergen_code] = item.severity || "medium";
       });
+      setSelected(codes);
       setSeverity(severityMap);
+      setSavedSelected(new Set(codes));
+      setSavedSeverity({ ...severityMap });
     }
+    setIsPageLoading(false);
   };
 
   const handleToggle = (code: string) => {
@@ -321,55 +327,58 @@ export default function AllergyProfilePage() {
       setSeverity(newSeverity);
     } else {
       newSelected.add(code);
-      setSeverity({ ...severity, [code]: "medium" });
+      setSeverity((prev) => ({ ...prev, [code]: "medium" }));
     }
     setSelected(newSelected);
+  };
+
+  const handleSeverityChange = (code: string, value: string) => {
+    setSeverity((prev) => ({ ...prev, [code]: value }));
   };
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(category)) {
-        next.delete(category);
-      } else {
-        next.add(category);
-      }
+      next.has(category) ? next.delete(category) : next.add(category);
       return next;
     });
   };
 
   const selectAllInCategory = (category: string) => {
-    const categoryAllergens = ALLERGENS.filter((a) => a.category === category);
+    const codes = ALLERGENS.filter((a) => a.category === category).map(
+      (a) => a.code,
+    );
     setSelected((prev) => {
       const next = new Set(prev);
-      categoryAllergens.forEach((a) => next.add(a.code));
+      codes.forEach((c) => {
+        next.add(c);
+        if (!severity[c]) setSeverity((s) => ({ ...s, [c]: "medium" }));
+      });
       return next;
     });
   };
 
   const deselectAllInCategory = (category: string) => {
-    const categoryAllergens = ALLERGENS.filter((a) => a.category === category);
+    const codes = ALLERGENS.filter((a) => a.category === category).map(
+      (a) => a.code,
+    );
     setSelected((prev) => {
       const next = new Set(prev);
-      categoryAllergens.forEach((a) => next.delete(a.code));
+      codes.forEach((c) => next.delete(c));
       return next;
     });
   };
 
-  // 자주 선택되는 알레르기
-  const COMMON_ALLERGENS = ["milk", "egg", "peanut", "shrimp", "crab"];
   const handleSave = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) {
       toast.error("알레르기 정보를 저장하려면 로그인해주세요");
       return;
     }
 
     setIsLoading(true);
-
     try {
       await supabase.from("user_allergies").delete().eq("user_id", user.id);
 
@@ -383,19 +392,19 @@ export default function AllergyProfilePage() {
             severity: severity[code] || "medium",
           };
         });
-
         await supabase.from("user_allergies").insert(insertData);
       }
 
-      toast.success("알레르기 정보가 저장되었습니다");
+      // 저장 후 기준점 갱신
+      setSavedSelected(new Set(selected));
+      setSavedSeverity({ ...severity });
 
+      toast.success(`알레르기 ${selected.size}개 저장 완료!`);
+      window.dispatchEvent(new CustomEvent("allergiesUpdated"));
       router.push("/mypage");
       router.refresh();
-
-      window.dispatchEvent(new CustomEvent("allergiesUpdated"));
     } catch (error) {
-      console.error(error);
-      toast.error("알레르기 정보 저장 중 오류가 발생했습니다");
+      toast.error("저장 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }
@@ -406,184 +415,235 @@ export default function AllergyProfilePage() {
     if (detailInfo) {
       setSelectedAllergenDetail(detailInfo);
       setIsModalOpen(true);
-    } else {
-      toast.error("상세 정보를 불러올 수 없습니다");
     }
   };
 
-  // 카테고리별 더보기
-  const handleShowMore = (category: string) => {
-    setCategoryShowCount((prev) => ({
-      ...prev,
-      [category]: (prev[category] || ITEMS_PER_PAGE) + ITEMS_PER_PAGE,
-    }));
-  };
-
-  // 검색 필터링
   const filteredAllergens = ALLERGENS.filter((allergen) => {
     if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
     return (
-      allergen.name.toLowerCase().includes(query) ||
-      allergen.description.toLowerCase().includes(query) ||
-      allergen.commonNames?.some((name) => name.toLowerCase().includes(query))
+      allergen.name.toLowerCase().includes(q) ||
+      allergen.description.toLowerCase().includes(q) ||
+      allergen.commonNames?.some((n) => n.toLowerCase().includes(q))
     );
   });
 
-  // 카테고리별 그룹화
-  const categories = Array.from(
-    new Set(ALLERGENS.map((a) => a.category)),
-  ).sort();
-
-  const allergensByCategory = categories.map((category) => ({
-    category,
-    allergens: filteredAllergens.filter((a) => a.category === category),
+  const categories = Array.from(new Set(ALLERGENS.map((a) => a.category)));
+  const allergensByCategory = categories.map((cat) => ({
+    category: cat,
+    allergens: filteredAllergens.filter((a) => a.category === cat),
   }));
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(categories),
-  );
+
+  if (isPageLoading) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              알레르기 정보 불러오는 중...
+            </p>
+          </div>
+        </main>
+        <MobileNav />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-32 md:pb-20">
         <div className="container mx-auto px-4 py-6">
-          <div className="mx-auto max-w-3xl">
-            {/* 헤더 */}
-            <div className="mb-6">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Shield className="h-6 w-6 text-primary" />내 알레르기 관리
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    식약처 지정 22가지 + 추가 알레르기
-                  </p>
+          <div className="mx-auto max-w-2xl">
+            {/* ── 헤더 ── */}
+            <div className="mb-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-white text-xl font-bold shadow">
+                    🛡️
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold">내 알레르기 관리</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      식약처 지정 22가지 알레르기 성분
+                    </p>
+                  </div>
                 </div>
-                <Button onClick={handleSave} disabled={isLoading} size="lg">
-                  {isLoading ? "저장 중..." : "저장"}
-                </Button>
+                {/* 완성도 */}
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-primary">
+                    {selected.size}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /{ALLERGENS.length}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">설정됨</p>
+                </div>
               </div>
 
-              {/* 진행도 표시 */}
+              {/* 완성도 바 */}
               {selected.size > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">
-                      알레르기 설정 진행
-                    </span>
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                    <span>알레르기 프로필 완성도</span>
                     <span className="font-medium text-primary">
-                      {selected.size}개 선택됨
+                      {completionPercent}%
                     </span>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary transition-all duration-300"
-                      style={{
-                        width: `${Math.min((selected.size / 10) * 100, 100)}%`,
-                      }}
+                      className="h-full bg-primary transition-all duration-500 rounded-full"
+                      style={{ width: `${completionPercent}%` }}
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 선택된 알레르기 요약 카드 */}
-            {selected.size > 0 && (
-              <Card className="mb-6 border-primary/20 bg-primary/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold text-primary flex items-center gap-2">
+            {/* ── 선택된 알레르기 요약 ── */}
+            {selected.size > 0 ? (
+              <Card className="mb-5 border-primary/20">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-primary">
                       <CheckCircle2 className="h-4 w-4" />
                       선택한 알레르기 ({selected.size}개)
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowCompactView(!showCompactView)}
-                      className="h-7 text-xs"
+                    </CardTitle>
+                    <button
+                      onClick={() => {
+                        setSelected(new Set());
+                        setSeverity({});
+                      }}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors"
                     >
-                      {showCompactView ? (
-                        <ChevronDown className="h-3 w-3" />
-                      ) : (
-                        <ChevronUp className="h-3 w-3" />
-                      )}
-                    </Button>
+                      전체 해제
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-4 pb-4">
+                  {/* 선택된 알레르기 칩 목록 */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {Array.from(selected).map((code) => {
+                      const allergen = ALLERGENS.find((a) => a.code === code);
+                      if (!allergen) return null;
+                      const sev = severity[code] || "medium";
+                      const sevOption = SEVERITY_OPTIONS.find(
+                        (s) => s.value === sev,
+                      );
+                      return (
+                        <div
+                          key={code}
+                          className="flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-sm shadow-sm"
+                        >
+                          <span>{allergen.emoji}</span>
+                          <span className="font-medium">{allergen.name}</span>
+                          <button
+                            onClick={() => handleToggle(code)}
+                            className="ml-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  {!showCompactView && (
-                    <div className="flex flex-wrap gap-2">
+                  {/* 심각도 설정 */}
+                  <div className="border-t pt-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      심각도 설정 (각 알레르기별 반응 강도)
+                    </p>
+                    <div className="space-y-2">
                       {Array.from(selected).map((code) => {
                         const allergen = ALLERGENS.find((a) => a.code === code);
                         if (!allergen) return null;
-
+                        const sev = severity[code] || "medium";
                         return (
-                          <Badge
-                            key={code}
-                            variant="secondary"
-                            className="px-3 py-1.5 text-sm font-medium cursor-pointer hover:bg-destructive/10 transition-colors group"
-                            onClick={() => handleToggle(code)}
-                          >
-                            <span className="mr-1.5">{allergen.emoji}</span>
-                            {allergen.name}
-                            <X className="ml-1.5 h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </Badge>
+                          <div key={code} className="flex items-center gap-2">
+                            <span className="text-sm w-20 shrink-0 font-medium">
+                              {allergen.emoji} {allergen.name}
+                            </span>
+                            <div className="flex gap-1.5">
+                              {SEVERITY_OPTIONS.map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  onClick={() =>
+                                    handleSeverityChange(code, opt.value)
+                                  }
+                                  className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${
+                                    sev === opt.value
+                                      ? opt.color + " shadow-sm scale-105"
+                                      : "bg-muted/50 text-muted-foreground border-transparent hover:border-border"
+                                  }`}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
+            ) : (
+              /* ── 빈 상태 ── */
+              <div className="mb-5 rounded-xl border-2 border-dashed border-muted-foreground/20 p-6 text-center">
+                <div className="text-4xl mb-2">🔍</div>
+                <p className="font-medium text-sm">
+                  아직 알레르기를 선택하지 않았어요
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  아래 빠른 선택 또는 카테고리에서 선택해주세요
+                </p>
+              </div>
             )}
 
-            {/* 빠른 선택 버튼 */}
-            <Card className="mb-6">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-amber-500" />
-                  빠른 선택
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex flex-wrap gap-2">
-                  {COMMON_ALLERGENS.map((code) => {
-                    const allergen = ALLERGENS.find((a) => a.code === code);
-                    if (!allergen) return null;
-                    const isSelected = selected.has(code);
+            {/* ── 빠른 선택 ── */}
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-2.5">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <span className="text-sm font-semibold">
+                  자주 선택되는 알레르기
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {COMMON_ALLERGENS.map((code) => {
+                  const allergen = ALLERGENS.find((a) => a.code === code);
+                  if (!allergen) return null;
+                  const isSelected = selected.has(code);
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => handleToggle(code)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background border-border hover:border-primary/50 hover:bg-primary/5"
+                      }`}
+                    >
+                      <span>{allergen.emoji}</span>
+                      <span>{allergen.name}</span>
+                      {isSelected && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-                    return (
-                      <button
-                        key={code}
-                        onClick={() => handleToggle(code)}
-                        className={`
-                        flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 
-                        transition-all duration-200 font-medium text-sm
-                        ${
-                          isSelected
-                            ? "border-primary bg-primary text-primary-foreground shadow-md scale-105"
-                            : "border-border bg-background hover:border-primary/50 hover:bg-primary/5"
-                        }
-                      `}
-                      >
-                        <span className="text-lg">{allergen.emoji}</span>
-                        <span>{allergen.name}</span>
-                        {isSelected && <Check className="h-4 w-4 ml-1" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 검색바 */}
-            <div className="mb-6 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            {/* ── 검색바 ── */}
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="알레르기 항목 검색... (예: 우유, 땅콩)"
+                placeholder="알레르기 검색... (예: 우유, 글루텐, 땅콩)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-12 text-base border-2"
+                className="pl-9 h-10"
               />
               {searchQuery && (
                 <button
@@ -595,171 +655,132 @@ export default function AllergyProfilePage() {
               )}
             </div>
 
-            {/* 카테고리별 알레르기 목록 */}
-            <div className="space-y-4">
+            {/* ── 카테고리별 목록 ── */}
+            <div className="space-y-3">
               {allergensByCategory.map(({ category, allergens }) => {
                 if (allergens.length === 0) return null;
-
                 const isExpanded = expandedCategories.has(category);
-                const categorySelectedCount = allergens.filter((a) =>
+                const meta = CATEGORY_META[category] || {
+                  icon: "•",
+                  color: "bg-gray-100 text-gray-700",
+                };
+                const selectedInCategory = allergens.filter((a) =>
                   selected.has(a.code),
                 ).length;
-                const allCategorySelected =
-                  categorySelectedCount === allergens.length;
+                const allSelected = selectedInCategory === allergens.length;
 
                 return (
                   <Card key={category} className="overflow-hidden">
                     <CardHeader
-                      className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:bg-muted/30 transition-colors"
                       onClick={() => toggleCategory(category)}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5">
                           <div
-                            className={`
-                          p-2 rounded-lg
-                          ${category === "곡물" ? "bg-amber-100 text-amber-700" : ""}
-                          ${category === "유제품·계란" ? "bg-blue-100 text-blue-700" : ""}
-                          ${category === "갑각류·어패류" ? "bg-cyan-100 text-cyan-700" : ""}
-                          ${category === "견과류" ? "bg-orange-100 text-orange-700" : ""}
-                          ${category === "과일·채소" ? "bg-green-100 text-green-700" : ""}
-                          ${category === "육류" ? "bg-red-100 text-red-700" : ""}
-                          ${category === "기타" ? "bg-purple-100 text-purple-700" : ""}
-                        `}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${meta.color}`}
                           >
-                            {isExpanded ? (
-                              <ChevronDown className="h-5 w-5" />
-                            ) : (
-                              <ChevronRight className="h-5 w-5" />
-                            )}
+                            {meta.icon}
                           </div>
                           <div>
-                            <CardTitle className="text-lg">
-                              {category}
-                            </CardTitle>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {categorySelectedCount > 0
-                                ? `${categorySelectedCount}/${allergens.length} 선택됨`
-                                : `총 ${allergens.length}개`}
+                            <p className="font-semibold text-sm">{category}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {selectedInCategory > 0
+                                ? `${selectedInCategory}/${allergens.length} 선택됨`
+                                : `${allergens.length}개`}
                             </p>
                           </div>
+                          {selectedInCategory > 0 && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] h-5"
+                            >
+                              {selectedInCategory}
+                            </Badge>
+                          )}
                         </div>
 
                         <div
                           className="flex items-center gap-2"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {categorySelectedCount > 0 &&
-                            categorySelectedCount < allergens.length && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => selectAllInCategory(category)}
-                                className="h-8 text-xs"
-                              >
-                                전체 선택
-                              </Button>
-                            )}
-                          {categorySelectedCount > 0 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deselectAllInCategory(category)}
-                              className="h-8 text-xs"
+                          {allergens.length > 1 && (
+                            <button
+                              onClick={() =>
+                                allSelected
+                                  ? deselectAllInCategory(category)
+                                  : selectAllInCategory(category)
+                              }
+                              className="text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/5"
                             >
-                              {allCategorySelected ? "전체 해제" : "선택 해제"}
-                            </Button>
+                              {allSelected ? "전체 해제" : "전체 선택"}
+                            </button>
+                          )}
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
                       </div>
                     </CardHeader>
 
                     {isExpanded && (
-                      <CardContent className="pt-0 pb-4">
+                      <CardContent className="pt-0 pb-3 px-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {allergens
-                            .slice(
-                              0,
-                              categoryShowCount[category] || ITEMS_PER_PAGE,
-                            )
-                            .map((allergen) => {
-                              const isSelected = selected.has(allergen.code);
-                              const severityColor =
-                                allergen.severity === "high"
-                                  ? "border-red-200 bg-red-50"
-                                  : allergen.severity === "medium"
-                                    ? "border-orange-200 bg-orange-50"
-                                    : "border-yellow-200 bg-yellow-50";
-
-                              return (
-                                <div
-                                  key={allergen.code}
-                                  onClick={() => handleToggle(allergen.code)}
-                                  className={`
-                                  flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer
-                                  transition-all duration-200
-                                  ${
-                                    isSelected
-                                      ? "border-primary bg-primary/10 shadow-sm"
-                                      : `${severityColor} hover:shadow-md hover:scale-[1.02]`
-                                  }
-                                `}
-                                >
-                                  <div className="flex-shrink-0 text-2xl">
-                                    {allergen.emoji}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <p className="font-semibold text-sm truncate">
-                                        {allergen.name}
-                                      </p>
-                                      {allergen.severity === "high" && (
-                                        <Badge
-                                          variant="destructive"
-                                          className="text-[10px] px-1.5 py-0 h-4"
-                                        >
-                                          심각
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {allergen.description}
+                          {allergens.map((allergen) => {
+                            const isSelected = selected.has(allergen.code);
+                            return (
+                              <div
+                                key={allergen.code}
+                                onClick={() => handleToggle(allergen.code)}
+                                className={`flex items-center gap-2.5 p-3 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
+                                  isSelected
+                                    ? "border-primary bg-primary/5 shadow-sm"
+                                    : "border-transparent bg-muted/40 hover:border-muted-foreground/20 hover:bg-muted/60"
+                                }`}
+                              >
+                                <span className="text-xl shrink-0">
+                                  {allergen.emoji}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="font-semibold text-sm">
+                                      {allergen.name}
                                     </p>
-                                  </div>
-                                  <div className="flex-shrink-0">
-                                    {isSelected ? (
-                                      <CheckCircle2 className="h-5 w-5 text-primary" />
-                                    ) : (
-                                      <Circle className="h-5 w-5 text-muted-foreground" />
+                                    {allergen.severity === "high" && (
+                                      <Badge
+                                        variant="destructive"
+                                        className="text-[9px] px-1 h-3.5"
+                                      >
+                                        심각
+                                      </Badge>
                                     )}
                                   </div>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {allergen.description}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {isSelected ? (
+                                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                                  ) : (
+                                    <Circle className="h-5 w-5 text-muted-foreground/40" />
+                                  )}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleShowDetail(allergen.code);
                                     }}
-                                    className="flex-shrink-0 p-1 hover:bg-background/80 rounded transition-colors"
+                                    className="p-1 hover:bg-background rounded transition-colors"
                                   >
-                                    <Info className="h-4 w-4 text-muted-foreground" />
+                                    <Info className="h-4 w-4 text-muted-foreground/60 hover:text-muted-foreground" />
                                   </button>
                                 </div>
-                              );
-                            })}
+                              </div>
+                            );
+                          })}
                         </div>
-
-                        {allergens.length >
-                          (categoryShowCount[category] || ITEMS_PER_PAGE) && (
-                          <Button
-                            variant="outline"
-                            onClick={() => handleShowMore(category)}
-                            className="w-full mt-3"
-                          >
-                            더보기 (
-                            {allergens.length -
-                              (categoryShowCount[category] || ITEMS_PER_PAGE)}
-                            개 남음)
-                          </Button>
-                        )}
                       </CardContent>
                     )}
                   </Card>
@@ -767,77 +788,86 @@ export default function AllergyProfilePage() {
               })}
             </div>
 
-            {/* 하단 정보 카드 */}
-            <Card className="mt-6 bg-muted/30">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  알레르기 정보 참고자료
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href="https://www.allergy.or.kr"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded border border-gray-200 bg-white p-2 text-xs transition-all hover:border-primary/50 hover:shadow-sm"
-                  >
-                    <span className="font-medium">대한 알레르기학회</span>
-                    <ExternalLink className="h-3 w-3 text-gray-500" />
-                  </a>
+            {/* ── 참고 자료 ── */}
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {[
+                {
+                  label: "대한 알레르기학회",
+                  url: "https://www.allergy.or.kr",
+                },
+                {
+                  label: "식품안전나라",
+                  url: "https://foodsafetykorea.go.kr/main.do",
+                },
+                {
+                  label: "Allergy Insider",
+                  url: "https://www.thermofisher.com/allergy/kr/ko/home.html",
+                },
+              ].map((link) => (
+                <a
+                  key={link.label}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded-lg border bg-card p-2.5 text-xs hover:border-primary/40 transition-colors"
+                >
+                  <span className="font-medium truncate">{link.label}</span>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 ml-1" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
 
-                  <a
-                    href="https://www.thermofisher.com/allergy/kr/ko/home.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded border border-gray-200 bg-white p-2 text-xs transition-all hover:border-primary/50 hover:shadow-sm"
-                  >
-                    <span className="font-medium">Allergy Insider</span>
-                    <ExternalLink className="h-3 w-3 text-gray-500" />
-                  </a>
-
-                  <a
-                    href="https://foodsafetykorea.go.kr/main.do"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded border border-gray-200 bg-white p-2 text-xs transition-all hover:border-primary/50 hover:shadow-sm"
-                  >
-                    <span className="font-medium">식품안전나라</span>
-                    <ExternalLink className="h-3 w-3 text-gray-500" />
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 저장 버튼 (하단 고정) */}
-            <div className="mt-6 pb-safe">
+      {/* ── 하단 sticky 저장 바 ── */}
+      <div
+        className={`fixed bottom-16 md:bottom-0 left-0 right-0 z-40 transition-all duration-300 ${
+          hasChanges
+            ? "translate-y-0 opacity-100"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="border-t bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
+          <div className="mx-auto max-w-2xl flex items-center gap-3">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+              <p className="text-sm text-muted-foreground truncate">
+                저장하지 않은 변경사항이 있어요
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
               <Button
+                variant="outline"
+                size="sm"
+                onClick={loadUserAllergens}
+                disabled={isLoading}
+                className="h-9"
+              >
+                되돌리기
+              </Button>
+              <Button
+                size="sm"
                 onClick={handleSave}
                 disabled={isLoading}
-                className="w-full h-12 text-base"
-                size="lg"
+                className="h-9 min-w-[80px]"
               >
                 {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    저장 중...
-                  </>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <Save className="mr-2 h-4 w-4" />
-                    알레르기 정보 저장
+                    <Save className="h-4 w-4 mr-1.5" />
+                    저장
                   </>
                 )}
               </Button>
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       <MobileNav />
 
-      {/* 상세 정보 모달 */}
       <AllergenDetailModal
         allergen={selectedAllergenDetail}
         open={isModalOpen}
