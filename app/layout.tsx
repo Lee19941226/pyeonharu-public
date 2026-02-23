@@ -36,6 +36,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: "/pyeonharu-icon.svg",
+  },
   openGraph: {
     title: "편하루 - 식사를 편하게",
     description:
