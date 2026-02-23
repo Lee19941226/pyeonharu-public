@@ -680,7 +680,18 @@ function FoodSearchPageInner() {
       setSearchProgress({ step: "검색 결과 정리 중...", progress: 75 });
 
       const phase2Data = await phase2Res.json();
-
+      // rate limit 처리
+      if (phase2Res.status === 429) {
+        toast.error(
+          phase2Data.error ||
+            "검색이 너무 빠릅니다. 잠시 후 다시 시도해주세요.",
+          {
+            duration: 5000,
+          },
+        );
+        // phase1 결과가 있으면 그걸로 유지
+        return;
+      }
       if (phase2Data.success) {
         const items = phase2Data.items || [];
         setSearchProgress({ step: "완료!", progress: 100 });

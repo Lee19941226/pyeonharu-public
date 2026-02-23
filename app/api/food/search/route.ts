@@ -78,7 +78,88 @@ export async function GET(req: NextRequest) {
     const userAgent = headersList.get("user-agent") || "unknown";
 
     console.log(ipAddress, userAgent);
+    // ==========================================
+    // Rate Limiting (phase=1 제외 - DB만 조회라 비용 없음)
+    // ==========================================
+    if (phase !== "1") {
+      const now = new Date();
+      const windowStart = new Date(now.getTime() - 60 * 1000); // 1분 슬라이딩 윈도우
 
+      let identifier: string;
+      let minuteLimit: number;
+      let dailyLimit: number;
+
+      if (user) {
+        // 로그인 사용자: 분당 30회, 하루 500회
+        identifier = `user:${user.id}`;
+        minuteLimit = 30;
+        dailyLimit = 500;
+      } else {
+        // 비로그인: IP 기반, 분당 10회, 하루 50회
+        identifier = `ip:${ipAddress}`;
+        minuteLimit = 10;
+        dailyLimit = 50;
+      }
+
+      // ── 1분 내 요청 수 체크 ──
+      const { count: minuteCount } = await supabase
+        .from("search_rate_limits")
+        .select("*", { count: "exact", head: true })
+        .eq("identifier", identifier)
+        .gte("searched_at", windowStart.toISOString());
+
+      if ((minuteCount || 0) >= minuteLimit) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: user
+              ? `검색이 너무 빠릅니다. 잠시 후 다시 시도해주세요. (분당 ${minuteLimit}회 제한)`
+              : `검색이 너무 빠릅니다. 잠시 후 다시 시도해주세요. (분당 ${minuteLimit}회 제한)\n로그인하시면 더 많이 검색할 수 있어요.`,
+            rateLimited: true,
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": "60",
+              "X-RateLimit-Limit": String(minuteLimit),
+              "X-RateLimit-Remaining": "0",
+              "X-RateLimit-Reset": String(Math.ceil(now.getTime() / 1000) + 60),
+            },
+          },
+        );
+      }
+
+      // ── 하루 요청 수 체크 ──
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { count: dailyCount } = await supabase
+        .from("search_rate_limits")
+        .select("*", { count: "exact", head: true })
+        .eq("identifier", identifier)
+        .gte("searched_at", todayStart.toISOString());
+
+      if ((dailyCount || 0) >= dailyLimit) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: user
+              ? `오늘 검색 한도(${dailyLimit}회)를 초과했습니다. 내일 다시 이용해주세요.`
+              : `오늘 무료 검색 한도(${dailyLimit}회)를 초과했습니다. 로그인하시면 더 많이 검색할 수 있어요.`,
+            rateLimited: true,
+          },
+          { status: 429, headers: { "Retry-After": "86400" } },
+        );
+      }
+
+      // ── 요청 기록 저장 (비동기, 응답 대기 안 함) ──
+      supabase
+        .from("search_rate_limits")
+        .insert({ identifier, searched_at: now.toISOString() })
+        .then(({ error }) => {
+          if (error) console.error("❌ rate limit 기록 실패:", error);
+        });
+    }
     // 사용자 알레르기 정보
     let userAllergens: string[] = [];
     if (user) {
