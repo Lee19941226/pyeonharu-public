@@ -113,6 +113,24 @@ export default function RootLayout({
           <Toaster />
         </AuthProvider>
         <Analytics />
+        {/* 서비스 워커 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(reg) {
+                      console.log('[SW] 등록 성공:', reg.scope);
+                    })
+                    .catch(function(err) {
+                      console.warn('[SW] 등록 실패:', err);
+                    });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

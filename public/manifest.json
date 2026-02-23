@@ -1,27 +1,71 @@
 {
+  "id": "/",
   "name": "편하루 - 편안한 메뉴 선택",
   "short_name": "편하루",
-  "description": "알레르기가 있어도 편안하게 메뉴를 고를 수 있게. 바코드·사진 알레르기 확인, 급식 체크, AI 증상 분석.",
-  "start_url": "/",
+  "description": "바코드·사진으로 알레르기 확인 5초. 급식 체크, 맛집 매칭, AI 증상 분석.",
+  "start_url": "/?source=pwa",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#ffffff",
   "theme_color": "#4A7C59",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "scope": "/",
   "lang": "ko",
-  "categories": ["health", "food", "education"],
+  "dir": "ltr",
+  "categories": ["health", "food", "medical"],
+  "prefer_related_applications": false,
+
   "icons": [
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+
+  "shortcuts": [
+    {
+      "name": "식품 검색",
+      "short_name": "검색",
+      "description": "식품 알레르기 검색",
+      "url": "/food/search?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "병원 찾기",
+      "short_name": "병원",
+      "description": "주변 병원 찾기",
+      "url": "/hospital?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+
+  "screenshots": [
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "편하루 메인 화면"
     }
   ]
 }
