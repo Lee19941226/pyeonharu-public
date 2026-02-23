@@ -87,20 +87,21 @@ const nextConfig = {
               // API 호출 허용 도메인
               [
                 "connect-src 'self'",
-                "https://*.supabase.co", // Supabase DB/Auth
-                "wss://*.supabase.co", // Supabase Realtime
-                "https://apis.data.go.kr", // 식약처 공공 API
-                "https://world.openfoodfacts.org", // OpenFoodFacts
-                "https://api.openai.com", // OpenAI
-                "https://dapi.kakao.com", // 카카오 API
-                "https://openapi.map.naver.com", // 네이버 지도
-                "https://oapi.map.naver.com", // 네이버 지도
-                "https://naveropenapi.apigw.ntruss.com", // 네이버 클라우드
+                "https://*.supabase.co",
+                "wss://*.supabase.co",
+                "https://apis.data.go.kr",
+                "https://world.openfoodfacts.org",
+                "https://api.openai.com",
+                "https://dapi.kakao.com",
+                "https://openapi.map.naver.com",
+                "https://oapi.map.naver.com",
+                "https://naveropenapi.apigw.ntruss.com",
                 "https://vitals.vercel-insights.com",
                 "https://va.vercel-scripts.com",
                 "https://cdn.jsdelivr.net",
-                "https://pagead2.googlesyndication.com", // Google 애드센스
-                "https://www.googleadservices.com", // Google 애드센스
+                "https://pagead2.googlesyndication.com",
+                "https://www.googleadservices.com",
+                "https://epi.adtrafficquality.google", // ← 이거 추가
               ].join(" "),
 
               // iframe: 카카오 로그인 팝업 + Google 애드센스
