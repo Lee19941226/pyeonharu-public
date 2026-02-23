@@ -1,27 +1,32 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import OpenAI from "openai"
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "로그인 필요" }, { status: 401 })
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user)
+      return NextResponse.json({ error: "로그인 필요" }, { status: 401 });
 
     // ─── 1. 사용자 알레르기 ───
     const { data: allergies } = await supabase
       .from("user_allergies")
       .select("allergen_name, severity")
-      .eq("user_id", user.id)
+      .eq("user_id", user.id);
 
-    const allergenList = (allergies || []).map(a => a.allergen_name)
+    const allergenList = (allergies || []).map((a) => a.allergen_name);
 
     // ─── 2. 오늘 식단 (KST) ───
-    const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split("T")[0]
-    const startOfDay = `${todayStr}T00:00:00+09:00`
-    const endOfDay = `${todayStr}T23:59:59+09:00`
+    const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const startOfDay = `${todayStr}T00:00:00+09:00`;
+    const endOfDay = `${todayStr}T23:59:59+09:00`;
 
     const { data: todayMeals } = await supabase
       .from("diet_entries")
@@ -29,12 +34,12 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
       .gte("recorded_at", startOfDay)
       .lte("recorded_at", endOfDay)
-      .order("recorded_at", { ascending: true })
+      .order("recorded_at", { ascending: true });
 
     // ─── 3. 최근 7일 식단 (주간 패턴) ───
-    const weekAgo = new Date(Date.now() + 9 * 60 * 60 * 1000)
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    const weekAgoStr = weekAgo.toISOString().split("T")[0]
+    const weekAgo = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split("T")[0];
 
     const { data: weeklyMeals } = await supabase
       .from("diet_entries")
@@ -42,54 +47,82 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
       .gte("recorded_at", `${weekAgoStr}T00:00:00+09:00`)
       .order("recorded_at", { ascending: false })
-      .limit(100)
+      .limit(100);
 
     // ─── 4. BMR ───
     const { data: profile } = await supabase
       .from("profiles")
       .select("bmr, height, weight, age, gender")
       .eq("id", user.id)
-      .single()
+      .single();
 
-    const bmr = profile?.bmr || 2000
-    const todayCalories = (todayMeals || []).reduce((sum, m) => sum + (m.estimated_cal || 0), 0)
-    const remainingCal = Math.max(bmr - todayCalories, 0)
+    const bmr = profile?.bmr || 2000;
+    const todayCalories = (todayMeals || []).reduce(
+      (sum, m) => sum + (m.estimated_cal || 0),
+      0,
+    );
+    const remainingCal = Math.max(bmr - todayCalories, 0);
 
     // ─── 5. 식사 타입 (KST) ───
-    const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getHours()
-    let mealType = "저녁"
-    if (kstHour < 10) mealType = "아침"
-    else if (kstHour < 15) mealType = "점심"
-    else if (kstHour < 18) mealType = "간식"
+    const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getHours();
+    let mealType = "저녁";
+    if (kstHour < 10) mealType = "아침";
+    else if (kstHour < 15) mealType = "점심";
+    else if (kstHour < 18) mealType = "간식";
 
     // ─── 6. 주간 분석 데이터 가공 ───
-    const todayFoodNames = (todayMeals || []).map(m => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`)
-    const recentFoodNames = [...new Set((weeklyMeals || []).map(m => m.food_name))].slice(0, 20)
+    const todayFoodNames = (todayMeals || []).map(
+      (m) => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`,
+    );
+    const recentFoodNames = [
+      ...new Set((weeklyMeals || []).map((m) => m.food_name)),
+    ].slice(0, 20);
 
     // 주간 음식 빈도
-    const foodFreq: Record<string, number> = {}
-    ;(weeklyMeals || []).forEach(m => {
-      foodFreq[m.food_name] = (foodFreq[m.food_name] || 0) + 1
-    })
+    const foodFreq: Record<string, number> = {};
+    (weeklyMeals || []).forEach((m) => {
+      foodFreq[m.food_name] = (foodFreq[m.food_name] || 0) + 1;
+    });
     const topFoods = Object.entries(foodFreq)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
-      .map(([name, count]) => `${name}(${count}회)`)
+      .map(([name, count]) => `${name}(${count}회)`);
 
     // 주간 일별 칼로리
-    const dailyCals: Record<string, number> = {}
-    ;(weeklyMeals || []).forEach(m => {
-      const kst = new Date(new Date(m.recorded_at).getTime() + 9 * 60 * 60 * 1000)
-      const key = kst.toISOString().split("T")[0]
-      dailyCals[key] = (dailyCals[key] || 0) + (m.estimated_cal || 0)
-    })
-    const dailyCalArr = Object.entries(dailyCals).sort(([a], [b]) => a.localeCompare(b))
-    const weekAvgCal = dailyCalArr.length > 0
-      ? Math.round(dailyCalArr.reduce((s, [, c]) => s + c, 0) / dailyCalArr.length)
-      : 0
-    const overDays = dailyCalArr.filter(([, c]) => bmr > 0 && c > bmr).length
+    const dailyCals: Record<string, number> = {};
+    (weeklyMeals || []).forEach((m) => {
+      const kst = new Date(
+        new Date(m.recorded_at).getTime() + 9 * 60 * 60 * 1000,
+      );
+      const key = kst.toISOString().split("T")[0];
+      dailyCals[key] = (dailyCals[key] || 0) + (m.estimated_cal || 0);
+    });
+    const dailyCalArr = Object.entries(dailyCals).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    const weekAvgCal =
+      dailyCalArr.length > 0
+        ? Math.round(
+            dailyCalArr.reduce((s, [, c]) => s + c, 0) / dailyCalArr.length,
+          )
+        : 0;
+    const overDays = dailyCalArr.filter(([, c]) => bmr > 0 && c > bmr).length;
 
-    // ─── 7. GPT-4o-mini 추천 (근거 체인 포함) ───
+    // ─── 7. 칼로리 상황 판단 ───
+    const isOver = todayCalories > bmr;
+    const remainingPercent = bmr > 0 ? (remainingCal / bmr) * 100 : 100;
+    let calorieSituation = "";
+    if (isOver) {
+      calorieSituation = `목표 ${bmr}kcal 대비 ${todayCalories - bmr}kcal 초과 상태 → 100kcal 이하 초경량 옵션 필요`;
+    } else if (remainingPercent >= 70) {
+      calorieSituation = `아직 ${todayCalories}kcal만 섭취, 잔여 ${remainingCal}kcal로 여유 충분 → 든든한 본식사 추천`;
+    } else if (remainingPercent >= 30) {
+      calorieSituation = `${todayCalories}kcal 섭취, 잔여 ${remainingCal}kcal → 적당한 한 끼 추천`;
+    } else {
+      calorieSituation = `${todayCalories}kcal 섭취, 잔여 ${remainingCal}kcal로 적음 → 가벼운 식사 추천`;
+    }
+
+    // ─── 8. GPT-4o-mini 추천 (근거 체인 포함) ───
     const prompt = `당신은 한국 식단 영양사입니다. 아래 데이터를 분석하고, 각 근거를 명시한 메뉴 추천을 해주세요.
 
 ## 사용자 데이터
@@ -99,6 +132,7 @@ export async function GET(req: NextRequest) {
 **오늘 섭취 내역**:
 ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
 - 합계: ${todayCalories}kcal / 목표: ${bmr}kcal / 잔여: ${remainingCal}kcal
+- 상황 판단: ${calorieSituation}
 
 **주간 패턴 (최근 7일)**:
 - 자주 먹은 음식: ${topFoods.join(", ") || "기록 없음"}
@@ -111,16 +145,20 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
 ## 추천 규칙
 1. 알레르기 식품 절대 제외
 2. 최근 7일 자주 먹은 음식 피하기 (다양성)
-3. 남은 칼로리(${remainingCal}kcal)에 맞추기. 칼로리 초과 상태라도 현실적으로 먹을 수 있는 저칼로리 옵션 추천
+3. 남은 칼로리(${remainingCal}kcal)에 맞는 식사량 추천:
+   - 잔여 칼로리가 목표의 70% 이상(많이 남음) → 든든한 정식/본식사 추천 (500~800kcal급)
+   - 잔여 칼로리가 목표의 30~70% → 적당한 한 끼 추천 (300~500kcal급)
+   - 잔여 칼로리가 목표의 30% 미만(적게 남음) → 가벼운 식사 추천 (100~300kcal급)
+   - 칼로리 초과 상태 → 100kcal 이하 초경량 옵션 추천
 4. 주간 영양 패턴의 편중 보완
 5. 오늘 먹은 음식과의 맛 밸런스 고려
-6. **반드시 최소 3개, 최대 5개** 메뉴를 추천하세요. 칼로리 초과 상태여도 3개 이상 추천하되, 가벼운 음식 위주로 구성하세요
+6. **반드시 최소 3개, 최대 5개** 메뉴를 추천하세요
 
 ## 응답 형식 (JSON만, 코드블록 없이)
 {
   "mealType": "${mealType}",
   "analysis": {
-    "calorieSituation": "오늘 칼로리 상황 1줄 (예: 이미 4,408kcal 섭취로 목표 초과, 가벼운 식사 필요)",
+    "calorieSituation": "오늘 칼로리 상황 1줄 (예: 아직 0kcal 섭취로 잔여 2000kcal, 든든한 본식사 추천 / 또는: 이미 1800kcal 섭취로 목표 초과, 가벼운 식사 필요)",
     "weeklyPattern": "주간 패턴 분석 1줄 (예: 햄버거·버거를 7일간 9회 섭취, 패스트푸드 편중 심각)",
     "nutritionGap": "부족한 영양소 1줄 (예: 식이섬유·비타민 부족, 단백질 과다)"
   },
@@ -131,7 +169,7 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
       "estimatedCal": 숫자,
       "reasoning": {
         "taste": "오늘 먹은 것 기반 입맛 근거 (예: 점심에 기름진 버거를 먹었으니 담백한 맛이 어울립니다)",
-        "calorie": "칼로리 근거 (예: 잔여 0kcal이므로 100kcal 이하 초경량 식사)",
+        "calorie": "칼로리 근거 (예: 잔여 1620kcal로 여유 충분하므로 든든한 600kcal급 본식사 적합)",
         "nutrition": "주간 영양 근거 (예: 7일간 채소 섭취 거의 없어 식이섬유 보충 필요)",
         "variety": "다양성 근거 (예: 최근 한식을 안 먹었으므로 한식 추천)"
       },
@@ -139,29 +177,35 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
     }
   ],
   "nutritionTip": "종합 영양 조언 1줄"
-}`
+}`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "한국 식단 영양사. 데이터 기반 근거를 명확히 제시하는 메뉴 추천. JSON만 응답." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content:
+            "한국 식단 영양사. 데이터 기반 근거를 명확히 제시하는 메뉴 추천. JSON만 응답.",
+        },
+        { role: "user", content: prompt },
       ],
       temperature: 0.6,
       max_tokens: 2500,
-    })
+    });
 
-    let result: any
+    let result: any;
     try {
-      const raw = (completion.choices[0]?.message?.content || "{}").replace(/```json\n?|```/g, "").trim()
-      result = JSON.parse(raw)
+      const raw = (completion.choices[0]?.message?.content || "{}")
+        .replace(/```json\n?|```/g, "")
+        .trim();
+      result = JSON.parse(raw);
     } catch {
       result = {
         mealType,
         analysis: { calorieSituation: "", weeklyPattern: "", nutritionGap: "" },
         recommendations: [],
-        nutritionTip: "추천을 생성하지 못했습니다."
-      }
+        nutritionTip: "추천을 생성하지 못했습니다.",
+      };
     }
 
     return NextResponse.json({
@@ -176,10 +220,13 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
         weeklyAvgCal: weekAvgCal,
         weeklyOverDays: overDays,
         weeklyTopFoods: topFoods,
-      }
-    })
+      },
+    });
   } catch (error: any) {
-    console.error("Meal recommend error:", error)
-    return NextResponse.json({ error: error.message || "추천 실패" }, { status: 500 })
+    console.error("Meal recommend error:", error);
+    return NextResponse.json(
+      { error: error.message || "추천 실패" },
+      { status: 500 },
+    );
   }
 }
