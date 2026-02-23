@@ -644,12 +644,11 @@ function FoodSearchPageInner() {
         }
       }
     }
-  }, []); // ✅ 최초 1회만 실행
+  }, []);
 
   const performSearch = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.trim().length < 2) return;
 
-    // 이전 요청 취소
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
@@ -659,7 +658,6 @@ function FoodSearchPageInner() {
     setCurrentPage(1);
 
     try {
-      // ✅ 1단계: DB만 빠르게
       setSearchProgress({ step: "DB 캐시 검색 중...", progress: 25 });
 
       const phase1Res = await fetch(
@@ -670,10 +668,8 @@ function FoodSearchPageInner() {
 
       if (phase1Data.items?.length > 0) {
         setAllResults(phase1Data.items);
-        setIsLoading(false); // ✅ DB 결과 즉시 표시
       }
 
-      // ✅ 2단계: 외부 API 전체 검색 (백그라운드)
       setSearchProgress({ step: "식약처 API 조회 중...", progress: 50 });
 
       const phase2Res = await fetch(
@@ -687,11 +683,9 @@ function FoodSearchPageInner() {
 
       if (phase2Data.success) {
         const items = phase2Data.items || [];
-
         setSearchProgress({ step: "완료!", progress: 100 });
         setAllResults(items);
 
-        // ✅ 캐싱
         const cacheKey = `search_cache_${searchQuery.trim()}`;
         sessionStorage.setItem(
           cacheKey,
@@ -702,13 +696,14 @@ function FoodSearchPageInner() {
           }),
         );
         sessionStorage.setItem("last_search_query", searchQuery.trim());
-      } else if (phase1Data.items?.length === 0) {
-        setAllResults([]);
       }
+      //
     } catch (error: any) {
       if (error.name === "AbortError") return;
       console.error("❌ 검색 오류:", error);
-      setAllResults([]);
+      if (allResults.length === 0) {
+        setAllResults([]);
+      }
       setSearchProgress({ step: "검색 실패", progress: 0 });
     } finally {
       setTimeout(() => {
@@ -729,12 +724,10 @@ function FoodSearchPageInner() {
     // ✅ 같은 검색어면 API 호출 안 함
     const urlQuery = searchParams.get("q");
     if (urlQuery === query.trim()) {
-      console.log("⚠️ 같은 검색어 - 스킵");
-      return;
+      router.push(`/food/search?q=${encodeURIComponent(query.trim())}`);
     }
 
     // ✅ URL 업데이트 후 검색
-    router.push(`/food/search?q=${encodeURIComponent(query.trim())}`);
     performSearch(query.trim());
   };
 
