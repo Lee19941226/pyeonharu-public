@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
           const textQuery = supabase
             .from("food_search_cache")
             .select("*")
-            .or(`food_name.ilike.%${query}%,manufacturer.ilike.%${query}%`)
+            .or(`food_name.ilike.%${query}%,raw_materials.ilike.%${query}%`)
             .limit(30);
 
           // 2. 초성 검색 (쿼리에 한글 자음만 있으면)
@@ -556,19 +556,28 @@ JSON 배열 형식으로만 반환:
       );
       const lowerName = item.food_name.toLowerCase();
       const lowerQuery = normalizedQuery.toLowerCase();
+      const lowerRaw = (item.raw_materials || "").toLowerCase();
 
       let matchReason = "제품명";
       let nameScore = 95;
 
       if (lowerName === lowerQuery) {
         nameScore = 100;
+        matchReason = "제품명";
       } else if (lowerName.startsWith(lowerQuery)) {
         nameScore = 95;
+        matchReason = "제품명";
       } else if (lowerName.includes(lowerQuery)) {
         nameScore = 90;
+        matchReason = "제품명";
+      } else if (lowerRaw.includes(lowerQuery)) {
+        // ✅ raw_materials 매칭인 경우
+        nameScore = 80;
+        matchReason = "원재료";
       } else {
-        matchReason = "초성";
+        // 초성 매칭
         nameScore = 85;
+        matchReason = "초성";
       }
 
       allResults.push({
@@ -641,16 +650,20 @@ JSON 배열 형식으로만 반환:
 
     // ── 3순위: Open Food Facts (기본 점수 + 120) ──
     openFoodItems.forEach((item: any) => {
-      const hasAllergen = (item.ALLERGENS || []).some((a: string) =>
-        userAllergens.some((ua) => a.includes(ua) || ua.includes(a)),
-      );
-
       const lowerName = (item.FOOD_NM || "").toLowerCase();
       const lowerQuery = normalizedQuery.toLowerCase();
 
+      // ✅ 이름 매칭 없으면 제외
+      if (!lowerName.includes(lowerQuery)) return;
+
+      const hasAllergen = (item.ALLERGENS || []).some((a: string) =>
+        userAllergens.some((ua) => a.includes(ua) || ua.includes(a)),
+      );
       let offScore = 75;
-      if (lowerName.includes(lowerQuery)) {
-        offScore = lowerName.startsWith(lowerQuery) ? 85 : 80;
+      if (lowerName.startsWith(lowerQuery)) {
+        offScore = 85;
+      } else {
+        offScore = 80;
       }
 
       allResults.push({
