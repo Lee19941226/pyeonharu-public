@@ -24,6 +24,7 @@ import type { AllergenInfo } from "@/lib/allergen-info";
 import { createClient } from "@/lib/supabase/client";
 import { FoodResult } from "@/types/food";
 import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
+import { getAiResult } from "@/lib/utils/ai-result-storage";
 
 export default function FoodResultPage() {
   const params = useParams();
@@ -279,16 +280,13 @@ export default function FoodResultPage() {
       // 2단계: API 실패 시 sessionStorage 백업 (AI만)
       // ==========================================
       if (id?.startsWith("ai-")) {
-        console.log("🔄 sessionStorage 백업 확인 (AI 결과)");
-
-        const storageKey = `ai_result_${id}`;
-        const analysisData = sessionStorage.getItem(storageKey);
+        // ✅ localStorage로 변경 (sessionStorage → 탭 전환 시 소실 문제 해결)
+        const analysisData = getAiResult(id);
 
         if (analysisData) {
           console.log("✅ sessionStorage에서 복구");
 
-          const analysisResult = JSON.parse(analysisData);
-
+          const analysisResult = analysisData;
           // ✅ FoodResult 형식으로 변환
           const aiResult: FoodResult = {
             foodCode: id,

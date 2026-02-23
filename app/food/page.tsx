@@ -34,7 +34,7 @@ import type {
   RecentProduct,
   FoodFavorite,
 } from "@/types/food";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { saveAiResult } from "@/lib/utils/ai-result-storage";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -378,21 +378,18 @@ function FoodMainContent() {
 
           if (aiData.success) {
             const aiResultId = `ai-text-${Date.now()}`;
-            sessionStorage.setItem(
-              `ai_result_${aiResultId}`,
-              JSON.stringify({
-                productName: aiData.productName || searchQuery,
-                manufacturer: aiData.manufacturer || "",
-                weight: aiData.weight || "",
-                detectedIngredients: aiData.detectedIngredients || [],
-                allergens: aiData.allergens || [],
-                hasUserAllergen: aiData.hasUserAllergen || false,
-                matchedUserAllergens: aiData.matchedUserAllergens || [],
-                dataSource: "ai",
-                rawMaterials: aiData.rawMaterials || "",
-                nutritionInfo: aiData.nutritionInfo || null,
-              }),
-            );
+            saveAiResult(aiResultId, {
+              productName: aiData.productName || searchQuery,
+              manufacturer: aiData.manufacturer || "",
+              weight: aiData.weight || "",
+              detectedIngredients: aiData.detectedIngredients || [],
+              allergens: aiData.allergens || [],
+              hasUserAllergen: aiData.hasUserAllergen || false,
+              matchedUserAllergens: aiData.matchedUserAllergens || [],
+              dataSource: "ai",
+              rawMaterials: aiData.rawMaterials || "",
+              nutritionInfo: aiData.nutritionInfo || null,
+            });
 
             setResults([
               {

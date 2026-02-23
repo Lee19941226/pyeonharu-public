@@ -25,6 +25,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { SearchHistory } from "@/types/food";
 import { toast } from "sonner";
+import { saveAiResult } from "@/lib/utils/ai-result-storage";
 
 interface SearchResult {
   foodCode: string;
@@ -206,29 +207,24 @@ function FoodSearchContent() {
   const handleProductClick = (foodCode: string) => {
     if (foodCode.startsWith("ai-")) {
       const aiResult = results.find((r) => r.foodCode === foodCode);
-
       if (aiResult) {
-        const storageKey = `ai_result_${foodCode}`;
-        sessionStorage.setItem(
-          storageKey,
-          JSON.stringify({
-            productName: aiResult.foodName,
-            manufacturer: aiResult.manufacturer || "",
-            weight: aiResult.weight || "",
-            detectedIngredients: aiResult.detectedIngredients || [],
-            allergens: aiResult.allergens || [],
-            hasUserAllergen: aiResult.hasAllergen || false,
-            matchedUserAllergens: aiResult.matchedUserAllergens || [],
-            dataSource: "ai",
-            rawMaterials: aiResult.rawMaterials || "",
-            nutritionInfo: aiResult.nutritionInfo || null,
-            ingredients:
-              aiResult.ingredients || aiResult.detectedIngredients || [],
-          }),
-        );
+        // ✅ localStorage로 변경
+        saveAiResult(foodCode, {
+          productName: aiResult.foodName,
+          manufacturer: aiResult.manufacturer || "",
+          weight: aiResult.weight || "",
+          detectedIngredients: aiResult.detectedIngredients || [],
+          allergens: aiResult.allergens || [],
+          hasUserAllergen: aiResult.hasAllergen || false,
+          matchedUserAllergens: aiResult.matchedUserAllergens || [],
+          dataSource: "ai",
+          rawMaterials: aiResult.rawMaterials || "",
+          nutritionInfo: aiResult.nutritionInfo || null,
+          ingredients:
+            aiResult.ingredients || aiResult.detectedIngredients || [],
+        });
       }
     }
-
     router.push(`/food/result/${foodCode}`);
   };
 
@@ -749,27 +745,23 @@ function FoodSearchPageInner() {
     if (item) {
       // ✅ 검색 결과를 sessionStorage에 저장
       const cacheKey = `food_quick_${foodCode}`;
-      sessionStorage.setItem(
-        cacheKey,
-        JSON.stringify({
-          foodCode: item.foodCode,
-          foodName: item.foodName,
-          manufacturer: item.manufacturer,
-          allergens: item.allergens,
-          hasAllergen: item.hasAllergen,
-          matchedUserAllergens: item.matchedUserAllergens,
-          dataSource: item.dataSource,
-          rawMaterials: item.rawMaterials,
-          weight: item.weight,
-          ingredients: item.ingredients,
-          timestamp: Date.now(), // 캐시 시간
-        }),
-      );
+      saveAiResult(foodCode, {
+        productName: aiResult.foodName,
+        manufacturer: aiResult.manufacturer || "",
+        weight: aiResult.weight || "",
+        detectedIngredients: aiResult.detectedIngredients || [],
+        allergens: aiResult.allergens || [],
+        hasUserAllergen: aiResult.hasAllergen || false,
+        matchedUserAllergens: aiResult.matchedUserAllergens || [],
+        dataSource: "ai",
+        rawMaterials: aiResult.rawMaterials || "",
+        nutritionInfo: aiResult.nutritionInfo || null,
+        ingredients: aiResult.ingredients || aiResult.detectedIngredients || [],
+      });
 
       console.log("💾 빠른 캐시 저장:", foodCode);
     }
-
-    router.push(`/food/result/${foodCode}`);
+    timestamp: (Date.now(), router.push(`/food/result/${foodCode}`));
   };
 
   // ✅ 페이지네이션

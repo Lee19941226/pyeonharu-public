@@ -13,6 +13,8 @@ import { useDevice } from "@/lib/hooks/use-device";
 import { Html5Qrcode } from "html5-qrcode";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
+import { saveAiResult } from "@/lib/utils/ai-result-storage";
+
 interface UploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -98,22 +100,19 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
             const data = await response.json();
 
             if (data.success && data.foodCode) {
-              sessionStorage.setItem(
-                `ai_result_${data.foodCode}`,
-                JSON.stringify({
-                  foodCode: data.foodCode,
-                  productName: data.productName,
-                  manufacturer: data.manufacturer,
-                  weight: data.weight,
-                  allergens: data.allergens,
-                  hasUserAllergen: data.hasUserAllergen,
-                  matchedUserAllergens: data.matchedUserAllergens || [],
-                  ingredients: data.ingredients || [],
-                  rawMaterials: data.rawMaterials || "",
-                  nutritionInfo: data.nutritionInfo || null,
-                  dataSource: data.dataSource || "ai",
-                }),
-              );
+              saveAiResult(data.foodCode, {
+                foodCode: data.foodCode,
+                productName: data.productName,
+                manufacturer: data.manufacturer,
+                weight: data.weight,
+                allergens: data.allergens,
+                hasUserAllergen: data.hasUserAllergen,
+                matchedUserAllergens: data.matchedUserAllergens || [],
+                ingredients: data.ingredients || [],
+                rawMaterials: data.rawMaterials || "",
+                nutritionInfo: data.nutritionInfo || null,
+                dataSource: data.dataSource || "ai",
+              });
               toast.success("분석 완료!");
               router.push(`/food/result/${data.foodCode}`);
             } else {
