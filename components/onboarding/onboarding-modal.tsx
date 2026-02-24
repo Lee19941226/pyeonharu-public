@@ -1,4 +1,3 @@
-  useBackHandler(open, () => onOpenChange(false));
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -27,6 +26,7 @@ export function OnboardingModal({
   onOpenChange,
   onComplete,
 }: OnboardingModalProps) {
+  useBackHandler(open, () => onOpenChange(false));
   const [step, setStep] = useState<OnboardingStep>(1);
 
   // 데모 스캔에서 선택한 제품 결과를 Aha 스텝으로 전달

@@ -109,6 +109,7 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  useBackHandler(loginModalOpen, () => setLoginModalOpen(false));
 
   // ✅ 기본값으로 초기화 (SSR 안전)
   const [mainTab, setMainTab] = useState<MainTab>("meal");
@@ -427,5 +428,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-  useBackHandler(loginModalOpen, () => setLoginModalOpen(false));

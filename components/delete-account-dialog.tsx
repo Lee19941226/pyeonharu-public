@@ -1,4 +1,3 @@
-  useBackHandler(isOpen, () => onOpenChange(false));
 "use client"
 
 import { useState } from "react"
@@ -28,6 +27,7 @@ export function DeleteAccountDialog({
   userEmail,
 }: DeleteAccountDialogProps) {
   const router = useRouter()
+  useBackHandler(isOpen, () => onOpenChange(false));
   const [confirmEmail, setConfirmEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
