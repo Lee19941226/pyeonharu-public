@@ -19,7 +19,7 @@ import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Footer } from "@/components/layout/footer";
 import { LoginModal } from "@/components/auth/login-modal";
-import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { WelcomeModal } from "@/components/onboarding/welcome-modal";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -437,7 +437,7 @@ export default function HomePage() {
         onOpenChange={setLoginModalOpen}
         onSuccess={() => router.refresh()}
       />
-      <OnboardingTour active={tourActive} onFinish={handleTourFinish} />
+      <WelcomeModal active={tourActive} onFinish={handleTourFinish} />
     </div>
   );
 }
