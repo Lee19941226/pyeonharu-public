@@ -113,11 +113,23 @@ function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bm
   );
 }
 
-// ─── 카카오 SDK 초기화 ───
-function initKakao() {
-  if (typeof window !== "undefined" && window.Kakao && !window.Kakao.isInitialized()) {
-    window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
+// ─── 카카오 SDK 초기화 (공유 시점에 호출) ───
+function ensureKakaoInit(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!window.Kakao) {
+    console.warn("[카카오] SDK가 아직 로드되지 않았습니다");
+    return false;
   }
+  if (!window.Kakao.isInitialized()) {
+    try {
+      window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
+      console.log("[카카오] SDK 초기화 완료");
+    } catch (e) {
+      console.error("[카카오] SDK 초기화 실패:", e);
+      return false;
+    }
+  }
+  return window.Kakao.isInitialized();
 }
 
 interface DietEntry { id: string; food_name: string; estimated_cal: number; source: "ai" | "manual"; emoji: string; ai_confidence: number | null; image_url: string | null; recorded_at: string }
@@ -170,8 +182,7 @@ export default function DietTab() {
   const [showRecordSheet, setShowRecordSheet] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
-  // ✅ 카카오 SDK 초기화
-  useEffect(() => { initKakao() }, []);
+  // 카카오 SDK는 공유 시점에 ensureKakaoInit()로 초기화
 
   useEffect(() => { supabase.auth.getUser().then(({ data: { user } }) => { setUser(user); if (!user) setIsLoading(false) }) }, []);
 
@@ -325,15 +336,15 @@ export default function DietTab() {
 
   // ─── 카카오 공유: 오늘 먹은 음식 ───
   const shareToday = () => {
-    if (!window.Kakao) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
       toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
     }
     const shareUrl = `${window.location.origin}/diet`;
     const foodList = entries.length > 0
-      ? entries.map(e => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`).slice(0, 5).join("\n")
+      ? entries.map(e => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`).slice(0, 5).join(", ")
       : "아직 기록이 없어요";
-    const moreText = entries.length > 5 ? `\n...외 ${entries.length - 5}개 더` : "";
+    const moreText = entries.length > 5 ? ` 외 ${entries.length - 5}개 더` : "";
     const statusText = isOver
       ? `⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과!`
       : bmr > 0 ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음` : `총 ${totalCal.toLocaleString()}kcal 섭취`;
@@ -342,20 +353,23 @@ export default function DietTab() {
         objectType: "feed",
         content: {
           title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`,
-          description: `${foodList}${moreText}\n\n${statusText}`,
-          imageUrl: `${window.location.origin}/pyeonharu-icon.svg`,
-          imageWidth: 200, imageHeight: 200,
+          description: `${foodList}${moreText} | ${statusText}`,
+          imageUrl: `${window.location.origin}/icons/icon-512.png`,
+          imageWidth: 512, imageHeight: 512,
           link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
         },
         buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
       });
       setShowShareMenu(false);
-    } catch { toast.error("공유에 실패했습니다") }
+    } catch (err) {
+      console.error("[카카오 공유 실패]", err);
+      toast.error("공유에 실패했습니다");
+    }
   };
 
   // ─── 카카오 공유: 식단 리포트 ───
   const shareReport = () => {
-    if (!window.Kakao) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
       toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
     }
@@ -365,24 +379,27 @@ export default function DietTab() {
     let description = `총 ${totalCal.toLocaleString()}kcal 섭취 · ${entries.length}끼`;
     if (bmr > 0) {
       description += isOver
-        ? `\n⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과`
-        : `\n✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`;
+        ? ` | ⚠️ BMR 대비 ${overAmount.toLocaleString()}kcal 초과`
+        : ` | ✅ BMR 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`;
     }
     if (dashData?.summary) {
       const rangeLabel = getRangeLabel();
       title = `📊 식단 리포트 (${rangeLabel})`;
-      description = `일 평균 ${dashData.summary.avgCal.toLocaleString()}kcal\n${dashData.summary.daysWithData}일 기록 / ${dashData.summary.totalDays}일`;
-      if (bmr > 0 && dashData.summary.overDays > 0) description += `\n⚠️ ${dashData.summary.overDays}일 칼로리 초과`;
-      if (dashData.summary.topFoods.length > 0) description += `\n🍴 자주 먹은: ${dashData.summary.topFoods.slice(0, 3).map(f => f.name).join(", ")}`;
+      description = `일 평균 ${dashData.summary.avgCal.toLocaleString()}kcal · ${dashData.summary.daysWithData}일 기록 / ${dashData.summary.totalDays}일`;
+      if (bmr > 0 && dashData.summary.overDays > 0) description += ` · ⚠️ ${dashData.summary.overDays}일 초과`;
+      if (dashData.summary.topFoods.length > 0) description += ` · 🍴 ${dashData.summary.topFoods.slice(0, 3).map(f => f.name).join(", ")}`;
     }
     try {
       window.Kakao.Share.sendDefault({
         objectType: "feed",
-        content: { title, description, imageUrl: `${window.location.origin}/pyeonharu-icon.svg`, imageWidth: 200, imageHeight: 200, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
+        content: { title, description, imageUrl: `${window.location.origin}/icons/icon-512.png`, imageWidth: 512, imageHeight: 512, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
         buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
       });
       setShowShareMenu(false);
-    } catch { toast.error("공유에 실패했습니다") }
+    } catch (err) {
+      console.error("[카카오 공유 실패]", err);
+      toast.error("공유에 실패했습니다");
+    }
   };
 
   const isToday = date === new Date().toLocaleDateString("en-CA");
