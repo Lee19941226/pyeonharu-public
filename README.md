@@ -27,6 +27,10 @@ npm install @vercel/og
 npm install dompurify
 npm install -D @types/dompurify
 
+2026-02-24 23:15 이진원
+npm install @capacitor/haptics
+npx cap sync
+
 ---
 
 # 1. 편하루 프로젝트로 이동

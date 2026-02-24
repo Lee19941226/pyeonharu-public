@@ -543,6 +543,14 @@ export default function RestaurantTab() {
       toast.error("위치 서비스를 지원하지 않는 브라우저입니다");
       return;
     }
+
+    // ✅ 모바일에서 빠른 위치 응답을 위한 옵션
+    const geoOptions: PositionOptions = {
+      enableHighAccuracy: false,  // 네트워크 위치 우선 (GPS보다 빠름)
+      timeout: 10000,             // 10초 타임아웃
+      maximumAge: 60000,          // 1분 캐시 허용
+    };
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -556,7 +564,33 @@ export default function RestaurantTab() {
         }
         searchRestaurants(latitude, longitude, undefined, undefined, RADIUS_STEPS[radiusIndex]);
       },
-      () => { toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요"); },
+      (error) => {
+        console.warn("[위치] 실패:", error.code, error.message);
+        if (error.code === error.TIMEOUT) {
+          // 타임아웃 시 한 번 더 시도 (높은 정확도로)
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              setUserCoords({ lat: latitude, lng: longitude });
+              try {
+                const res = await fetch(`/api/restaurant/reverse-geocode?lat=${latitude}&lng=${longitude}`);
+                const data = await res.json();
+                setLocationName(data.full || data.address || "내 위치");
+              } catch {
+                setLocationName("내 위치");
+              }
+              searchRestaurants(latitude, longitude, undefined, undefined, RADIUS_STEPS[radiusIndex]);
+            },
+            () => {
+              toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+          );
+        } else {
+          toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
+        }
+      },
+      geoOptions,
     );
   };
 
