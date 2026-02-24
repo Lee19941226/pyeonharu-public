@@ -74,12 +74,12 @@ const nextConfig = {
               "default-src 'self'",
 
               // 스크립트: self + 카카오SDK + 네이버지도 + Google 애드센스 + 인라인(Next.js 필수)
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://www.googletagmanager.com https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://*.pstatic.net https://www.googletagmanager.com https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
 
               // 스타일: self + 인라인(Tailwind)
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 
-              // 이미지: self + Supabase + Google + 카카오 + 애드센스 + data URI
+              // 이미지: self + Supabase + Google + 카카오 + 네이버 + 애드센스 + data URI
               "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com https://*.map.naver.com https://*.pstatic.net https://*.naver.net",
 
               // 폰트: self
@@ -96,12 +96,14 @@ const nextConfig = {
                 "https://openapi.map.naver.com",
                 "https://oapi.map.naver.com",
                 "https://naveropenapi.apigw.ntruss.com",
+                "https://*.pstatic.net",
+                "https://*.nelo.navercorp.com",
                 "https://vitals.vercel-insights.com",
                 "https://va.vercel-scripts.com",
                 "https://cdn.jsdelivr.net",
                 "https://pagead2.googlesyndication.com",
                 "https://www.googleadservices.com",
-                "https://epi.adtrafficquality.google", // ← 이거 추가
+                "https://epi.adtrafficquality.google",
               ].join(" "),
 
               // iframe: 카카오 로그인 팝업 + Google 애드센스
