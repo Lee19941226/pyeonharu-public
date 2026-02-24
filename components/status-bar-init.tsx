@@ -12,7 +12,7 @@ export function StatusBarInit() {
         const { StatusBar, Style } = await import("@capacitor/status-bar");
 
         // 상태바 스타일: 어두운 텍스트 (밝은 배경용)
-        await StatusBar.setStyle({ style: Style.Light });
+        await StatusBar.setStyle({ style: Style.Dark });
 
         // 상태바 배경색: 흰색
         await StatusBar.setBackgroundColor({ color: "#ffffff" });
