@@ -26,7 +26,7 @@ import {
 
 // ─── restaurant_key 생성 (기존 로직 재활용) ───
 function makeHospitalKey(name: string, address: string): string {
-  const raw = `hospital::${name.trim()}::${address.trim()}`.toLowerCase();
+  const raw = `${name.trim()}::${address.trim()}`.toLowerCase();
   let hash = 0;
   for (let i = 0; i < raw.length; i++) {
     const char = raw.charCodeAt(i);
