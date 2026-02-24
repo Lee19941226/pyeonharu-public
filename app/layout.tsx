@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import { AuthProvider } from "@/contexts/auth-context";
-
+import { HapticProvider } from "@/components/haptic-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -111,8 +111,10 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <AuthProvider>
-          {children}
-          <Toaster />
+          <HapticProvider>
+            {children}
+            <Toaster />
+          </HapticProvider>
         </AuthProvider>
         <Analytics />
         <Script
