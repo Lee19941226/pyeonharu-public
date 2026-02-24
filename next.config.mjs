@@ -80,7 +80,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 
               // 이미지: self + Supabase + Google + 카카오 + 애드센스 + data URI
-              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com https://*.map.naver.com https://*.pstatic.net https://*.naver.net",
 
               // 폰트: self
               "font-src 'self' data: https://cdn.jsdelivr.net",
