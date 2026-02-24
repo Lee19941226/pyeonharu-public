@@ -136,6 +136,22 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
     router.refresh();
   };
 
+  // 서브페이지에서 탭 클릭 시 홈으로 이동
+  const handleNavToHome = (tab: "meal" | "sick") => {
+    if (isHome && onMainTabChange) {
+      onMainTabChange(tab);
+    } else {
+      // localStorage에 탭 정보 저장 후 홈으로 이동
+      try {
+        localStorage.setItem(
+          "pyeonharu_nav_tab",
+          `${tab}:${tab === "meal" ? "food" : "symptom"}`,
+        );
+      } catch {}
+      router.push("/");
+    }
+  };
+
   const isLoggedIn = isLoaded && nickname !== null;
   const isAdminUser = userRole === "admin" || userRole === "super_admin";
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -148,35 +164,23 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
           <PyeonharuLogo size="sm" />
         </Link>
 
-        {isHome && onMainTabChange && (
-          <nav className="hidden md:flex items-center gap-1 ml-6">
-            <button
-              onClick={() => onMainTabChange("meal")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${mainTab === "meal" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              <UtensilsCrossed className="h-4 w-4" />
-              식사
-            </button>
-            <button
-              onClick={() => onMainTabChange("sick")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${mainTab === "sick" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              <HeartPulse className="h-4 w-4" />
-              아파요
-            </button>
-          </nav>
-        )}
-
-        {!isHome && (
-          <nav className="hidden md:flex items-center gap-1 ml-6">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <UtensilsCrossed className="h-4 w-4" />홈
-            </Link>
-          </nav>
-        )}
+        {/* 데스크톱: 모든 페이지에서 식사/아파요 탭 표시 */}
+        <nav className="hidden md:flex items-center gap-1 ml-6">
+          <button
+            onClick={() => handleNavToHome("meal")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isHome && mainTab === "meal" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          >
+            <UtensilsCrossed className="h-4 w-4" />
+            식사
+          </button>
+          <button
+            onClick={() => handleNavToHome("sick")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isHome && mainTab === "sick" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          >
+            <HeartPulse className="h-4 w-4" />
+            아파요
+          </button>
+        </nav>
 
         <div className="hidden items-center gap-2 md:flex">
           {isLoggedIn && isAdminUser && (
@@ -263,7 +267,9 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       {isMobileMenuOpen && (
         <div
           className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
-          style={{ height: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))" }}
+          style={{
+            height: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))",
+          }}
         >
           <div className="container mx-auto px-4 py-4">
             {isLoggedIn ? (

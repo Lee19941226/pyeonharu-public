@@ -110,14 +110,14 @@ export default function AboutPage() {
               </span>
             </div>
             <h1 className="text-pretty text-3xl font-bold md:text-4xl lg:text-5xl">
-              알레르기가 있어도
+              어떤 고민이 있어도
               <br />
               <span className="text-primary">편안하게 메뉴를 고를 수 있게</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
               바코드·사진 한 번이면 알레르기 확인 5초.
               <br />
-              급식 체크, 맛집 매칭, 칼로리 관리, AI 증상 분석까지.
+              급식 체크, 주변 음식점 서칭, 칼로리 관리, AI 증상 분석까지.
               <br />
               편안한 하루의 식사, 편하루.
             </p>
@@ -137,9 +137,9 @@ export default function AboutPage() {
                 </div>
                 <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
                   편하루는{" "}
-                  <strong className="text-foreground">신입 개발자 2명</strong>
-                  으로 이루어진 팀이 만들었습니다. 식사할 때 조금이라도 편하게,
-                  그리고 학교에서 서로 소통할 수 있도록 구성했습니다.
+                  <strong className="text-foreground">신입 개발자</strong>로
+                  이루어진 소규모 팀이 만들었습니다. 식사할 때 조금이라도
+                  편하게, 그리고 학교에서 서로 소통할 수 있도록 구성했습니다.
                 </p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   쓴소리도 환영합니다. 부족한 점은 저희의 역량 부족이고, 모든
