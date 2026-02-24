@@ -62,7 +62,6 @@ function getSidoCdByLocation(lat: number, lng: number): string[] {
     }))
     .sort((a, b) => a.dist - b.dist);
 
-  // 가장 가까운 시도 1개 (경계 지역이면 2개까지 확장 가능)
   return [sorted[0].code];
 }
 
@@ -84,6 +83,40 @@ function haversine(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ─── API 호출 헬퍼 (serviceKey 인코딩 문제 방지) ───
+async function callPharmacyApi(
+  serviceKey: string,
+  sidoName: string,
+  numOfRows: number = 1000,
+): Promise<string | null> {
+  // ★ 공공데이터 API는 serviceKey를 이미 인코딩된 상태로 전달해야 함
+  // URLSearchParams를 사용하면 이중 인코딩되므로, 직접 URL 조합
+  const baseUrl =
+    "https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire";
+
+  const params = new URLSearchParams();
+  params.append("Q0", sidoName);
+  params.append("pageNo", "1");
+  params.append("numOfRows", String(numOfRows));
+  params.append("ORD", "NAME");
+
+  // serviceKey는 URLSearchParams에 넣지 않고 직접 붙임 (이중 인코딩 방지)
+  const url = `${baseUrl}?serviceKey=${serviceKey}&${params.toString()}`;
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/xml" },
+  });
+
+  if (!response.ok) {
+    console.error(
+      `[Pharmacies API] API 에러: ${response.status} (${sidoName})`,
+    );
+    return null;
+  }
+
+  return response.text();
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const lat = searchParams.get("lat");
@@ -99,6 +132,7 @@ export async function GET(request: NextRequest) {
 
   let SERVICE_KEY = process.env.DATA_GO_KR_API_KEY || "";
 
+  // 이미 디코딩된 키인 경우 그대로 사용, 인코딩된 키인 경우 디코딩
   if (SERVICE_KEY.includes("%")) {
     try {
       SERVICE_KEY = decodeURIComponent(SERVICE_KEY);
@@ -126,71 +160,24 @@ export async function GET(request: NextRequest) {
       const sidoName = SIDO_CODE_TO_NAME[sidoCd];
       if (!sidoName) continue;
 
-      // 시도명으로 약국 목록 조회 (최대 1000개)
-      const encodedSido = encodeURIComponent(sidoName);
-      const baseUrl = `https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire`;
-      const url = `${baseUrl}?serviceKey=${SERVICE_KEY}&Q0=${encodedSido}&pageNo=1&numOfRows=1000&ORD=NAME`;
-
       console.log(
         `[Pharmacies API] 시도코드=${sidoCd}, 시도명=${sidoName} 조회 중...`,
       );
 
-      const response = await fetch(url, {
-        headers: { Accept: "application/xml" },
-      });
+      let text = await callPharmacyApi(SERVICE_KEY, sidoName);
 
-      if (!response.ok) {
-        console.error(`[Pharmacies API] API 에러: ${response.status}`);
-
-        // fallback 시도명으로 재시도
-        if (SIDO_FALLBACK[sidoName]) {
-          console.log(
-            `[Pharmacies API] fallback 시도: ${SIDO_FALLBACK[sidoName]}`,
-          );
-          const fallbackUrl = `${baseUrl}?serviceKey=${SERVICE_KEY}&Q0=${encodeURIComponent(SIDO_FALLBACK[sidoName])}&pageNo=1&numOfRows=1000&ORD=NAME`;
-          const fallbackRes = await fetch(fallbackUrl, {
-            headers: { Accept: "application/xml" },
-          });
-          if (!fallbackRes.ok) continue;
-          const fallbackText = await fallbackRes.text();
-          parsePharmaciesXml(
-            fallbackText,
-            userLat,
-            userLng,
-            radiusKm,
-            allPharmacies,
-          );
-          continue;
-        }
-        continue;
-      }
-
-      const text = await response.text();
-
-      // 에러 응답 체크 — fallback 시도
+      // 결과 없으면 fallback 시도명으로 재시도
       if (
-        text.includes("<totalCount>0</totalCount>") &&
+        (!text || text.includes("<totalCount>0</totalCount>")) &&
         SIDO_FALLBACK[sidoName]
       ) {
         console.log(
-          `[Pharmacies API] 결과 0건, fallback 시도: ${SIDO_FALLBACK[sidoName]}`,
+          `[Pharmacies API] fallback 시도: ${SIDO_FALLBACK[sidoName]}`,
         );
-        const fallbackUrl = `${baseUrl}?serviceKey=${SERVICE_KEY}&Q0=${encodeURIComponent(SIDO_FALLBACK[sidoName])}&pageNo=1&numOfRows=1000&ORD=NAME`;
-        const fallbackRes = await fetch(fallbackUrl, {
-          headers: { Accept: "application/xml" },
-        });
-        if (fallbackRes.ok) {
-          const fallbackText = await fallbackRes.text();
-          parsePharmaciesXml(
-            fallbackText,
-            userLat,
-            userLng,
-            radiusKm,
-            allPharmacies,
-          );
-        }
-        continue;
+        text = await callPharmacyApi(SERVICE_KEY, SIDO_FALLBACK[sidoName]);
       }
+
+      if (!text) continue;
 
       parsePharmaciesXml(text, userLat, userLng, radiusKm, allPharmacies);
     }
