@@ -12,16 +12,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // API 키
   let SERVICE_KEY = process.env.DATA_GO_KR_API_KEY || "";
 
-  // 이중 인코딩 방지
   if (SERVICE_KEY.includes("%")) {
     try {
       SERVICE_KEY = decodeURIComponent(SERVICE_KEY);
-    } catch {
-      // 디코딩 실패 시 원본 사용
-    }
+    } catch {}
   }
 
   if (!SERVICE_KEY) {
@@ -32,24 +28,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // 약국 목록 조회 API (거리순 정렬 지원)
     const baseUrl =
-      "https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyLcinfoInqire";
+      "https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire";
 
     const params = new URLSearchParams();
     params.append("serviceKey", SERVICE_KEY);
     params.append("WGS84_LON", lng);
     params.append("WGS84_LAT", lat);
+    params.append("ORD", "distance");
     params.append("pageNo", "1");
-    params.append("numOfRows", "100");
+    params.append("numOfRows", "50");
 
     const url = `${baseUrl}?${params.toString()}`;
 
     console.log("[pharmacies API] 요청 중... lat:", lat, "lng:", lng);
 
     const response = await fetch(url, {
-      headers: {
-        Accept: "application/xml",
-      },
+      headers: { Accept: "application/xml" },
     });
 
     console.log("[pharmacies API] 응답 상태:", response.status);
@@ -57,7 +53,6 @@ export async function GET(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[pharmacies API] 에러 응답:", errorText);
-
       return NextResponse.json({
         pharmacies: [],
         error: `API 오류: ${response.status}`,
@@ -65,7 +60,6 @@ export async function GET(request: NextRequest) {
     }
 
     const text = await response.text();
-
     const pharmacies = parsePharmacyXML(text);
     console.log(`[pharmacies API] ${pharmacies.length}개 약국 발견`);
 
@@ -86,7 +80,6 @@ function parsePharmacyXML(xml: string): Array<{
   dutyTel1: string;
   wgs84Lon: number;
   wgs84Lat: number;
-  distance: string;
 }> {
   const pharmacies: Array<{
     hpid: string;
@@ -95,16 +88,13 @@ function parsePharmacyXML(xml: string): Array<{
     dutyTel1: string;
     wgs84Lon: number;
     wgs84Lat: number;
-    distance: string;
   }> = [];
 
-  // 에러 응답 체크
   if (xml.includes("<errMsg>") && xml.includes("SERVICE ERROR")) {
     console.error("[parsePharmacyXML] API 서비스 에러");
     return pharmacies;
   }
 
-  // item 태그 찾기
   const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
   let match;
 
@@ -119,18 +109,16 @@ function parsePharmacyXML(xml: string): Array<{
 
     const dutyName = getValue("dutyName");
 
-    // 좌표: 여러 필드명 시도 (API 버전에 따라 다를 수 있음)
     const latitude =
-      parseFloat(getValue("latitude")) ||
       parseFloat(getValue("wgs84Lat")) ||
+      parseFloat(getValue("latitude")) ||
       parseFloat(getValue("YPos")) ||
       0;
     const longitude =
-      parseFloat(getValue("longitude")) ||
       parseFloat(getValue("wgs84Lon")) ||
+      parseFloat(getValue("longitude")) ||
       parseFloat(getValue("XPos")) ||
       0;
-    const distance = getValue("distance");
 
     if (dutyName && latitude !== 0 && longitude !== 0) {
       pharmacies.push({
@@ -140,7 +128,6 @@ function parsePharmacyXML(xml: string): Array<{
         dutyTel1: getValue("dutyTel1"),
         wgs84Lon: longitude,
         wgs84Lat: latitude,
-        distance: distance ? `${distance}km` : "",
       });
     }
   }
