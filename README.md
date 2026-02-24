@@ -32,6 +32,7 @@ npm install @capacitor/haptics
 npx cap sync
 npm install @capacitor/app
 npx cap sync
+pnpm add @capacitor/status-bar
 
 ---
 

@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
@@ -7,6 +7,7 @@ import { HapticProvider } from "@/components/haptic-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import { BackButtonHandler } from "@/components/back-button-handler";
+import { StatusBarInit } from "@/components/status-bar-init";
 
 export const metadata: Metadata = {
   title: {
@@ -74,6 +75,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#4A7C59" },
     { media: "(prefers-color-scheme: dark)", color: "#4A7C59" },
@@ -113,6 +115,7 @@ export default function RootLayout({
         />
         <AuthProvider>
           <BackButtonHandler />
+          <StatusBarInit />
           <HapticProvider>
             {children}
             <Toaster />

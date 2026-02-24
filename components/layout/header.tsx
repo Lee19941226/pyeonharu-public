@@ -41,7 +41,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null); // ← 추가
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -56,7 +56,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               user.email?.split("@")[0] ||
               "사용자",
           );
-          // ← role 조회 추가
           supabase
             .from("profiles")
             .select("role")
@@ -83,7 +82,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
             user.email?.split("@")[0] ||
             "사용자",
         );
-        // ← role 조회 추가
         const supabase2 = createClient();
         supabase2
           .from("profiles")
@@ -95,7 +93,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
           });
       } else {
         setNickname(null);
-        setUserRole(null); // ← 추가
+        setUserRole(null);
       }
       setIsLoaded(true);
     });
@@ -133,18 +131,18 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
     const supabase = createClient();
     await supabase.auth.signOut();
     setNickname(null);
-    setUserRole(null); // ← 추가
+    setUserRole(null);
     router.push("/");
     router.refresh();
   };
 
   const isLoggedIn = isLoaded && nickname !== null;
-  const isAdminUser = userRole === "admin" || userRole === "super_admin"; // ← 추가
+  const isAdminUser = userRole === "admin" || userRole === "super_admin";
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
   const isHome = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[env(safe-area-inset-top)]">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center">
           <PyeonharuLogo size="sm" />
@@ -181,7 +179,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
         )}
 
         <div className="hidden items-center gap-2 md:flex">
-          {/* ← 관리자 버튼 추가 (데스크톱) */}
           {isLoggedIn && isAdminUser && (
             <Link
               href="/admin"
@@ -265,8 +262,8 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-x-0 top-16 bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
-          style={{ height: "calc(100vh - 4rem)" }}
+          className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
+          style={{ height: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))" }}
         >
           <div className="container mx-auto px-4 py-4">
             {isLoggedIn ? (
@@ -289,7 +286,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
                 로그인 / 회원가입
               </Link>
             )}
-            {/* ← 관리자 버튼 추가 (모바일) */}
             {isLoggedIn && isAdminUser && (
               <Link
                 href="/admin"
