@@ -57,11 +57,13 @@ export function MobileNav() {
 
   // ─── 카메라 상태 ───
   const [showSheet, setShowSheet] = useState(false);
+  useBackHandler(showSheet, () => setShowSheet(false));
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // ─── 메뉴 추천 모달 상태 ───
   const [showRecommendModal, setShowRecommendModal] = useState(false);
+  useBackHandler(showRecommendModal, () => setShowRecommendModal(false));
   const [recommendData, setRecommendData] = useState<MealRecommendData | null>(null);
   const [recommendLoading, setRecommendLoading] = useState(false);
   const [recommendError, setRecommendError] = useState("");
@@ -590,6 +592,3 @@ export function MobileNav() {
     </>
   );
 }
-
-  useBackHandler(showRecommendModal, () => setShowRecommendModal(false));
-  useBackHandler(showSheet, () => setShowSheet(false));
