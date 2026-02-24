@@ -137,6 +137,19 @@ export default function HomePage() {
       }
     } catch {}
     setHomeRestored(true);
+    // 서브페이지에서 탭 선택 후 돌아온 경우
+    const navTab = localStorage.getItem('pyeonharu_nav_tab');
+    if (navTab) {
+      localStorage.removeItem('pyeonharu_nav_tab');
+      const [m, s] = navTab.split(':');
+      if (m === 'meal' && ['food', 'restaurant', 'diet'].includes(s)) {
+        setMainTab('meal');
+        setMealSubTab(s as any);
+      } else if (m === 'sick' && ['symptom', 'hospital', 'medicine'].includes(s)) {
+        setMainTab('sick');
+        setSickSubTab(s as any);
+      }
+    }
   }, []);
 
   // ✅ 현재 탭이 첫 화면으로 설정되어 있는지 확인

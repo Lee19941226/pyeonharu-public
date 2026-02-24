@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { HomeTabNav } from "@/components/layout/home-tab-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -163,7 +164,6 @@ export default function PostDetailPage({
       });
       const data = await res.json();
 
-      // 댓글 좋아요 상태 업데이트
       const updateComments = (list: Comment[]): Comment[] =>
         list.map((c) => {
           if (c.id === commentId) {
@@ -206,7 +206,6 @@ export default function PostDetailPage({
 
       if (data.success) {
         if (replyTo) {
-          // 대댓글: 부모 댓글에 추가
           setComments((prev) =>
             prev.map((c) =>
               c.id === replyTo.id
@@ -215,7 +214,6 @@ export default function PostDetailPage({
             ),
           );
         } else {
-          // 1단 댓글
           setComments((prev) => [...prev, data.comment]);
         }
 
@@ -242,7 +240,6 @@ export default function PostDetailPage({
         { method: "DELETE" },
       );
       if (res.ok) {
-        // 1단에서 삭제
         const newComments = comments
           .filter((c) => c.id !== commentId)
           .map((c) => ({
@@ -281,6 +278,7 @@ export default function PostDetailPage({
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
+        <HomeTabNav />
         <main className="flex-1 pb-20">
           <div className="container mx-auto px-4 py-6">
             <div className="mx-auto max-w-2xl space-y-4">
@@ -300,6 +298,7 @@ export default function PostDetailPage({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
+      <HomeTabNav />
       <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-4">
           <div className="mx-auto max-w-2xl space-y-4">
@@ -401,7 +400,6 @@ export default function PostDetailPage({
               <div className="space-y-2">
                 {comments.map((comment) => (
                   <div key={comment.id}>
-                    {/* 1단 댓글 */}
                     <CommentItem
                       comment={comment}
                       onLike={() => handleLikeComment(comment.id)}
@@ -412,7 +410,6 @@ export default function PostDetailPage({
                       onDelete={() => handleDeleteComment(comment.id)}
                     />
 
-                    {/* 2단 대댓글 */}
                     {comment.replies.map((reply) => (
                       <div key={reply.id} className="ml-8 mt-1">
                         <CommentItem
@@ -497,7 +494,6 @@ export default function PostDetailPage({
   );
 }
 
-// 댓글 아이템 컴포넌트
 function CommentItem({
   comment,
   isReply,
