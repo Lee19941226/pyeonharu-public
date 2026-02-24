@@ -51,6 +51,12 @@ interface AIAnalysis {
   summary: string;
   popularity: string;
   popularityNote: string;
+  reviewAnalysis?: {
+    topKeywords: string[];
+    positiveReviews: string[];
+    negativeReviews: string[];
+    overallSentiment: string;
+  };
   estimatedMenus: Array<{
     name: string;
     price: string;
@@ -319,11 +325,12 @@ function AIAnalysisModal({
     <>
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
       <div className="fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-lg max-h-[80vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-xl animate-in zoom-in-95 flex flex-col">
+        {/* 헤더 */}
         <div className="flex items-center justify-between border-b p-4">
           <div>
             <h3 className="text-lg font-bold flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              AI 메뉴 분석
+              AI 식당 리뷰 분석
             </h3>
             <p className="text-sm text-muted-foreground">{restaurantName}</p>
           </div>
@@ -332,17 +339,19 @@ function AIAnalysisModal({
           </button>
         </div>
 
+        {/* 본문 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {isAnalyzing && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-              <p className="text-sm text-muted-foreground">AI가 메뉴를 분석하고 있어요...</p>
-              <p className="text-xs text-muted-foreground mt-1">카테고리 기반 추정이라 10초 내외 소요됩니다</p>
+              <p className="text-sm text-muted-foreground">AI가 리뷰를 분석하고 있어요...</p>
+              <p className="text-xs text-muted-foreground mt-1">10초 내외 소요됩니다</p>
             </div>
           )}
 
           {analysis && (
             <>
+              {/* 요약 + 유명도 */}
               <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
                 <p className="text-sm font-medium">{analysis.summary}</p>
                 {analysis.popularity && analysis.popularity !== "알 수 없음" && (
@@ -361,12 +370,68 @@ function AIAnalysisModal({
                 )}
               </div>
 
-              {analysis.overallReview && (
+              {/* ✅ 리뷰 분석 섹션 */}
+              {analysis.reviewAnalysis && (
+                <div className="space-y-3">
+                  {/* 리뷰 키워드 태그 */}
+                  {analysis.reviewAnalysis.topKeywords?.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">🏷️ 주요 리뷰 키워드</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analysis.reviewAnalysis.topKeywords.map((kw, i) => (
+                          <span key={i} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 긍정 리뷰 */}
+                  {analysis.reviewAnalysis.positiveReviews?.length > 0 && (
+                    <div className="rounded-lg bg-green-50 p-3">
+                      <p className="mb-1.5 text-xs font-semibold text-green-800">👍 긍정 리뷰</p>
+                      <ul className="space-y-1">
+                        {analysis.reviewAnalysis.positiveReviews.map((r, i) => (
+                          <li key={i} className="text-xs text-green-700 flex items-start gap-1.5">
+                            <span className="shrink-0 mt-0.5">✓</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 부정 리뷰 */}
+                  {analysis.reviewAnalysis.negativeReviews?.length > 0 && (
+                    <div className="rounded-lg bg-red-50 p-3">
+                      <p className="mb-1.5 text-xs font-semibold text-red-800">👎 부정 리뷰</p>
+                      <ul className="space-y-1">
+                        {analysis.reviewAnalysis.negativeReviews.map((r, i) => (
+                          <li key={i} className="text-xs text-red-700 flex items-start gap-1.5">
+                            <span className="shrink-0 mt-0.5">✗</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 전반적 분위기 */}
+                  {analysis.reviewAnalysis.overallSentiment && (
+                    <p className="text-sm text-muted-foreground italic">&ldquo;{analysis.reviewAnalysis.overallSentiment}&rdquo;</p>
+                  )}
+                </div>
+              )}
+
+              {/* 기존 overallReview (reviewAnalysis 없을 때 폴백) */}
+              {!analysis.reviewAnalysis && analysis.overallReview && (
                 <p className="text-sm text-muted-foreground italic">&ldquo;{analysis.overallReview}&rdquo;</p>
               )}
 
+              {/* 메뉴 분석 */}
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">메뉴 분석</p>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">🍽️ 메뉴 정보</p>
                 <div className="space-y-1.5">
                   {analysis.estimatedMenus?.map((menu, i) => (
                     <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm ${
@@ -390,6 +455,7 @@ function AIAnalysisModal({
                 </div>
               </div>
 
+              {/* 안전한 선택 */}
               {analysis.safeOptions && analysis.safeOptions.length > 0 && (
                 <div className="rounded-lg bg-green-50 p-3">
                   <p className="mb-1 text-xs font-semibold text-green-800">✅ 비교적 안전한 선택</p>
@@ -397,12 +463,14 @@ function AIAnalysisModal({
                 </div>
               )}
 
+              {/* 팁 */}
               {analysis.tips && <p className="text-xs text-muted-foreground">💡 {analysis.tips}</p>}
               <p className="text-[10px] text-muted-foreground/60">⚠️ {analysis.disclaimer}</p>
             </>
           )}
         </div>
 
+        {/* 하단 버튼 */}
         <div className="border-t p-4">
           <Button onClick={onClose} className="w-full">닫기</Button>
         </div>
