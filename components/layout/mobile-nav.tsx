@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { createClient } from "@/lib/supabase/client";
+import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
 
 type CameraMode = "allergy" | "diet" | null;
 
@@ -235,11 +236,6 @@ export function MobileNav() {
   const calPercent = bmr > 0 ? Math.min((todayCal / bmr) * 100, 100) : 0;
   const isOver = bmr > 0 && todayCal > bmr;
 
-  const deliveryLinks = (keyword: string) => [
-    { name: "배민", url: `https://www.baemin.com/search?keyword=${encodeURIComponent(keyword)}`, color: "bg-[#2AC1BC]" },
-    { name: "요기요", url: `https://www.yogiyo.co.kr/mobile/#/search/${encodeURIComponent(keyword)}`, color: "bg-[#FA0050]" },
-    { name: "쿠팡이츠", url: `https://www.coupangeats.com/search?keyword=${encodeURIComponent(keyword)}`, color: "bg-[#5D00E6]" },
-  ];
   const youtubeUrl = (name: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(name + " 레시피")}`;
 
   const reasonMeta: Record<keyof Reasoning, { icon: typeof Flame; label: string; color: string }> = {
@@ -437,7 +433,6 @@ export function MobileNav() {
 
             {/* 모달 컨텐츠 (스크롤) */}
             <div className="flex-1 overflow-y-auto">
-              {/* 칼로리 바 */}
               {bmr > 0 && (
                 <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
                   <Flame className="h-3 w-3 text-orange-500 shrink-0" />
@@ -455,7 +450,6 @@ export function MobileNav() {
                 </div>
               )}
 
-              {/* 로딩 */}
               {recommendLoading && (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
                   <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
@@ -463,7 +457,6 @@ export function MobileNav() {
                 </div>
               )}
 
-              {/* 에러 */}
               {recommendError && !recommendLoading && (
                 <div className="flex items-center gap-2 p-4">
                   <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
@@ -471,10 +464,8 @@ export function MobileNav() {
                 </div>
               )}
 
-              {/* 추천 결과 */}
               {recommendData && !recommendLoading && (
                 <div className="p-3 space-y-2.5">
-                  {/* 분석 요약 */}
                   {recommendData.analysis && (
                     <div className="rounded-xl bg-muted/40 p-3 space-y-1.5">
                       <p className="text-[11px] font-bold flex items-center gap-1">
@@ -501,7 +492,6 @@ export function MobileNav() {
                     </div>
                   )}
 
-                  {/* 메뉴 카드 */}
                   {recommendData.recommendations.map((rec, i) => {
                     const isExpanded = expandedIdx === i;
                     return (
@@ -544,19 +534,25 @@ export function MobileNav() {
                               </div>
                             )}
                             <div className="border-t" />
+
+                            {/* ✅ 배달 주문 — 앱 딥링크 (mobile-nav는 모바일 전용이므로 항상 앱 호출) */}
                             <div>
                               <p className="text-[10px] font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
                                 <Store className="h-3 w-3" /> 배달 주문
                               </p>
                               <div className="flex gap-1.5">
-                                {deliveryLinks(rec.deliveryKeyword).map((app) => (
-                                  <a key={app.name} href={app.url} target="_blank" rel="noopener noreferrer"
-                                    className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity`}>
+                                {getDeliveryLinks(rec.deliveryKeyword).map((app) => (
+                                  <button
+                                    key={app.name}
+                                    onClick={() => openDeliveryApp(app)}
+                                    className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity active:scale-95`}
+                                  >
                                     <Bike className="h-3 w-3" />{app.name}
-                                  </a>
+                                  </button>
                                 ))}
                               </div>
                             </div>
+
                             <a href={youtubeUrl(rec.name)} target="_blank" rel="noopener noreferrer"
                               className="flex items-center justify-center gap-1.5 rounded-lg bg-[#FF0000] py-2 text-[11px] font-bold text-white hover:bg-[#CC0000] transition-colors">
                               <Youtube className="h-4 w-4" />직접 만들기 — 유튜브 레시피

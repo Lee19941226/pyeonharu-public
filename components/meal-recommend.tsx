@@ -9,6 +9,7 @@ import {
   Share2,
 } from "lucide-react"
 import { toast } from "sonner"
+import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery"
 
 interface Reasoning {
   taste: string
@@ -138,12 +139,6 @@ export default function MealRecommend() {
   const remainingCal = bmr > 0 ? Math.max(bmr - todayCal, 0) : 0
   const calPercent = bmr > 0 ? Math.min((todayCal / bmr) * 100, 100) : 0
   const isOver = bmr > 0 && todayCal > bmr
-
-  const deliveryLinks = (keyword: string) => [
-    { name: "배민", url: `https://www.baemin.com/search?keyword=${encodeURIComponent(keyword)}`, color: "bg-[#2AC1BC]" },
-    { name: "요기요", url: `https://www.yogiyo.co.kr/mobile/#/search/${encodeURIComponent(keyword)}`, color: "bg-[#FA0050]" },
-    { name: "쿠팡이츠", url: `https://www.coupangeats.com/search?keyword=${encodeURIComponent(keyword)}`, color: "bg-[#5D00E6]" },
-  ]
 
   const youtubeUrl = (name: string) =>
     `https://www.youtube.com/results?search_query=${encodeURIComponent(name + " 레시피")}`
@@ -282,7 +277,6 @@ export default function MealRecommend() {
                   <span className="text-xl">{rec.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate">{rec.name}</p>
-                    {/* 1줄 근거 미리보기 */}
                     <p className="text-[10px] text-muted-foreground line-clamp-1">
                       {rec.reasoning?.taste || rec.reasoning?.calorie || ""}
                     </p>
@@ -295,7 +289,6 @@ export default function MealRecommend() {
 
                 {isExpanded && (
                   <div className="border-t px-2.5 pb-2.5 pt-2 space-y-2.5">
-                    {/* 추천 근거 체인 */}
                     {rec.reasoning && (
                       <div className="space-y-1.5">
                         <p className="text-[10px] font-bold">📋 추천 근거</p>
@@ -315,30 +308,32 @@ export default function MealRecommend() {
                       </div>
                     )}
 
-                    {/* 구분선 */}
                     <div className="border-t" />
 
-                    {/* 배달 주문 */}
+                    {/* ✅ 배달 주문 — 모바일: 앱 딥링크 / PC: 안내 문구 */}
                     <div>
                       <p className="text-[10px] font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
                         <Store className="h-3 w-3" /> 배달 주문
                       </p>
-                      <div className="flex gap-1.5">
-                        {deliveryLinks(rec.deliveryKeyword).map((app) => (
-                          <a
-                            key={app.name}
-                            href={app.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity`}
-                          >
-                            <Bike className="h-3 w-3" />{app.name}
-                          </a>
-                        ))}
-                      </div>
+                      {isMobileDevice() ? (
+                        <div className="flex gap-1.5">
+                          {getDeliveryLinks(rec.deliveryKeyword).map((app) => (
+                            <button
+                              key={app.name}
+                              onClick={() => openDeliveryApp(app)}
+                              className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity active:scale-95`}
+                            >
+                              <Bike className="h-3 w-3" />{app.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground text-center py-2 rounded-lg bg-muted/50">
+                          📱 배달 주문은 모바일에서만 이용 가능합니다
+                        </p>
+                      )}
                     </div>
 
-                    {/* 유튜브 레시피 */}
                     <a
                       href={youtubeUrl(rec.name)}
                       target="_blank"
@@ -349,7 +344,6 @@ export default function MealRecommend() {
                       직접 만들기 — 유튜브 레시피
                     </a>
 
-                    {/* 알레르기 */}
                     {data.context.allergens.length > 0 && (
                       <div className="flex items-start gap-1 rounded-lg bg-green-50 border border-green-200 p-1.5">
                         <AlertTriangle className="h-3 w-3 text-green-600 shrink-0 mt-0.5" />
@@ -364,7 +358,6 @@ export default function MealRecommend() {
             )
           })}
 
-          {/* 영양 팁 */}
           {data.nutritionTip && (
             <div className="rounded-lg bg-blue-50/50 border border-blue-100 px-2 py-1.5">
               <p className="text-[10px] text-blue-700">💡 {data.nutritionTip}</p>
