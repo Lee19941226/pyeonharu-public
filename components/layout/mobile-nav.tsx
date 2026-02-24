@@ -589,3 +589,6 @@ export function MobileNav() {
     </>
   );
 }
+
+  useBackHandler(showRecommendModal, () => setShowRecommendModal(false));
+  useBackHandler(showSheet, () => setShowSheet(false));

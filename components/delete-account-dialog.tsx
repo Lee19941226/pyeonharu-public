@@ -1,3 +1,4 @@
+  useBackHandler(isOpen, () => onOpenChange(false));
 "use client"
 
 import { useState } from "react"

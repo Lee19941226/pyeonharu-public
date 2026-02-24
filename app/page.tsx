@@ -426,3 +426,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+  useBackHandler(loginModalOpen, () => setLoginModalOpen(false));

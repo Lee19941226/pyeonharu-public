@@ -1274,3 +1274,5 @@ export default function RestaurantTab() {
     </div>
   );
 }
+
+  useBackHandler(aiModalOpen, () => setAiModalOpen(false));
