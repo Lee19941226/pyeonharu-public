@@ -518,6 +518,7 @@ export default function RestaurantTab() {
   const [myReviews, setMyReviews] = useState<Record<string, { id: string; rating: number; memo: string }>>({});
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  useBackHandler(aiModalOpen, () => setAiModalOpen(false));
 
   // 초기화
   useEffect(() => {
@@ -1275,5 +1276,3 @@ export default function RestaurantTab() {
     </div>
   );
 }
-
-  useBackHandler(aiModalOpen, () => setAiModalOpen(false));
