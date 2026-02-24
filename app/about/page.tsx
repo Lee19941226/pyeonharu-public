@@ -1,8 +1,12 @@
+"use client";
+
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   ShieldCheck,
   Store,
@@ -94,6 +98,33 @@ const extraFeatures = [
       "알레르기 확인, 칼로리 추정 모두 사진 촬영만으로 가능합니다. AI가 불안하다면 직접 입력도 가능합니다.",
   },
 ];
+
+function CtaSection() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user);
+    });
+  }, []);
+
+  return (
+    <section className="container mx-auto px-4 py-12 md:py-16 text-center">
+      <h2 className="text-2xl font-bold md:text-3xl">지금 바로 시작해보세요</h2>
+      <p className="mt-4 text-muted-foreground">알레르기가 있어도 편안한 식사, 편하루가 도와드릴게요.</p>
+      <div className="mt-6 flex justify-center gap-3">
+        <Link href="/" className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-primary/90">
+          편하루 시작하기
+        </Link>
+        {!isLoggedIn && (
+          <Link href="/sign-up" className="rounded-xl border border-border px-6 py-3 text-sm font-semibold transition-all hover:bg-muted">
+            회원가입
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export default function AboutPage() {
   return (
@@ -305,28 +336,7 @@ export default function AboutPage() {
         </section>
 
         {/* CTA */}
-        <section className="container mx-auto px-4 py-12 md:py-16 text-center">
-          <h2 className="text-2xl font-bold md:text-3xl">
-            지금 바로 시작해보세요
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            알레르기가 있어도 편안한 식사, 편하루가 도와드릴게요.
-          </p>
-          <div className="mt-6 flex justify-center gap-3">
-            <Link
-              href="/"
-              className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-primary/90"
-            >
-              편하루 시작하기
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded-xl border border-border px-6 py-3 text-sm font-semibold transition-all hover:bg-muted"
-            >
-              회원가입
-            </Link>
-          </div>
-        </section>
+        <CtaSection />
       </main>
 
       <Footer />
