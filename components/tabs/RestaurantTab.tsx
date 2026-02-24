@@ -19,7 +19,7 @@ import {
   Sparkles,
   Info,
   Filter,
-  Map,
+  Map, Navigation2,
   X,
   Star,
   MessageSquare,
@@ -1010,7 +1010,8 @@ export default function RestaurantTab() {
                     return (
                       <div
                         key={`${restaurant.name}-${idx}`}
-                        className={`bg-background hover:bg-muted/30 transition-colors border-l-[3px] ${risk.rowAccent}`}
+                        className={`bg-background hover:bg-muted/30 transition-colors border-l-[3px] ${risk.rowAccent} cursor-pointer active:bg-muted/50`}
+                        onClick={() => openReviewModal(restaurant)}
                       >
                         {/* 1행: 이름 + 카테고리 + 거리 + 안전뱃지 */}
                         <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
@@ -1026,23 +1027,19 @@ export default function RestaurantTab() {
                           </Badge>
                         </div>
 
-                        {/* 2행: 별점(클릭→리뷰) + 주소 + 알레르기 태그 + 액션 */}
+                        {/* 2행: 별점 + 주소 + 알레르기 태그 + 액션 */}
                         <div className="flex items-center gap-2 px-3 pb-2.5">
-                          {/* ✅ 별점 항상 표시 — 클릭하면 리뷰 모달 */}
-                          <button
-                            onClick={() => openReviewModal(restaurant)}
-                            className="flex items-center gap-1 shrink-0 hover:opacity-80 transition-opacity"
-                            title="별점을 눌러 리뷰를 남겨보세요"
-                          >
+                          {/* ✅ 별점 항상 표시 */}
+                          <div className="flex items-center gap-1 shrink-0">
                             <StarRating rating={displayRating} />
                             {ratingData ? (
                               <span className="text-[10px] font-semibold text-amber-600">{ratingData.avg.toFixed(1)}<span className="text-muted-foreground font-normal">({ratingData.count})</span></span>
                             ) : (
                               <span className="text-[10px] text-muted-foreground">평가</span>
                             )}
-                          </button>
+                          </div>
 
-                          {/* 주소 (truncate) */}
+                          {/* 주소 */}
                           <p className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
                             {restaurant.roadAddress || restaurant.address}
                           </p>
@@ -1059,10 +1056,10 @@ export default function RestaurantTab() {
                             </div>
                           )}
 
-                          {/* 액션: AI + 지도 (아이콘만) */}
+                          {/* 액션: AI + 길찾기 + 전화 (이벤트 버블링 차단) */}
                           <div className="flex items-center gap-0.5 shrink-0">
                             <button
-                              onClick={() => analyzeRestaurant(restaurant)}
+                              onClick={(e) => { e.stopPropagation(); analyzeRestaurant(restaurant); }}
                               className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-primary/10 transition-colors"
                               title="AI 분석"
                             >
@@ -1070,16 +1067,23 @@ export default function RestaurantTab() {
                             </button>
                             {restaurant.lat && restaurant.lng && (
                               <button
-                                onClick={() => window.open(`https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name)}`, "_blank")}
-                                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted transition-colors"
-                                title="지도"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const dest = encodeURIComponent(restaurant.roadAddress || restaurant.address);
+                                  const name = encodeURIComponent(restaurant.name);
+                                  // 카카오맵 길찾기 (목적지 좌표)
+                                  const kakaoUrl = `https://map.kakao.com/link/to/${name},${restaurant.lat},${restaurant.lng}`;
+                                  window.open(kakaoUrl, "_blank");
+                                }}
+                                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-blue-50 transition-colors"
+                                title="길찾기"
                               >
-                                <Map className="h-3.5 w-3.5 text-muted-foreground" />
+                                <Navigation2 className="h-3.5 w-3.5 text-blue-500" />
                               </button>
                             )}
                             {restaurant.phone && (
                               <button
-                                onClick={() => window.open(`tel:${restaurant.phone}`)}
+                                onClick={(e) => { e.stopPropagation(); window.open(`tel:${restaurant.phone}`); }}
                                 className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted transition-colors"
                                 title="전화"
                               >
