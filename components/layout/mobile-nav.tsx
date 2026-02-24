@@ -71,7 +71,6 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           toast.info("AI가 성분표를 분석 중...");
 
           try {
-            // ✅ 원본 file에서 직접 리사이즈
             const { base64: base64Data } = await resizeImageForAI(file);
 
             const { createClient } = await import("@/lib/supabase/client");
@@ -139,13 +138,11 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             `${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`,
           );
 
-          // ✅ 수정: 식단 관리 페이지로 이동 + 타임스탬프로 데이터 새로고침 트리거
-          if (pathname === "/diet") {
-            // 이미 식단 페이지에 있으면 커스텀 이벤트로 새로고침 트리거
-            window.dispatchEvent(new CustomEvent("diet-entry-added"));
-          } else if (pathname === "/" || pathname.startsWith("/")) {
-            // 홈 탭의 DietTab에 있을 수 있으므로 이벤트 발송 + /diet 페이지 이동
-            window.dispatchEvent(new CustomEvent("diet-entry-added"));
+          // ✅ 커스텀 이벤트로 식단 데이터 새로고침 트리거
+          window.dispatchEvent(new CustomEvent("diet-entry-added"));
+
+          // 현재 /diet 페이지가 아니면 이동
+          if (pathname !== "/diet" && !pathname.startsWith("/diet")) {
             router.push(`/diet?refresh=${Date.now()}`);
           }
         } else {

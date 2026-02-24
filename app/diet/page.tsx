@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { Camera, ImageIcon, PenLine, Trash2, X, AlertTriangle, Activity, ChevronLeft, ChevronRight, Loader2, Info, Sparkles, CalendarDays, TrendingUp, TrendingDown, Flame, BarChart3, Trophy, Utensils, Download, Share2 } from "lucide-react"
+import { Camera, ImageIcon, PenLine, Trash2, X, AlertTriangle, Activity, ChevronLeft, ChevronRight, Loader2, Info, Sparkles, CalendarDays, TrendingUp, TrendingDown, Flame, BarChart3, Trophy, Utensils, Download, Share2, Plus } from "lucide-react"
 
 function getTimePeriod(dateStr: string): { label: string; emoji: string; color: string } {
   const h = new Date(dateStr).getHours()
@@ -83,7 +83,6 @@ interface DailyStat { date: string; totalCal: number; count: number; isOver: boo
 interface ReportSummary { totalCalSum: number; avgCal: number; daysWithData: number; totalDays: number; overDays: number; maxDay: { date: string; totalCal: number } | null; minDay: { date: string; totalCal: number } | null; topFoods: { name: string; count: number }[] }
 type ViewMode = "daily" | "weekly" | "monthly"
 
-// ─── 카카오 공유 유틸 ───
 function initKakao() {
   if (typeof window !== "undefined" && window.Kakao && !window.Kakao.isInitialized()) {
     window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY)
@@ -101,11 +100,10 @@ function DietPageInner() {
   const [showWarning, setShowWarning] = useState(false); const [warningShownToday, setWarningShownToday] = useState(false); const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [manualImage, setManualImage] = useState<File | null>(null); const [manualImagePreview, setManualImagePreview] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false); const manualImageInputRef = useRef<HTMLInputElement>(null); const editImageInputRef = useRef<HTMLInputElement>(null)
+  const [showRecordSheet, setShowRecordSheet] = useState(false)
   const [showShareMenu, setShowShareMenu] = useState(false)
 
-  // ✅ 카카오 SDK 초기화
   useEffect(() => { initKakao() }, [])
-
   useEffect(() => { supabase.auth.getUser().then(({ data: { user } }) => { setUser(user); if (!user) setIsLoading(false) }) }, [])
 
   const loadEntries = useCallback(async () => {
@@ -118,23 +116,17 @@ function DietPageInner() {
   }, [user, date, warningShownToday])
   useEffect(() => { if (user) loadEntries() }, [user, date, loadEntries])
 
-  // ✅ 외부에서 식단 추가 시 데이터 새로고침 (mobile-nav에서 diet-entry-added 이벤트)
+  // ✅ 외부에서 식단 추가 시 데이터 새로고침
   useEffect(() => {
-    const handleDietEntryAdded = () => {
-      if (user) loadEntries()
-    }
-    window.addEventListener("diet-entry-added", handleDietEntryAdded)
-    return () => window.removeEventListener("diet-entry-added", handleDietEntryAdded)
+    const handler = () => { if (user) loadEntries() }
+    window.addEventListener("diet-entry-added", handler)
+    return () => window.removeEventListener("diet-entry-added", handler)
   }, [user, loadEntries])
 
-  // ✅ URL 쿼리 파라미터 refresh 감지 시 데이터 새로고침
+  // ✅ URL 쿼리 파라미터 refresh 감지
   useEffect(() => {
     const refreshParam = searchParams.get("refresh")
-    if (refreshParam && user) {
-      loadEntries()
-      // URL에서 refresh 파라미터 제거 (히스토리 깔끔하게)
-      router.replace("/diet", { scroll: false })
-    }
+    if (refreshParam && user) { loadEntries(); router.replace("/diet", { scroll: false }) }
   }, [searchParams, user])
 
   const loadReport = useCallback(async (type: "weekly" | "monthly") => {
@@ -146,7 +138,7 @@ function DietPageInner() {
   useEffect(() => { if (viewMode !== "daily" && user) loadReport(viewMode) }, [viewMode, user, date, loadReport])
 
   const handlePhotoAnalyze = async (file: File) => {
-    setIsAnalyzing(true)
+    setShowRecordSheet(false); setIsAnalyzing(true)
     try { const fd = new FormData(); fd.append("image", file); const res = await fetch("/api/diet/analyze", { method: "POST", body: fd }); const data = await res.json()
       if (data.success) { toast.success(`${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`); loadEntries() } else toast.error(data.error || "분석 실패")
     } catch { toast.error("분석 중 오류") } finally { setIsAnalyzing(false) }
@@ -197,92 +189,39 @@ function DietPageInner() {
 
   const moveDate = (offset: number) => { const d = new Date(date); if (viewMode === "monthly") d.setMonth(d.getMonth() + offset); else if (viewMode === "weekly") d.setDate(d.getDate() + offset * 7); else d.setDate(d.getDate() + offset); setDate(d.toLocaleDateString("en-CA")); setWarningShownToday(false) }
 
-  // ─── 카카오 공유: 오늘 먹은 음식 공유 ───
+  // ─── 카카오 공유: 오늘 먹은 음식 ───
   const shareToday = () => {
     if (!window.Kakao) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
-    }
-
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") { toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return }
     const shareUrl = `${window.location.origin}/diet`
-    const foodList = entries.length > 0
-      ? entries.map(e => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`).slice(0, 5).join("\n")
-      : "아직 기록이 없어요"
+    const foodList = entries.length > 0 ? entries.map(e => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`).slice(0, 5).join("\n") : "아직 기록이 없어요"
     const moreText = entries.length > 5 ? `\n...외 ${entries.length - 5}개 더` : ""
-    const statusText = isOver
-      ? `⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과!`
-      : bmr > 0
-        ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`
-        : `총 ${totalCal.toLocaleString()}kcal 섭취`
-
-    const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" })
-
+    const statusText = isOver ? `⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과!` : bmr > 0 ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음` : `총 ${totalCal.toLocaleString()}kcal 섭취`
     try {
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title: `🍽️ ${isToday ? "오늘" : dateLabel} 먹은 것들`,
-          description: `${foodList}${moreText}\n\n${statusText}`,
-          imageUrl: `${window.location.origin}/pyeonharu-icon.svg`,
-          imageWidth: 200,
-          imageHeight: 200,
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-        },
-        buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
-      })
+      window.Kakao.Share.sendDefault({ objectType: "feed", content: { title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`, description: `${foodList}${moreText}\n\n${statusText}`, imageUrl: `${window.location.origin}/pyeonharu-icon.svg`, imageWidth: 200, imageHeight: 200, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }, buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }] })
       setShowShareMenu(false)
     } catch { toast.error("공유에 실패했습니다") }
   }
 
-  // ─── 카카오 공유: 식단 리포트 공유 ───
+  // ─── 카카오 공유: 식단 리포트 ───
   const shareReport = () => {
     if (!window.Kakao) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
-    }
-
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") { toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return }
     const shareUrl = `${window.location.origin}/diet`
-    const modeLabel = viewMode === "weekly" ? "주간" : viewMode === "monthly" ? "월간" : "일일"
-
-    let title = ""
-    let description = ""
-
+    let title = ""; let description = ""
     if (viewMode === "daily") {
-      // 일일 리포트 공유
       const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })
-      title = `📊 ${dateLabel} 식단 리포트`
-      description = `총 ${totalCal.toLocaleString()}kcal 섭취 · ${entries.length}끼`
-      if (bmr > 0) {
-        description += isOver
-          ? `\n⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과`
-          : `\n✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`
-      }
+      title = `📊 ${dateLabel} 식단 리포트`; description = `총 ${totalCal.toLocaleString()}kcal 섭취 · ${entries.length}끼`
+      if (bmr > 0) description += isOver ? `\n⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과` : `\n✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`
     } else if (reportData) {
-      // 주간/월간 리포트 공유
+      const modeLabel = viewMode === "weekly" ? "주간" : "월간"
       const rangeLabel = `${new Date(reportData.startDate + "T12:00:00").toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} ~ ${new Date(reportData.endDate + "T12:00:00").toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}`
-      title = `📊 ${modeLabel} 식단 리포트 (${rangeLabel})`
-      description = `일 평균 ${reportData.summary.avgCal.toLocaleString()}kcal\n${reportData.summary.daysWithData}일 기록 / ${reportData.summary.totalDays}일`
-      if (bmr > 0 && reportData.summary.overDays > 0) {
-        description += `\n⚠️ ${reportData.summary.overDays}일 칼로리 초과`
-      }
-      if (reportData.summary.topFoods.length > 0) {
-        description += `\n🍴 자주 먹은: ${reportData.summary.topFoods.slice(0, 3).map(f => f.name).join(", ")}`
-      }
+      title = `📊 ${modeLabel} 식단 리포트 (${rangeLabel})`; description = `일 평균 ${reportData.summary.avgCal.toLocaleString()}kcal\n${reportData.summary.daysWithData}일 기록 / ${reportData.summary.totalDays}일`
+      if (bmr > 0 && reportData.summary.overDays > 0) description += `\n⚠️ ${reportData.summary.overDays}일 칼로리 초과`
+      if (reportData.summary.topFoods.length > 0) description += `\n🍴 자주 먹은: ${reportData.summary.topFoods.slice(0, 3).map(f => f.name).join(", ")}`
     }
-
     try {
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title,
-          description,
-          imageUrl: `${window.location.origin}/pyeonharu-icon.svg`,
-          imageWidth: 200,
-          imageHeight: 200,
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-        },
-        buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
-      })
+      window.Kakao.Share.sendDefault({ objectType: "feed", content: { title, description, imageUrl: `${window.location.origin}/pyeonharu-icon.svg`, imageWidth: 200, imageHeight: 200, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }, buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }] })
       setShowShareMenu(false)
     } catch { toast.error("공유에 실패했습니다") }
   }
@@ -313,57 +252,43 @@ function DietPageInner() {
             {bmr === 0 && !isLoading && <Card className="border-dashed border-primary/50"><CardContent className="p-4 text-center space-y-2"><Info className="h-6 w-6 text-primary mx-auto" /><p className="text-sm font-medium">기초대사량을 설정해주세요</p><p className="text-xs text-muted-foreground">칼로리 초과 분석을 위해 필요해요</p><Button size="sm" onClick={() => router.push("/mypage")}>마이페이지에서 설정하기</Button></CardContent></Card>}
             <div className="lg:hidden">{isLoading ? <div className="flex justify-center py-8"><Skeleton className="h-40 w-40 rounded-full" /></div> : <CircularProgress current={totalCal} total={bmr} isOver={isOver} />}{!isLoading && <div className="grid grid-cols-3 gap-2 text-center text-sm mt-3"><div><p className="text-muted-foreground text-xs">섭취</p><p className={`font-bold ${isOver?"text-red-600":""}`}>{totalCal.toLocaleString()}</p></div><div><p className="text-muted-foreground text-xs">기초대사량</p><p className="font-bold">{bmr>0?bmr.toLocaleString():"-"}</p></div><div><p className="text-muted-foreground text-xs">{isOver?"초과":"남은량"}</p><p className={`font-bold ${isOver?"text-red-600":"text-primary"}`}>{bmr>0?(isOver?`+${overAmount.toLocaleString()}`:(bmr-totalCal).toLocaleString()):"-"}</p></div></div>}</div>
             <div className="hidden lg:block">{!isLoading && <div className="grid grid-cols-3 gap-2 text-center text-sm"><div><p className="text-muted-foreground text-xs">섭취</p><p className={`font-bold ${isOver?"text-red-600":""}`}>{totalCal.toLocaleString()}</p></div><div><p className="text-muted-foreground text-xs">기초대사량</p><p className="font-bold">{bmr>0?bmr.toLocaleString():"-"}</p></div><div><p className="text-muted-foreground text-xs">{isOver?"초과":"남은량"}</p><p className={`font-bold ${isOver?"text-red-600":"text-primary"}`}>{bmr>0?(isOver?`+${overAmount.toLocaleString()}`:(bmr-totalCal).toLocaleString()):"-"}</p></div></div>}</div>
-            {isToday && <div className="flex gap-2"><Button variant="outline" className="flex-1 gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={() => cameraInputRef.current?.click()} disabled={isAnalyzing}>{isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}{isAnalyzing ? "분석 중..." : "사진 촬영"}</Button><Button variant="outline" className="flex-1 gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={() => fileInputRef.current?.click()} disabled={isAnalyzing}><ImageIcon className="h-4 w-4" />앨범 선택</Button><Button className="flex-1 gap-2" onClick={() => setShowManualInput(true)}><PenLine className="h-4 w-4" />직접 입력</Button><input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} /><input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} /></div>}
+
+            {/* ✅ 기록하기 + 공유 버튼 (통합) */}
+            {isToday && (
+              <div className="flex gap-2">
+                <Button className="flex-1 gap-2" onClick={() => setShowRecordSheet(true)} disabled={isAnalyzing}>
+                  {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {isAnalyzing ? "분석 중..." : "기록하기"}
+                </Button>
+                <div className="relative">
+                  <Button variant="outline" size="icon" className="border-primary/30 text-primary hover:bg-primary/5" onClick={() => setShowShareMenu(!showShareMenu)} disabled={entries.length === 0}>
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  {showShareMenu && entries.length > 0 && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowShareMenu(false)} />
+                      <div className="absolute right-0 top-11 z-50 w-52 rounded-xl border bg-background shadow-lg p-1.5 space-y-0.5">
+                        <button onClick={shareToday} className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs hover:bg-muted transition-colors text-left">
+                          <span className="text-lg">🍽️</span>
+                          <div><p className="font-medium">먹은 음식 공유</p><p className="text-[10px] text-muted-foreground">오늘 먹은 것들 카카오톡으로</p></div>
+                        </button>
+                        <button onClick={shareReport} className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs hover:bg-muted transition-colors text-left">
+                          <span className="text-lg">📊</span>
+                          <div><p className="font-medium">식단 리포트 공유</p><p className="text-[10px] text-muted-foreground">칼로리 요약 · 통계</p></div>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} />
+              </div>
+            )}
+
             {isAnalyzing && <Card className="border-primary/30 bg-primary/5"><CardContent className="p-4 flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-primary" /><div><p className="text-sm font-medium">AI가 음식을 분석하고 있어요...</p><p className="text-xs text-muted-foreground">잠시만 기다려주세요</p></div></CardContent></Card>}
             {isOver && entries.length > 0 && <div className="lg:hidden"><CalorieAnalysisCard totalCal={totalCal} bmr={bmr} overAmount={overAmount} /></div>}
-
-            {/* ✅ 타임라인 헤더 + 카카오 공유 버튼 */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold flex items-center gap-1.5">📋 {isToday ? "오늘" : "이 날"} 먹은 것들</h2>
-              <div className="flex items-center gap-2">
-                {entries.length > 0 && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowShareMenu(!showShareMenu)}
-                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded-md hover:bg-muted"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                      <span>공유</span>
-                    </button>
-                    {showShareMenu && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setShowShareMenu(false)} />
-                        <div className="absolute right-0 top-7 z-50 w-48 rounded-lg border bg-background shadow-lg p-1.5 space-y-0.5">
-                          <button
-                            onClick={shareToday}
-                            className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-xs hover:bg-muted transition-colors text-left"
-                          >
-                            <span className="text-base">🍽️</span>
-                            <div>
-                              <p className="font-medium">먹은 음식 공유</p>
-                              <p className="text-[10px] text-muted-foreground">{isToday ? "오늘" : "이 날"} 먹은 것들</p>
-                            </div>
-                          </button>
-                          <button
-                            onClick={shareReport}
-                            className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-xs hover:bg-muted transition-colors text-left"
-                          >
-                            <span className="text-base">📊</span>
-                            <div>
-                              <p className="font-medium">식단 리포트 공유</p>
-                              <p className="text-[10px] text-muted-foreground">칼로리 요약 · 통계</p>
-                            </div>
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                <span className="text-[10px] text-muted-foreground">00시 리셋</span>
-              </div>
-            </div>
-
-            {isLoading ? <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}</div> : entries.length === 0 ? <div className="py-12 text-center"><p className="text-sm text-muted-foreground">아직 기록이 없어요</p>{isToday && <p className="text-xs text-muted-foreground mt-1">사진을 찍거나 직접 입력해보세요</p>}</div> : (
+            <div className="flex items-center justify-between"><h2 className="text-sm font-bold flex items-center gap-1.5">📋 {isToday ? "오늘" : "이 날"} 먹은 것들</h2><span className="text-[10px] text-muted-foreground">00시 리셋</span></div>
+            {isLoading ? <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}</div> : entries.length === 0 ? <div className="py-12 text-center"><p className="text-sm text-muted-foreground">아직 기록이 없어요</p>{isToday && <p className="text-xs text-muted-foreground mt-1">위 기록하기 버튼으로 음식을 추가해보세요</p>}</div> : (
               <div className="space-y-2">{entries.map((entry, idx) => { const period = getTimePeriod(entry.recorded_at); const time = new Date(entry.recorded_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }); return (
                 <Card key={entry.id} className={`transition-all ${isOver && idx === entries.length - 1 ? "border-red-200" : ""}`}><CardContent className="p-3"><div className="flex items-start justify-between gap-2"><div className="flex gap-3 flex-1 min-w-0">
                   {entry.image_url ? (<div className="flex-shrink-0 relative group"><button onClick={() => setPreviewImage(entry.image_url)} className="overflow-hidden rounded-lg border hover:border-primary/50 transition-colors"><img src={entry.image_url} alt={entry.food_name} className="h-12 w-12 object-cover" /></button>{isToday && <button onClick={(e) => { e.stopPropagation(); editImageInputRef.current?.setAttribute("data-entry-id", entry.id); editImageInputRef.current?.click() }} className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg"><Camera className="h-4 w-4 text-white" /></button>}</div>
@@ -374,25 +299,19 @@ function DietPageInner() {
             <input ref={editImageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; const eid = editImageInputRef.current?.getAttribute("data-entry-id"); if (f && eid) handleEditImage(eid, f); e.target.value = "" }} />
           </>)}
 
-          {viewMode !== "daily" && (<>{reportLoading ? <div className="space-y-4"><Skeleton className="h-32 w-full rounded-lg" /><Skeleton className="h-48 w-full rounded-lg" /><Skeleton className="h-24 w-full rounded-lg" /></div> : !reportData ? <div className="py-12 text-center"><p className="text-sm text-muted-foreground">데이터를 불러오는 중...</p></div> : (<>
-            <div className="lg:hidden"><Card><CardContent className="p-4 space-y-3"><div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-primary/5 p-3 text-center"><p className="text-[10px] text-muted-foreground">일 평균</p><p className="text-lg font-bold text-primary">{reportData.summary.avgCal.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">kcal</p></div><div className="rounded-lg bg-muted/50 p-3 text-center"><p className="text-[10px] text-muted-foreground">기록한 날</p><p className="text-lg font-bold">{reportData.summary.daysWithData}</p><p className="text-[10px] text-muted-foreground">/ {reportData.summary.totalDays}일</p></div>{bmr > 0 && <><div className={`rounded-lg p-3 text-center ${reportData.summary.overDays > 0 ? "bg-red-50" : "bg-green-50"}`}><p className="text-[10px] text-muted-foreground">초과한 날</p><p className={`text-lg font-bold ${reportData.summary.overDays > 0 ? "text-red-600" : "text-green-600"}`}>{reportData.summary.overDays}일</p><p className="text-[10px] text-muted-foreground">{reportData.summary.overDays > 0 ? "주의 필요" : "잘하고 있어요!"}</p></div><div className="rounded-lg bg-blue-50 p-3 text-center"><p className="text-[10px] text-muted-foreground">총 섭취</p><p className="text-lg font-bold text-blue-600">{reportData.summary.totalCalSum.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">kcal</p></div></>}</div></CardContent></Card></div>
-
-            {/* ✅ 주간/월간 리포트 공유 버튼 */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />일별 칼로리</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={shareReport}
-                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded-md hover:bg-muted"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  <span>리포트 공유</span>
-                </button>
-                {bmr > 0 && <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="h-[1px] w-4 border-t border-dashed border-red-400" />BMR {bmr.toLocaleString()}</div>}
+          {/* 주간/월간 리포트 */}
+          {viewMode !== "daily" && (<>
+            {/* ✅ 주간/월간에서도 공유 버튼 */}
+            {!reportLoading && reportData && (
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5" onClick={shareReport}>
+                  <Share2 className="h-3.5 w-3.5" />리포트 공유
+                </Button>
               </div>
-            </div>
-            <Card><CardContent className="p-4"><MiniBarChart dailyStats={reportData.dailyStats} bmr={bmr} /></CardContent></Card>
-
+            )}
+            {reportLoading ? <div className="space-y-4"><Skeleton className="h-32 w-full rounded-lg" /><Skeleton className="h-48 w-full rounded-lg" /><Skeleton className="h-24 w-full rounded-lg" /></div> : !reportData ? <div className="py-12 text-center"><p className="text-sm text-muted-foreground">데이터를 불러오는 중...</p></div> : (<>
+            <div className="lg:hidden"><Card><CardContent className="p-4 space-y-3"><div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-primary/5 p-3 text-center"><p className="text-[10px] text-muted-foreground">일 평균</p><p className="text-lg font-bold text-primary">{reportData.summary.avgCal.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">kcal</p></div><div className="rounded-lg bg-muted/50 p-3 text-center"><p className="text-[10px] text-muted-foreground">기록한 날</p><p className="text-lg font-bold">{reportData.summary.daysWithData}</p><p className="text-[10px] text-muted-foreground">/ {reportData.summary.totalDays}일</p></div>{bmr > 0 && <><div className={`rounded-lg p-3 text-center ${reportData.summary.overDays > 0 ? "bg-red-50" : "bg-green-50"}`}><p className="text-[10px] text-muted-foreground">초과한 날</p><p className={`text-lg font-bold ${reportData.summary.overDays > 0 ? "text-red-600" : "text-green-600"}`}>{reportData.summary.overDays}일</p><p className="text-[10px] text-muted-foreground">{reportData.summary.overDays > 0 ? "주의 필요" : "잘하고 있어요!"}</p></div><div className="rounded-lg bg-blue-50 p-3 text-center"><p className="text-[10px] text-muted-foreground">총 섭취</p><p className="text-lg font-bold text-blue-600">{reportData.summary.totalCalSum.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">kcal</p></div></>}</div></CardContent></Card></div>
+            <Card><CardContent className="p-4 space-y-3"><div className="flex items-center justify-between"><h3 className="text-sm font-bold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />일별 칼로리</h3>{bmr > 0 && <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="h-[1px] w-4 border-t border-dashed border-red-400" />BMR {bmr.toLocaleString()}</div>}</div><MiniBarChart dailyStats={reportData.dailyStats} bmr={bmr} /></CardContent></Card>
             <div className="flex items-center justify-between"><h2 className="text-sm font-bold">📅 일별 상세</h2></div>
             <div className="space-y-1.5">{reportData.dailyStats.map((d) => { const dayDate = new Date(d.date + "T12:00:00"); const dayLabel = dayDate.toLocaleDateString("ko-KR", { month: "short", day: "numeric", weekday: "narrow" }); const pct = bmr > 0 ? Math.min((d.totalCal / bmr) * 100, 100) : 0; return (<Card key={d.date} className={`cursor-pointer transition-colors hover:bg-muted/50 ${d.isOver ? "border-red-200" : ""}`} onClick={() => { setViewMode("daily"); setDate(d.date) }}><CardContent className="p-3"><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground w-16 shrink-0">{dayLabel}</span><div className="flex-1"><div className="h-2 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full transition-all ${d.isOver ? "bg-red-400" : d.totalCal > 0 ? "bg-primary/60" : ""}`} style={{ width: `${pct}%` }} /></div></div><div className="flex items-center gap-1.5 shrink-0"><span className={`text-xs font-medium ${d.isOver ? "text-red-600" : d.totalCal > 0 ? "" : "text-muted-foreground"}`}>{d.totalCal > 0 ? `${d.totalCal.toLocaleString()}kcal` : "-"}</span>{d.count > 0 && <Badge variant="secondary" className="text-[9px] h-4 px-1">{d.count}끼</Badge>}</div></div></CardContent></Card>) })}</div>
             {reportData.summary.topFoods.length > 0 && <div className="lg:hidden"><Card><CardContent className="p-4 space-y-2"><div className="flex items-center gap-2"><Utensils className="h-4 w-4 text-primary" /><span className="text-sm font-bold">자주 먹은 음식</span></div><div className="space-y-1.5">{reportData.summary.topFoods.map((f, i) => (<div key={f.name} className="flex items-center gap-2 text-sm"><span className="text-muted-foreground w-4 text-right">{i+1}</span><span className="flex-1 truncate">{f.name}</span><Badge variant="secondary" className="text-xs">{f.count}회</Badge></div>))}</div></CardContent></Card></div>}
@@ -401,6 +320,37 @@ function DietPageInner() {
       </div></div></main>
       <MobileNav />
 
+      {/* ✅ 기록하기 바텀시트 (촬영/앨범/직접입력 선택) */}
+      {showRecordSheet && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowRecordSheet(false)}>
+          <div className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3" style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
+            <div className="text-center">
+              <h3 className="text-base font-bold">🍽️ 식단 기록하기</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">음식을 기록할 방법을 선택하세요</p>
+            </div>
+            <div className="space-y-2">
+              <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10"><Camera className="h-5 w-5 text-primary" /></div>
+                <div className="text-left"><p className="text-sm font-semibold">카메라로 촬영</p><p className="text-xs text-muted-foreground">AI가 음식을 분석하고 칼로리를 추정해요</p></div>
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} />
+              </label>
+              <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10"><ImageIcon className="h-5 w-5 text-orange-500" /></div>
+                <div className="text-left"><p className="text-sm font-semibold">앨범에서 선택</p><p className="text-xs text-muted-foreground">저장된 음식 사진으로 분석</p></div>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} />
+              </label>
+              <button onClick={() => { setShowRecordSheet(false); setShowManualInput(true) }} className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500/10"><PenLine className="h-5 w-5 text-blue-500" /></div>
+                <div className="text-left"><p className="text-sm font-semibold">직접 입력</p><p className="text-xs text-muted-foreground">음식 이름과 칼로리를 직접 입력해요</p></div>
+              </button>
+            </div>
+            <button onClick={() => setShowRecordSheet(false)} className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors">취소</button>
+          </div>
+        </div>
+      )}
+
+      {/* 직접 입력 모달 */}
       {showManualInput && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeManualInput}><div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between"><div><h3 className="text-lg font-bold">칼로리 직접 입력</h3><p className="text-xs text-muted-foreground">정확한 칼로리를 알고 있다면</p></div><button onClick={closeManualInput} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button></div>
         <div className="space-y-3">
@@ -421,20 +371,7 @@ function DietPageInner() {
 
 export default function DietPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen flex-col bg-background">
-        <Header />
-        <main className="flex-1 pb-16 md:pb-0">
-          <div className="container mx-auto px-4 py-8">
-            <div className="mx-auto max-w-lg text-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-              <p className="text-sm text-muted-foreground mt-3">식단 관리를 불러오는 중...</p>
-            </div>
-          </div>
-        </main>
-        <MobileNav />
-      </div>
-    }>
+    <Suspense fallback={<div className="flex min-h-screen flex-col bg-background"><Header /><main className="flex-1 pb-16 md:pb-0"><div className="container mx-auto px-4 py-8"><div className="mx-auto max-w-lg text-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /><p className="text-sm text-muted-foreground mt-3">식단 관리를 불러오는 중...</p></div></div></main><MobileNav /></div>}>
       <DietPageInner />
     </Suspense>
   )
