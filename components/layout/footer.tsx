@@ -21,6 +21,13 @@ export function Footer() {
             </Link>
             <span className="text-border">|</span>
             <Link
+              href="/support"
+              className="px-2 py-1 hover:text-foreground transition-colors"
+            >
+              고객센터
+            </Link>
+            <span className="text-border">|</span>
+            <Link
               href="/privacy"
               className="px-2 py-1 font-semibold hover:text-foreground transition-colors"
             >
