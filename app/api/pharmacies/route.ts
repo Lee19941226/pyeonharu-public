@@ -1,5 +1,71 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// ─── 시도 중심 좌표 → 시도코드 매핑 (병원 API와 동일) ───
+const SIDO_CENTERS: Record<string, { lat: number; lng: number; code: string }> =
+  {
+    서울: { lat: 37.5665, lng: 126.978, code: "110000" },
+    부산: { lat: 35.1796, lng: 129.0756, code: "210000" },
+    대구: { lat: 35.8714, lng: 128.6014, code: "220000" },
+    인천: { lat: 37.4563, lng: 126.7052, code: "230000" },
+    광주: { lat: 35.1595, lng: 126.8526, code: "240000" },
+    대전: { lat: 36.3504, lng: 127.3845, code: "250000" },
+    울산: { lat: 35.5384, lng: 129.3114, code: "260000" },
+    세종: { lat: 36.48, lng: 127.259, code: "290000" },
+    경기: { lat: 37.275, lng: 127.0094, code: "310000" },
+    강원: { lat: 37.8228, lng: 128.1555, code: "320000" },
+    충북: { lat: 36.6357, lng: 127.4913, code: "330000" },
+    충남: { lat: 36.6588, lng: 126.6728, code: "340000" },
+    전북: { lat: 35.8203, lng: 127.1088, code: "350000" },
+    전남: { lat: 34.8161, lng: 126.4629, code: "360000" },
+    경북: { lat: 36.576, lng: 128.506, code: "370000" },
+    경남: { lat: 35.2384, lng: 128.6924, code: "380000" },
+    제주: { lat: 33.4996, lng: 126.5312, code: "390000" },
+  };
+
+// 시도코드 → 한글 시도명 (Q0 파라미터용)
+const SIDO_CODE_TO_NAME: Record<string, string> = {
+  "110000": "서울특별시",
+  "210000": "부산광역시",
+  "220000": "대구광역시",
+  "230000": "인천광역시",
+  "240000": "광주광역시",
+  "250000": "대전광역시",
+  "260000": "울산광역시",
+  "290000": "세종특별자치시",
+  "310000": "경기도",
+  "320000": "강원특별자치도",
+  "330000": "충청북도",
+  "340000": "충청남도",
+  "350000": "전북특별자치도",
+  "360000": "전라남도",
+  "370000": "경상북도",
+  "380000": "경상남도",
+  "390000": "제주특별자치도",
+};
+
+// 새 명칭이 API에서 안 될 수 있으므로 대체명 준비
+const SIDO_FALLBACK: Record<string, string> = {
+  강원특별자치도: "강원도",
+  전북특별자치도: "전라북도",
+  제주특별자치도: "제주도",
+  세종특별자치시: "세종시",
+};
+
+function getSidoCdByLocation(lat: number, lng: number): string[] {
+  const sorted = Object.entries(SIDO_CENTERS)
+    .map(([name, center]) => ({
+      name,
+      code: center.code,
+      dist: Math.sqrt(
+        Math.pow(lat - center.lat, 2) + Math.pow(lng - center.lng, 2),
+      ),
+    }))
+    .sort((a, b) => a.dist - b.dist);
+
+  // 가장 가까운 시도 1개 (경계 지역이면 2개까지 확장 가능)
+  return [sorted[0].code];
+}
+
 // ─── Haversine 거리 계산 (km) ───
 function haversine(
   lat1: number,
@@ -51,128 +117,82 @@ export async function GET(request: NextRequest) {
   const radiusKm = radiusM / 1000;
 
   try {
-    // 응급의료기관 약국 목록 API (위경도 기반 검색)
-    const baseUrl =
-      "https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire";
-
+    // 1) 위경도 → 시도코드
+    const sidoCodes = getSidoCdByLocation(userLat, userLng);
     const allPharmacies: any[] = [];
-    let debugLogged = false;
 
-    // 여러 페이지 조회 (최대 3페이지)
-    for (let page = 1; page <= 3; page++) {
-      const params = new URLSearchParams();
-      params.append("serviceKey", SERVICE_KEY);
-      params.append("WGS84_LON", lng);
-      params.append("WGS84_LAT", lat);
-      params.append("ORD", "distance");
-      params.append("pageNo", String(page));
-      params.append("numOfRows", "100");
+    // 2) 각 시도에 대해 Q0(시도명) 기반 API 호출
+    for (const sidoCd of sidoCodes) {
+      const sidoName = SIDO_CODE_TO_NAME[sidoCd];
+      if (!sidoName) continue;
 
-      const url = `${baseUrl}?${params.toString()}`;
+      // 시도명으로 약국 목록 조회 (최대 1000개)
+      const encodedSido = encodeURIComponent(sidoName);
+      const baseUrl = `https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire`;
+      const url = `${baseUrl}?serviceKey=${SERVICE_KEY}&Q0=${encodedSido}&pageNo=1&numOfRows=1000&ORD=NAME`;
 
-      console.log(`[Pharmacies API] 페이지 ${page} 요청 중...`);
+      console.log(
+        `[Pharmacies API] 시도코드=${sidoCd}, 시도명=${sidoName} 조회 중...`,
+      );
 
       const response = await fetch(url, {
         headers: { Accept: "application/xml" },
       });
 
       if (!response.ok) {
-        console.error(
-          `[Pharmacies API] 페이지 ${page} 에러: ${response.status}`,
-        );
-        break;
+        console.error(`[Pharmacies API] API 에러: ${response.status}`);
+
+        // fallback 시도명으로 재시도
+        if (SIDO_FALLBACK[sidoName]) {
+          console.log(
+            `[Pharmacies API] fallback 시도: ${SIDO_FALLBACK[sidoName]}`,
+          );
+          const fallbackUrl = `${baseUrl}?serviceKey=${SERVICE_KEY}&Q0=${encodeURIComponent(SIDO_FALLBACK[sidoName])}&pageNo=1&numOfRows=1000&ORD=NAME`;
+          const fallbackRes = await fetch(fallbackUrl, {
+            headers: { Accept: "application/xml" },
+          });
+          if (!fallbackRes.ok) continue;
+          const fallbackText = await fallbackRes.text();
+          parsePharmaciesXml(
+            fallbackText,
+            userLat,
+            userLng,
+            radiusKm,
+            allPharmacies,
+          );
+          continue;
+        }
+        continue;
       }
 
       const text = await response.text();
 
-      // 에러 응답 체크
-      if (text.includes("<errMsg>") && text.includes("SERVICE ERROR")) {
-        console.error("[Pharmacies API] API 서비스 에러");
-        break;
-      }
-
-      // totalCount 확인
-      const totalMatch = text.match(/<totalCount>(\d+)<\/totalCount>/);
-      const totalCount = totalMatch ? parseInt(totalMatch[1]) : 0;
-
-      // ★ 디버그: 첫 페이지 첫 번째 item의 XML 구조 출력
-      if (!debugLogged) {
-        const firstItem = text.match(/<item>([\s\S]*?)<\/item>/i);
-        if (firstItem) {
-          const tagNames = firstItem[1].match(/<([a-zA-Z0-9_]+)>/g);
-          console.log(
-            `[Pharmacies API] XML 태그 목록: ${tagNames?.map((t) => t.replace(/[<>]/g, "")).join(", ")}`,
-          );
-          console.log(
-            `[Pharmacies API] 첫 item 샘플: ${firstItem[1].substring(0, 500)}`,
-          );
-        }
-        debugLogged = true;
-      }
-
-      const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
-      let match;
-      let pageCount = 0;
-      let skipCount = 0;
-
-      while ((match = itemRegex.exec(text)) !== null) {
-        const itemXml = match[1];
-        pageCount++;
-
-        const getValue = (tag: string): string => {
-          const pattern = new RegExp(`<${tag}>([^<]*)</${tag}>`, "i");
-          const m = pattern.exec(itemXml);
-          return m ? m[1].trim() : "";
-        };
-
-        const dutyName = getValue("dutyName");
-
-        // 좌표 파싱 - 모든 가능한 필드명 시도
-        const latStr =
-          getValue("wgs84Lat") ||
-          getValue("latitude") ||
-          getValue("YPos") ||
-          getValue("lat");
-        const lngStr =
-          getValue("wgs84Lon") ||
-          getValue("longitude") ||
-          getValue("XPos") ||
-          getValue("lon") ||
-          getValue("lng");
-
-        const pLat = parseFloat(latStr) || 0;
-        const pLng = parseFloat(lngStr) || 0;
-
-        if (!dutyName || pLat === 0 || pLng === 0) {
-          skipCount++;
-          continue;
-        }
-
-        // 거리 계산
-        const dist = haversine(userLat, userLng, pLat, pLng);
-
-        // 반경 내만 포함
-        if (dist > radiusKm) continue;
-
-        allPharmacies.push({
-          hpid: getValue("hpid") || getValue("rnum") || String(Math.random()),
-          dutyName,
-          dutyAddr: getValue("dutyAddr"),
-          dutyTel1: getValue("dutyTel1"),
-          wgs84Lat: pLat,
-          wgs84Lon: pLng,
-          distance:
-            dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`,
-          distanceNum: dist,
+      // 에러 응답 체크 — fallback 시도
+      if (
+        text.includes("<totalCount>0</totalCount>") &&
+        SIDO_FALLBACK[sidoName]
+      ) {
+        console.log(
+          `[Pharmacies API] 결과 0건, fallback 시도: ${SIDO_FALLBACK[sidoName]}`,
+        );
+        const fallbackUrl = `${baseUrl}?serviceKey=${SERVICE_KEY}&Q0=${encodeURIComponent(SIDO_FALLBACK[sidoName])}&pageNo=1&numOfRows=1000&ORD=NAME`;
+        const fallbackRes = await fetch(fallbackUrl, {
+          headers: { Accept: "application/xml" },
         });
+        if (fallbackRes.ok) {
+          const fallbackText = await fallbackRes.text();
+          parsePharmaciesXml(
+            fallbackText,
+            userLat,
+            userLng,
+            radiusKm,
+            allPharmacies,
+          );
+        }
+        continue;
       }
 
-      console.log(
-        `[Pharmacies API] 페이지 ${page}: ${pageCount}개 항목, 좌표없음=${skipCount}개, 총 ${totalCount}개`,
-      );
-
-      // 더 이상 데이터 없으면 중단
-      if (pageCount === 0 || page * 100 >= totalCount) break;
+      parsePharmaciesXml(text, userLat, userLng, radiusKm, allPharmacies);
     }
 
     // 거리순 정렬
@@ -193,4 +213,61 @@ export async function GET(request: NextRequest) {
       error: "약국 정보를 가져오는데 실패했습니다.",
     });
   }
+}
+
+// ─── XML 파싱 헬퍼 ───
+function parsePharmaciesXml(
+  text: string,
+  userLat: number,
+  userLng: number,
+  radiusKm: number,
+  allPharmacies: any[],
+) {
+  const totalMatch = text.match(/<totalCount>(\d+)<\/totalCount>/);
+  const totalCount = totalMatch ? parseInt(totalMatch[1]) : 0;
+
+  const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+  let match;
+  let parsed = 0;
+  let withinRadius = 0;
+
+  while ((match = itemRegex.exec(text)) !== null) {
+    const itemXml = match[1];
+    parsed++;
+
+    const getValue = (tag: string): string => {
+      const pattern = new RegExp(`<${tag}>([^<]*)</${tag}>`, "i");
+      const m = pattern.exec(itemXml);
+      return m ? m[1].trim() : "";
+    };
+
+    const dutyName = getValue("dutyName");
+    const pLat = parseFloat(getValue("wgs84Lat")) || 0;
+    const pLng = parseFloat(getValue("wgs84Lon")) || 0;
+
+    if (!dutyName || pLat === 0 || pLng === 0) continue;
+
+    // 거리 계산
+    const dist = haversine(userLat, userLng, pLat, pLng);
+
+    // 반경 내만 포함
+    if (dist > radiusKm) continue;
+    withinRadius++;
+
+    allPharmacies.push({
+      hpid: getValue("hpid") || String(Math.random()),
+      dutyName,
+      dutyAddr: getValue("dutyAddr"),
+      dutyTel1: getValue("dutyTel1"),
+      wgs84Lat: pLat,
+      wgs84Lon: pLng,
+      distance:
+        dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`,
+      distanceNum: dist,
+    });
+  }
+
+  console.log(
+    `[Pharmacies API] 파싱: ${parsed}개 중 반경 내 ${withinRadius}개 (총 ${totalCount}개)`,
+  );
 }
