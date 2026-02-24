@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 interface Restaurant {
   name: string;

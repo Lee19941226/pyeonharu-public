@@ -10,6 +10,7 @@ import { StepDemo } from "./step-demo";
 import { StepAha } from "./step-aha";
 import { StepProfile } from "./step-profile";
 import { StepSchool } from "./step-school";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 

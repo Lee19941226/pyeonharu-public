@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { createClient } from "@/lib/supabase/client";
 import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 type CameraMode = "allergy" | "diet" | null;
 

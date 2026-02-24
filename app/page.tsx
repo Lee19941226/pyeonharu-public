@@ -32,6 +32,7 @@ import MedicineTab from "@/components/tabs/MedicineTab";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 import MealRecommend from "@/components/meal-recommend";
 import { toast } from "sonner";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
