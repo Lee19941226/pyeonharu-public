@@ -50,19 +50,6 @@ const TAB_LABELS: Record<string, string> = {
   "sick:medicine": "아파요 > 약",
 };
 
-function getStoredHomeTab(): { main: MainTab; sub: string } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = localStorage.getItem(HOME_TAB_KEY);
-    if (!stored) return null;
-    const [main, sub] = stored.split(":");
-    if ((main === "meal" || main === "sick") && sub) {
-      return { main: main as MainTab, sub };
-    }
-  } catch {}
-  return null;
-}
-
 function TabButton({
   active,
   onClick,
@@ -122,21 +109,36 @@ export default function HomePage() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
-  // ✅ 저장된 첫 화면으로 초기 탭 설정
-  const storedHome = getStoredHomeTab();
-  const [mainTab, setMainTab] = useState<MainTab>(storedHome?.main ?? "meal");
-  const [mealSubTab, setMealSubTab] = useState<MealSubTab>(
-    (storedHome?.main === "meal" ? storedHome.sub : "food") as MealSubTab,
-  );
-  const [sickSubTab, setSickSubTab] = useState<SickSubTab>(
-    (storedHome?.main === "sick" ? storedHome.sub : "symptom") as SickSubTab,
-  );
+  // ✅ 기본값으로 초기화 (SSR 안전)
+  const [mainTab, setMainTab] = useState<MainTab>("meal");
+  const [mealSubTab, setMealSubTab] = useState<MealSubTab>("food");
+  const [sickSubTab, setSickSubTab] = useState<SickSubTab>("symptom");
+
+  // ✅ 저장된 첫 화면 키
+  const [savedHomeKey, setSavedHomeKey] = useState("meal:food");
+
+  // ✅ 클라이언트에서 localStorage 읽어 첫 화면 복원
+  const [homeRestored, setHomeRestored] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HOME_TAB_KEY);
+      if (stored) {
+        const [main, sub] = stored.split(":");
+        if (main === "meal" && ["food", "restaurant", "diet"].includes(sub)) {
+          setMainTab("meal");
+          setMealSubTab(sub as MealSubTab);
+        } else if (main === "sick" && ["symptom", "hospital", "medicine"].includes(sub)) {
+          setMainTab("sick");
+          setSickSubTab(sub as SickSubTab);
+        }
+        setSavedHomeKey(stored);
+      }
+    } catch {}
+    setHomeRestored(true);
+  }, []);
 
   // ✅ 현재 탭이 첫 화면으로 설정되어 있는지 확인
   const currentTabKey = mainTab === "meal" ? `meal:${mealSubTab}` : `sick:${sickSubTab}`;
-  const [savedHomeKey, setSavedHomeKey] = useState<string>(
-    storedHome ? `${storedHome.main}:${storedHome.sub}` : "meal:food",
-  );
   const isCurrentHome = currentTabKey === savedHomeKey;
 
   const setAsHome = () => {
@@ -251,9 +253,10 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* ✅ pointer-events-none 추가: 로딩 중에도 뒤 탭 클릭 가능 */}
       {isInitialLoading && (
         <div
-          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${isFadingOut ? "opacity-0" : "opacity-100"}`}
+          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 pointer-events-none ${isFadingOut ? "opacity-0" : "opacity-100"}`}
         >
           <div className="flex flex-col items-center gap-6">
             <PyeonharuLogo size="lg" />
@@ -385,30 +388,32 @@ export default function HomePage() {
         {activeTab === "hospital" && <HospitalTab />}
       </main>
 
-      {/* ═══ 첫 화면 설정 고정 버튼 ═══ */}
-      <div className="fixed bottom-20 right-3 z-40 md:bottom-6 md:right-6">
-        <button
-          onClick={setAsHome}
-          disabled={isCurrentHome}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all active:scale-95 ${
-            isCurrentHome
-              ? "bg-primary/10 text-primary border border-primary/30"
-              : "bg-background text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
-          }`}
-        >
-          {isCurrentHome ? (
-            <>
-              <Check className="h-3.5 w-3.5" />
-              첫 화면
-            </>
-          ) : (
-            <>
-              <Pin className="h-3.5 w-3.5" />
-              첫 화면으로 설정
-            </>
-          )}
-        </button>
-      </div>
+      {/* ═══ 첫 화면 설정 고정 버튼 (로딩 완료 후 표시) ═══ */}
+      {!isInitialLoading && homeRestored && (
+        <div className="fixed bottom-20 right-3 z-40 md:bottom-6 md:right-6">
+          <button
+            onClick={setAsHome}
+            disabled={isCurrentHome}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all active:scale-95 ${
+              isCurrentHome
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "bg-background text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            {isCurrentHome ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                첫 화면
+              </>
+            ) : (
+              <>
+                <Pin className="h-3.5 w-3.5" />
+                첫 화면으로 설정
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       <Footer />
       <MobileNav />
