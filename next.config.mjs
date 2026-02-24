@@ -106,8 +106,8 @@ const nextConfig = {
                 "https://epi.adtrafficquality.google",
               ].join(" "),
 
-              // iframe: 카카오 로그인 팝업 + Google 애드센스
-              "frame-src 'self' https://accounts.kakao.com https://kauth.kakao.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+              // iframe: 카카오 로그인 + Google 애드센스 + 네이버 지도 임베드
+              "frame-src 'self' https://accounts.kakao.com https://kauth.kakao.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://map.naver.com https://*.map.naver.com",
 
               // 미디어: self + blob (카메라)
               "media-src 'self' blob:",
