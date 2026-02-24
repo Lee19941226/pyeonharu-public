@@ -9,19 +9,22 @@ type HapticStyle = "light" | "medium" | "heavy";
 
 export async function haptic(style: HapticStyle = "light") {
   try {
-    // 1순위: Capacitor Haptics (네이티브 앱에서 확실히 동작)
-    const { Haptics, ImpactStyle } = await import("@capacitor/haptics");
-    const styleMap: Record<HapticStyle, any> = {
-      light: ImpactStyle.Light,
-      medium: ImpactStyle.Medium,
-      heavy: ImpactStyle.Heavy,
-    };
-    await Haptics.impact({ style: styleMap[style] });
+    const { Haptics, ImpactStyle, NotificationType } = await import("@capacitor/haptics");
+
+    if (style === "light") {
+      // 가장 약한 진동: notification Success (impact Light보다 부드러움)
+      await Haptics.notification({ type: NotificationType.Success });
+    } else {
+      const styleMap: Record<string, any> = {
+        medium: ImpactStyle.Light,
+        heavy: ImpactStyle.Medium,
+      };
+      await Haptics.impact({ style: styleMap[style] });
+    }
   } catch {
-    // 2순위: Web API 폴백
     try {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        const ms = style === "heavy" ? 30 : style === "medium" ? 15 : 8;
+        const ms = style === "heavy" ? 15 : style === "medium" ? 8 : 3;
         navigator.vibrate(ms);
       }
     } catch {
