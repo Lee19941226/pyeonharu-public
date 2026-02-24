@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/client"
 import {
   Sparkles, Store, Flame, Youtube, TrendingDown, TrendingUp,
   ChevronDown, ChevronUp, Loader2, BarChart3,
-  UtensilsCrossed, AlertTriangle, Bike, Salad, Scale, Shuffle
+  UtensilsCrossed, AlertTriangle, Bike, Salad, Scale, Shuffle,
+  Share2,
 } from "lucide-react"
+import { toast } from "sonner"
 
 interface Reasoning {
   taste: string
@@ -44,6 +46,17 @@ interface MealRecommendData {
     weeklyOverDays: number
     weeklyTopFoods: string[]
   }
+}
+
+// ✅ 카카오 SDK 초기화 (공유 시점에 호출)
+function ensureKakaoInit(): boolean {
+  if (typeof window === "undefined") return false
+  if (!window.Kakao) { console.warn("[카카오] SDK 미로드"); return false }
+  if (!window.Kakao.isInitialized()) {
+    try { window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY); console.log("[카카오] SDK 초기화 완료") }
+    catch (e) { console.error("[카카오] SDK 초기화 실패:", e); return false }
+  }
+  return window.Kakao.isInitialized()
 }
 
 export default function MealRecommend() {
@@ -88,6 +101,38 @@ export default function MealRecommend() {
     finally { setLoading(false) }
   }, [])
 
+  // ✅ 카카오 공유: AI 추천 메뉴
+  const shareRecommend = () => {
+    if (!data || !data.recommendations.length) { toast.error("공유할 추천 결과가 없습니다"); return }
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
+    }
+    const shareUrl = `${window.location.origin}/food`
+    const mealLabel = data.mealType === "아침" ? "🌅 아침" : data.mealType === "점심" ? "☀️ 점심" : data.mealType === "간식" ? "🍪 간식" : "🌇 저녁"
+    const menuList = data.recommendations.slice(0, 5).map(r => `${r.emoji} ${r.name} (${r.estimatedCal}kcal)`).join(", ")
+    const title = `${mealLabel} AI 맞춤 메뉴 추천`
+    let description = menuList
+    if (data.analysis?.calorieSituation) description += ` | ${data.analysis.calorieSituation}`
+    if (description.length > 150) description = description.slice(0, 147) + "..."
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title,
+          description,
+          imageUrl: `${window.location.origin}/icons/icon-512.png`,
+          imageWidth: 512, imageHeight: 512,
+          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+        },
+        buttons: [{ title: "편하루에서 메뉴 추천받기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
+      })
+    } catch (err) {
+      console.error("[카카오 공유 실패]", err)
+      toast.error("공유에 실패했습니다")
+    }
+  }
+
   if (isLoggedIn === false || isLoggedIn === null) return null
 
   const remainingCal = bmr > 0 ? Math.max(bmr - todayCal, 0) : 0
@@ -124,14 +169,26 @@ export default function MealRecommend() {
             <p className="text-[9px] text-muted-foreground">알레르기·식단·영양 분석</p>
           </div>
         </div>
-        <button
-          onClick={fetchRecommend}
-          disabled={loading}
-          className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          {data ? "다시 추천" : "추천받기"}
-        </button>
+        {/* ✅ 공유 + 추천 버튼 */}
+        <div className="flex items-center gap-1.5">
+          {data && !loading && (
+            <button
+              onClick={shareRecommend}
+              className="flex items-center justify-center rounded-lg border border-primary/30 px-2 py-1.5 text-primary hover:bg-primary/5 transition-colors"
+              title="카카오톡으로 공유"
+            >
+              <Share2 className="h-3 w-3" />
+            </button>
+          )}
+          <button
+            onClick={fetchRecommend}
+            disabled={loading}
+            className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {data ? "다시 추천" : "추천받기"}
+          </button>
+        </div>
       </div>
 
       {/* 칼로리 바 (항상) */}

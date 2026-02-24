@@ -310,6 +310,10 @@ export default function HomePage() {
               {/* 좌측: FoodTab 본문 */}
               <div className="w-full max-w-2xl">
                 <FoodTab onProgress={handleFoodTabProgress} />
+                {/* ✅ 모바일: FoodTab 아래에 AI 추천 표시 */}
+                <div className="lg:hidden mt-4 mb-4">
+                  <MealRecommend />
+                </div>
               </div>
               {/* 우측: AI 추천 (데스크톱 lg+) */}
               <div className="hidden lg:block w-[320px] shrink-0">
