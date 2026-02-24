@@ -19,6 +19,7 @@ import {
   School,
   BarChart3,
   MessageSquare,
+  Headphones,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -230,6 +231,12 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/support" className="flex items-center gap-2">
+                    <Headphones className="h-4 w-4" />
+                    고객센터
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="flex items-center gap-2 text-destructive focus:text-destructive"
@@ -396,7 +403,15 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               </div>
             )}
             <div className="border-t pt-3">
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/support"
+                  onClick={closeMobileMenu}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Headphones className="h-3.5 w-3.5" />
+                  고객센터
+                </Link>
                 <Link
                   href="/faq"
                   onClick={closeMobileMenu}
