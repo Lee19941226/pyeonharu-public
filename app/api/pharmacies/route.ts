@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
       "https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire";
 
     const allPharmacies: any[] = [];
+    let debugLogged = false;
 
     // 여러 페이지 조회 (최대 3페이지)
     for (let page = 1; page <= 3; page++) {
@@ -94,9 +95,25 @@ export async function GET(request: NextRequest) {
       const totalMatch = text.match(/<totalCount>(\d+)<\/totalCount>/);
       const totalCount = totalMatch ? parseInt(totalMatch[1]) : 0;
 
+      // ★ 디버그: 첫 페이지 첫 번째 item의 XML 구조 출력
+      if (!debugLogged) {
+        const firstItem = text.match(/<item>([\s\S]*?)<\/item>/i);
+        if (firstItem) {
+          const tagNames = firstItem[1].match(/<([a-zA-Z0-9_]+)>/g);
+          console.log(
+            `[Pharmacies API] XML 태그 목록: ${tagNames?.map((t) => t.replace(/[<>]/g, "")).join(", ")}`,
+          );
+          console.log(
+            `[Pharmacies API] 첫 item 샘플: ${firstItem[1].substring(0, 500)}`,
+          );
+        }
+        debugLogged = true;
+      }
+
       const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
       let match;
       let pageCount = 0;
+      let skipCount = 0;
 
       while ((match = itemRegex.exec(text)) !== null) {
         const itemXml = match[1];
@@ -110,19 +127,26 @@ export async function GET(request: NextRequest) {
 
         const dutyName = getValue("dutyName");
 
-        // 좌표 파싱 (여러 필드명 시도)
-        const pLat =
-          parseFloat(getValue("wgs84Lat")) ||
-          parseFloat(getValue("latitude")) ||
-          parseFloat(getValue("YPos")) ||
-          0;
-        const pLng =
-          parseFloat(getValue("wgs84Lon")) ||
-          parseFloat(getValue("longitude")) ||
-          parseFloat(getValue("XPos")) ||
-          0;
+        // 좌표 파싱 - 모든 가능한 필드명 시도
+        const latStr =
+          getValue("wgs84Lat") ||
+          getValue("latitude") ||
+          getValue("YPos") ||
+          getValue("lat");
+        const lngStr =
+          getValue("wgs84Lon") ||
+          getValue("longitude") ||
+          getValue("XPos") ||
+          getValue("lon") ||
+          getValue("lng");
 
-        if (!dutyName || pLat === 0 || pLng === 0) continue;
+        const pLat = parseFloat(latStr) || 0;
+        const pLng = parseFloat(lngStr) || 0;
+
+        if (!dutyName || pLat === 0 || pLng === 0) {
+          skipCount++;
+          continue;
+        }
 
         // 거리 계산
         const dist = haversine(userLat, userLng, pLat, pLng);
@@ -144,7 +168,7 @@ export async function GET(request: NextRequest) {
       }
 
       console.log(
-        `[Pharmacies API] 페이지 ${page}: ${pageCount}개 항목, 총 ${totalCount}개`,
+        `[Pharmacies API] 페이지 ${page}: ${pageCount}개 항목, 좌표없음=${skipCount}개, 총 ${totalCount}개`,
       );
 
       // 더 이상 데이터 없으면 중단
