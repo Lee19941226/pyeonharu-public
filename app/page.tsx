@@ -230,6 +230,7 @@ export default function HomePage() {
 
       <Header mainTab={mainTab} onMainTabChange={setMainTab} />
 
+      {/* ✅ 모바일 식사/아파요 탭 (하단 탭에서 제거했으므로 여기서 유지) */}
       <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
         <div className="flex">
           <TabButton
@@ -310,10 +311,6 @@ export default function HomePage() {
               {/* 좌측: FoodTab 본문 */}
               <div className="w-full max-w-2xl">
                 <FoodTab onProgress={handleFoodTabProgress} />
-                {/* ✅ 모바일: FoodTab 아래에 AI 추천 표시 */}
-                <div className="lg:hidden mt-4 mb-4">
-                  <MealRecommend />
-                </div>
               </div>
               {/* 우측: AI 추천 (데스크톱 lg+) */}
               <div className="hidden lg:block w-[320px] shrink-0">
@@ -339,7 +336,8 @@ export default function HomePage() {
       </main>
 
       <Footer />
-      <MobileNav mainTab={mainTab} onMainTabChange={setMainTab} />
+      {/* ✅ props 제거 — 하단 탭이 더 이상 식사/아파요 전환 담당하지 않음 */}
+      <MobileNav />
       <LoginModal
         open={loginModalOpen}
         onOpenChange={setLoginModalOpen}
