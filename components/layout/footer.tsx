@@ -18,7 +18,7 @@ export function Footer() {
             <h3 className="mb-4 text-sm font-semibold">알레르기</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/food" className="hover:text-foreground">
+                <Link href="/" className="hover:text-foreground">
                   식품 알레르기 확인
                 </Link>
               </li>
@@ -44,17 +44,17 @@ export function Footer() {
             <h3 className="mb-4 text-sm font-semibold">건강</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/search" className="hover:text-foreground">
+                <Link href="/" className="hover:text-foreground">
                   병원/약국 찾기
                 </Link>
               </li>
               <li>
-                <Link href="/symptom" className="hover:text-foreground">
+                <Link href="/" className="hover:text-foreground">
                   AI 증상 분석
                 </Link>
               </li>
               <li>
-                <Link href="/medicine" className="hover:text-foreground">
+                <Link href="/" className="hover:text-foreground">
                   약 정보 검색
                 </Link>
               </li>

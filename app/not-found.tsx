@@ -33,7 +33,7 @@ export default function NotFound() {
               </Button>
             </Link>
 
-            <Link href="/food" className="block">
+            <Link href="/" className="block">
               <Button className="w-full" variant="outline">
                 <Search className="mr-2 h-4 w-4" />
                 식품 검색
