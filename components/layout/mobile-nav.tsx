@@ -125,6 +125,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           }
         }
       } else {
+        // ✅ 식단 분석 모드
         const fd = new FormData();
         fd.append("image", file);
         const res = await fetch("/api/diet/analyze", {
@@ -137,7 +138,16 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           toast.success(
             `${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`,
           );
-          router.refresh();
+
+          // ✅ 수정: 식단 관리 페이지로 이동 + 타임스탬프로 데이터 새로고침 트리거
+          if (pathname === "/diet") {
+            // 이미 식단 페이지에 있으면 커스텀 이벤트로 새로고침 트리거
+            window.dispatchEvent(new CustomEvent("diet-entry-added"));
+          } else if (pathname === "/" || pathname.startsWith("/")) {
+            // 홈 탭의 DietTab에 있을 수 있으므로 이벤트 발송 + /diet 페이지 이동
+            window.dispatchEvent(new CustomEvent("diet-entry-added"));
+            router.push(`/diet?refresh=${Date.now()}`);
+          }
         } else {
           toast.error(data.error || "분석에 실패했습니다");
         }
