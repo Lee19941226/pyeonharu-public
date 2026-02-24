@@ -111,13 +111,21 @@ function CtaSection() {
   return (
     <section className="container mx-auto px-4 py-12 md:py-16 text-center">
       <h2 className="text-2xl font-bold md:text-3xl">지금 바로 시작해보세요</h2>
-      <p className="mt-4 text-muted-foreground">알레르기가 있어도 편안한 식사, 편하루가 도와드릴게요.</p>
+      <p className="mt-4 text-muted-foreground">
+        어떤 고민이 있어도 편안한 식사, 편하루가 도와드릴게요.
+      </p>
       <div className="mt-6 flex justify-center gap-3">
-        <Link href="/" className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-primary/90">
+        <Link
+          href="/"
+          className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-primary/90"
+        >
           편하루 시작하기
         </Link>
         {!isLoggedIn && (
-          <Link href="/sign-up" className="rounded-xl border border-border px-6 py-3 text-sm font-semibold transition-all hover:bg-muted">
+          <Link
+            href="/sign-up"
+            className="rounded-xl border border-border px-6 py-3 text-sm font-semibold transition-all hover:bg-muted"
+          >
             회원가입
           </Link>
         )}
