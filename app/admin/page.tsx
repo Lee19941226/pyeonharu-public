@@ -21,6 +21,7 @@ import {
   Zap,
   ArrowUpRight,
   ArrowDownRight,
+  Headphones,
 } from "lucide-react";
 import {
   LineChart,
@@ -42,10 +43,11 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import UserManagement from "./user-management";
+import SupportManagement from "./support-management";
 import AdminReportButton from "./admin-report-button";
 
 // ─── Admin Tab ───
-type AdminTab = "dashboard" | "users";
+type AdminTab = "dashboard" | "users" | "support";
 
 // ─── Types ───
 interface Stats {
@@ -277,6 +279,19 @@ export default function AdminDashboard() {
               >
                 사용자 관리
               </button>
+              <button
+                onClick={() => setActiveTab("support")}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === "support"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  <Headphones className="h-3 w-3" />
+                  고객센터
+                </span>
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -317,6 +332,8 @@ export default function AdminDashboard() {
       <div className="container mx-auto px-4 py-6 space-y-6">
         {activeTab === "users" ? (
           <UserManagement />
+        ) : activeTab === "support" ? (
+          <SupportManagement />
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
