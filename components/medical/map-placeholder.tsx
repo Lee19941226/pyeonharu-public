@@ -2,7 +2,20 @@
 
 import { MapPin, Building2, Cross, Navigation } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Place } from "@/app/search/page"
+interface Place {
+  id: string;
+  name: string;
+  type: "hospital" | "pharmacy";
+  address: string;
+  phone: string;
+  distance: string;
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+  departments?: string[];
+  lat: number;
+  lng: number;
+}
 
 interface MapPlaceholderProps {
   places: Place[]
