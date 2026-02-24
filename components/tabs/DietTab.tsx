@@ -27,6 +27,7 @@ import {
   Calendar,
   Pencil,
   Sparkles,
+  Download,
 } from "lucide-react";
 
 function getTimePeriod(dateStr: string) {
@@ -150,6 +151,13 @@ export default function DietTab() {
   const [editingCal, setEditingCal] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  // 🆕 이미지 관련 state
+  const [manualImage, setManualImage] = useState<File | null>(null);
+  const [manualImagePreview, setManualImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const manualImageInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => { supabase.auth.getUser().then(({ data: { user } }) => { setUser(user); if (!user) setIsLoading(false) }) }, []);
 
   const loadEntries = useCallback(async () => {
@@ -214,12 +222,114 @@ export default function DietTab() {
     } catch { toast.error("AI 추정 중 오류가 발생했습니다") } finally { setIsEstimating(false) }
   };
 
+  // 🆕 직접 입력용 이미지 선택
+  const handleManualImageSelect = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 선택 가능합니다");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("5MB 이하 이미지만 가능합니다");
+      return;
+    }
+    setManualImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setManualImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // 🆕 이미지 업로드 (Supabase Storage)
+  const uploadDietImage = async (file: File, entryId?: string): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      if (entryId) formData.append("entryId", entryId);
+      const res = await fetch("/api/diet/upload-image", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success) return data.image_url;
+      toast.error(data.error || "이미지 업로드 실패");
+      return null;
+    } catch {
+      toast.error("이미지 업로드 중 오류");
+      return null;
+    }
+  };
+
+  // 🆕 기존 엔트리에 사진 추가/변경
+  const handleEditImage = async (entryId: string, file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 선택 가능합니다");
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const imageUrl = await uploadDietImage(file, entryId);
+      if (imageUrl) {
+        toast.success("사진이 추가되었습니다");
+        loadEntries();
+        loadDashboard();
+      }
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // 🆕 이미지 다운로드
+  const handleDownloadImage = async (imageUrl: string, foodName: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${foodName}_${new Date().toLocaleDateString("ko-KR")}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("이미지가 저장되었습니다");
+    } catch {
+      window.open(imageUrl, "_blank");
+    }
+  };
+
+  // 🆕 직접 입력 모달 닫기 + 상태 초기화
+  const closeManualInput = () => {
+    setShowManualInput(false);
+    setManualName("");
+    setManualCal("");
+    setManualGrams("");
+    setServingDesc("");
+    setManualImage(null);
+    setManualImagePreview(null);
+  };
+
   const handleManualSubmit = async () => {
     if (!manualName.trim() || !manualCal) return;
     try {
-      const res = await fetch("/api/diet/entries", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ food_name: manualName.trim(), estimated_cal: parseInt(manualCal) }) }); const data = await res.json();
-      if (data.success) { toast.success(`📝 ${manualName} (${manualCal}kcal)`); setManualName(""); setManualCal(""); setManualGrams(""); setServingDesc(""); setShowManualInput(false); loadEntries(); loadDashboard() }
+      // 🆕 이미지가 있으면 먼저 업로드
+      let imageUrl: string | null = null;
+      if (manualImage) {
+        setIsUploadingImage(true);
+        imageUrl = await uploadDietImage(manualImage);
+        setIsUploadingImage(false);
+      }
+
+      const res = await fetch("/api/diet/entries", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          food_name: manualName.trim(),
+          estimated_cal: parseInt(manualCal),
+          image_url: imageUrl,
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`${imageUrl ? "📸" : "📝"} ${manualName} (${manualCal}kcal)`);
+        closeManualInput();
+        loadEntries();
+        loadDashboard();
+      }
       else toast.error(data.error);
     } catch { toast.error("저장 실패") }
   };
@@ -343,12 +453,33 @@ export default function DietTab() {
                       <CardContent className="p-2.5">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex gap-2 flex-1 min-w-0">
+                            {/* 🆕 사진 썸네일 - 클릭 시 미리보기, hover 시 편집 */}
                             {entry.image_url ? (
-                              <button onClick={() => setPreviewImage(entry.image_url)} className="flex-shrink-0 overflow-hidden rounded-lg border hover:border-primary/50">
-                                <img src={entry.image_url} alt={entry.food_name} className="h-10 w-10 object-cover" />
-                              </button>
+                              <div className="flex-shrink-0 relative group">
+                                <button onClick={() => setPreviewImage(entry.image_url)} className="overflow-hidden rounded-lg border hover:border-primary/50">
+                                  <img src={entry.image_url} alt={entry.food_name} className="h-10 w-10 object-cover" />
+                                </button>
+                                {isToday && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); editImageInputRef.current?.setAttribute("data-entry-id", entry.id); editImageInputRef.current?.click(); }}
+                                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg"
+                                  >
+                                    <Camera className="h-3.5 w-3.5 text-white" />
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm">{entry.emoji}</div>
+                              <button
+                                onClick={() => { if (isToday) { editImageInputRef.current?.setAttribute("data-entry-id", entry.id); editImageInputRef.current?.click(); } }}
+                                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm relative group ${isToday ? "cursor-pointer hover:bg-primary/10 transition-colors" : ""}`}
+                              >
+                                <span>{entry.emoji}</span>
+                                {isToday && (
+                                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg">
+                                    <Camera className="h-3 w-3 text-white" />
+                                  </div>
+                                )}
+                              </button>
                             )}
                             <div className="min-w-0">
                               <span className="text-xs font-medium truncate block">{entry.food_name}</span>
@@ -384,6 +515,20 @@ export default function DietTab() {
                 })}
               </div>
             )}
+
+            {/* 🆕 엔트리 사진 편집용 숨겨진 input */}
+            <input
+              ref={editImageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                const entryId = editImageInputRef.current?.getAttribute("data-entry-id");
+                if (f && entryId) handleEditImage(entryId, f);
+                e.target.value = "";
+              }}
+            />
           </div>
 
           {/* ═══ 우측: 대시보드 ═══ */}
@@ -463,19 +608,81 @@ export default function DietTab() {
         </div>
       </div>
 
-      {/* ═══ 직접 입력 모달 (AI 추정 기능 포함) ═══ */}
+      {/* ═══ 직접 입력 모달 (AI 추정 기능 + 🆕 사진 첨부) ═══ */}
       {showManualInput && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowManualInput(false)}>
-          <div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeManualInput}>
+          <div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold">음식 등록</h3>
                 <p className="text-xs text-muted-foreground">음식 이름을 입력하면 AI가 칼로리를 추정해요</p>
               </div>
-              <button onClick={() => { setShowManualInput(false); setManualName(""); setManualCal(""); setManualGrams(""); setServingDesc("") }} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+              <button onClick={closeManualInput} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
 
             <div className="space-y-3">
+              {/* 🆕 사진 첨부 영역 */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">사진 (선택)</label>
+                <div className="mt-1">
+                  {manualImagePreview ? (
+                    <div className="relative">
+                      <img src={manualImagePreview} alt="음식 사진" className="w-full h-32 object-cover rounded-lg border" />
+                      <button
+                        onClick={() => { setManualImage(null); setManualImagePreview(null) }}
+                        className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => manualImageInputRef.current?.click()}
+                        className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full px-2 py-0.5 text-[10px] hover:bg-black/70 transition-colors"
+                      >
+                        변경
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*";
+                          input.capture = "environment";
+                          input.onchange = (e) => {
+                            const f = (e.target as HTMLInputElement).files?.[0];
+                            if (f) handleManualImageSelect(f);
+                          };
+                          input.click();
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-lg border border-dashed border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        촬영
+                      </button>
+                      <button
+                        onClick={() => manualImageInputRef.current?.click()}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-lg border border-dashed border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        앨범에서 선택
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    ref={manualImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleManualImageSelect(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+
               {/* 음식 이름 */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground">음식 이름</label>
@@ -520,8 +727,10 @@ export default function DietTab() {
             )}
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setShowManualInput(false); setManualName(""); setManualCal(""); setManualGrams(""); setServingDesc("") }}>취소</Button>
-              <Button className="flex-[2]" disabled={!manualName.trim() || !manualCal || parseInt(manualCal) <= 0} onClick={handleManualSubmit}>등록</Button>
+              <Button variant="outline" className="flex-1" onClick={closeManualInput}>취소</Button>
+              <Button className="flex-[2]" disabled={!manualName.trim() || !manualCal || parseInt(manualCal) <= 0 || isUploadingImage} onClick={handleManualSubmit}>
+                {isUploadingImage ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />업로드 중...</> : "등록"}
+              </Button>
             </div>
           </div>
         </div>
@@ -547,11 +756,22 @@ export default function DietTab() {
         </div>
       )}
 
-      {/* 이미지 미리보기 */}
+      {/* 🆕 이미지 미리보기 + 다운로드 버튼 */}
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewImage(null)}>
           <div className="relative max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setPreviewImage(null)} className="absolute -top-10 right-0 text-white hover:text-gray-300"><X className="h-6 w-6" /></button>
+            <div className="absolute -top-10 right-0 flex items-center gap-3">
+              <button
+                onClick={() => handleDownloadImage(previewImage, "음식사진")}
+                className="text-white hover:text-gray-300 transition-colors flex items-center gap-1"
+              >
+                <Download className="h-5 w-5" />
+                <span className="text-xs">저장</span>
+              </button>
+              <button onClick={() => setPreviewImage(null)} className="text-white hover:text-gray-300 transition-colors">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
             <img src={previewImage} alt="음식 사진" className="w-full rounded-xl object-contain max-h-[70vh]" />
           </div>
         </div>
