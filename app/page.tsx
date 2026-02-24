@@ -301,7 +301,7 @@ export default function HomePage() {
       <Header mainTab={mainTab} onMainTabChange={setMainTab} />
 
       {/* ✅ 모바일 식사/아파요 탭 */}
-      <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
         <div className="flex">
           <TabButton
             active={mainTab === "meal"}
@@ -320,7 +320,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="sticky top-[7.5rem] md:top-16 z-30 bg-background border-b">
+      <div className="sticky top-[calc(7.5rem+env(safe-area-inset-top))] md:top-16 z-30 bg-background border-b">
         <div className="container mx-auto px-4">
           <div
             className="flex items-center justify-center overflow-x-auto scrollbar-hide"
