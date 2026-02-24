@@ -30,6 +30,8 @@ npm install -D @types/dompurify
 2026-02-24 23:15 이진원
 npm install @capacitor/haptics
 npx cap sync
+npm install @capacitor/app
+npx cap sync
 
 ---
 

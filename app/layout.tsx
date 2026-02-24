@@ -6,6 +6,7 @@ import { AuthProvider } from "@/contexts/auth-context";
 import { HapticProvider } from "@/components/haptic-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+import { BackButtonHandler } from "@/components/back-button-handler";
 
 export const metadata: Metadata = {
   title: {
@@ -111,6 +112,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <AuthProvider>
+          <BackButtonHandler />
           <HapticProvider>
             {children}
             <Toaster />
