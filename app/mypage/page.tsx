@@ -29,6 +29,7 @@ import {
   Activity,
   UtensilsCrossed,
   Users,
+  TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -469,83 +470,81 @@ export default function MyPage() {
 
             {/* Activity Links */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">내 활동</CardTitle>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-base font-semibold">
+                  내 활동
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1 p-4 pt-0">
-                <Link
-                  href="/reports"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
-                    <span>주간 안전 리포트</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
-                <Link
-                  href="/food/insights"
-                  className="flex items-center justify-between rounded-xl border bg-card p-4 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
-                      <BarChart3 className="h-5 w-5 text-purple-600" />
+              <CardContent className="p-2 pt-2">
+                {[
+                  {
+                    href: "/reports",
+                    icon: BarChart3,
+                    color: "bg-green-100",
+                    iconColor: "text-green-600",
+                    label: "주간 안전 리포트",
+                    sub: "이번 주 식품 안전 현황",
+                  },
+                  {
+                    href: "/food/insights",
+                    icon: TrendingUp,
+                    color: "bg-purple-100",
+                    iconColor: "text-purple-600",
+                    label: "알레르기 인사이트",
+                    sub: "나의 스캔 패턴 분석",
+                  },
+                  {
+                    href: "/bookmarks",
+                    icon: Heart,
+                    color: "bg-red-100",
+                    iconColor: "text-red-500",
+                    label: "즐겨찾기",
+                    sub: "저장한 식품 목록",
+                  },
+                  {
+                    href: "/food/profile",
+                    icon: ShieldCheck,
+                    color: "bg-orange-100",
+                    iconColor: "text-orange-600",
+                    label: "내 알레르기 정보",
+                    sub: "알레르기 프로필 관리",
+                  },
+                  {
+                    href: "/family",
+                    icon: Users,
+                    color: "bg-blue-100",
+                    iconColor: "text-blue-600",
+                    label: "가족 프로필",
+                    sub: "가족 알레르기 관리",
+                  },
+                  {
+                    href: "/school",
+                    icon: GraduationCap,
+                    color: "bg-yellow-100",
+                    iconColor: "text-yellow-600",
+                    label: "학교 급식 관리",
+                    sub: "급식 알레르기 확인",
+                  },
+                ].map(({ href, icon: Icon, color, iconColor, label, sub }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="flex items-center justify-between rounded-xl p-3 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${color}`}
+                      >
+                        <Icon className={`h-5 w-5 ${iconColor}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-xs text-muted-foreground">{sub}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">알레르기 인사이트</p>
-                      <p className="text-xs text-muted-foreground">
-                        나의 스캔 패턴 분석
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-                <Link
-                  href="/bookmarks"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Heart className="h-5 w-5 text-muted-foreground" />
-                    <span>즐겨찾기</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
-                <Link
-                  href="/food/profile"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-                    <span>내 알레르기 정보</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
-                <Link
-                  href="/family"
-                  className="flex items-center justify-between rounded-xl border bg-card p-4 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                      <Users className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">가족 프로필</p>
-                      <p className="text-xs text-muted-foreground">
-                        가족 알레르기 관리
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </Link>
-                <Link
-                  href="/school"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <GraduationCap className="h-5 w-5 text-muted-foreground" />
-                    <span>학교 급식 관리</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                ))}
               </CardContent>
             </Card>
 
