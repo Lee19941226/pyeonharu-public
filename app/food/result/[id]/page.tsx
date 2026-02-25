@@ -37,7 +37,8 @@ export default function FoodResultPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const lastLoadedIdRef = useRef<string | undefined>(null);
-
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("me");
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -74,19 +75,24 @@ export default function FoodResultPage() {
       if (user) {
         setIsLoggedIn(true);
 
-        // ✅ profiles 테이블에서 nickname 가져오기
         const { data: profile } = await supabase
-          .from("profiles") // ← user_profiles가 아니라 profiles
+          .from("profiles")
           .select("nickname")
-          .eq("id", user.id) // ← user_id가 아니라 id
+          .eq("id", user.id)
           .single();
 
         if (profile?.nickname) {
           setUserName(profile.nickname);
         } else {
-          // 닉네임 없으면 이메일에서 추출
           setUserName(user.email?.split("@")[0] || "회원");
         }
+
+        // ✅ 가족 구성원 로드 (user 확인 후 여기서 호출)
+        fetch("/api/family")
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.success) setFamilyMembers(d.members);
+          });
       } else {
         setIsLoggedIn(false);
       }
@@ -806,6 +812,88 @@ export default function FoodResultPage() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+            {/* 가족 구성원 선택기 */}
+            {isLoggedIn && familyMembers.length > 0 && (
+              <div className="rounded-xl border bg-card p-3">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  누구의 알레르기로 확인할까요?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {/* 내 알레르기 */}
+                  <button
+                    onClick={() => setSelectedMemberId("me")}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                      selectedMemberId === "me"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-gray-200 bg-white"
+                    }`}
+                  >
+                    👤 나
+                  </button>
+
+                  {familyMembers.map((m) => {
+                    // 이 구성원 기준으로 위험 여부 계산
+                    const memberAllergenNames = m.family_member_allergies.map(
+                      (a: any) => a.allergen_name,
+                    );
+                    const memberDanger = result?.allergens.some((a: string) =>
+                      memberAllergenNames.includes(a),
+                    );
+
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => setSelectedMemberId(m.id)}
+                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                          selectedMemberId === m.id
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : memberDanger
+                              ? "border-red-200 bg-red-50 text-red-700"
+                              : "border-green-200 bg-green-50 text-green-700"
+                        }`}
+                      >
+                        {m.avatar_emoji} {m.name}
+                        {memberDanger && selectedMemberId !== m.id && (
+                          <span className="text-red-500">⚠️</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 선택된 구성원 알레르기 경고 */}
+                {selectedMemberId !== "me" &&
+                  (() => {
+                    const member = familyMembers.find(
+                      (m) => m.id === selectedMemberId,
+                    );
+                    if (!member || !result) return null;
+
+                    const memberAllergenNames =
+                      member.family_member_allergies.map(
+                        (a: any) => a.allergen_name,
+                      );
+                    const matched = result.allergens.filter((a: string) =>
+                      memberAllergenNames.includes(a),
+                    );
+
+                    return matched.length > 0 ? (
+                      <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
+                        <p className="text-xs font-semibold text-red-700">
+                          ⚠️ {member.name}님의 알레르기 성분 포함:{" "}
+                          {matched.join(", ")}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-lg bg-green-50 border border-green-200 p-3">
+                        <p className="text-xs font-semibold text-green-700">
+                          ✅ {member.name}님의 알레르기 성분 없음
+                        </p>
+                      </div>
+                    );
+                  })()}
+              </div>
             )}
             {/* 안전 여부 카드 - 안전 */}
             {result.isSafe && (

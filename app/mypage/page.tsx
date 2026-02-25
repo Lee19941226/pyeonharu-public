@@ -6,12 +6,7 @@ import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -33,6 +28,7 @@ import {
   BarChart3,
   Activity,
   UtensilsCrossed,
+  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -147,22 +143,37 @@ function BmrSection() {
               </p>
               {bmrData.height && (
                 <p className="text-xs text-muted-foreground">
-                  {bmrData.gender === "male" ? "남" : "여"} · {bmrData.height}cm · {bmrData.weight}kg · {bmrData.age}세
+                  {bmrData.gender === "male" ? "남" : "여"} · {bmrData.height}cm
+                  · {bmrData.weight}kg · {bmrData.age}세
                 </p>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={() => setMode("direct")}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMode("direct")}
+            >
               수정
             </Button>
           </div>
         ) : (
           <div className="text-center space-y-2 py-2">
-            <p className="text-sm text-muted-foreground">기초대사량을 설정해주세요</p>
+            <p className="text-sm text-muted-foreground">
+              기초대사량을 설정해주세요
+            </p>
             <div className="flex gap-2 justify-center">
-              <Button size="sm" variant="outline" onClick={() => setMode("direct")}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMode("direct")}
+              >
                 ✏️ 직접 입력
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setMode("calculate")}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMode("calculate")}
+              >
                 🤖 AI 계산
               </Button>
             </div>
@@ -184,16 +195,26 @@ function BmrSection() {
             value={directBmr}
             onChange={(e) => setDirectBmr(e.target.value)}
           />
-          <span className="text-sm text-muted-foreground self-center">kcal</span>
+          <span className="text-sm text-muted-foreground self-center">
+            kcal
+          </span>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setMode("view")}>
             취소
           </Button>
-          <Button size="sm" onClick={saveDirect} disabled={!directBmr || isSaving}>
+          <Button
+            size="sm"
+            onClick={saveDirect}
+            disabled={!directBmr || isSaving}
+          >
             {isSaving ? "저장중..." : "설정 완료"}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setMode("calculate")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setMode("calculate")}
+          >
             AI 계산으로
           </Button>
         </div>
@@ -324,7 +345,7 @@ export default function MyPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setUser((prev) => prev ? { ...prev, name: editName.trim() } : null);
+        setUser((prev) => (prev ? { ...prev, name: editName.trim() } : null));
         toast.success("프로필이 저장되었습니다");
       } else {
         toast.error(data.error || "저장 실패");
@@ -393,7 +414,9 @@ export default function MyPage() {
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="flex flex-1 flex-col items-center justify-center gap-4">
-          <p className="text-sm text-muted-foreground">{error || "로그인이 필요합니다."}</p>
+          <p className="text-sm text-muted-foreground">
+            {error || "로그인이 필요합니다."}
+          </p>
           <Button onClick={() => router.push("/login")}>로그인</Button>
         </main>
         <MobileNav />
@@ -408,7 +431,6 @@ export default function MyPage() {
       <main className="flex-1 pb-16 md:pb-0">
         <div className="container mx-auto px-4 py-6">
           <div className="mx-auto max-w-lg space-y-4">
-
             {/* Profile Header */}
             <Card>
               <CardContent className="flex items-center gap-4 p-6">
@@ -432,7 +454,10 @@ export default function MyPage() {
               </CardHeader>
               <CardContent className="space-y-1 p-4 pt-0">
                 <BmrSection />
-                <Link href="/diet" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
+                <Link
+                  href="/diet"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <UtensilsCrossed className="h-5 w-5 text-muted-foreground" />
                     <span>식단관리</span>
@@ -448,28 +473,57 @@ export default function MyPage() {
                 <CardTitle className="text-lg">내 활동</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 p-4 pt-0">
-                <Link href="/reports" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
+                <Link
+                  href="/reports"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     <span>주간 안전 리포트</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </Link>
-                <Link href="/bookmarks" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
+                <Link
+                  href="/bookmarks"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <Heart className="h-5 w-5 text-muted-foreground" />
                     <span>즐겨찾기</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </Link>
-                <Link href="/food/profile" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
+                <Link
+                  href="/food/profile"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <ShieldCheck className="h-5 w-5 text-muted-foreground" />
                     <span>내 알레르기 정보</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </Link>
-                <Link href="/school" className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors">
+                <Link
+                  href="/family"
+                  className="flex items-center justify-between rounded-xl border bg-card p-4 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">가족 프로필</p>
+                      <p className="text-xs text-muted-foreground">
+                        가족 알레르기 관리
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+                <Link
+                  href="/school"
+                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <GraduationCap className="h-5 w-5 text-muted-foreground" />
                     <span>학교 급식 관리</span>
@@ -505,7 +559,9 @@ export default function MyPage() {
                       className="pl-10 bg-muted"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
+                  <p className="text-xs text-muted-foreground">
+                    이메일은 변경할 수 없습니다.
+                  </p>
                 </div>
                 <Button
                   className="w-full"
@@ -513,9 +569,14 @@ export default function MyPage() {
                   disabled={isSaving || editName.trim() === user.name}
                 >
                   {isSaving ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...</>
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장
+                      중...
+                    </>
                   ) : editName.trim() === user.name ? (
-                    <><Check className="mr-2 h-4 w-4" /> 저장됨</>
+                    <>
+                      <Check className="mr-2 h-4 w-4" /> 저장됨
+                    </>
                   ) : (
                     "저장하기"
                   )}
@@ -535,11 +596,15 @@ export default function MyPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p className="font-medium text-sm">날씨 알림</p>
-                    <p className="text-xs text-muted-foreground">매일 아침 오늘의 날씨를 알려드려요</p>
+                    <p className="text-xs text-muted-foreground">
+                      매일 아침 오늘의 날씨를 알려드려요
+                    </p>
                   </div>
                   <Switch
                     checked={notifications.weather}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, weather: checked })}
+                    onCheckedChange={(checked) =>
+                      setNotifications({ ...notifications, weather: checked })
+                    }
                     aria-label="날씨 알림"
                   />
                 </div>
@@ -555,7 +620,11 @@ export default function MyPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" disabled={isLogoutLoading}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  disabled={isLogoutLoading}
+                >
                   비밀번호 변경
                 </Button>
                 <Button
@@ -580,13 +649,25 @@ export default function MyPage() {
                 ) : (
                   <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-3">
                     <p className="text-sm text-destructive font-medium">
-                      정말 탈퇴하시겠습니까? 모든 데이터가 삭제되며 복구할 수 없습니다.
+                      정말 탈퇴하시겠습니까? 모든 데이터가 삭제되며 복구할 수
+                      없습니다.
                     </p>
                     <div className="flex gap-2">
-                      <Button variant="destructive" size="sm" className="flex-1" onClick={handleDeleteAccount} disabled={isDeleting}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                      >
                         {isDeleting ? "처리 중..." : "탈퇴하기"}
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setShowDeleteConfirm(false)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-transparent"
+                        onClick={() => setShowDeleteConfirm(false)}
+                      >
                         취소
                       </Button>
                     </div>
@@ -599,10 +680,10 @@ export default function MyPage() {
             <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-900">
               <p className="font-medium mb-2">💡 팁</p>
               <p className="text-xs leading-relaxed">
-                개인정보 보호를 위해 비밀번호는 정기적으로 변경하시고, 중요한 정보는 주기적으로 백업해주세요.
+                개인정보 보호를 위해 비밀번호는 정기적으로 변경하시고, 중요한
+                정보는 주기적으로 백업해주세요.
               </p>
             </div>
-
           </div>
         </div>
       </main>
