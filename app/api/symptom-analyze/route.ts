@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
+import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -57,6 +58,16 @@ export async function POST(req: NextRequest) {
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
+
+    // ✅ OpenAI 비용 통제
+    const rateCheck = checkOpenAIRateLimit("symptom-analyze");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 },
+      );
+    }
+
     if (!apiKey) {
       return NextResponse.json(
         { error: "OpenAI API 키가 설정되지 않았습니다." },

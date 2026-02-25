@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -20,6 +21,15 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
+    // ✅ OpenAI 비용 통제: 호출 제한
+    const rateCheck = checkOpenAIRateLimit("analyze-image");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 },
+      );
+    }
+
     const body = await req.json();
     const { imageBase64, userAllergens } = body;
 

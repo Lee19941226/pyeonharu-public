@@ -141,3 +141,12 @@ create policy "style_preferences_select_own" on public.style_preferences for sel
 create policy "style_preferences_insert_own" on public.style_preferences for insert with check (auth.uid() = user_id);
 create policy "style_preferences_update_own" on public.style_preferences for update using (auth.uid() = user_id);
 create policy "style_preferences_delete_own" on public.style_preferences for delete using (auth.uid() = user_id);
+
+
+-- ✅ #14: food_search_cache RLS 정책 (보안 패치 2026-02-25)
+-- 캐시 데이터는 누구나 읽을 수 있지만, 쓰기는 service_role만 가능
+-- Supabase 대시보드에서 RLS가 활성화되어 있는지 먼저 확인하세요:
+-- ALTER TABLE public.food_search_cache ENABLE ROW LEVEL SECURITY;
+-- 아래 정책을 적용하세요:
+-- create policy "food_cache_select_all" on public.food_search_cache for select using (true);
+-- (insert/update/delete는 정책을 만들지 않으면 service_role 외 차단됩니다)

@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET(req: NextRequest) {
+  // ✅ OpenAI 비용 통제
+  const rateCheck = checkOpenAIRateLimit("meal-recommend");
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429 },
+    );
+  }
   try {
     const supabase = await createClient();
     const {

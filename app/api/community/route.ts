@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// ✅ 서버사이드 HTML 태그 제거 (XSS 방어)
+function stripHtml(str: string): string {
+  return str.replace(/<[^>]*>/g, "").trim();
+}
+
 // 프로필 + 학교명 조회 헬퍼
 async function enrichPosts(supabase: any, data: any[], userId?: string) {
   if (!data || data.length === 0) return [];
@@ -140,7 +145,8 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     console.error("community_posts 조회 에러:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[community]", error.message);
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 
   const posts = await enrichPosts(supabase, data || [], user?.id);
@@ -208,15 +214,16 @@ export async function POST(req: NextRequest) {
     .insert({
       user_id: user.id,
       school_code: schoolCode,
-      title: title.trim(),
-      content: content.trim(),
+      title: stripHtml(title),
+      content: stripHtml(content),
       image_urls: imageUrls || [],
     })
     .select()
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[community]", error.message);
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, post: data });

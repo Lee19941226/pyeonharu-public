@@ -3,7 +3,7 @@
 // 전략: Network First + 오프라인 폴백
 // ============================================
 
-const CACHE_NAME = "pyeonharu-v1";
+const CACHE_NAME = "pyeonharu-v2-20260225";
 const OFFLINE_URL = "/offline";
 
 // ── 캐시할 정적 자원 (앱 셸) ──
