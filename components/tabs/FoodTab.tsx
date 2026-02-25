@@ -662,6 +662,14 @@ export default function FoodTab({
       return;
     }
 
+    // ✅ 이미지 크기 사전 검증
+    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setIsProcessing(true);
     toast.info("이미지 분석 중...");
 
@@ -799,6 +807,13 @@ export default function FoodTab({
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith("image/")) {
       toast.error("이미지 파일만 업로드 가능합니다");
+      return;
+    }
+
+    // ✅ 이미지 크기 사전 검증
+    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
       return;
     }
 

@@ -228,6 +228,13 @@ export default function DietTab() {
   useEffect(() => { if (user) loadDashboard() }, [user, loadDashboard]);
 
   const handlePhotoAnalyze = async (file: File) => {
+    // ✅ 이미지 크기 사전 검증
+    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+      return;
+    }
+
     setShowRecordSheet(false); setIsAnalyzing(true);
     try {
       const fd = new FormData(); fd.append("image", file);
@@ -256,7 +263,7 @@ export default function DietTab() {
 
   const handleManualImageSelect = (file: File) => {
     if (!file.type.startsWith("image/")) { toast.error("이미지 파일만 선택 가능합니다"); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error("5MB 이하 이미지만 가능합니다"); return }
+    if (file.size > 7 * 1024 * 1024) { toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요."); return }
     setManualImage(file);
     const reader = new FileReader();
     reader.onload = (e) => setManualImagePreview(e.target?.result as string);

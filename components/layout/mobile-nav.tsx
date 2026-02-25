@@ -77,8 +77,17 @@ export function MobileNav() {
   };
 
   // ─── 카메라 파일 처리 (기존 로직 100% 유지) ───
+  const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+
   const handleFileSelected = async (file: File) => {
     if (!cameraMode) return;
+
+    // ✅ 이미지 크기 사전 검증
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+      return;
+    }
+
     setShowSheet(false);
     setIsProcessing(true);
 

@@ -43,6 +43,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ─── 파일 크기 제한 (7MB) ───
+    const MAX_FILE_SIZE = 7 * 1024 * 1024; // 7MB
+    if (image.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요." },
+        { status: 413 },
+      );
+    }
+
+    // ─── MIME 타입 검증 ───
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    if (!allowedTypes.includes(image.type)) {
+      return NextResponse.json(
+        { error: "지원하지 않는 이미지 형식입니다. (JPG, PNG, WebP만 가능)" },
+        { status: 400 },
+      );
+    }
+
     // 이미지를 base64로 변환
     const bytes = await image.arrayBuffer();
     const base64 = Buffer.from(bytes).toString("base64");
