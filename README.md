@@ -11,7 +11,6 @@ npm install html5-qrcode
 npm install nodemailer
 npm install -D @types/nodemailer
 npm install -g pnpm
-pnpm install
 
 2026-02-11 11:10 이진원
 npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-link @tiptap/extension-underline @tiptap/extension-placeholder @tiptap/extension-dropcursor @tiptap/pm
