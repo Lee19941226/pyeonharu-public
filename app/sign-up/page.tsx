@@ -13,13 +13,13 @@ export default function SignUpPage() {
   const [agreedMarketing, setAgreedMarketing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleOAuthSignUp = async (provider: "kakao" | "google" | "naver") => {
+  const handleOAuthSignUp = async (provider: "kakao" | "google") => {
     if (!agreedTerms) return
     setIsLoading(true)
 
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: provider as any,
+      provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/sign-up-complete`,
       },
@@ -91,15 +91,6 @@ export default function SignUpPage() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
             Google로 시작하기
-          </button>
-
-          <button
-            onClick={() => handleOAuthSignUp("naver")}
-            disabled={!agreedTerms || isLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#03C75A] px-4 py-3 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <span className="text-lg font-bold">N</span>
-            네이버로 시작하기
           </button>
         </div>
 

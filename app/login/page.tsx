@@ -53,18 +53,11 @@ function LoginContent() {
     router.refresh();
   };
 
-  const handleOAuthLogin = async (provider: "google" | "kakao" | "naver") => {
+  const handleOAuthLogin = async (provider: "google" | "kakao") => {
     setIsOAuthLoading(provider);
     setError(null);
 
     try {
-      if (provider === "naver") {
-        // 네이버는 Supabase 미지원 → 서버 라우트로 처리
-        window.location.href = `/api/auth/naver`;
-        return;
-      }
-
-      // Google, Kakao → Supabase OAuth
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -188,25 +181,6 @@ function LoginContent() {
                   </svg>
                 )}
                 카카오로 계속하기
-              </Button>
-
-              <Button
-                variant="outline"
-                className="w-full bg-[#03C75A] text-white hover:bg-[#03C75A]/90"
-                onClick={() => handleOAuthLogin("naver")}
-                disabled={isOAuthLoading !== null}
-              >
-                {isOAuthLoading === "naver" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727v12.845z"
-                    />
-                  </svg>
-                )}
-                네이버로 계속하기
               </Button>
             </div>
 
