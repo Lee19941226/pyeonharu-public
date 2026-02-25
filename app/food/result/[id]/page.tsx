@@ -39,6 +39,8 @@ export default function FoodResultPage() {
   const lastLoadedIdRef = useRef<string | undefined>(null);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("me");
+  const [alternatives, setAlternatives] = useState<any[]>([]);
+  const [altLoading, setAltLoading] = useState(false);
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -272,6 +274,7 @@ export default function FoodResultPage() {
 
             setTimeout(() => {
               saveToHistory(data.result);
+              fetchAlternatives(data.result);
             }, 0);
 
             return;
@@ -432,7 +435,24 @@ export default function FoodResultPage() {
       console.warn("⚠️ 상세 정보 로드 실패 (무시):", error);
     }
   };
+  const fetchAlternatives = async (foodResult: FoodResult) => {
+    // 안전한 제품이거나 알레르기 없으면 스킵
+    if (foodResult.isSafe || !foodResult.userAllergens?.length) return;
 
+    setAltLoading(true);
+    try {
+      const allergenParam = foodResult.userAllergens.join(",");
+      const res = await fetch(
+        `/api/food/alternatives?name=${encodeURIComponent(foodResult.foodName)}&allergens=${encodeURIComponent(allergenParam)}&code=${foodResult.foodCode}`,
+      );
+      const data = await res.json();
+      if (data.success) setAlternatives(data.alternatives);
+    } catch (e) {
+      console.warn("대체품 로드 실패:", e);
+    } finally {
+      setAltLoading(false);
+    }
+  };
   useEffect(() => {
     loadFoodResult();
   }, [params.id]);
@@ -1311,86 +1331,101 @@ export default function FoodResultPage() {
               </Card>
             )}
             {/* 대체 식품 추천 (위험할 때만 표시) */}
-            {!result.isSafe &&
-              result.alternatives &&
-              result.alternatives.length > 0 && (
-                <Card className="border-2 border-blue-500 bg-blue-50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Lightbulb className="h-5 w-5 text-blue-600" />
-                      <span className="text-blue-900">대신 이거 안전해요!</span>
-                    </CardTitle>
-                    <p className="text-sm text-blue-700">
-                      비슷한 제품 중 알레르기 없는 대체품을 추천해드려요
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    {/* 가로 스크롤 카드 */}
+            {!result.isSafe && (altLoading || alternatives.length > 0) && (
+              <Card className="border-2 border-blue-500 bg-blue-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Lightbulb className="h-5 w-5 text-blue-600" />
+                    <span className="text-blue-900">대신 이거 안전해요!</span>
+                  </CardTitle>
+                  <p className="text-sm text-blue-700">
+                    비슷한 제품 중 알레르기 없는 대체품을 추천해드려요
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {/* 가로 스크롤 카드 */}
+                  {altLoading && (
                     <div className="flex gap-3 overflow-x-auto pb-2">
-                      {result.alternatives.map((alt: any, idx: number) => (
+                      {[1, 2, 3].map((i) => (
                         <div
-                          key={idx}
-                          className="min-w-[200px] flex-shrink-0 cursor-pointer rounded-lg border-2 border-green-300 bg-white p-3 transition-all hover:shadow-md"
-                          onClick={() =>
-                            router.push(`/food/result/${alt.barcode}`)
-                          }
-                        >
-                          {/* 안전 배지 */}
-                          <div className="mb-2 flex items-center justify-between">
-                            <Badge className="bg-green-600 text-white">
-                              ✓ 안전
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {alt.category}
-                            </span>
-                          </div>
-
-                          {/* 제품명 */}
-                          <h4 className="mb-1 font-bold text-gray-900">
-                            {alt.productName}
-                          </h4>
-
-                          {/* 제조사 */}
-                          {alt.manufacturer && (
-                            <p className="mb-2 text-xs text-muted-foreground">
-                              {alt.manufacturer}
-                            </p>
-                          )}
-
-                          {/* 추천 이유 */}
-                          {alt.reason && (
-                            <p className="text-xs text-blue-700">
-                              💡 {alt.reason}
-                            </p>
-                          )}
-
-                          {/* 바코드 */}
-                          <p className="mt-2 text-[10px] text-gray-400">
-                            {alt.barcode}
-                          </p>
-                        </div>
+                          key={i}
+                          className="min-w-[180px] animate-pulse rounded-lg border-2 border-gray-200 bg-gray-100 p-3 h-28"
+                        />
                       ))}
                     </div>
+                  )}
 
-                    {/* 더 보기 버튼 */}
-                    <Button
-                      variant="outline"
-                      className="mt-3 w-full text-blue-600 hover:bg-blue-50"
-                      onClick={() => {
-                        // TODO: 대체 식품 더보기 페이지로 이동
-                        toast.info("곧 더 많은 대체품을 추천해드릴게요!");
-                      }}
-                    >
-                      더 많은 대체품 보기 →
-                    </Button>
-                    {/* 안내 메시지 */}
-                    <div className="mt-3 rounded-lg bg-blue-100 p-2 text-xs text-blue-800">
-                      💡 <strong>팁:</strong> AI 추천 제품은 참고용이에요. 구매
-                      전 성분표를 꼭 확인하세요!
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {alternatives.map((alt: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="min-w-[200px] flex-shrink-0 cursor-pointer rounded-lg border-2 border-green-300 bg-white p-3 transition-all hover:shadow-md"
+                        onClick={() =>
+                          alt.barcode
+                            ? router.push(`/food/result/${alt.barcode}`)
+                            : toast.info(
+                                "바코드로 검색해보세요: " + alt.productName,
+                              )
+                        }
+                      >
+                        {/* 안전 배지 */}
+                        <div className="mb-2 flex items-center justify-between">
+                          <Badge className="bg-green-600 text-white">
+                            ✓ 안전
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {alt.category}
+                          </span>
+                        </div>
+
+                        {/* 제품명 */}
+                        <h4 className="mb-1 font-bold text-gray-900">
+                          {alt.productName}
+                        </h4>
+
+                        {/* 제조사 */}
+                        {alt.manufacturer && (
+                          <p className="mb-2 text-xs text-muted-foreground">
+                            {alt.manufacturer}
+                          </p>
+                        )}
+
+                        {/* 추천 이유 */}
+                        {alt.reason && (
+                          <p className="text-xs text-blue-700">
+                            💡 {alt.reason}
+                          </p>
+                        )}
+
+                        {/* 바코드 */}
+                        <p className="mt-2 text-[10px] text-gray-400">
+                          {alt.barcode}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 유사 제품 버튼 */}
+                  <Button
+                    variant="outline"
+                    className="mt-3 w-full text-blue-600 hover:bg-blue-50"
+                    onClick={() => {
+                      const keyword = result.foodName.slice(0, 4);
+                      router.push(
+                        `/food/search?q=${encodeURIComponent(keyword)}`,
+                      );
+                    }}
+                  >
+                    유사 제품 더 검색하기 →
+                  </Button>
+                  {/* 안내 메시지 */}
+                  <div className="mt-3 rounded-lg bg-blue-100 p-2 text-xs text-blue-800">
+                    💡 <strong>팁:</strong> AI 추천 제품은 참고용이에요. 구매 전
+                    성분표를 꼭 확인하세요!
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 알레르기 미등록 안내 */}
             {safeUserAllergens.length === 0 && (
