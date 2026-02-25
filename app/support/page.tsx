@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 import type { RichEditorRef } from "@/components/editor/rich-editor";
 
 const RichEditor = dynamic(() => import("@/components/editor/rich-editor"), {
@@ -296,7 +297,7 @@ function SupportContent() {
                             <div className="mt-3 space-y-3 border-t pt-3">
                               <div
                                 className="prose prose-sm max-w-none text-sm"
-                                dangerouslySetInnerHTML={{ __html: inq.content }}
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inq.content) }}
                               />
                               {inq.admin_reply && (
                                 <div className="rounded-lg bg-primary/5 p-3">
@@ -306,7 +307,7 @@ function SupportContent() {
                                   <div
                                     className="prose prose-sm max-w-none text-sm"
                                     dangerouslySetInnerHTML={{
-                                      __html: inq.admin_reply,
+                                      __html: DOMPurify.sanitize(inq.admin_reply),
                                     }}
                                   />
                                   {inq.replied_at && (

@@ -98,17 +98,11 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
     }
   };
 
-  const handleOAuthLogin = async (provider: "kakao" | "google" | "naver") => {
+  const handleOAuthLogin = async (provider: "kakao" | "google") => {
     setIsLoading(true);
     setError(null);
 
     try {
-      if (provider === "naver") {
-        // 네이버는 Supabase 미지원 → 서버 라우트로 처리
-        window.location.href = `/api/auth/naver`;
-        return;
-      }
-
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -197,18 +191,6 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                     />
                   </svg>
                   Google로 로그인
-                </Button>
-
-                <Button
-                  type="button"
-                  className="w-full bg-[#03C75A] text-white hover:bg-[#03C75A]/90"
-                  onClick={() => handleOAuthLogin("naver")}
-                  disabled={isLoading}
-                >
-                  <span className="mr-2 flex h-5 w-5 items-center justify-center font-bold">
-                    N
-                  </span>
-                  네이버로 로그인
                 </Button>
               </div>
 

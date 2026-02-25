@@ -228,10 +228,23 @@ export default function DietTab() {
   useEffect(() => { if (user) loadDashboard() }, [user, loadDashboard]);
 
   const handlePhotoAnalyze = async (file: File) => {
+    // ✅ 이미지 크기 사전 검증
+    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+      return;
+    }
+
     setShowRecordSheet(false); setIsAnalyzing(true);
     try {
       const fd = new FormData(); fd.append("image", file);
-      const res = await fetch("/api/diet/analyze", { method: "POST", body: fd }); const data = await res.json();
+      const res = await fetch("/api/diet/analyze", { method: "POST", body: fd });
+      // ✅ 413 이미지 크기 초과 처리
+      if (res.status === 413) {
+        toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+        return;
+      }
+      const data = await res.json();
       if (data.success) { toast.success(`${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`); loadEntries(); loadDashboard() }
       else toast.error(data.error || "분석 실패");
     } catch { toast.error("분석 중 오류") } finally { setIsAnalyzing(false) }
@@ -256,7 +269,7 @@ export default function DietTab() {
 
   const handleManualImageSelect = (file: File) => {
     if (!file.type.startsWith("image/")) { toast.error("이미지 파일만 선택 가능합니다"); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error("5MB 이하 이미지만 가능합니다"); return }
+    if (file.size > 7 * 1024 * 1024) { toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요."); return }
     setManualImage(file);
     const reader = new FileReader();
     reader.onload = (e) => setManualImagePreview(e.target?.result as string);

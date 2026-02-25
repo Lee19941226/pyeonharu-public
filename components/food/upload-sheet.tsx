@@ -46,6 +46,13 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
+      // ✅ 이미지 크기 사전 검증
+      const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+        return;
+      }
+
       onOpenChange(false);
 
       // 먼저 바코드 감지 시도
@@ -103,6 +110,11 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
             });
+            // ── 413 이미지 크기 초과 ──
+            if (response.status === 413) {
+              toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+              return;
+            }
             // ── 스캔 제한 ──
             if (response.status === 429) {
               setLoginPrompt({ open: true, reason: "scan_limit" });

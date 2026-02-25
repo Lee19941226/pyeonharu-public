@@ -20,10 +20,36 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
-    const { imageBase64, userAllergens } = await req.json();
+    const body = await req.json();
+    const { imageBase64, userAllergens } = body;
+
+    // ─── 입력 검증 ───
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      return NextResponse.json(
+        { success: false, error: "이미지 데이터가 필요합니다." },
+        { status: 400 },
+      );
+    }
+
+    // ─── Base64 크기 제한 (약 7.5MB 원본 → 10MB Base64) ───
+    const MAX_BASE64_LENGTH = 10 * 1024 * 1024; // 10MB
+    if (imageBase64.length > MAX_BASE64_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+        },
+        { status: 413 },
+      );
+    }
+
+    // ─── userAllergens 타입 검증 ───
+    const safeAllergens = Array.isArray(userAllergens)
+      ? userAllergens.filter((a: unknown) => typeof a === "string").slice(0, 50)
+      : [];
 
     console.log("🤖 AI 이미지 분석 시작...");
-    console.log("👤 사용자 알레르기:", userAllergens);
+    console.log("👤 사용자 알레르기:", safeAllergens);
 
     // ==========================================
     // Step 1: OpenAI Vision으로 이미지 분석
@@ -251,9 +277,9 @@ export async function POST(req: NextRequest) {
     const detectedAllergens = analysisData.allergens || [];
     const matchedUserAllergens: string[] = [];
 
-    if (userAllergens && userAllergens.length > 0) {
+    if (safeAllergens && safeAllergens.length > 0) {
       detectedAllergens.forEach((allergen: string) => {
-        userAllergens.forEach((userAllergen: string) => {
+        safeAllergens.forEach((userAllergen: string) => {
           if (
             allergen.includes(userAllergen) ||
             userAllergen.includes(allergen)
@@ -447,9 +473,9 @@ export async function POST(req: NextRequest) {
 
     // 사용자 알레르기 재매칭
     const finalMatchedAllergens: string[] = [];
-    if (userAllergens && userAllergens.length > 0) {
+    if (safeAllergens && safeAllergens.length > 0) {
       finalAllergens.forEach((allergen: string) => {
-        userAllergens.forEach((userAllergen: string) => {
+        safeAllergens.forEach((userAllergen: string) => {
           if (
             allergen.includes(userAllergen) ||
             userAllergen.includes(allergen)
