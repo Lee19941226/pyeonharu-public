@@ -484,6 +484,22 @@ export default function MyPage() {
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </Link>
                 <Link
+                  href="/food/insights"
+                  className="flex items-center justify-between rounded-xl border bg-card p-4 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
+                      <BarChart3 className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">알레르기 인사이트</p>
+                      <p className="text-xs text-muted-foreground">
+                        나의 스캔 패턴 분석
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+                <Link
                   href="/bookmarks"
                   className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
                 >
