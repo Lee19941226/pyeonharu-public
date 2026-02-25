@@ -238,7 +238,13 @@ export default function DietTab() {
     setShowRecordSheet(false); setIsAnalyzing(true);
     try {
       const fd = new FormData(); fd.append("image", file);
-      const res = await fetch("/api/diet/analyze", { method: "POST", body: fd }); const data = await res.json();
+      const res = await fetch("/api/diet/analyze", { method: "POST", body: fd });
+      // ✅ 413 이미지 크기 초과 처리
+      if (res.status === 413) {
+        toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+        return;
+      }
+      const data = await res.json();
       if (data.success) { toast.success(`${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`); loadEntries(); loadDashboard() }
       else toast.error(data.error || "분석 실패");
     } catch { toast.error("분석 중 오류") } finally { setIsAnalyzing(false) }

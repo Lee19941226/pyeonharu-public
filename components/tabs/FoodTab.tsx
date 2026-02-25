@@ -698,6 +698,12 @@ export default function FoodTab({
         body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
       });
 
+      // ── 413 이미지 크기 초과 ──
+      if (response.status === 413) {
+        toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+        return;
+      }
+
       // ── 스캔 제한 초과 ──
       if (response.status === 429) {
         setLoginPrompt({ open: true, reason: "scan_limit" });
@@ -871,6 +877,12 @@ export default function FoodTab({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
             });
+
+            // ✅ 413 이미지 크기 초과 처리
+            if (response.status === 413) {
+              toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+              return;
+            }
 
             const data = await response.json();
 
