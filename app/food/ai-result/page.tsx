@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
 import { DataSourceBadge } from "@/components/food/data-source-badge";
+import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
 interface AIAnalysisResult {
   productName?: string;
   manufacturer?: string;
@@ -55,7 +56,7 @@ export default function AIResultPage() {
     matchedUserAllergens: [],
     isProcessing: true,
   });
-
+  const [loginPrompt, setLoginPrompt] = useState(false);
   useEffect(() => {
     // ✅ 이미 실행했으면 중단
     if (hasAnalyzed.current) return;
@@ -108,23 +109,20 @@ export default function AIResultPage() {
       });
 
       if (response.status === 429) {
-        const data = await response.json();
-        toast.error(data.message, { duration: 5000 });
-        setTimeout(() => {
-          router.push("/login?reason=scan_limit");
-        }, 3000);
+        setLoginPrompt(true);
+        setResult((prev) => ({ ...prev, isProcessing: false }));
         return;
       }
 
       if (!user) {
-        const remainingScans = response.headers.get("X-Remaining-Scans");
-        if (remainingScans && parseInt(remainingScans) <= 2) {
-          toast.info(
-            `오늘 무료 스캔 ${remainingScans}회 남았습니다. 회원가입하면 무제한!`,
-            {
-              duration: 4000,
-            },
-          );
+        const remaining = response.headers.get("X-Remaining-Scans");
+        if (
+          remaining !== null &&
+          parseInt(remaining) <= 2 &&
+          parseInt(remaining) > 0
+        ) {
+          // 결과 표시 후 약간 딜레이로 바텀시트 (결과를 먼저 보여주고 유도)
+          setTimeout(() => setLoginPrompt(true), 1500);
         }
       }
 
@@ -482,6 +480,11 @@ export default function AIResultPage() {
           </div>
         </div>
       </main>
+      <LoginPromptSheet
+        open={loginPrompt}
+        onClose={() => setLoginPrompt(false)}
+        reason="scan_limit"
+      />
     </div>
   );
 }

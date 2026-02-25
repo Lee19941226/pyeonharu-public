@@ -14,7 +14,8 @@ import { Html5Qrcode } from "html5-qrcode";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
-
+import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
+import { useState } from "react";
 interface UploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,6 +24,12 @@ interface UploadSheetProps {
 export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
   const router = useRouter();
   const { isMobile } = useDevice();
+
+  const [loginPrompt, setLoginPrompt] = useState<{
+    open: boolean;
+    reason: "scan_limit" | "scan_warning" | "feature";
+    remainingScans?: number;
+  }>({ open: false, reason: "scan_warning" });
 
   // ==========================================
   // 파일 업로드 (AI 분석만)
@@ -96,7 +103,24 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
             });
+            // ── 스캔 제한 ──
+            if (response.status === 429) {
+              setLoginPrompt({ open: true, reason: "scan_limit" });
+              return;
+            }
 
+            // ── 남은 스캔 경고 ──
+            const remaining = response.headers.get("X-Remaining-Scans");
+            if (remaining !== null) {
+              const remainingNum = parseInt(remaining);
+              if (remainingNum <= 2 && remainingNum > 0) {
+                setLoginPrompt({
+                  open: true,
+                  reason: "scan_warning",
+                  remainingScans: remainingNum,
+                });
+              }
+            }
             const data = await response.json();
 
             if (data.success && data.foodCode) {
@@ -177,6 +201,12 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
           )}
         </div>
       </DialogContent>
+      <LoginPromptSheet
+        open={loginPrompt.open}
+        onClose={() => setLoginPrompt((v) => ({ ...v, open: false }))}
+        reason={loginPrompt.reason}
+        remainingScans={loginPrompt.remainingScans}
+      />
     </Dialog>
   );
 }

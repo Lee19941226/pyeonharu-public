@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { UploadSheet } from "@/components/food/upload-sheet";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
-
+import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
 // ─── 드롭다운 전용 미니맵 ───
 function MiniNaverMap({
   lat,
@@ -501,6 +501,11 @@ export default function FoodTab({
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  const [loginPrompt, setLoginPrompt] = useState<{
+    open: boolean;
+    reason: "scan_limit" | "scan_warning" | "feature";
+    remainingScans?: number;
+  }>({ open: false, reason: "scan_warning" });
   // ─── 마운트 시 진행률 알림 ───
   useEffect(() => {
     onProgress?.(35, "화면 구성 중...");
@@ -684,6 +689,25 @@ export default function FoodTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
       });
+
+      // ── 스캔 제한 초과 ──
+      if (response.status === 429) {
+        setLoginPrompt({ open: true, reason: "scan_limit" });
+        return;
+      }
+
+      // ── 남은 스캔 경고 (비로그인 && 2회 이하) ──
+      const remaining = response.headers.get("X-Remaining-Scans");
+      if (remaining !== null) {
+        const remainingNum = parseInt(remaining);
+        if (remainingNum <= 2 && remainingNum > 0) {
+          setLoginPrompt({
+            open: true,
+            reason: "scan_warning",
+            remainingScans: remainingNum,
+          });
+        }
+      }
 
       const data = await response.json();
 
@@ -1259,6 +1283,12 @@ export default function FoodTab({
 
       {/* 업로드 시트 */}
       <UploadSheet open={showUploadSheet} onOpenChange={setShowUploadSheet} />
+      <LoginPromptSheet
+        open={loginPrompt.open}
+        onClose={() => setLoginPrompt((v) => ({ ...v, open: false }))}
+        reason={loginPrompt.reason}
+        remainingScans={loginPrompt.remainingScans}
+      />
     </div>
   );
 }
