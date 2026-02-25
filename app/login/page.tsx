@@ -294,7 +294,7 @@ function LoginContent() {
           <CardFooter className="flex flex-col gap-4">
             <div className="text-center text-sm text-muted-foreground">
               아직 계정이 없으신가요?{" "}
-              <Link href="/signup" className="text-primary hover:underline">
+              <Link href="/sign-up" className="text-primary hover:underline">
                 회원가입
               </Link>
             </div>

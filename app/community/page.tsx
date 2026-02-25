@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { MobileNav } from "@/components/layout/mobile-nav"
+import { HomeTabNav } from "@/components/layout/home-tab-nav"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -146,6 +147,7 @@ export default function CommunityPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
+      <HomeTabNav />
       <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-4">
           <div className="mx-auto max-w-5xl flex gap-4">

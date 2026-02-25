@@ -19,7 +19,7 @@ import {
   Sparkles,
   Info,
   Filter,
-  Map,
+  Map, Navigation2,
   X,
   Star,
   MessageSquare,
@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 interface Restaurant {
   name: string;
@@ -51,6 +52,12 @@ interface AIAnalysis {
   summary: string;
   popularity: string;
   popularityNote: string;
+  reviewAnalysis?: {
+    topKeywords: string[];
+    positiveReviews: string[];
+    negativeReviews: string[];
+    overallSentiment: string;
+  };
   estimatedMenus: Array<{
     name: string;
     price: string;
@@ -72,6 +79,7 @@ const RISK_CONFIG = {
     cardBorder: "border-green-200",
     badgeVariant: "default" as const,
     badgeClass: "bg-green-600 hover:bg-green-600",
+    rowAccent: "border-l-green-500",
   },
   caution: {
     icon: AlertTriangle,
@@ -80,6 +88,7 @@ const RISK_CONFIG = {
     cardBorder: "border-amber-200",
     badgeVariant: "default" as const,
     badgeClass: "bg-amber-500 hover:bg-amber-500",
+    rowAccent: "border-l-amber-500",
   },
   danger: {
     icon: XCircle,
@@ -88,6 +97,7 @@ const RISK_CONFIG = {
     cardBorder: "border-red-200",
     badgeVariant: "destructive" as const,
     badgeClass: "",
+    rowAccent: "border-l-red-500",
   },
 };
 
@@ -116,9 +126,6 @@ const CATEGORY_FILTERS: { label: string; emoji: string; keywords: string[] }[] =
   { label: "기타", emoji: "🍴", keywords: ["뷔페", "도시락", "샐러드", "주점", "음료", "죽"] },
 ];
 
-// ═══════════════════════════════════════════
-// restaurant_key 생성 (이름+주소 → 해시)
-// ═══════════════════════════════════════════
 function makeRestaurantKey(name: string, address: string): string {
   const raw = `${name.trim()}::${address.trim()}`.toLowerCase();
   let hash = 0;
@@ -246,7 +253,6 @@ function ReviewModal({
 
         <p className="mb-4 text-sm text-muted-foreground">{restaurant.name}</p>
 
-        {/* 별점 선택 */}
         <div className="mb-4">
           <p className="mb-2 text-sm font-medium">별점</p>
           <div className="flex items-center gap-3">
@@ -257,7 +263,6 @@ function ReviewModal({
           </div>
         </div>
 
-        {/* 메모 */}
         <div className="mb-5">
           <div className="mb-1 flex items-center justify-between">
             <p className="text-sm font-medium">한줄 메모 (선택)</p>
@@ -272,7 +277,6 @@ function ReviewModal({
           />
         </div>
 
-        {/* 버튼 */}
         <div className="flex gap-2">
           {existingReview && (
             <Button
@@ -327,7 +331,7 @@ function AIAnalysisModal({
           <div>
             <h3 className="text-lg font-bold flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              AI 메뉴 분석
+              AI 식당 리뷰 분석
             </h3>
             <p className="text-sm text-muted-foreground">{restaurantName}</p>
           </div>
@@ -341,8 +345,8 @@ function AIAnalysisModal({
           {isAnalyzing && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-              <p className="text-sm text-muted-foreground">AI가 메뉴를 분석하고 있어요...</p>
-              <p className="text-xs text-muted-foreground mt-1">카테고리 기반 추정이라 10초 내외 소요됩니다</p>
+              <p className="text-sm text-muted-foreground">AI가 리뷰를 분석하고 있어요...</p>
+              <p className="text-xs text-muted-foreground mt-1">10초 내외 소요됩니다</p>
             </div>
           )}
 
@@ -367,14 +371,68 @@ function AIAnalysisModal({
                 )}
               </div>
 
-              {/* 전반적 평가 */}
-              {analysis.overallReview && (
+              {/* ✅ 리뷰 분석 섹션 */}
+              {analysis.reviewAnalysis && (
+                <div className="space-y-3">
+                  {/* 리뷰 키워드 태그 */}
+                  {analysis.reviewAnalysis.topKeywords?.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">🏷️ 주요 리뷰 키워드</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analysis.reviewAnalysis.topKeywords.map((kw, i) => (
+                          <span key={i} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 긍정 리뷰 */}
+                  {analysis.reviewAnalysis.positiveReviews?.length > 0 && (
+                    <div className="rounded-lg bg-green-50 p-3">
+                      <p className="mb-1.5 text-xs font-semibold text-green-800">👍 긍정 리뷰</p>
+                      <ul className="space-y-1">
+                        {analysis.reviewAnalysis.positiveReviews.map((r, i) => (
+                          <li key={i} className="text-xs text-green-700 flex items-start gap-1.5">
+                            <span className="shrink-0 mt-0.5">✓</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 부정 리뷰 */}
+                  {analysis.reviewAnalysis.negativeReviews?.length > 0 && (
+                    <div className="rounded-lg bg-red-50 p-3">
+                      <p className="mb-1.5 text-xs font-semibold text-red-800">👎 부정 리뷰</p>
+                      <ul className="space-y-1">
+                        {analysis.reviewAnalysis.negativeReviews.map((r, i) => (
+                          <li key={i} className="text-xs text-red-700 flex items-start gap-1.5">
+                            <span className="shrink-0 mt-0.5">✗</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 전반적 분위기 */}
+                  {analysis.reviewAnalysis.overallSentiment && (
+                    <p className="text-sm text-muted-foreground italic">&ldquo;{analysis.reviewAnalysis.overallSentiment}&rdquo;</p>
+                  )}
+                </div>
+              )}
+
+              {/* 기존 overallReview (reviewAnalysis 없을 때 폴백) */}
+              {!analysis.reviewAnalysis && analysis.overallReview && (
                 <p className="text-sm text-muted-foreground italic">&ldquo;{analysis.overallReview}&rdquo;</p>
               )}
 
               {/* 메뉴 분석 */}
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">메뉴 분석</p>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">🍽️ 메뉴 정보</p>
                 <div className="space-y-1.5">
                   {analysis.estimatedMenus?.map((menu, i) => (
                     <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm ${
@@ -408,8 +466,6 @@ function AIAnalysisModal({
 
               {/* 팁 */}
               {analysis.tips && <p className="text-xs text-muted-foreground">💡 {analysis.tips}</p>}
-
-              {/* 면책 */}
               <p className="text-[10px] text-muted-foreground/60">⚠️ {analysis.disclaimer}</p>
             </>
           )}
@@ -450,22 +506,19 @@ export default function RestaurantTab() {
   const [aiAnalysis, setAiAnalysis] = useState<Record<string, AIAnalysis>>({});
   const [analyzingRestaurant, setAnalyzingRestaurant] = useState<string | null>(null);
 
-  // 필터
   const [riskFilter, setRiskFilter] = useState<"all" | "safe" | "caution" | "danger">("all");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
-  // ✅ 기준 위치 직접 입력
   const [addressInput, setAddressInput] = useState("");
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
 
-  // ✅ 리뷰 관련
   const [restaurantRatings, setRestaurantRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ name: string; address: string; key: string } | null>(null);
   const [myReviews, setMyReviews] = useState<Record<string, { id: string; rating: number; memo: string }>>({});
 
-  // ✅ AI 분석 모달
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  useBackHandler(aiModalOpen, () => setAiModalOpen(false));
 
   // 초기화
   useEffect(() => {
@@ -492,6 +545,14 @@ export default function RestaurantTab() {
       toast.error("위치 서비스를 지원하지 않는 브라우저입니다");
       return;
     }
+
+    // ✅ 모바일에서 빠른 위치 응답을 위한 옵션
+    const geoOptions: PositionOptions = {
+      enableHighAccuracy: false,  // 네트워크 위치 우선 (GPS보다 빠름)
+      timeout: 10000,             // 10초 타임아웃
+      maximumAge: 60000,          // 1분 캐시 허용
+    };
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -505,7 +566,33 @@ export default function RestaurantTab() {
         }
         searchRestaurants(latitude, longitude, undefined, undefined, RADIUS_STEPS[radiusIndex]);
       },
-      () => { toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요"); },
+      (error) => {
+        console.warn("[위치] 실패:", error.code, error.message);
+        if (error.code === error.TIMEOUT) {
+          // 타임아웃 시 한 번 더 시도 (높은 정확도로)
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              setUserCoords({ lat: latitude, lng: longitude });
+              try {
+                const res = await fetch(`/api/restaurant/reverse-geocode?lat=${latitude}&lng=${longitude}`);
+                const data = await res.json();
+                setLocationName(data.full || data.address || "내 위치");
+              } catch {
+                setLocationName("내 위치");
+              }
+              searchRestaurants(latitude, longitude, undefined, undefined, RADIUS_STEPS[radiusIndex]);
+            },
+            () => {
+              toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+          );
+        } else {
+          toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
+        }
+      },
+      geoOptions,
     );
   };
 
@@ -565,26 +652,20 @@ export default function RestaurantTab() {
 
   const analyzeRestaurant = async (restaurant: Restaurant) => {
     const key = restaurant.name;
-
-    // 이미 분석 결과가 있으면 바로 모달 표시
     if (aiAnalysis[key]) {
       setSelectedRestaurant(key);
       setAiModalOpen(true);
       return;
     }
-
     if (userAllergens.length === 0) {
       toast.error("알레르기를 등록해야 AI 분석을 사용할 수 있어요", {
         action: { label: "등록하기", onClick: () => router.push("/food/profile") },
       });
       return;
     }
-
-    // 분석 시작 → 모달 열기
     setSelectedRestaurant(key);
     setAnalyzingRestaurant(key);
     setAiModalOpen(true);
-
     try {
       const res = await fetch("/api/restaurant/analyze", {
         method: "POST",
@@ -604,10 +685,6 @@ export default function RestaurantTab() {
     finally { setAnalyzingRestaurant(null); }
   };
 
-  // ═══════════════════════════════════════════
-  // ═══════════════════════════════════════════
-  // ✅ 기준 위치 직접 입력으로 검색
-  // ═══════════════════════════════════════════
   const searchByAddress = async () => {
     if (!addressInput.trim()) return;
     setIsGeocodingAddress(true);
@@ -629,8 +706,6 @@ export default function RestaurantTab() {
     }
   };
 
-  // ✅ 리뷰: 평균 별점 일괄 조회
-  // ═══════════════════════════════════════════
   const fetchRatings = useCallback(async (restaurantList: Restaurant[]) => {
     if (restaurantList.length === 0) return;
     const keys = restaurantList.map(r =>
@@ -642,7 +717,6 @@ export default function RestaurantTab() {
       if (data.ratings) {
         setRestaurantRatings(prev => ({ ...prev, ...data.ratings }));
       }
-      // ✅ 내 리뷰 복원 (새로고침 시 "내 리뷰" 버튼 유지)
       if (data.myReviews) {
         setMyReviews(prev => ({ ...prev, ...data.myReviews }));
       }
@@ -657,9 +731,6 @@ export default function RestaurantTab() {
     }
   }, [restaurants, fetchRatings]);
 
-  // ═══════════════════════════════════════════
-  // ✅ 리뷰: 모달 열기
-  // ═══════════════════════════════════════════
   const openReviewModal = (restaurant: Restaurant) => {
     if (!user) {
       toast.error("로그인이 필요합니다", {
@@ -674,8 +745,6 @@ export default function RestaurantTab() {
       key,
     });
     setReviewModalOpen(true);
-
-    // 내 기존 리뷰 조회
     fetch(`/api/restaurant/reviews?key=${key}`)
       .then(res => res.json())
       .then(data => {
@@ -686,9 +755,6 @@ export default function RestaurantTab() {
       .catch(() => {});
   };
 
-  // ═══════════════════════════════════════════
-  // ✅ 리뷰: 작성/수정
-  // ═══════════════════════════════════════════
   const handleReviewSubmit = async (rating: number, memo: string) => {
     if (!reviewTarget) return;
     const res = await fetch("/api/restaurant/reviews", {
@@ -715,9 +781,6 @@ export default function RestaurantTab() {
     }
   };
 
-  // ═══════════════════════════════════════════
-  // ✅ 리뷰: 삭제
-  // ═══════════════════════════════════════════
   const handleReviewDelete = async () => {
     if (!reviewTarget || !myReviews[reviewTarget.key]) return;
     const res = await fetch(`/api/restaurant/reviews?id=${myReviews[reviewTarget.key].id}`, {
@@ -737,7 +800,6 @@ export default function RestaurantTab() {
     }
   };
 
-  // ── 카테고리별 음식점 수 계산 ──
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const cf of CATEGORY_FILTERS) {
@@ -748,16 +810,11 @@ export default function RestaurantTab() {
     return counts;
   }, [restaurants]);
 
-  // ── 복합 필터링 ──
   const filteredRestaurants = useMemo(() => {
     let list = restaurants;
-
-    // 위험도 필터
     if (riskFilter !== "all") {
       list = list.filter(r => r.riskLevel === riskFilter);
     }
-
-    // 카테고리 필터
     if (categoryFilter) {
       const cf = CATEGORY_FILTERS.find(c => c.label === categoryFilter);
       if (cf) {
@@ -766,16 +823,14 @@ export default function RestaurantTab() {
         );
       }
     }
-
     return list;
   }, [restaurants, riskFilter, categoryFilter]);
 
   // ═══════════════════════════════════════════
-  // 필터 사이드바 (데스크톱 우측 고정 / 모바일 상단 sticky)
+  // 필터 패널 (데스크톱 사이드바 / 모바일 상단)
   // ═══════════════════════════════════════════
   const FilterPanel = () => (
     <div className="space-y-4">
-      {/* 위험도 필터 */}
       <div>
         <p className="mb-2 text-xs font-semibold text-muted-foreground">위험도</p>
         <div className="flex flex-wrap gap-1.5">
@@ -801,7 +856,6 @@ export default function RestaurantTab() {
         </div>
       </div>
 
-      {/* 카테고리 필터 */}
       {hasSearched && restaurants.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold text-muted-foreground">카테고리</p>
@@ -837,7 +891,6 @@ export default function RestaurantTab() {
         </div>
       )}
 
-      {/* 반경 슬라이더 */}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-semibold text-muted-foreground">검색 반경</span>
@@ -886,7 +939,6 @@ export default function RestaurantTab() {
         </div>
       </div>
 
-      {/* 알레르기 미등록 안내 */}
       {hasSearched && userAllergens.length === 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
@@ -910,7 +962,7 @@ export default function RestaurantTab() {
     <div className="w-full">
       <div className="container mx-auto px-4 py-4">
 
-          {/* ── 검색바 (전체 너비) ── */}
+          {/* ── 검색바 ── */}
           <div className="mx-auto mb-4 max-w-4xl space-y-2">
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -936,7 +988,6 @@ export default function RestaurantTab() {
           <div className="sticky top-16 z-30 -mx-4 mb-4 border-b bg-background/95 px-4 py-3 backdrop-blur md:hidden">
             <div className="overflow-x-auto scrollbar-hide">
               <div className="flex gap-1.5 pb-1">
-                {/* 위험도 필터 */}
                 {(["all", "safe", "caution", "danger"] as const).map((f) => (
                   <button
                     key={f}
@@ -954,7 +1005,6 @@ export default function RestaurantTab() {
                   </button>
                 ))}
                 <div className="mx-1 w-px shrink-0 bg-border" />
-                {/* 카테고리 칩 */}
                 {CATEGORY_FILTERS.map((cf) => {
                   const count = categoryCounts[cf.label] || 0;
                   if (count === 0 && hasSearched) return null;
@@ -974,8 +1024,6 @@ export default function RestaurantTab() {
                 })}
               </div>
             </div>
-
-            {/* 반경 미니 슬라이더 (모바일) */}
             <div className="mt-2 flex items-center gap-3">
               <span className="shrink-0 text-[10px] text-muted-foreground">반경</span>
               <input
@@ -987,13 +1035,10 @@ export default function RestaurantTab() {
             </div>
           </div>
 
-          {/* ── 메인 레이아웃: 리스트 + 사이드바 ── */}
+          {/* ── 메인 레이아웃 ── */}
           <div className="mx-auto flex max-w-4xl gap-6">
-
-            {/* 왼쪽: 음식점 리스트 */}
             <div className="min-w-0 flex-1">
 
-              {/* 위치 + 결과 수 */}
               {locationName && hasSearched && (
                 <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -1005,22 +1050,18 @@ export default function RestaurantTab() {
                 </div>
               )}
 
-              {/* 로딩 */}
+              {/* 로딩 스켈레톤 */}
               {isLoading && restaurants.length === 0 && (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Card key={i}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-2 flex-1">
-                            <Skeleton className="h-5 w-40" />
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-3 w-56" />
-                          </div>
-                          <Skeleton className="h-6 w-14 rounded-full" />
-                        </div>
-                      </CardContent>
-                    </Card>
+                <div className="space-y-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="rounded-lg border p-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-16" />
+                        <div className="flex-1" />
+                        <Skeleton className="h-5 w-12 rounded-full" />
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1059,98 +1100,107 @@ export default function RestaurantTab() {
                 </div>
               )}
 
-              {/* ═══ 음식점 카드 리스트 ═══ */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {filteredRestaurants.map((restaurant, idx) => {
-                  const risk = RISK_CONFIG[restaurant.riskLevel];
-                  const RiskIcon = risk.icon;
-                  const rKey = makeRestaurantKey(restaurant.name, restaurant.roadAddress || restaurant.address);
-                  const ratingData = restaurantRatings[rKey];
+              {/* ═══ 컴팩트 음식점 리스트 ═══ */}
+              {filteredRestaurants.length > 0 && (
+                <div className="rounded-xl border overflow-hidden divide-y">
+                  {filteredRestaurants.map((restaurant, idx) => {
+                    const risk = RISK_CONFIG[restaurant.riskLevel];
+                    const RiskIcon = risk.icon;
+                    const rKey = makeRestaurantKey(restaurant.name, restaurant.roadAddress || restaurant.address);
+                    const ratingData = restaurantRatings[rKey];
+                    const myReview = myReviews[rKey];
+                    const displayRating = ratingData ? Math.round(ratingData.avg) : (myReview ? myReview.rating : 0);
 
-                  return (
-                    <Card
-                      key={`${restaurant.name}-${idx}`}
-                      className={`transition-all ${risk.cardBorder}`}
-                    >
-                      <CardContent className="p-4">
-                        {/* 상단 */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold truncate">{restaurant.name}</h3>
-                            <p className="text-xs text-muted-foreground">{restaurant.category}</p>
-                            {/* ✅ 평균 별점 표시 */}
-                            {ratingData && (
-                              <div className="mt-0.5 flex items-center gap-1">
-                                <StarRating rating={Math.round(ratingData.avg)} />
-                                <span className="text-xs font-semibold text-amber-600">{ratingData.avg.toFixed(1)}</span>
-                                <span className="text-[10px] text-muted-foreground">({ratingData.count})</span>
-                              </div>
-                            )}
-                          </div>
-                          <Badge variant={risk.badgeVariant} className={`ml-2 shrink-0 ${risk.badgeClass}`}>
-                            <RiskIcon className="mr-1 h-3 w-3" />
+                    return (
+                      <div
+                        key={`${restaurant.name}-${idx}`}
+                        className={`bg-background hover:bg-muted/30 transition-colors border-l-[3px] ${risk.rowAccent} cursor-pointer active:bg-muted/50`}
+                        onClick={() => openReviewModal(restaurant)}
+                      >
+                        {/* 1행: 이름 + 카테고리 + 거리 + 안전뱃지 */}
+                        <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+                          <h3 className="text-sm font-semibold truncate">{restaurant.name}</h3>
+                          <span className="text-[11px] text-muted-foreground shrink-0">{restaurant.category}</span>
+                          {restaurant.distance && (
+                            <span className="text-[11px] text-primary font-medium shrink-0">📍{restaurant.distance}</span>
+                          )}
+                          <div className="flex-1" />
+                          <Badge variant={risk.badgeVariant} className={`shrink-0 text-[10px] px-1.5 py-0.5 ${risk.badgeClass}`}>
+                            <RiskIcon className="mr-0.5 h-2.5 w-2.5" />
                             {risk.label}
                           </Badge>
                         </div>
 
-                        <p className="mt-2 text-xs text-muted-foreground truncate">
-                          {restaurant.roadAddress || restaurant.address}
-                        </p>
-                        {restaurant.distance && (
-                          <p className="mt-0.5 text-xs text-primary font-medium">📍 {restaurant.distance}</p>
-                        )}
-
-                        {restaurant.matchedAllergens.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {restaurant.matchedAllergens.map((a, i) => (
-                              <span key={i} className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">{a}</span>
-                            ))}
+                        {/* 2행: 별점 + 주소 + 알레르기 태그 + 액션 */}
+                        <div className="flex items-center gap-2 px-3 pb-2.5">
+                          {/* ✅ 별점 항상 표시 */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <StarRating rating={displayRating} />
+                            {ratingData ? (
+                              <span className="text-[10px] font-semibold text-amber-600">{ratingData.avg.toFixed(1)}<span className="text-muted-foreground font-normal">({ratingData.count})</span></span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">평가</span>
+                            )}
                           </div>
-                        )}
 
-                        {/* 액션 버튼 */}
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm" className="h-7 gap-1 text-xs"
-                            onClick={() => analyzeRestaurant(restaurant)}
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            AI 분석
-                          </Button>
-                          {/* ✅ 리뷰 버튼 */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 gap-1 text-xs"
-                            onClick={() => openReviewModal(restaurant)}
-                          >
-                            {myReviews[rKey]
-                              ? <><Pencil className="h-3.5 w-3.5" />내 리뷰</>
-                              : <><MessageSquare className="h-3.5 w-3.5" />리뷰</>
-                            }
-                          </Button>
-                          {restaurant.phone && (
-                            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"
-                              onClick={() => window.open(`tel:${restaurant.phone}`)}>
-                              <Phone className="h-3.5 w-3.5" />전화
-                            </Button>
+                          {/* 주소 */}
+                          <p className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
+                            {restaurant.roadAddress || restaurant.address}
+                          </p>
+
+                          {/* 알레르기 매칭 태그 */}
+                          {restaurant.matchedAllergens.length > 0 && (
+                            <div className="flex gap-0.5 shrink-0">
+                              {restaurant.matchedAllergens.slice(0, 2).map((a, i) => (
+                                <span key={i} className="rounded bg-red-100 px-1 py-0 text-[9px] text-red-700">{a}</span>
+                              ))}
+                              {restaurant.matchedAllergens.length > 2 && (
+                                <span className="text-[9px] text-red-500">+{restaurant.matchedAllergens.length - 2}</span>
+                              )}
+                            </div>
                           )}
-                          {restaurant.lat && restaurant.lng && (
-                            <Button
-                              variant="ghost"
-                              size="sm" className="h-7 gap-1 text-xs"
-                              onClick={() => window.open(`https://map.naver.com/v5/search/${encodeURIComponent(restaurant.name)}`, "_blank")}
+
+                          {/* 액션: AI + 길찾기 + 전화 (이벤트 버블링 차단) */}
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); analyzeRestaurant(restaurant); }}
+                              className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-primary/10 transition-colors"
+                              title="AI 분석"
                             >
-                              <Map className="h-3.5 w-3.5" />지도
-                            </Button>
-                          )}
+                              <Sparkles className="h-3.5 w-3.5 text-primary" />
+                            </button>
+                            {restaurant.lat && restaurant.lng && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const dest = encodeURIComponent(restaurant.roadAddress || restaurant.address);
+                                  const name = encodeURIComponent(restaurant.name);
+                                  // 카카오맵 길찾기 (목적지 좌표)
+                                  const kakaoUrl = `https://map.kakao.com/link/to/${name},${restaurant.lat},${restaurant.lng}`;
+                                  window.open(kakaoUrl, "_blank");
+                                }}
+                                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-blue-50 transition-colors"
+                                title="길찾기"
+                              >
+                                <Navigation2 className="h-3.5 w-3.5 text-blue-500" />
+                              </button>
+                            )}
+                            {restaurant.phone && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); window.open(`tel:${restaurant.phone}`); }}
+                                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted transition-colors"
+                                title="전화"
+                              >
+                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* 더보기 */}
               {hasSearched && !isLoading && totalCount > restaurants.length && (
@@ -1165,10 +1215,9 @@ export default function RestaurantTab() {
               )}
             </div>
 
-            {/* ═══ 오른쪽: 데스크톱 고정 필터 사이드바 ═══ */}
+            {/* ═══ 데스크톱 사이드바 ═══ */}
             <aside className="hidden md:block w-56 shrink-0">
               <div className="sticky top-20 space-y-3">
-                {/* 기준 위치 변경 */}
                 <div className="rounded-xl border bg-card p-4">
                   <p className="mb-2 text-xs font-semibold text-muted-foreground">📍 기준 위치</p>
                   {locationName && (
@@ -1194,7 +1243,6 @@ export default function RestaurantTab() {
                   </div>
                 </div>
 
-                {/* 필터 */}
                 <div className="rounded-xl border bg-card p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
@@ -1206,7 +1254,7 @@ export default function RestaurantTab() {
             </aside>
           </div>
 
-      {/* ✅ 리뷰 모달 */}
+      {/* 리뷰 모달 */}
       <ReviewModal
         open={reviewModalOpen}
         onClose={() => { setReviewModalOpen(false); setReviewTarget(null); }}
@@ -1216,7 +1264,7 @@ export default function RestaurantTab() {
         onDelete={handleReviewDelete}
       />
 
-      {/* ✅ AI 분석 모달 */}
+      {/* AI 분석 모달 */}
       <AIAnalysisModal
         open={aiModalOpen}
         onClose={() => { setAiModalOpen(false); }}

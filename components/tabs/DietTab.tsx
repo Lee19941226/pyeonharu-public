@@ -27,6 +27,9 @@ import {
   Calendar,
   Pencil,
   Sparkles,
+  Download,
+  Share2,
+  Plus,
 } from "lucide-react";
 
 function getTimePeriod(dateStr: string) {
@@ -110,6 +113,25 @@ function BarChart({ dailyStats, bmr, onDayClick }: { dailyStats: DailyStat[]; bm
   );
 }
 
+// ─── 카카오 SDK 초기화 (공유 시점에 호출) ───
+function ensureKakaoInit(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!window.Kakao) {
+    console.warn("[카카오] SDK가 아직 로드되지 않았습니다");
+    return false;
+  }
+  if (!window.Kakao.isInitialized()) {
+    try {
+      window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
+      console.log("[카카오] SDK 초기화 완료");
+    } catch (e) {
+      console.error("[카카오] SDK 초기화 실패:", e);
+      return false;
+    }
+  }
+  return window.Kakao.isInitialized();
+}
+
 interface DietEntry { id: string; food_name: string; estimated_cal: number; source: "ai" | "manual"; emoji: string; ai_confidence: number | null; image_url: string | null; recorded_at: string }
 interface DailyStat { date: string; totalCal: number; count: number; isOver: boolean; overAmount: number }
 interface ReportSummary { totalCalSum: number; avgCal: number; daysWithData: number; totalDays: number; overDays: number; maxDay: { date: string; totalCal: number } | null; minDay: { date: string; totalCal: number } | null; topFoods: { name: string; count: number }[] }
@@ -150,6 +172,18 @@ export default function DietTab() {
   const [editingCal, setEditingCal] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  const [manualImage, setManualImage] = useState<File | null>(null);
+  const [manualImagePreview, setManualImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const manualImageInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ 새로 추가
+  const [showRecordSheet, setShowRecordSheet] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+
+  // 카카오 SDK는 공유 시점에 ensureKakaoInit()로 초기화
+
   useEffect(() => { supabase.auth.getUser().then(({ data: { user } }) => { setUser(user); if (!user) setIsLoading(false) }) }, []);
 
   const loadEntries = useCallback(async () => {
@@ -166,6 +200,13 @@ export default function DietTab() {
     } catch { toast.error("데이터를 불러오지 못했습니다") } finally { setIsLoading(false) }
   }, [user, date, warningShownToday]);
   useEffect(() => { if (user) loadEntries() }, [user, date, loadEntries]);
+
+  // ✅ 외부에서 식단 추가 시 데이터 새로고침
+  useEffect(() => {
+    const handler = () => { if (user) { loadEntries(); loadDashboard() } };
+    window.addEventListener("diet-entry-added", handler);
+    return () => window.removeEventListener("diet-entry-added", handler);
+  }, [user, loadEntries]);
 
   const getDashRange = useCallback(() => {
     const today = new Date(); const todayStr = today.toLocaleDateString("en-CA");
@@ -187,7 +228,7 @@ export default function DietTab() {
   useEffect(() => { if (user) loadDashboard() }, [user, loadDashboard]);
 
   const handlePhotoAnalyze = async (file: File) => {
-    setIsAnalyzing(true);
+    setShowRecordSheet(false); setIsAnalyzing(true);
     try {
       const fd = new FormData(); fd.append("image", file);
       const res = await fetch("/api/diet/analyze", { method: "POST", body: fd }); const data = await res.json();
@@ -196,7 +237,6 @@ export default function DietTab() {
     } catch { toast.error("분석 중 오류") } finally { setIsAnalyzing(false) }
   };
 
-  // ─── AI 칼로리 추정 ───
   const handleEstimate = async () => {
     if (!manualName.trim()) { toast.error("음식 이름을 입력해주세요"); return }
     setIsEstimating(true); setServingDesc("");
@@ -214,12 +254,58 @@ export default function DietTab() {
     } catch { toast.error("AI 추정 중 오류가 발생했습니다") } finally { setIsEstimating(false) }
   };
 
+  const handleManualImageSelect = (file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("이미지 파일만 선택 가능합니다"); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error("5MB 이하 이미지만 가능합니다"); return }
+    setManualImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setManualImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const uploadDietImage = async (file: File, entryId?: string): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      if (entryId) formData.append("entryId", entryId);
+      const res = await fetch("/api/diet/upload-image", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success) return data.image_url;
+      toast.error(data.error || "이미지 업로드 실패"); return null;
+    } catch { toast.error("이미지 업로드 중 오류"); return null }
+  };
+
+  const handleEditImage = async (entryId: string, file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("이미지 파일만 선택 가능합니다"); return }
+    setIsUploadingImage(true);
+    try { const imageUrl = await uploadDietImage(file, entryId); if (imageUrl) { toast.success("사진이 추가되었습니다"); loadEntries(); loadDashboard() } }
+    finally { setIsUploadingImage(false) }
+  };
+
+  const handleDownloadImage = async (imageUrl: string, foodName: string) => {
+    try {
+      const response = await fetch(imageUrl); const blob = await response.blob(); const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `${foodName}_${new Date().toLocaleDateString("ko-KR")}.jpg`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(url); toast.success("이미지가 저장되었습니다");
+    } catch { window.open(imageUrl, "_blank") }
+  };
+
+  const closeManualInput = () => {
+    setShowManualInput(false); setManualName(""); setManualCal(""); setManualGrams("");
+    setServingDesc(""); setManualImage(null); setManualImagePreview(null);
+  };
+
   const handleManualSubmit = async () => {
     if (!manualName.trim() || !manualCal) return;
     try {
-      const res = await fetch("/api/diet/entries", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ food_name: manualName.trim(), estimated_cal: parseInt(manualCal) }) }); const data = await res.json();
-      if (data.success) { toast.success(`📝 ${manualName} (${manualCal}kcal)`); setManualName(""); setManualCal(""); setManualGrams(""); setServingDesc(""); setShowManualInput(false); loadEntries(); loadDashboard() }
+      let imageUrl: string | null = null;
+      if (manualImage) { setIsUploadingImage(true); imageUrl = await uploadDietImage(manualImage); setIsUploadingImage(false) }
+      const res = await fetch("/api/diet/entries", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ food_name: manualName.trim(), estimated_cal: parseInt(manualCal), image_url: imageUrl })
+      });
+      const data = await res.json();
+      if (data.success) { toast.success(`${imageUrl ? "📸" : "📝"} ${manualName} (${manualCal}kcal)`); closeManualInput(); loadEntries(); loadDashboard() }
       else toast.error(data.error);
     } catch { toast.error("저장 실패") }
   };
@@ -247,6 +333,74 @@ export default function DietTab() {
   };
 
   const moveDate = (offset: number) => { const d = new Date(date); d.setDate(d.getDate() + offset); setDate(d.toLocaleDateString("en-CA")); setWarningShownToday(false) };
+
+  // ─── 카카오 공유: 오늘 먹은 음식 ───
+  const shareToday = () => {
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
+    }
+    const shareUrl = `${window.location.origin}/diet`;
+    const foodList = entries.length > 0
+      ? entries.map(e => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`).slice(0, 5).join(", ")
+      : "아직 기록이 없어요";
+    const moreText = entries.length > 5 ? ` 외 ${entries.length - 5}개 더` : "";
+    const statusText = isOver
+      ? `⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과!`
+      : bmr > 0 ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음` : `총 ${totalCal.toLocaleString()}kcal 섭취`;
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`,
+          description: `${foodList}${moreText} | ${statusText}`,
+          imageUrl: `${window.location.origin}/icons/icon-512.png`,
+          imageWidth: 512, imageHeight: 512,
+          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+        },
+        buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
+      });
+      setShowShareMenu(false);
+    } catch (err) {
+      console.error("[카카오 공유 실패]", err);
+      toast.error("공유에 실패했습니다");
+    }
+  };
+
+  // ─── 카카오 공유: 식단 리포트 ───
+  const shareReport = () => {
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
+    }
+    const shareUrl = `${window.location.origin}/diet`;
+    const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+    let title = `📊 ${dateLabel} 식단 리포트`;
+    let description = `총 ${totalCal.toLocaleString()}kcal 섭취 · ${entries.length}끼`;
+    if (bmr > 0) {
+      description += isOver
+        ? ` | ⚠️ BMR 대비 ${overAmount.toLocaleString()}kcal 초과`
+        : ` | ✅ BMR 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`;
+    }
+    if (dashData?.summary) {
+      const rangeLabel = getRangeLabel();
+      title = `📊 식단 리포트 (${rangeLabel})`;
+      description = `일 평균 ${dashData.summary.avgCal.toLocaleString()}kcal · ${dashData.summary.daysWithData}일 기록 / ${dashData.summary.totalDays}일`;
+      if (bmr > 0 && dashData.summary.overDays > 0) description += ` · ⚠️ ${dashData.summary.overDays}일 초과`;
+      if (dashData.summary.topFoods.length > 0) description += ` · 🍴 ${dashData.summary.topFoods.slice(0, 3).map(f => f.name).join(", ")}`;
+    }
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: { title, description, imageUrl: `${window.location.origin}/icons/icon-512.png`, imageWidth: 512, imageHeight: 512, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
+        buttons: [{ title: "편하루에서 식단 관리하기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
+      });
+      setShowShareMenu(false);
+    } catch (err) {
+      console.error("[카카오 공유 실패]", err);
+      toast.error("공유에 실패했습니다");
+    }
+  };
 
   const isToday = date === new Date().toLocaleDateString("en-CA");
   const isOver = bmr > 0 && totalCal > bmr;
@@ -296,15 +450,33 @@ export default function DietTab() {
               </div></CardContent></Card>
             </div>
 
+            {/* ✅ 기록하기 + 공유 버튼 (통합) */}
             {isToday && (
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-1.5 text-xs h-9 border-primary/30 text-primary hover:bg-primary/5" onClick={() => cameraInputRef.current?.click()} disabled={isAnalyzing}>
-                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}{isAnalyzing ? "분석중" : "촬영"}
+                <Button className="flex-1 gap-1.5 text-xs h-9" onClick={() => setShowRecordSheet(true)} disabled={isAnalyzing}>
+                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  {isAnalyzing ? "분석 중..." : "기록하기"}
                 </Button>
-                <Button variant="outline" className="flex-1 gap-1.5 text-xs h-9 border-primary/30 text-primary hover:bg-primary/5" onClick={() => fileInputRef.current?.click()} disabled={isAnalyzing}>
-                  <ImageIcon className="h-3.5 w-3.5" />앨범
-                </Button>
-                <Button className="flex-1 gap-1.5 text-xs h-9" onClick={() => setShowManualInput(true)}><PenLine className="h-3.5 w-3.5" />직접 입력</Button>
+                <div className="relative">
+                  <Button variant="outline" size="icon" className="h-9 w-9 border-primary/30 text-primary hover:bg-primary/5" onClick={() => setShowShareMenu(!showShareMenu)} disabled={entries.length === 0}>
+                    <Share2 className="h-3.5 w-3.5" />
+                  </Button>
+                  {showShareMenu && entries.length > 0 && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowShareMenu(false)} />
+                      <div className="absolute right-0 top-10 z-50 w-48 rounded-xl border bg-background shadow-lg p-1.5 space-y-0.5">
+                        <button onClick={shareToday} className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[11px] hover:bg-muted transition-colors text-left">
+                          <span className="text-base">🍽️</span>
+                          <div><p className="font-medium">먹은 음식 공유</p><p className="text-[9px] text-muted-foreground">카카오톡으로 공유</p></div>
+                        </button>
+                        <button onClick={shareReport} className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[11px] hover:bg-muted transition-colors text-left">
+                          <span className="text-base">📊</span>
+                          <div><p className="font-medium">식단 리포트 공유</p><p className="text-[9px] text-muted-foreground">칼로리 요약 · 통계</p></div>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
                 <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f)handlePhotoAnalyze(f);e.target.value=""}} />
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f)handlePhotoAnalyze(f);e.target.value=""}} />
               </div>
@@ -332,7 +504,7 @@ export default function DietTab() {
             {isLoading ? (
               <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
             ) : entries.length === 0 ? (
-              <div className="py-8 text-center"><p className="text-xs text-muted-foreground">아직 기록이 없어요</p></div>
+              <div className="py-8 text-center"><p className="text-xs text-muted-foreground">아직 기록이 없어요</p>{isToday && <p className="text-[10px] text-muted-foreground mt-1">위 기록하기 버튼으로 음식을 추가해보세요</p>}</div>
             ) : (
               <div className="space-y-1.5">
                 {entries.map((entry, idx) => {
@@ -344,11 +516,23 @@ export default function DietTab() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex gap-2 flex-1 min-w-0">
                             {entry.image_url ? (
-                              <button onClick={() => setPreviewImage(entry.image_url)} className="flex-shrink-0 overflow-hidden rounded-lg border hover:border-primary/50">
-                                <img src={entry.image_url} alt={entry.food_name} className="h-10 w-10 object-cover" />
-                              </button>
+                              <div className="flex-shrink-0 relative group">
+                                <button onClick={() => setPreviewImage(entry.image_url)} className="overflow-hidden rounded-lg border hover:border-primary/50">
+                                  <img src={entry.image_url} alt={entry.food_name} className="h-10 w-10 object-cover" />
+                                </button>
+                                {isToday && (
+                                  <button onClick={(e) => { e.stopPropagation(); editImageInputRef.current?.setAttribute("data-entry-id", entry.id); editImageInputRef.current?.click(); }}
+                                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg">
+                                    <Camera className="h-3.5 w-3.5 text-white" />
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm">{entry.emoji}</div>
+                              <button onClick={() => { if (isToday) { editImageInputRef.current?.setAttribute("data-entry-id", entry.id); editImageInputRef.current?.click(); } }}
+                                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm relative group ${isToday ? "cursor-pointer hover:bg-primary/10 transition-colors" : ""}`}>
+                                <span>{entry.emoji}</span>
+                                {isToday && (<div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg"><Camera className="h-3 w-3 text-white" /></div>)}
+                              </button>
                             )}
                             <div className="min-w-0">
                               <span className="text-xs font-medium truncate block">{entry.food_name}</span>
@@ -384,6 +568,9 @@ export default function DietTab() {
                 })}
               </div>
             )}
+
+            <input ref={editImageInputRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; const entryId = editImageInputRef.current?.getAttribute("data-entry-id"); if (f && entryId) handleEditImage(entryId, f); e.target.value = "" }} />
           </div>
 
           {/* ═══ 우측: 대시보드 ═══ */}
@@ -463,65 +650,81 @@ export default function DietTab() {
         </div>
       </div>
 
-      {/* ═══ 직접 입력 모달 (AI 추정 기능 포함) ═══ */}
-      {showManualInput && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowManualInput(false)}>
-          <div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold">음식 등록</h3>
-                <p className="text-xs text-muted-foreground">음식 이름을 입력하면 AI가 칼로리를 추정해요</p>
-              </div>
-              <button onClick={() => { setShowManualInput(false); setManualName(""); setManualCal(""); setManualGrams(""); setServingDesc("") }} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+      {/* ✅ 기록하기 바텀시트 (촬영/앨범/직접입력 선택) */}
+      {showRecordSheet && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowRecordSheet(false)}>
+          <div className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3" style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
+            <div className="text-center">
+              <h3 className="text-base font-bold">🍽️ 식단 기록하기</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">음식을 기록할 방법을 선택하세요</p>
             </div>
+            <div className="space-y-2">
+              <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10"><Camera className="h-5 w-5 text-primary" /></div>
+                <div className="text-left"><p className="text-sm font-semibold">카메라로 촬영</p><p className="text-xs text-muted-foreground">AI가 음식을 분석하고 칼로리를 추정해요</p></div>
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} />
+              </label>
+              <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10"><ImageIcon className="h-5 w-5 text-orange-500" /></div>
+                <div className="text-left"><p className="text-sm font-semibold">앨범에서 선택</p><p className="text-xs text-muted-foreground">저장된 음식 사진으로 분석</p></div>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoAnalyze(f); e.target.value = "" }} />
+              </label>
+              <button onClick={() => { setShowRecordSheet(false); setShowManualInput(true) }} className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500/10"><PenLine className="h-5 w-5 text-blue-500" /></div>
+                <div className="text-left"><p className="text-sm font-semibold">직접 입력</p><p className="text-xs text-muted-foreground">음식 이름과 칼로리를 직접 입력해요</p></div>
+              </button>
+            </div>
+            <button onClick={() => setShowRecordSheet(false)} className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors">취소</button>
+          </div>
+        </div>
+      )}
 
+      {/* ═══ 직접 입력 모달 (AI 추정 기능 + 사진 첨부) ═══ */}
+      {showManualInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeManualInput}>
+          <div className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div><h3 className="text-lg font-bold">음식 등록</h3><p className="text-xs text-muted-foreground">음식 이름을 입력하면 AI가 칼로리를 추정해요</p></div>
+              <button onClick={closeManualInput} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
             <div className="space-y-3">
-              {/* 음식 이름 */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">음식 이름</label>
-                <Input placeholder="예: 김치찌개, 빅맥 세트" value={manualName} onChange={(e) => setManualName(e.target.value)} className="mt-1" />
-              </div>
-
-              {/* 그램 수 (선택) */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">양 (선택)</label>
-                <div className="flex gap-2 mt-1">
-                  <Input type="number" placeholder="모르면 비워두세요" value={manualGrams} onChange={(e) => setManualGrams(e.target.value)} className="flex-1" />
-                  <span className="text-sm text-muted-foreground self-center">g</span>
+              <div><label className="text-xs font-medium text-muted-foreground">사진 (선택)</label>
+                <div className="mt-1">
+                  {manualImagePreview ? (
+                    <div className="relative">
+                      <img src={manualImagePreview} alt="음식 사진" className="w-full h-32 object-cover rounded-lg border" />
+                      <button onClick={() => { setManualImage(null); setManualImagePreview(null) }} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"><X className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => manualImageInputRef.current?.click()} className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full px-2 py-0.5 text-[10px] hover:bg-black/70 transition-colors">변경</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => { const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.capture = "environment"; input.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleManualImageSelect(f) }; input.click() }}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-lg border border-dashed border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"><Camera className="h-3.5 w-3.5" />촬영</button>
+                      <button onClick={() => manualImageInputRef.current?.click()}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-lg border border-dashed border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"><ImageIcon className="h-3.5 w-3.5" />앨범에서 선택</button>
+                    </div>
+                  )}
+                  <input ref={manualImageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleManualImageSelect(f); e.target.value = "" }} />
                 </div>
+              </div>
+              <div><label className="text-xs font-medium text-muted-foreground">음식 이름</label><Input placeholder="예: 김치찌개, 빅맥 세트" value={manualName} onChange={(e) => setManualName(e.target.value)} className="mt-1" /></div>
+              <div><label className="text-xs font-medium text-muted-foreground">양 (선택)</label>
+                <div className="flex gap-2 mt-1"><Input type="number" placeholder="모르면 비워두세요" value={manualGrams} onChange={(e) => setManualGrams(e.target.value)} className="flex-1" /><span className="text-sm text-muted-foreground self-center">g</span></div>
                 <p className="text-[10px] text-muted-foreground mt-0.5">비워두면 1인분 기준으로 추정합니다</p>
               </div>
-
-              {/* AI 추정 버튼 */}
               <Button variant="outline" className="w-full gap-2 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={handleEstimate} disabled={!manualName.trim() || isEstimating}>
-                {isEstimating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {isEstimating ? "AI 추정 중..." : "AI 칼로리 추정"}
+                {isEstimating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEstimating ? "AI 추정 중..." : "AI 칼로리 추정"}
               </Button>
-
-              {/* AI 추정 결과 안내 */}
-              {servingDesc && (
-                <div className="rounded-lg bg-purple-50 p-2.5">
-                  <p className="text-xs text-purple-700">✨ 기준: {servingDesc}</p>
-                  <p className="text-[10px] text-purple-500 mt-0.5">추정값이 다르면 아래에서 직접 수정하세요</p>
-                </div>
-              )}
-
-              {/* 칼로리 (AI 추정 또는 직접 입력) */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">칼로리 (kcal)</label>
-                <Input type="number" placeholder="AI 추정 또는 직접 입력" value={manualCal} onChange={(e) => setManualCal(e.target.value)} className="mt-1" />
-              </div>
+              {servingDesc && (<div className="rounded-lg bg-purple-50 p-2.5"><p className="text-xs text-purple-700">✨ 기준: {servingDesc}</p><p className="text-[10px] text-purple-500 mt-0.5">추정값이 다르면 아래에서 직접 수정하세요</p></div>)}
+              <div><label className="text-xs font-medium text-muted-foreground">칼로리 (kcal)</label><Input type="number" placeholder="AI 추정 또는 직접 입력" value={manualCal} onChange={(e) => setManualCal(e.target.value)} className="mt-1" /></div>
             </div>
-
-            {!servingDesc && (
-              <div className="rounded-lg bg-blue-50 p-2.5">
-                <p className="text-xs text-blue-700">💡 칼로리를 알고 있다면 직접 입력해도 돼요</p>
-              </div>
-            )}
-
+            {!servingDesc && (<div className="rounded-lg bg-blue-50 p-2.5"><p className="text-xs text-blue-700">💡 칼로리를 알고 있다면 직접 입력해도 돼요</p></div>)}
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setShowManualInput(false); setManualName(""); setManualCal(""); setManualGrams(""); setServingDesc("") }}>취소</Button>
-              <Button className="flex-[2]" disabled={!manualName.trim() || !manualCal || parseInt(manualCal) <= 0} onClick={handleManualSubmit}>등록</Button>
+              <Button variant="outline" className="flex-1" onClick={closeManualInput}>취소</Button>
+              <Button className="flex-[2]" disabled={!manualName.trim() || !manualCal || parseInt(manualCal) <= 0 || isUploadingImage} onClick={handleManualSubmit}>
+                {isUploadingImage ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />업로드 중...</> : "등록"}
+              </Button>
             </div>
           </div>
         </div>
@@ -547,11 +750,14 @@ export default function DietTab() {
         </div>
       )}
 
-      {/* 이미지 미리보기 */}
+      {/* 이미지 미리보기 + 다운로드 */}
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewImage(null)}>
           <div className="relative max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setPreviewImage(null)} className="absolute -top-10 right-0 text-white hover:text-gray-300"><X className="h-6 w-6" /></button>
+            <div className="absolute -top-10 right-0 flex items-center gap-3">
+              <button onClick={() => handleDownloadImage(previewImage, "음식사진")} className="text-white hover:text-gray-300 transition-colors flex items-center gap-1"><Download className="h-5 w-5" /><span className="text-xs">저장</span></button>
+              <button onClick={() => setPreviewImage(null)} className="text-white hover:text-gray-300 transition-colors"><X className="h-6 w-6" /></button>
+            </div>
             <img src={previewImage} alt="음식 사진" className="w-full rounded-xl object-contain max-h-[70vh]" />
           </div>
         </div>

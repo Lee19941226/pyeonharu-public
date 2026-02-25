@@ -19,6 +19,11 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import android.view.View;
+import android.view.Window;
+import android.os.Handler;
+import android.os.Looper;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 import java.io.File;
@@ -60,6 +65,12 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 상태바 흰색 배경 + 검정 텍스트 강제 설정
+        Window window = getWindow();
+        window.setStatusBarColor(android.graphics.Color.WHITE);
+        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, window.getDecorView());
+        controller.setAppearanceLightStatusBars(true);
     }
 
     @Override
@@ -78,6 +89,17 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStart() {
         super.onStart();
+
+        // 상태바 강제 재설정 (WebView 로드 후에도 반복 적용)
+        Runnable setStatusBar = () -> {
+            Window w = getWindow();
+            w.setStatusBarColor(android.graphics.Color.WHITE);
+            new WindowInsetsControllerCompat(w, w.getDecorView()).setAppearanceLightStatusBars(true);
+        };
+        setStatusBar.run();
+        new Handler(Looper.getMainLooper()).postDelayed(setStatusBar, 500);
+        new Handler(Looper.getMainLooper()).postDelayed(setStatusBar, 1500);
+        new Handler(Looper.getMainLooper()).postDelayed(setStatusBar, 3000);
 
         requestAllPermissions();
 

@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Loader2 } from "lucide-react"
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 interface DeleteAccountDialogProps {
   isOpen: boolean
@@ -26,6 +27,7 @@ export function DeleteAccountDialog({
   userEmail,
 }: DeleteAccountDialogProps) {
   const router = useRouter()
+  useBackHandler(isOpen, () => onOpenChange(false));
   const [confirmEmail, setConfirmEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

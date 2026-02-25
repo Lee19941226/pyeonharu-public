@@ -12,12 +12,14 @@ import {
   Building2,
   HeartPulse,
   Loader2,
+  Pin,
+  Check,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Footer } from "@/components/layout/footer";
 import { LoginModal } from "@/components/auth/login-modal";
-import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { WelcomeModal } from "@/components/onboarding/welcome-modal";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -29,10 +31,25 @@ import HospitalTab from "@/components/tabs/HospitalTab";
 import MedicineTab from "@/components/tabs/MedicineTab";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 import MealRecommend from "@/components/meal-recommend";
+import { toast } from "sonner";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
 type SickSubTab = "symptom" | "hospital" | "medicine";
+
+// ── 첫 화면 설정 키 ──
+const HOME_TAB_KEY = "pyeonharu_home_tab";
+
+// 탭 조합 → 한글 라벨
+const TAB_LABELS: Record<string, string> = {
+  "meal:food": "식사 > 식품",
+  "meal:restaurant": "식사 > 음식점",
+  "meal:diet": "식사 > 식단관리",
+  "sick:symptom": "아파요 > 증상",
+  "sick:hospital": "아파요 > 병원",
+  "sick:medicine": "아파요 > 약",
+};
 
 function TabButton({
   active,
@@ -92,10 +109,62 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  useBackHandler(loginModalOpen, () => setLoginModalOpen(false));
 
+  // ✅ 기본값으로 초기화 (SSR 안전)
   const [mainTab, setMainTab] = useState<MainTab>("meal");
   const [mealSubTab, setMealSubTab] = useState<MealSubTab>("food");
   const [sickSubTab, setSickSubTab] = useState<SickSubTab>("symptom");
+
+  // ✅ 저장된 첫 화면 키
+  const [savedHomeKey, setSavedHomeKey] = useState("meal:food");
+
+  // ✅ 클라이언트에서 localStorage 읽어 첫 화면 복원
+  const [homeRestored, setHomeRestored] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HOME_TAB_KEY);
+      if (stored) {
+        const [main, sub] = stored.split(":");
+        if (main === "meal" && ["food", "restaurant", "diet"].includes(sub)) {
+          setMainTab("meal");
+          setMealSubTab(sub as MealSubTab);
+        } else if (main === "sick" && ["symptom", "hospital", "medicine"].includes(sub)) {
+          setMainTab("sick");
+          setSickSubTab(sub as SickSubTab);
+        }
+        setSavedHomeKey(stored);
+      }
+    } catch {}
+    setHomeRestored(true);
+    // 서브페이지에서 탭 선택 후 돌아온 경우
+    const navTab = localStorage.getItem('pyeonharu_nav_tab');
+    if (navTab) {
+      localStorage.removeItem('pyeonharu_nav_tab');
+      const [m, s] = navTab.split(':');
+      if (m === 'meal' && ['food', 'restaurant', 'diet'].includes(s)) {
+        setMainTab('meal');
+        setMealSubTab(s as any);
+      } else if (m === 'sick' && ['symptom', 'hospital', 'medicine'].includes(s)) {
+        setMainTab('sick');
+        setSickSubTab(s as any);
+      }
+    }
+  }, []);
+
+  // ✅ 현재 탭이 첫 화면으로 설정되어 있는지 확인
+  const currentTabKey = mainTab === "meal" ? `meal:${mealSubTab}` : `sick:${sickSubTab}`;
+  const isCurrentHome = currentTabKey === savedHomeKey;
+
+  const setAsHome = () => {
+    try {
+      localStorage.setItem(HOME_TAB_KEY, currentTabKey);
+      setSavedHomeKey(currentTabKey);
+      toast.success(`'${TAB_LABELS[currentTabKey] || currentTabKey}'을(를) 첫 화면으로 설정했어요`);
+    } catch {
+      toast.error("설정 저장에 실패했습니다");
+    }
+  };
 
   const [visited, setVisited] = useState<Set<string>>(
     new Set(["food", "restaurant", "diet", "medicine"]),
@@ -199,9 +268,10 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* ✅ pointer-events-none 추가: 로딩 중에도 뒤 탭 클릭 가능 */}
       {isInitialLoading && (
         <div
-          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${isFadingOut ? "opacity-0" : "opacity-100"}`}
+          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 pointer-events-none ${isFadingOut ? "opacity-0" : "opacity-100"}`}
         >
           <div className="flex flex-col items-center gap-6">
             <PyeonharuLogo size="lg" />
@@ -230,7 +300,8 @@ export default function HomePage() {
 
       <Header mainTab={mainTab} onMainTabChange={setMainTab} />
 
-      <div className="sticky top-16 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
+      {/* ✅ 모바일 식사/아파요 탭 */}
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
         <div className="flex">
           <TabButton
             active={mainTab === "meal"}
@@ -249,7 +320,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="sticky top-[7.5rem] md:top-16 z-30 bg-background border-b">
+      <div className="sticky top-[calc(7.5rem+env(safe-area-inset-top))] md:top-16 z-30 bg-background border-b">
         <div className="container mx-auto px-4">
           <div
             className="flex items-center justify-center overflow-x-auto scrollbar-hide"
@@ -307,11 +378,9 @@ export default function HomePage() {
         <div style={{ display: activeTab === "food" ? "block" : "none" }}>
           <div className="container mx-auto px-4 pt-3">
             <div className="flex gap-4 justify-center">
-              {/* 좌측: FoodTab 본문 */}
               <div className="w-full max-w-2xl">
                 <FoodTab onProgress={handleFoodTabProgress} />
               </div>
-              {/* 우측: AI 추천 (데스크톱 lg+) */}
               <div className="hidden lg:block w-[320px] shrink-0">
                 <div className="sticky top-[7.5rem]">
                   <MealRecommend />
@@ -334,14 +403,41 @@ export default function HomePage() {
         {activeTab === "hospital" && <HospitalTab />}
       </main>
 
+      {/* ═══ 첫 화면 설정 고정 버튼 (로딩 완료 후 표시) ═══ */}
+      {!isInitialLoading && homeRestored && (
+        <div className="fixed bottom-20 right-3 z-40 md:bottom-6 md:right-6">
+          <button
+            onClick={setAsHome}
+            disabled={isCurrentHome}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all active:scale-95 ${
+              isCurrentHome
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "bg-background text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            {isCurrentHome ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                첫 화면
+              </>
+            ) : (
+              <>
+                <Pin className="h-3.5 w-3.5" />
+                첫 화면으로 설정
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       <Footer />
-      <MobileNav mainTab={mainTab} onMainTabChange={setMainTab} />
+      <MobileNav />
       <LoginModal
         open={loginModalOpen}
         onOpenChange={setLoginModalOpen}
         onSuccess={() => router.refresh()}
       />
-      <OnboardingTour active={tourActive} onFinish={handleTourFinish} />
+      <WelcomeModal active={tourActive} onFinish={handleTourFinish} />
     </div>
   );
 }

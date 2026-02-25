@@ -75,7 +75,7 @@ function EmailSignUpContent() {
       return
     }
 
-    router.push("/sign-up-success")
+    router.push("/sign-up-complete")
   }
 
   return (

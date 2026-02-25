@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 interface LoginModalProps {
   open: boolean;
@@ -33,6 +34,7 @@ type ModalView = "login" | "reset-password";
 
 export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
   const router = useRouter();
+  useBackHandler(open, () => onOpenChange(false));
   const [view, setView] = useState<ModalView>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

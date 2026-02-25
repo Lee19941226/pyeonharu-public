@@ -9,6 +9,7 @@ import { StepDemo } from "./step-demo";
 import { StepAha } from "./step-aha";
 import { StepProfile } from "./step-profile";
 import { StepSchool } from "./step-school";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 
@@ -25,6 +26,7 @@ export function OnboardingModal({
   onOpenChange,
   onComplete,
 }: OnboardingModalProps) {
+  useBackHandler(open, () => onOpenChange(false));
   const [step, setStep] = useState<OnboardingStep>(1);
 
   // 데모 스캔에서 선택한 제품 결과를 Aha 스텝으로 전달

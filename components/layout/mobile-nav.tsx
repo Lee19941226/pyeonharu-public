@@ -1,43 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  UtensilsCrossed,
-  HeartPulse,
-  User,
-  Bookmark,
   Camera,
   ImageIcon,
   ShieldCheck,
   Loader2,
+  ClipboardList,
+  Sparkles,
+  X,
+  Store,
+  Flame,
+  Youtube,
+  ChevronDown,
+  ChevronUp,
+  BarChart3,
+  UtensilsCrossed,
+  AlertTriangle,
+  Bike,
+  Salad,
+  Scale,
+  Shuffle,
+  Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import Link from "next/link";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
+import { createClient } from "@/lib/supabase/client";
+import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
+import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 type CameraMode = "allergy" | "diet" | null;
 
-interface MobileNavProps {
-  mainTab?: "meal" | "sick";
-  onMainTabChange?: (tab: "meal" | "sick") => void;
+// ─── 메뉴 추천 타입 ───
+interface Reasoning { taste: string; calorie: string; nutrition: string; variety: string }
+interface Recommendation { name: string; emoji: string; estimatedCal: number; reasoning: Reasoning; deliveryKeyword: string }
+interface Analysis { calorieSituation: string; weeklyPattern: string; nutritionGap: string }
+interface MealRecommendData {
+  mealType: string; analysis: Analysis; recommendations: Recommendation[]; nutritionTip: string;
+  context: { todayCalories: number; targetCalories: number; remainingCalories: number; allergens: string[]; todayMeals: string[]; weeklyAvgCal: number; weeklyOverDays: number; weeklyTopFoods: string[] }
 }
 
-export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
+function ensureKakaoInit(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!window.Kakao) return false;
+  if (!window.Kakao.isInitialized()) {
+    try { window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY) } catch { return false }
+  }
+  return window.Kakao.isInitialized();
+}
+
+export function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const isHome = pathname === "/";
 
+  // ─── 카메라 상태 ───
   const [showSheet, setShowSheet] = useState(false);
+  useBackHandler(showSheet, () => setShowSheet(false));
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // ─── 메뉴 추천 모달 상태 ───
+  const [showRecommendModal, setShowRecommendModal] = useState(false);
+  useBackHandler(showRecommendModal, () => setShowRecommendModal(false));
+  const [recommendData, setRecommendData] = useState<MealRecommendData | null>(null);
+  const [recommendLoading, setRecommendLoading] = useState(false);
+  const [recommendError, setRecommendError] = useState("");
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [todayCal, setTodayCal] = useState(0);
+  const [bmr, setBmr] = useState(0);
 
   const openSheet = (mode: CameraMode) => {
     setCameraMode(mode);
     setShowSheet(true);
   };
 
+  // ─── 카메라 파일 처리 (기존 로직 100% 유지) ───
   const handleFileSelected = async (file: File) => {
     if (!cameraMode) return;
     setShowSheet(false);
@@ -71,10 +110,8 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           toast.info("AI가 성분표를 분석 중...");
 
           try {
-            // ✅ 원본 file에서 직접 리사이즈
             const { base64: base64Data } = await resizeImageForAI(file);
 
-            const { createClient } = await import("@/lib/supabase/client");
             const supabase = createClient();
             const {
               data: { user },
@@ -98,7 +135,6 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             const data = await response.json();
 
             if (data.success && data.foodCode) {
-              const { default: nextRouter } = await import("next/navigation");
               sessionStorage.setItem(
                 `ai_result_${data.foodCode}`,
                 JSON.stringify({
@@ -120,11 +156,12 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             } else {
               toast.error(data.error || "분석에 실패했습니다");
             }
-          } catch (aiError) {
+          } catch {
             toast.error("분석 중 오류가 발생했습니다");
           }
         }
       } else {
+        // 식단 분석 모드
         const fd = new FormData();
         fd.append("image", file);
         const res = await fetch("/api/diet/analyze", {
@@ -137,7 +174,10 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
           toast.success(
             `${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`,
           );
-          router.refresh();
+          window.dispatchEvent(new CustomEvent("diet-entry-added"));
+          if (pathname !== "/diet" && !pathname.startsWith("/diet")) {
+            router.push(`/diet?refresh=${Date.now()}`);
+          }
         } else {
           toast.error(data.error || "분석에 실패했습니다");
         }
@@ -150,6 +190,64 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
     }
   };
 
+  // ─── 메뉴 추천 API 호출 ───
+  const fetchRecommend = useCallback(async () => {
+    setRecommendLoading(true);
+    setRecommendError("");
+    setExpandedIdx(null);
+    setShowRecommendModal(true);
+    try {
+      const res = await fetch("/api/meal-recommend");
+      if (!res.ok) throw new Error((await res.json()).error || "추천 실패");
+      const result = await res.json();
+      setRecommendData(result);
+      if (result.context) {
+        setTodayCal(result.context.todayCalories);
+        setBmr(result.context.targetCalories);
+      }
+    } catch (err: any) {
+      setRecommendError(err.message);
+    } finally {
+      setRecommendLoading(false);
+    }
+  }, []);
+
+  // ─── 카카오 공유 ───
+  const shareRecommend = () => {
+    if (!recommendData || !recommendData.recommendations.length) return;
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다"); return
+    }
+    const shareUrl = `${window.location.origin}/food`;
+    const mealLabel = recommendData.mealType === "아침" ? "🌅 아침" : recommendData.mealType === "점심" ? "☀️ 점심" : recommendData.mealType === "간식" ? "🍪 간식" : "🌇 저녁";
+    const menuList = recommendData.recommendations.slice(0, 5).map(r => `${r.emoji} ${r.name} (${r.estimatedCal}kcal)`).join(", ");
+    let description = menuList;
+    if (recommendData.analysis?.calorieSituation) description += ` | ${recommendData.analysis.calorieSituation}`;
+    if (description.length > 150) description = description.slice(0, 147) + "...";
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: { title: `${mealLabel} AI 맞춤 메뉴 추천`, description, imageUrl: `${window.location.origin}/icons/icon-512.png`, imageWidth: 512, imageHeight: 512, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
+        buttons: [{ title: "편하루에서 메뉴 추천받기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
+      });
+    } catch (err) { console.error("[카카오 공유 실패]", err); toast.error("공유에 실패했습니다") }
+  };
+
+  // ─── 유틸 ───
+  const remainingCal = bmr > 0 ? Math.max(bmr - todayCal, 0) : 0;
+  const calPercent = bmr > 0 ? Math.min((todayCal / bmr) * 100, 100) : 0;
+  const isOver = bmr > 0 && todayCal > bmr;
+
+  const youtubeUrl = (name: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(name + " 레시피")}`;
+
+  const reasonMeta: Record<keyof Reasoning, { icon: typeof Flame; label: string; color: string }> = {
+    taste: { icon: UtensilsCrossed, label: "입맛", color: "text-amber-600 bg-amber-50" },
+    calorie: { icon: Scale, label: "칼로리", color: "text-red-600 bg-red-50" },
+    nutrition: { icon: Salad, label: "영양", color: "text-green-600 bg-green-50" },
+    variety: { icon: Shuffle, label: "다양성", color: "text-blue-600 bg-blue-50" },
+  };
+
   return (
     <>
       <nav
@@ -157,62 +255,16 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         data-tour="bottom-nav"
       >
-        <div className="mx-auto flex h-16 max-w-md items-center justify-around">
-          {/* 1. 식사(홈) */}
-          {isHome && onMainTabChange ? (
-            <button
-              onClick={() => onMainTabChange("meal")}
-              className={cn(
-                "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
-                mainTab === "meal" ? "text-amber-600" : "text-muted-foreground",
-              )}
-            >
-              <UtensilsCrossed className="h-5 w-5" />
-              <span className="font-medium">식사</span>
-            </button>
-          ) : (
-            <Link
-              href="/"
-              className="flex flex-col items-center gap-1 px-2 py-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <UtensilsCrossed className="h-5 w-5" />
-              <span>식사</span>
-            </Link>
-          )}
-
-          {/* 2. 아파요 */}
-          {isHome && onMainTabChange ? (
-            <button
-              onClick={() => onMainTabChange("sick")}
-              className={cn(
-                "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
-                mainTab === "sick" ? "text-rose-600" : "text-muted-foreground",
-              )}
-            >
-              <HeartPulse className="h-5 w-5" />
-              <span className="font-medium">아파요</span>
-            </button>
-          ) : (
-            <Link
-              href="/"
-              className="flex flex-col items-center gap-1 px-2 py-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <HeartPulse className="h-5 w-5" />
-              <span>아파요</span>
-            </Link>
-          )}
-
-          {/* 3. 안전확인 카메라 (중앙 왼쪽) */}
+        <div className="mx-auto flex h-16 max-w-md items-center justify-around px-4">
+          {/* 1. 안전확인 카메라 */}
           <button
             onClick={() => openSheet("allergy")}
             disabled={isProcessing}
             className={cn(
-              "relative -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
+              "relative -mt-4 flex h-[56px] w-[56px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
               isProcessing && cameraMode === "allergy"
                 ? "bg-primary/70 text-primary-foreground"
-                : pathname.startsWith("/food")
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-primary/90 text-primary-foreground",
+                : "bg-primary text-primary-foreground",
             )}
             aria-label="식품 안전 확인"
           >
@@ -226,17 +278,37 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
             </div>
           </button>
 
-          {/* 4. 식단관리 카메라 (중앙 오른쪽) */}
+          {/* 2. 메뉴 추천 */}
+          <button
+            onClick={fetchRecommend}
+            disabled={recommendLoading}
+            className={cn(
+              "relative -mt-4 flex h-[56px] w-[56px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
+              recommendLoading
+                ? "bg-violet-400 text-white"
+                : "bg-violet-500 text-white",
+            )}
+            aria-label="AI 메뉴 추천"
+          >
+            {recommendLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <ClipboardList className="h-6 w-6" />
+            )}
+            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 shadow-sm">
+              <Sparkles className="h-3 w-3 text-white" />
+            </div>
+          </button>
+
+          {/* 3. 식단관리 카메라 */}
           <button
             onClick={() => openSheet("diet")}
             disabled={isProcessing}
             className={cn(
-              "relative -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
+              "relative -mt-4 flex h-[56px] w-[56px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
               isProcessing && cameraMode === "diet"
                 ? "bg-orange-300 text-white"
-                : pathname.startsWith("/diet")
-                  ? "bg-orange-500 text-white"
-                  : "bg-orange-400 text-white",
+                : "bg-orange-400 text-white",
             )}
             aria-label="식단 관리 촬영"
           >
@@ -249,44 +321,17 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
               🍽️
             </div>
           </button>
-
-          {/* 5. 즐겨찾기 */}
-          <Link
-            href="/bookmarks"
-            className={cn(
-              "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
-              pathname.startsWith("/bookmarks")
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Bookmark className="h-5 w-5" />
-            <span>즐겨찾기</span>
-          </Link>
-
-          {/* 6. 마이페이지 */}
-          <Link
-            href="/mypage"
-            className={cn(
-              "flex flex-col items-center gap-1 px-2 py-2 text-[11px] transition-colors",
-              pathname.startsWith("/mypage")
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <User className="h-5 w-5" />
-            <span>MY</span>
-          </Link>
         </div>
 
-        {/* 카메라 버튼 아래 라벨 */}
-        <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-14 pointer-events-none">
-          <span className="text-[9px] text-muted-foreground">
-            {isProcessing && cameraMode === "allergy"
-              ? "분석중..."
-              : "안전확인"}
+        {/* 버튼 아래 라벨 */}
+        <div className="absolute bottom-1 left-0 right-0 flex justify-around max-w-md mx-auto px-4 pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <span className="text-[9px] text-muted-foreground w-14 text-center">
+            {isProcessing && cameraMode === "allergy" ? "분석중..." : "안전확인"}
           </span>
-          <span className="text-[9px] text-muted-foreground">
+          <span className="text-[9px] text-muted-foreground w-14 text-center">
+            {recommendLoading ? "추천중..." : "메뉴추천"}
+          </span>
+          <span className="text-[9px] text-muted-foreground w-14 text-center">
             {isProcessing && cameraMode === "diet" ? "분석중..." : "식단관리"}
           </span>
         </div>
@@ -295,7 +340,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
       {/* 바코드 스캔용 hidden div */}
       <div id="qr-reader-nav-hidden" className="hidden" />
 
-      {/* ── 카메라/앨범 선택 바텀시트 ── */}
+      {/* ═══ 카메라/앨범 선택 바텀시트 ═══ */}
       {showSheet && (
         <div
           className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden"
@@ -303,18 +348,13 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
         >
           <div
             className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3"
-            style={{
-              paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
-            }}
+            style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
-
             <div className="text-center">
               <h3 className="text-base font-bold">
-                {cameraMode === "allergy"
-                  ? "🛡️ 알레르기 안전 확인"
-                  : "🍽️ 먹은 음식 기록"}
+                {cameraMode === "allergy" ? "🛡️ 알레르기 안전 확인" : "🍽️ 먹은 음식 기록"}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {cameraMode === "allergy"
@@ -322,9 +362,7 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
                   : "음식 사진을 촬영/선택하면 자동으로 등록돼요"}
               </p>
             </div>
-
             <div className="space-y-2">
-              {/* 카메라 촬영 */}
               <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
                   <Camera className="h-5 w-5 text-primary" />
@@ -332,25 +370,12 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
                 <div className="text-left">
                   <p className="text-sm font-semibold">카메라로 촬영</p>
                   <p className="text-xs text-muted-foreground">
-                    {cameraMode === "allergy"
-                      ? "바코드·성분표를 바로 촬영"
-                      : "음식을 바로 촬영"}
+                    {cameraMode === "allergy" ? "바코드·성분표를 바로 촬영" : "음식을 바로 촬영"}
                   </p>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFileSelected(f);
-                    e.target.value = "";
-                  }}
-                />
+                <input type="file" accept="image/*" capture="environment" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = "" }} />
               </label>
-
-              {/* 앨범에서 선택 */}
               <label className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10">
                   <ImageIcon className="h-5 w-5 text-orange-500" />
@@ -358,30 +383,209 @@ export function MobileNav({ mainTab, onMainTabChange }: MobileNavProps) {
                 <div className="text-left">
                   <p className="text-sm font-semibold">앨범에서 선택</p>
                   <p className="text-xs text-muted-foreground">
-                    {cameraMode === "allergy"
-                      ? "저장된 바코드·성분표 이미지 선택"
-                      : "저장된 음식 사진 선택"}
+                    {cameraMode === "allergy" ? "저장된 바코드·성분표 이미지 선택" : "저장된 음식 사진 선택"}
                   </p>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFileSelected(f);
-                    e.target.value = "";
-                  }}
-                />
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = "" }} />
               </label>
             </div>
-
-            <button
-              onClick={() => setShowSheet(false)}
-              className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
-            >
+            <button onClick={() => setShowSheet(false)}
+              className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors">
               취소
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ AI 메뉴 추천 모달 (풀 리포트) ═══ */}
+      {showRecommendModal && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowRecommendModal(false)}>
+          <div
+            className="w-full max-w-md max-h-[85vh] animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background overflow-hidden flex flex-col"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-violet-50 to-amber-50/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">AI 맞춤 메뉴 추천</h3>
+                  <p className="text-[10px] text-muted-foreground">알레르기·식단·영양 분석</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {recommendData && !recommendLoading && (
+                  <>
+                    <button onClick={shareRecommend} className="flex items-center justify-center rounded-lg border border-violet-300 px-2 py-1.5 text-violet-500 hover:bg-violet-50 transition-colors" title="카카오톡으로 공유">
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={fetchRecommend} className="flex items-center gap-1 rounded-lg bg-violet-500 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-violet-600 transition-colors">
+                      <Sparkles className="h-3 w-3" />다시 추천
+                    </button>
+                  </>
+                )}
+                <button onClick={() => setShowRecommendModal(false)} className="ml-1 p-1.5 rounded-lg hover:bg-muted transition-colors">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+
+            {/* 모달 컨텐츠 (스크롤) */}
+            <div className="flex-1 overflow-y-auto">
+              {bmr > 0 && (
+                <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
+                  <Flame className="h-3 w-3 text-orange-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span>오늘 {todayCal.toLocaleString()}kcal</span>
+                      <span className={`font-medium ${isOver ? "text-red-600" : ""}`}>
+                        {isOver ? `${(todayCal - bmr).toLocaleString()}kcal 초과` : `잔여 ${remainingCal.toLocaleString()}kcal`}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 h-1 rounded-full bg-muted overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${isOver ? "bg-red-400" : "bg-gradient-to-r from-green-400 to-amber-400"}`} style={{ width: `${Math.min(calPercent, 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {recommendLoading && (
+                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                  <p className="text-xs text-muted-foreground">식단·영양 패턴 분석 중...</p>
+                </div>
+              )}
+
+              {recommendError && !recommendLoading && (
+                <div className="flex items-center gap-2 p-4">
+                  <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                  <p className="text-xs text-red-600">{recommendError}</p>
+                </div>
+              )}
+
+              {recommendData && !recommendLoading && (
+                <div className="p-3 space-y-2.5">
+                  {recommendData.analysis && (
+                    <div className="rounded-xl bg-muted/40 p-3 space-y-1.5">
+                      <p className="text-[11px] font-bold flex items-center gap-1">
+                        <BarChart3 className="h-3.5 w-3.5 text-violet-500" /> 식단 분석
+                      </p>
+                      {recommendData.analysis.calorieSituation && (
+                        <div className="flex items-start gap-1.5">
+                          <Scale className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-muted-foreground">{recommendData.analysis.calorieSituation}</p>
+                        </div>
+                      )}
+                      {recommendData.analysis.weeklyPattern && (
+                        <div className="flex items-start gap-1.5">
+                          <BarChart3 className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-muted-foreground">{recommendData.analysis.weeklyPattern}</p>
+                        </div>
+                      )}
+                      {recommendData.analysis.nutritionGap && (
+                        <div className="flex items-start gap-1.5">
+                          <Salad className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-muted-foreground">{recommendData.analysis.nutritionGap}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {recommendData.recommendations.map((rec, i) => {
+                    const isExpanded = expandedIdx === i;
+                    return (
+                      <div key={i} className="rounded-xl border bg-background overflow-hidden">
+                        <button
+                          onClick={() => setExpandedIdx(isExpanded ? null : i)}
+                          className="w-full flex items-center gap-2 p-2.5 hover:bg-muted/30 transition-colors text-left"
+                        >
+                          <span className="text-xl">{rec.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold truncate">{rec.name}</p>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1">
+                              {rec.reasoning?.taste || rec.reasoning?.calorie || ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[11px] font-medium text-orange-600">{rec.estimatedCal}kcal</span>
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t px-2.5 pb-2.5 pt-2 space-y-2.5">
+                            {rec.reasoning && (
+                              <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold">📋 추천 근거</p>
+                                {(Object.entries(rec.reasoning) as [keyof Reasoning, string][]).map(([key, text]) => {
+                                  if (!text) return null;
+                                  const meta = reasonMeta[key];
+                                  const Icon = meta.icon;
+                                  return (
+                                    <div key={key} className="flex items-start gap-1.5">
+                                      <span className={`flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[9px] font-medium shrink-0 ${meta.color}`}>
+                                        <Icon className="h-2.5 w-2.5" />{meta.label}
+                                      </span>
+                                      <p className="text-[10px] text-muted-foreground leading-relaxed">{text}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div className="border-t" />
+
+                            {/* ✅ 배달 주문 — 앱 딥링크 (mobile-nav는 모바일 전용이므로 항상 앱 호출) */}
+                            <div>
+                              <p className="text-[10px] font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
+                                <Store className="h-3 w-3" /> 배달 주문
+                              </p>
+                              <div className="flex gap-1.5">
+                                {getDeliveryLinks(rec.deliveryKeyword).map((app) => (
+                                  <button
+                                    key={app.name}
+                                    onClick={() => openDeliveryApp(app)}
+                                    className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity active:scale-95`}
+                                  >
+                                    <Bike className="h-3 w-3" />{app.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <a href={youtubeUrl(rec.name)} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center justify-center gap-1.5 rounded-lg bg-[#FF0000] py-2 text-[11px] font-bold text-white hover:bg-[#CC0000] transition-colors">
+                              <Youtube className="h-4 w-4" />직접 만들기 — 유튜브 레시피
+                            </a>
+                            {recommendData.context.allergens.length > 0 && (
+                              <div className="flex items-start gap-1 rounded-lg bg-green-50 border border-green-200 p-1.5">
+                                <AlertTriangle className="h-3 w-3 text-green-600 shrink-0 mt-0.5" />
+                                <p className="text-[9px] text-green-700">
+                                  <b>{recommendData.context.allergens.join(", ")}</b> 알레르기를 고려한 추천입니다.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {recommendData.nutritionTip && (
+                    <div className="rounded-lg bg-blue-50/50 border border-blue-100 px-2.5 py-2">
+                      <p className="text-[10px] text-blue-700">💡 {recommendData.nutritionTip}</p>
+                    </div>
+                  )}
+
+                  <p className="text-[8px] text-center text-muted-foreground/60">
+                    AI 추천은 참고용입니다. 알레르기 반응 우려 시 성분을 직접 확인하세요.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

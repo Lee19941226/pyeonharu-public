@@ -5,8 +5,11 @@ import { createClient } from "@/lib/supabase/client"
 import {
   Sparkles, Store, Flame, Youtube, TrendingDown, TrendingUp,
   ChevronDown, ChevronUp, Loader2, BarChart3,
-  UtensilsCrossed, AlertTriangle, Bike, Salad, Scale, Shuffle
+  UtensilsCrossed, AlertTriangle, Bike, Salad, Scale, Shuffle,
+  Share2,
 } from "lucide-react"
+import { toast } from "sonner"
+import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery"
 
 interface Reasoning {
   taste: string
@@ -44,6 +47,17 @@ interface MealRecommendData {
     weeklyOverDays: number
     weeklyTopFoods: string[]
   }
+}
+
+// ✅ 카카오 SDK 초기화 (공유 시점에 호출)
+function ensureKakaoInit(): boolean {
+  if (typeof window === "undefined") return false
+  if (!window.Kakao) { console.warn("[카카오] SDK 미로드"); return false }
+  if (!window.Kakao.isInitialized()) {
+    try { window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY); console.log("[카카오] SDK 초기화 완료") }
+    catch (e) { console.error("[카카오] SDK 초기화 실패:", e); return false }
+  }
+  return window.Kakao.isInitialized()
 }
 
 export default function MealRecommend() {
@@ -88,17 +102,43 @@ export default function MealRecommend() {
     finally { setLoading(false) }
   }, [])
 
+  // ✅ 카카오 공유: AI 추천 메뉴
+  const shareRecommend = () => {
+    if (!data || !data.recommendations.length) { toast.error("공유할 추천 결과가 없습니다"); return }
+    if (!ensureKakaoInit()) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", { description: "배포 후 테스트해주세요", duration: 5000 }); return
+    }
+    const shareUrl = `${window.location.origin}/food`
+    const mealLabel = data.mealType === "아침" ? "🌅 아침" : data.mealType === "점심" ? "☀️ 점심" : data.mealType === "간식" ? "🍪 간식" : "🌇 저녁"
+    const menuList = data.recommendations.slice(0, 5).map(r => `${r.emoji} ${r.name} (${r.estimatedCal}kcal)`).join(", ")
+    const title = `${mealLabel} AI 맞춤 메뉴 추천`
+    let description = menuList
+    if (data.analysis?.calorieSituation) description += ` | ${data.analysis.calorieSituation}`
+    if (description.length > 150) description = description.slice(0, 147) + "..."
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title,
+          description,
+          imageUrl: `${window.location.origin}/icons/icon-512.png`,
+          imageWidth: 512, imageHeight: 512,
+          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+        },
+        buttons: [{ title: "편하루에서 메뉴 추천받기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
+      })
+    } catch (err) {
+      console.error("[카카오 공유 실패]", err)
+      toast.error("공유에 실패했습니다")
+    }
+  }
+
   if (isLoggedIn === false || isLoggedIn === null) return null
 
   const remainingCal = bmr > 0 ? Math.max(bmr - todayCal, 0) : 0
   const calPercent = bmr > 0 ? Math.min((todayCal / bmr) * 100, 100) : 0
   const isOver = bmr > 0 && todayCal > bmr
-
-  const deliveryLinks = (keyword: string) => [
-    { name: "배민", url: `https://www.baemin.com/search?keyword=${encodeURIComponent(keyword)}`, color: "bg-[#2AC1BC]" },
-    { name: "요기요", url: `https://www.yogiyo.co.kr/mobile/#/search/${encodeURIComponent(keyword)}`, color: "bg-[#FA0050]" },
-    { name: "쿠팡이츠", url: `https://www.coupangeats.com/search?keyword=${encodeURIComponent(keyword)}`, color: "bg-[#5D00E6]" },
-  ]
 
   const youtubeUrl = (name: string) =>
     `https://www.youtube.com/results?search_query=${encodeURIComponent(name + " 레시피")}`
@@ -124,14 +164,26 @@ export default function MealRecommend() {
             <p className="text-[9px] text-muted-foreground">알레르기·식단·영양 분석</p>
           </div>
         </div>
-        <button
-          onClick={fetchRecommend}
-          disabled={loading}
-          className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          {data ? "다시 추천" : "추천받기"}
-        </button>
+        {/* ✅ 공유 + 추천 버튼 */}
+        <div className="flex items-center gap-1.5">
+          {data && !loading && (
+            <button
+              onClick={shareRecommend}
+              className="flex items-center justify-center rounded-lg border border-primary/30 px-2 py-1.5 text-primary hover:bg-primary/5 transition-colors"
+              title="카카오톡으로 공유"
+            >
+              <Share2 className="h-3 w-3" />
+            </button>
+          )}
+          <button
+            onClick={fetchRecommend}
+            disabled={loading}
+            className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {data ? "다시 추천" : "추천받기"}
+          </button>
+        </div>
       </div>
 
       {/* 칼로리 바 (항상) */}
@@ -225,7 +277,6 @@ export default function MealRecommend() {
                   <span className="text-xl">{rec.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate">{rec.name}</p>
-                    {/* 1줄 근거 미리보기 */}
                     <p className="text-[10px] text-muted-foreground line-clamp-1">
                       {rec.reasoning?.taste || rec.reasoning?.calorie || ""}
                     </p>
@@ -238,7 +289,6 @@ export default function MealRecommend() {
 
                 {isExpanded && (
                   <div className="border-t px-2.5 pb-2.5 pt-2 space-y-2.5">
-                    {/* 추천 근거 체인 */}
                     {rec.reasoning && (
                       <div className="space-y-1.5">
                         <p className="text-[10px] font-bold">📋 추천 근거</p>
@@ -258,30 +308,32 @@ export default function MealRecommend() {
                       </div>
                     )}
 
-                    {/* 구분선 */}
                     <div className="border-t" />
 
-                    {/* 배달 주문 */}
+                    {/* ✅ 배달 주문 — 모바일: 앱 딥링크 / PC: 안내 문구 */}
                     <div>
                       <p className="text-[10px] font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
                         <Store className="h-3 w-3" /> 배달 주문
                       </p>
-                      <div className="flex gap-1.5">
-                        {deliveryLinks(rec.deliveryKeyword).map((app) => (
-                          <a
-                            key={app.name}
-                            href={app.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity`}
-                          >
-                            <Bike className="h-3 w-3" />{app.name}
-                          </a>
-                        ))}
-                      </div>
+                      {isMobileDevice() ? (
+                        <div className="flex gap-1.5">
+                          {getDeliveryLinks(rec.deliveryKeyword).map((app) => (
+                            <button
+                              key={app.name}
+                              onClick={() => openDeliveryApp(app)}
+                              className={`flex-1 flex items-center justify-center gap-0.5 rounded-lg ${app.color} py-2 text-[10px] font-bold text-white hover:opacity-90 transition-opacity active:scale-95`}
+                            >
+                              <Bike className="h-3 w-3" />{app.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground text-center py-2 rounded-lg bg-muted/50">
+                          📱 배달 주문은 모바일에서만 이용 가능합니다
+                        </p>
+                      )}
                     </div>
 
-                    {/* 유튜브 레시피 */}
                     <a
                       href={youtubeUrl(rec.name)}
                       target="_blank"
@@ -292,7 +344,6 @@ export default function MealRecommend() {
                       직접 만들기 — 유튜브 레시피
                     </a>
 
-                    {/* 알레르기 */}
                     {data.context.allergens.length > 0 && (
                       <div className="flex items-start gap-1 rounded-lg bg-green-50 border border-green-200 p-1.5">
                         <AlertTriangle className="h-3 w-3 text-green-600 shrink-0 mt-0.5" />
@@ -307,7 +358,6 @@ export default function MealRecommend() {
             )
           })}
 
-          {/* 영양 팁 */}
           {data.nutritionTip && (
             <div className="rounded-lg bg-blue-50/50 border border-blue-100 px-2 py-1.5">
               <p className="text-[10px] text-blue-700">💡 {data.nutritionTip}</p>

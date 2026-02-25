@@ -19,6 +19,7 @@ import {
   School,
   BarChart3,
   MessageSquare,
+  Headphones,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null); // ← 추가
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -56,7 +57,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               user.email?.split("@")[0] ||
               "사용자",
           );
-          // ← role 조회 추가
           supabase
             .from("profiles")
             .select("role")
@@ -83,7 +83,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
             user.email?.split("@")[0] ||
             "사용자",
         );
-        // ← role 조회 추가
         const supabase2 = createClient();
         supabase2
           .from("profiles")
@@ -95,7 +94,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
           });
       } else {
         setNickname(null);
-        setUserRole(null); // ← 추가
+        setUserRole(null);
       }
       setIsLoaded(true);
     });
@@ -133,55 +132,58 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
     const supabase = createClient();
     await supabase.auth.signOut();
     setNickname(null);
-    setUserRole(null); // ← 추가
+    setUserRole(null);
     router.push("/");
     router.refresh();
   };
 
+  // 서브페이지에서 탭 클릭 시 홈으로 이동
+  const handleNavToHome = (tab: "meal" | "sick") => {
+    if (isHome && onMainTabChange) {
+      onMainTabChange(tab);
+    } else {
+      // localStorage에 탭 정보 저장 후 홈으로 이동
+      try {
+        localStorage.setItem(
+          "pyeonharu_nav_tab",
+          `${tab}:${tab === "meal" ? "food" : "symptom"}`,
+        );
+      } catch {}
+      router.push("/");
+    }
+  };
+
   const isLoggedIn = isLoaded && nickname !== null;
-  const isAdminUser = userRole === "admin" || userRole === "super_admin"; // ← 추가
+  const isAdminUser = userRole === "admin" || userRole === "super_admin";
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
   const isHome = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[env(safe-area-inset-top)]">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center">
           <PyeonharuLogo size="sm" />
         </Link>
 
-        {isHome && onMainTabChange && (
-          <nav className="hidden md:flex items-center gap-1 ml-6">
-            <button
-              onClick={() => onMainTabChange("meal")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${mainTab === "meal" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              <UtensilsCrossed className="h-4 w-4" />
-              식사
-            </button>
-            <button
-              onClick={() => onMainTabChange("sick")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${mainTab === "sick" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              <HeartPulse className="h-4 w-4" />
-              아파요
-            </button>
-          </nav>
-        )}
-
-        {!isHome && (
-          <nav className="hidden md:flex items-center gap-1 ml-6">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <UtensilsCrossed className="h-4 w-4" />홈
-            </Link>
-          </nav>
-        )}
+        {/* 데스크톱: 모든 페이지에서 식사/아파요 탭 표시 */}
+        <nav className="hidden md:flex items-center gap-1 ml-6">
+          <button
+            onClick={() => handleNavToHome("meal")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isHome && mainTab === "meal" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          >
+            <UtensilsCrossed className="h-4 w-4" />
+            식사
+          </button>
+          <button
+            onClick={() => handleNavToHome("sick")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isHome && mainTab === "sick" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          >
+            <HeartPulse className="h-4 w-4" />
+            아파요
+          </button>
+        </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          {/* ← 관리자 버튼 추가 (데스크톱) */}
           {isLoggedIn && isAdminUser && (
             <Link
               href="/admin"
@@ -229,6 +231,12 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/support" className="flex items-center gap-2">
+                    <Headphones className="h-4 w-4" />
+                    고객센터
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="flex items-center gap-2 text-destructive focus:text-destructive"
@@ -265,8 +273,10 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-x-0 top-16 bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
-          style={{ height: "calc(100vh - 4rem)" }}
+          className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
+          style={{
+            height: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))",
+          }}
         >
           <div className="container mx-auto px-4 py-4">
             {isLoggedIn ? (
@@ -289,7 +299,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
                 로그인 / 회원가입
               </Link>
             )}
-            {/* ← 관리자 버튼 추가 (모바일) */}
             {isLoggedIn && isAdminUser && (
               <Link
                 href="/admin"
@@ -394,7 +403,15 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               </div>
             )}
             <div className="border-t pt-3">
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/support"
+                  onClick={closeMobileMenu}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Headphones className="h-3.5 w-3.5" />
+                  고객센터
+                </Link>
                 <Link
                   href="/faq"
                   onClick={closeMobileMenu}

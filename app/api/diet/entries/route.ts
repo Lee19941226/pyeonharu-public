@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/diet/entries — 직접 입력
+// POST /api/diet/entries — 직접 입력 (image_url 지원)
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const {
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { food_name, estimated_cal } = body;
+  const { food_name, estimated_cal, image_url } = body;
 
   if (!food_name?.trim()) {
     return NextResponse.json(
@@ -96,7 +96,8 @@ export async function POST(req: NextRequest) {
       food_name: food_name.trim(),
       estimated_cal: Math.round(estimated_cal),
       source: "manual",
-      emoji: "📝",
+      emoji: image_url ? "📸" : "📝",
+      image_url: image_url || null,
       recorded_at: new Date().toISOString(),
     })
     .select()

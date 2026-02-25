@@ -30,6 +30,13 @@ npm install -D @types/dompurify
 2026-02-24 17:00 이용재
 npm install @radix-ui/react-tooltip
 
+2026-02-24 23:15 이진원
+npm install @capacitor/haptics
+npx cap sync
+npm install @capacitor/app
+npx cap sync
+pnpm add @capacitor/status-bar
+
 ---
 
 # 1. 편하루 프로젝트로 이동
