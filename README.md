@@ -27,6 +27,9 @@ npm install @vercel/og
 npm install dompurify
 npm install -D @types/dompurify
 
+2026-02-24 17:00 이용재
+npm install @radix-ui/react-tooltip
+
 ---
 
 # 1. 편하루 프로젝트로 이동

@@ -25,7 +25,8 @@ import { createClient } from "@/lib/supabase/client";
 import { FoodResult } from "@/types/food";
 import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
 import { getAiResult } from "@/lib/utils/ai-result-storage";
-
+import { classifyApiError, getToastDuration } from "@/lib/utils/api-error";
+import { DataSourceBadge } from "@/components/food/data-source-badge";
 export default function FoodResultPage() {
   const params = useParams();
   const router = useRouter();
@@ -271,9 +272,21 @@ export default function FoodResultPage() {
           }
         }
 
-        console.warn("⚠️ API 응답 실패:", response.status);
+        const errInfo = classifyApiError(null, response.status);
+        console.warn("⚠️ API 응답 실패:", response.status, errInfo.type);
+
+        // 서버 오류일 때 사용자에게 알림 (AI 결과가 없을 경우만)
+        if (response.status >= 500 && !id?.startsWith("ai-")) {
+          toast.error("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요", {
+            duration: 4000,
+          });
+        }
       } catch (apiError) {
-        console.error("❌ API 호출 오류:", apiError);
+        const errInfo = classifyApiError(apiError);
+        console.error("❌ API 호출 오류:", errInfo.type, apiError);
+        if (errInfo.type === "network") {
+          toast.error("인터넷 연결을 확인해주세요", { duration: 5000 });
+        }
       }
 
       // ==========================================
@@ -285,8 +298,8 @@ export default function FoodResultPage() {
 
         if (analysisData) {
           console.log("✅ sessionStorage에서 복구");
-
           const analysisResult = analysisData;
+
           // ✅ FoodResult 형식으로 변환
           const aiResult: FoodResult = {
             foodCode: id,
@@ -375,8 +388,9 @@ export default function FoodResultPage() {
       console.error("❌ 제품 정보를 불러올 수 없음");
       setError("제품 정보를 불러올 수 없습니다");
     } catch (error) {
-      console.error("💥 loadFoodResult 전체 오류:", error);
-      setError("결과를 불러오는 중 오류가 발생했습니다");
+      const errInfo = classifyApiError(error);
+      console.error("💥 loadFoodResult 전체 오류:", errInfo.type, error);
+      setError(errInfo.message);
     } finally {
       setIsLoading(false);
     }
@@ -695,21 +709,11 @@ export default function FoodResultPage() {
                 <h1 className="text-3xl font-bold">{result.foodName}</h1>
 
                 {result.dataSource && (
-                  <Badge
-                    variant={
-                      result.dataSource === "openapi"
-                        ? "default"
-                        : result.dataSource === "openfood"
-                          ? "secondary"
-                          : "outline"
-                    }
-                    className="text-xs"
-                  >
-                    {result.dataSource === "db" && "🗄️ DB"}
-                    {result.dataSource === "openapi" && "🏛️ 식약처"}
-                    {result.dataSource === "openfood" && "🌍 수입식품"}{" "}
-                    {result.dataSource === "ai" && "🤖 AI"}
-                  </Badge>
+                  <DataSourceBadge
+                    source={result.dataSource}
+                    size="md"
+                    withTooltip={true}
+                  />
                 )}
               </div>
 
@@ -1104,11 +1108,10 @@ export default function FoodResultPage() {
                     return (
                       <div>
                         <div className="mb-3 flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {result.dataSource === "openapi" && "식약처"}
-                            {result.dataSource === "nutrition" && "영양성분DB"}
-                            {result.dataSource === "db" && "DB"}
-                          </Badge>
+                          <DataSourceBadge
+                            source={result.dataSource}
+                            withTooltip={false}
+                          />
                           <span className="text-xs text-muted-foreground">
                             {parsedIngredients.length}개 원재료
                           </span>

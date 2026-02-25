@@ -26,7 +26,8 @@ import Link from "next/link";
 import type { SearchHistory } from "@/types/food";
 import { toast } from "sonner";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
-
+import { classifyApiError, getToastDuration } from "@/lib/utils/api-error";
+import { DataSourceBadge } from "@/components/food/data-source-badge";
 interface SearchResult {
   foodCode: string;
   foodName: string;
@@ -676,16 +677,28 @@ function FoodSearchPageInner() {
       setSearchProgress({ step: "검색 결과 정리 중...", progress: 75 });
 
       const phase2Data = await phase2Res.json();
-      // rate limit 처리
       if (phase2Res.status === 429) {
-        toast.error(
-          phase2Data.error ||
-            "검색이 너무 빠릅니다. 잠시 후 다시 시도해주세요.",
-          {
-            duration: 5000,
-          },
-        );
-        // phase1 결과가 있으면 그걸로 유지
+        const errInfo = classifyApiError(null, 429, phase2Data);
+        toast.error(errInfo.message, {
+          duration: getToastDuration("rate_limit"),
+        });
+        return; // phase1 결과 유지
+      }
+
+      // ── 서버 오류 처리 ──
+      if (phase2Res.status >= 500) {
+        if (allResults.length === 0) {
+          toast.error(
+            "식약처 서버에 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요",
+            {
+              duration: 4000,
+            },
+          );
+        } else {
+          toast.warning("외부 API 조회에 실패했습니다. DB 결과만 표시합니다", {
+            duration: 3000,
+          });
+        }
         return;
       }
       if (phase2Data.success) {
@@ -707,9 +720,24 @@ function FoodSearchPageInner() {
       //
     } catch (error: any) {
       if (error.name === "AbortError") return;
-      console.error("❌ 검색 오류:", error);
+
+      const errInfo = classifyApiError(error);
+      console.error("❌ 검색 오류:", errInfo.type, error);
+
+      // phase1 결과가 있으면 그걸로 유지 (외부 API 실패)
       if (allResults.length === 0) {
         setAllResults([]);
+        toast.error(errInfo.message, {
+          duration: getToastDuration(errInfo.type),
+        });
+      } else {
+        // DB 결과는 있는데 외부 API만 실패한 경우
+        toast.warning(
+          "일부 데이터를 불러오지 못했습니다. DB 결과만 표시합니다",
+          {
+            duration: 4000,
+          },
+        );
       }
       setSearchProgress({ step: "검색 실패", progress: 0 });
     } finally {
@@ -975,17 +1003,10 @@ function FoodSearchPageInner() {
 
                                     {/* 데이터 소스 배지 */}
                                     {item.dataSource && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs shrink-0"
-                                      >
-                                        {item.dataSource === "db" && "DB"}
-                                        {item.dataSource === "openapi" &&
-                                          "식약처"}
-                                        {item.dataSource === "openfood" &&
-                                          "수입"}
-                                        {item.dataSource === "ai" && "AI"}
-                                      </Badge>
+                                      <DataSourceBadge
+                                        source={item.dataSource}
+                                        withTooltip={false}
+                                      />
                                     )}
 
                                     {/* 매칭 이유 배지 */}

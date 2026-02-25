@@ -20,7 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
-
+import { DataSourceBadge } from "@/components/food/data-source-badge";
 interface AIAnalysisResult {
   productName?: string;
   manufacturer?: string;
@@ -310,11 +310,11 @@ export default function AIResultPage() {
                         </p>
                       )}
                       {result.dataSource && (
-                        <Badge variant="outline" className="mt-2 text-xs">
-                          {result.dataSource === "openapi"
-                            ? "📊 식약처 공식 데이터"
-                            : "🤖 AI 분석 결과"}
-                        </Badge>
+                        <DataSourceBadge
+                          source={result.dataSource}
+                          size="md"
+                          withTooltip={true}
+                        />
                       )}
                     </div>
                   </div>
