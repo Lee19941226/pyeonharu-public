@@ -35,7 +35,7 @@ import type {
   FoodFavorite,
 } from "@/types/food";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
-
+import { classifyApiError, getToastDuration } from "@/lib/utils/api-error";
 const ITEMS_PER_PAGE = 10;
 
 const POPULAR_KEYWORDS = [
@@ -423,10 +423,14 @@ function FoodMainContent() {
         }
       }
     } catch (error: any) {
-      if (error.name === "AbortError") return; // 취소된 요청은 무시
-      console.error("Search error:", error);
+      if (error.name === "AbortError") return;
+
+      const errInfo = classifyApiError(error);
+      console.error("Search error:", errInfo.type, error);
       setResults([]);
-      toast.error("검색 중 오류가 발생했습니다");
+      toast.error(errInfo.message, {
+        duration: getToastDuration(errInfo.type),
+      });
     } finally {
       setIsLoading(false);
     }
