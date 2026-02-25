@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Input } from "@/components/ui/input";
@@ -616,6 +616,14 @@ function FoodSearchPageInner() {
     progress: 0,
   });
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [filterSafeOnly, setFilterSafeOnly] = useState(false);
+  const [filterSource, setFilterSource] = useState<string>("all"); // "all" | "openapi" | "db" | "openfood" | "ai"
+  const [sortBy, setSortBy] = useState<string>("default"); // "default" | "name" | "safe_first"
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterSafeOnly, filterSource, sortBy]);
+
   // ✅ 초기 로드 시 캐시 복원
   useEffect(() => {
     const urlQuery = searchParams.get("q");
@@ -705,7 +713,7 @@ function FoodSearchPageInner() {
         const items = phase2Data.items || [];
         setSearchProgress({ step: "완료!", progress: 100 });
         setAllResults(items);
-
+        setCurrentPage(1);
         const cacheKey = `search_cache_${searchQuery.trim()}`;
         sessionStorage.setItem(
           cacheKey,
@@ -810,10 +818,34 @@ function FoodSearchPageInner() {
     router.push(`/food/result/${foodCode}`);
   };
   // ✅ 페이지네이션
-  const totalPages = Math.ceil(allResults.length / ITEMS_PER_PAGE);
+  // ── 필터 + 정렬 적용 ──
+  const filteredResults = useMemo(() => {
+    let list = [...allResults];
+
+    // 1) 안전 제품만
+    if (filterSafeOnly) {
+      list = list.filter((r) => !r.hasAllergen);
+    }
+
+    // 2) 데이터 소스
+    if (filterSource !== "all") {
+      list = list.filter((r) => r.dataSource === filterSource);
+    }
+
+    // 3) 정렬
+    if (sortBy === "name") {
+      list.sort((a, b) => a.foodName.localeCompare(b.foodName, "ko"));
+    } else if (sortBy === "safe_first") {
+      list.sort((a, b) => Number(a.hasAllergen) - Number(b.hasAllergen));
+    }
+
+    return list;
+  }, [allResults, filterSafeOnly, filterSource, sortBy]);
+
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentResults = allResults.slice(startIndex, endIndex);
+  const currentResults = filteredResults.slice(startIndex, endIndex);
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
@@ -972,7 +1004,57 @@ function FoodSearchPageInner() {
                         </p>
                       )}
                     </div>
+                    {allResults.length > 0 && (
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        {/* 안전 필터 토글 */}
+                        <button
+                          onClick={() => setFilterSafeOnly((v) => !v)}
+                          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                            filterSafeOnly
+                              ? "border-green-400 bg-green-50 text-green-700"
+                              : "border-gray-200 bg-white text-gray-600 hover:border-green-300 hover:bg-green-50"
+                          }`}
+                        >
+                          <span>{filterSafeOnly ? "✅" : "🔍"}</span>내 알레르기
+                          없는 것만
+                        </button>
 
+                        {(
+                          ["all", "openapi", "db", "openfood", "ai"] as const
+                        ).map((src) => {
+                          const labels: Record<string, string> = {
+                            all: "전체",
+                            openapi: "🏛️ 식약처",
+                            db: "🗄️ DB",
+                            openfood: "🌍 수입",
+                            ai: "🤖 AI",
+                          };
+                          return (
+                            <button
+                              key={src}
+                              onClick={() => setFilterSource(src)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                                filterSource === src
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-gray-200 bg-white text-gray-600 hover:border-primary/50"
+                              }`}
+                            >
+                              {labels[src]}
+                            </button>
+                          );
+                        })}
+
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          className="ml-auto rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="default">관련도순</option>
+                          <option value="safe_first">안전 먼저</option>
+                          <option value="name">이름순</option>
+                        </select>
+                      </div>
+                    )}
                     {/* ✅ 결과 목록 - 여백 줄임 */}
                     <div className="space-y-2">
                       {currentResults.map((item) => {
@@ -1140,11 +1222,40 @@ function FoodSearchPageInner() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <div className="mb-4 text-4xl">🔍</div>
-                    <p className="text-lg font-medium">검색 결과가 없습니다</p>
-                    <p className="text-sm text-muted-foreground">
-                      다른 키워드로 검색해보세요
-                    </p>
+                    {filteredResults.length === 0 && allResults.length > 0 ? (
+                      // 검색 결과는 있지만 필터 조건에 안 맞는 경우
+                      <>
+                        <div className="mb-4 text-4xl">🔎</div>
+                        <p className="font-medium text-gray-700">
+                          필터 조건에 맞는 결과가 없어요
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {filterSafeOnly &&
+                            "내 알레르기 없는 제품이 없습니다."}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setFilterSafeOnly(false);
+                            setFilterSource("all");
+                            setSortBy("default");
+                          }}
+                          className="mt-4 rounded-lg border border-primary px-4 py-2 text-sm text-primary hover:bg-primary/5"
+                        >
+                          필터 초기화
+                        </button>
+                      </>
+                    ) : (
+                      // 검색 자체 결과 없음
+                      <>
+                        <div className="mb-4 text-4xl">🔍</div>
+                        <p className="text-lg font-medium">
+                          검색 결과가 없습니다
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          다른 키워드로 검색해보세요
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
