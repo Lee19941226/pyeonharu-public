@@ -18,6 +18,7 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 
 interface Inquiry {
   id: string;
@@ -339,7 +340,7 @@ export default function SupportManagement() {
                       </p>
                       <div
                         className="prose prose-sm max-w-none rounded-lg bg-muted/40 p-3 text-sm"
-                        dangerouslySetInnerHTML={{ __html: inq.content }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inq.content) }}
                       />
                     </div>
 
@@ -376,7 +377,7 @@ export default function SupportManagement() {
                         </p>
                         <div
                           className="prose prose-sm max-w-none text-sm text-green-800"
-                          dangerouslySetInnerHTML={{ __html: inq.admin_reply }}
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inq.admin_reply) }}
                         />
                       </div>
                     )}
