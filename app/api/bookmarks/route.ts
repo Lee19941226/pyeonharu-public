@@ -65,6 +65,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "필수 정보가 누락되었습니다." }, { status: 400 })
   }
 
+  // ✅ type 화이트리스트 검증
+  if (!["hospital", "pharmacy"].includes(type)) {
+    return NextResponse.json({ error: "올바르지 않은 타입입니다." }, { status: 400 })
+  }
+
+  // ✅ id, name 타입 검증
+  if (typeof id !== "string" || typeof name !== "string") {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 })
+  }
+
   if (type === "hospital") {
     const { error } = await supabase.from("hospital_bookmarks").insert({
       user_id: user.id,

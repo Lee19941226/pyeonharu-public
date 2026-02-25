@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!estimated_cal || estimated_cal <= 0) {
+  if (!estimated_cal || typeof estimated_cal !== "number" || estimated_cal <= 0 || estimated_cal > 10000) {
     return NextResponse.json(
       { error: "칼로리를 입력해주세요." },
       { status: 400 },
@@ -134,7 +134,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "ID가 필요합니다." }, { status: 400 });
   }
 
-  if (!estimated_cal || estimated_cal <= 0) {
+  if (!estimated_cal || typeof estimated_cal !== "number" || estimated_cal <= 0 || estimated_cal > 10000) {
     return NextResponse.json(
       { error: "올바른 칼로리를 입력해주세요." },
       { status: 400 },

@@ -1,11 +1,29 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 // 서버사이드 Supabase (service_role로 RLS 우회)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+// ✅ 관리자 인증 헬퍼
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const userSupabase = await createServerClient();
+    const { data: { user } } = await userSupabase.auth.getUser();
+    if (!user) return false;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    return !!profile && ["admin", "super_admin"].includes(profile.role);
+  } catch {
+    return false;
+  }
+}
 
 // 날짜 헬퍼
 function daysAgo(n: number) {
@@ -22,6 +40,11 @@ function startOfDay(date: Date) {
 
 export async function GET(request: Request) {
   try {
+    // ✅ 관리자 인증 체크
+    if (!(await verifyAdmin())) {
+      return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // 기본 30일
     const days = parseInt(period);

@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
+const ipScanMap = new Map<string, number>();
+// 매시간 오래된 키 정리
+setInterval(() => { ipScanMap.clear(); }, 60 * 60 * 1000);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -57,6 +62,29 @@ export async function updateSession(request: NextRequest) {
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
     const scanDate = request.cookies.get("scan_date")?.value;
     const scanCountCookie = request.cookies.get("scan_count")?.value;
+
+    // ✅ IP 기반 보조 rate limit (쿠키 우회 방어)
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const ipKey = `scan:${clientIp}:${today}`;
+    const ipCount = ipScanMap.get(ipKey) || 0;
+    if (ipCount >= 10) {
+      // IP당 일 10회 (쿠키 5회보다 여유)
+      console.log("🚫 IP 기반 스캔 제한 초과:", clientIp, ipCount);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "scan_limit_exceeded",
+          message:
+            "하루 무료 스캔 횟수를 초과했습니다. 회원가입하면 무제한 스캔이 가능합니다.",
+          remainingScans: 0,
+        },
+        { status: 429 },
+      );
+    }
+    ipScanMap.set(ipKey, ipCount + 1);
 
     let scanCount = 0;
 
