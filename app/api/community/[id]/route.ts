@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+function stripHtml(str: string): string {
+  return str.replace(/<[^>]*>/g, "").trim();
+}
+
 // GET /api/community/[id] — 게시글 상세 조회
 export async function GET(
   req: NextRequest,
@@ -203,8 +207,8 @@ export async function PUT(
   const { data, error } = await supabase
     .from("community_posts")
     .update({
-      title: title?.trim(),
-      content: content?.trim(),
+      title: stripHtml(title),
+      content: stripHtml(content),
       image_urls: imageUrls,
       updated_at: new Date().toISOString(),
     })
