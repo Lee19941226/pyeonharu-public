@@ -34,9 +34,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!image.type.startsWith("image/")) {
+    const ALLOWED_TYPES = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+    if (!ALLOWED_TYPES.includes(image.type)) {
       return NextResponse.json(
-        { error: "이미지 파일만 업로드 가능합니다." },
+        { error: "JPG, PNG, WEBP 형식만 업로드 가능합니다." },
         { status: 400 },
       );
     }
