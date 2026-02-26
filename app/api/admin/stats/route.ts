@@ -8,23 +8,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-// ✅ 관리자 인증 헬퍼
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const userSupabase = await createServerClient();
-    const { data: { user } } = await userSupabase.auth.getUser();
-    if (!user) return false;
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    return !!profile && ["admin", "super_admin"].includes(profile.role);
-  } catch {
-    return false;
-  }
-}
-
 // 날짜 헬퍼
 function daysAgo(n: number) {
   const d = new Date();
@@ -39,16 +22,24 @@ function startOfDay(date: Date) {
 }
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const period = searchParams.get("period") || "30"; // 기본 30일
+  const days = parseInt(period);
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || !["admin", "super_admin"].includes(profile.role)) {
+    return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+  }
   try {
-    // ✅ 관리자 인증 체크
-    if (!(await verifyAdmin())) {
-      return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "30"; // 기본 30일
-    const days = parseInt(period);
-
     // ═══ 1. 사용자 통계 ═══
     // 전체 가입자 수
     const { count: totalUsers } = await supabase
