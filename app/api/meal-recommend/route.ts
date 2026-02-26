@@ -236,9 +236,9 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
       },
     });
   } catch (error: any) {
-    console.error("Meal recommend error:", error);
+    console.error("[meal-recommend]", error);
     return NextResponse.json(
-      { error: error.message || "추천 실패" },
+      { error: "추천 중 오류가 발생했습니다." },
       { status: 500 },
     );
   }
