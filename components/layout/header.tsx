@@ -315,7 +315,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <Link
-                  href="/food/camera"
+                  href="/food"
                   onClick={closeMobileMenu}
                   className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50"
                 >

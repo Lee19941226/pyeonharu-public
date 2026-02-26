@@ -155,7 +155,7 @@ export default function ScanSummaryPage() {
             <Button
               onClick={() => {
                 localStorage.removeItem("scan_summary");
-                router.push("/food/camera");
+                router.push("/food");
               }}
               className="w-full"
               variant="default"

@@ -12,7 +12,7 @@ function CanIEatContent() {
     const mode = searchParams.get("mode");
 
     if (mode === "camera") {
-      router.replace("/food/camera");
+      router.replace("/food");
     } else if (q) {
       router.replace(`/food/search?q=${q}`);
     } else {
