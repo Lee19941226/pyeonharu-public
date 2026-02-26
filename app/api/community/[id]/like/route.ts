@@ -1,21 +1,26 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 // POST /api/community/[id]/like — 게시글 좋아요 토글
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id: postId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { id: postId } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 })
+    return NextResponse.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 },
+    );
   }
 
-  const body = await req.json().catch(() => ({}))
-  const commentId = body.commentId || null
+  const body = await req.json().catch(() => ({}));
+  const commentId = body.commentId || null;
 
   if (commentId) {
     // 댓글 좋아요 토글
@@ -24,20 +29,24 @@ export async function POST(
       .select("id")
       .eq("user_id", user.id)
       .eq("comment_id", commentId)
-      .maybeSingle()
+      .maybeSingle();
 
     if (existing) {
-      await supabase.from("community_likes").delete().eq("id", existing.id)
-      return NextResponse.json({ liked: false })
+      await supabase.from("community_likes").delete().eq("id", existing.id);
+      return NextResponse.json({ liked: false });
     } else {
       const { error } = await supabase.from("community_likes").insert({
         user_id: user.id,
         comment_id: commentId,
-      })
+      });
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error("[community/like]", error.message);
+        return NextResponse.json(
+          { error: "서버 오류가 발생했습니다." },
+          { status: 500 },
+        );
       }
-      return NextResponse.json({ liked: true })
+      return NextResponse.json({ liked: true });
     }
   } else {
     // 게시글 좋아요 토글
@@ -46,20 +55,24 @@ export async function POST(
       .select("id")
       .eq("user_id", user.id)
       .eq("post_id", postId)
-      .maybeSingle()
+      .maybeSingle();
 
     if (existing) {
-      await supabase.from("community_likes").delete().eq("id", existing.id)
-      return NextResponse.json({ liked: false })
+      await supabase.from("community_likes").delete().eq("id", existing.id);
+      return NextResponse.json({ liked: false });
     } else {
       const { error } = await supabase.from("community_likes").insert({
         user_id: user.id,
         post_id: postId,
-      })
+      });
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error("[community/like]", error.message);
+        return NextResponse.json(
+          { error: "서버 오류가 발생했습니다." },
+          { status: 500 },
+        );
       }
-      return NextResponse.json({ liked: true })
+      return NextResponse.json({ liked: true });
     }
   }
 }
