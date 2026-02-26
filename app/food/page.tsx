@@ -453,35 +453,25 @@ function FoodMainContent() {
   );
   const handlePageChange = (page: number) => setCurrentPage(page);
   const handleProductClick = (foodCode: string) => {
-    // ✅ AI 결과인 경우 sessionStorage에 저장 후 이동
     if (foodCode.startsWith("ai-")) {
       const aiResult = results.find((r) => r.foodCode === foodCode);
-
       if (aiResult) {
-        // sessionStorage에 저장
-        const storageKey = `ai_result_${foodCode}`;
-        sessionStorage.setItem(
-          storageKey,
-          JSON.stringify({
-            productName: aiResult.foodName,
-            manufacturer: aiResult.manufacturer || "",
-            weight: aiResult.weight || "",
-            detectedIngredients: aiResult.detectedIngredients || [],
-            allergens: aiResult.allergens || [],
-            hasUserAllergen: aiResult.hasAllergen || false,
-            matchedUserAllergens: aiResult.matchedUserAllergens || [],
-            dataSource: "ai",
-            rawMaterials: aiResult.rawMaterials || "",
-            nutritionInfo: aiResult.nutritionInfo || null,
-            ingredients:
-              aiResult.ingredients || aiResult.detectedIngredients || [],
-          }),
-        );
-
-        console.log("✅ AI 검색 결과 sessionStorage 저장:", storageKey);
+        saveAiResult(foodCode, {
+          productName: aiResult.foodName,
+          manufacturer: aiResult.manufacturer || "",
+          weight: aiResult.weight || "",
+          detectedIngredients: aiResult.detectedIngredients || [],
+          allergens: aiResult.allergens || [],
+          hasUserAllergen: aiResult.hasAllergen || false,
+          matchedUserAllergens: aiResult.matchedUserAllergens || [],
+          dataSource: "ai",
+          rawMaterials: aiResult.rawMaterials || "",
+          nutritionInfo: aiResult.nutritionInfo || null,
+          ingredients:
+            aiResult.ingredients || aiResult.detectedIngredients || [],
+        });
       }
     }
-
     router.push(`/food/result/${foodCode}`);
   };
   const handleKeywordClick = (keyword: string) => {
