@@ -19,7 +19,18 @@ export async function POST(req: NextRequest) {
     }
     const { query } = await req.json();
 
-    console.log("🔍 AI 텍스트 분석:", query);
+    if (!query || typeof query !== "string" || !query.trim()) {
+      return NextResponse.json(
+        { success: false, error: "검색어를 입력해주세요." },
+        { status: 400 },
+      );
+    }
+    if (query.trim().length > 100) {
+      return NextResponse.json(
+        { success: false, error: "검색어는 100자 이하로 입력해주세요." },
+        { status: 400 },
+      );
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
