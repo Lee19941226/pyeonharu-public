@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// ✅ 서버사이드 HTML 태그 제거 (XSS 방어)
+function stripHtml(str: string): string {
+  return str.replace(/<[^>]*>/g, "").trim();
+}
+
 // POST /api/community/[id]/comments — 댓글/대댓글 작성
 export async function POST(
   req: NextRequest,
@@ -66,13 +71,14 @@ export async function POST(
       post_id: postId,
       user_id: user.id,
       parent_id: parentId || null,
-      content: content.trim(),
+      content: stripHtml(content),
     })
     .select("*")
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[community/comments]", error.message);
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 
   // 작성자 닉네임 조회

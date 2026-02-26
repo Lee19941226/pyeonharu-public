@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       {/* 본문 */}
       <div className="max-w-3xl mx-auto px-4 py-6">
         <div className="bg-white rounded-2xl shadow-sm p-6 space-y-6 text-gray-700 text-sm leading-relaxed">
-          <p className="text-xs text-gray-400">시행일: 2025년 2월 24일</p>
+          <p className="text-xs text-gray-400">시행일: 2026년 2월 25일</p>
 
           <p>
             편하루(이하 &quot;서비스&quot;)는 이용자의 개인정보를 중요시하며,
@@ -249,7 +249,7 @@ export default function PrivacyPage() {
           </section>
 
           <div className="pt-4 border-t border-gray-100 text-xs text-gray-400">
-            <p>본 개인정보처리방침은 2025년 2월 24일부터 시행됩니다.</p>
+            <p>본 개인정보처리방침은 2026년 2월 25일부터 시행됩니다.</p>
             <p className="mt-1">편하루 팀</p>
           </div>
         </div>

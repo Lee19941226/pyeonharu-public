@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { getChosung, normalizeChosungQuery } from "@/lib/utils/chosung";
 import { headers } from "next/headers";
+import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
 interface ProductScore {
   foodCode: string;
@@ -51,6 +52,15 @@ export async function GET(req: NextRequest) {
     const phase = searchParams.get("phase") || "full";
     const serviceKey = process.env.FOOD_API_KEY || "";
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
+
+    // ✅ OpenAI 비용 통제
+    const rateCheck = checkOpenAIRateLimit("food-search");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 },
+      );
+    }
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,

@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("[Reviews GET] Error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[restaurant/reviews]', error.message)
+      return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
     }
 
     // 음식점별 평균 계산

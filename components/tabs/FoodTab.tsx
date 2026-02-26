@@ -51,7 +51,7 @@ function MiniNaverMap({
 
   useEffect(() => {
     const NAVER_CLIENT_ID =
-      process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "4q5sd2kb26";
+      process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "";
 
     if (window.naver?.maps) {
       setReady(true);
