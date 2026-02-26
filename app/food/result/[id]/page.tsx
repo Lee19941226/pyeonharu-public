@@ -158,34 +158,51 @@ export default function FoodResultPage() {
       : "전체 성분 보기";
 
     try {
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title,
-          description,
-          imageUrl: ogImageUrl.toString(),
-          imageWidth: 800,
-          imageHeight: 400,
-          link: {
-            mobileWebUrl: shareUrl,
-            webUrl: shareUrl,
-          },
-        },
-        buttons: [
-          {
-            title: buttonTitle,
-            link: {
-              mobileWebUrl: shareUrl,
-              webUrl: shareUrl,
+      // ✅ Share 모듈 로드 대기 (최대 3초)
+      let retryCount = 0;
+      const tryShare = () => {
+        if (window.Kakao?.Share?.sendDefault) {
+          window.Kakao.Share.sendDefault({
+            objectType: "feed",
+            content: {
+              title,
+              description,
+              imageUrl: ogImageUrl.toString(),
+              link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
             },
-          },
-        ],
-      });
+            buttons: [
+              {
+                title: "편하루에서 확인하기",
+                link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+              },
+            ],
+          });
+        } else if (retryCount < 6) {
+          retryCount++;
+          setTimeout(tryShare, 500);
+        } else {
+          // 3초 후에도 없으면 링크 복사로 fallback
+          navigator.clipboard.writeText(shareUrl).then(() => {
+            toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요");
+          });
+        }
+      };
+      tryShare();
     } catch (error) {
       console.error("카카오 공유 실패:", error);
-      toast.error("공유에 실패했습니다");
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        toast.success("공유 실패 → 링크를 복사했어요");
+      });
     }
+    console.log("1. Kakao 존재:", !!window.Kakao);
+    console.log("2. initialized:", window.Kakao?.isInitialized());
+    console.log("3. Share 존재:", !!window.Kakao?.Share);
+    console.log(
+      "4. sendDefault 타입:",
+      typeof window.Kakao?.Share?.sendDefault,
+    );
   };
+
   const loadFoodResult = async () => {
     try {
       setIsLoading(true);

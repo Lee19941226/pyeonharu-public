@@ -116,7 +116,7 @@ const nextConfig = {
               "worker-src 'self' blob:",
 
               // form: self만
-              "form-action 'self'",
+              "form-action 'self' https://sharer.kakao.com https://kauth.kakao.com https://accounts.kakao.com https://t1.kakaocdn.net",
 
               // 업그레이드 요청
               "upgrade-insecure-requests",
