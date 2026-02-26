@@ -56,7 +56,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-
+    if (symptom.trim().length > 500) {
+      return NextResponse.json(
+        { error: "증상은 500자 이하로 입력해주세요." },
+        { status: 400 },
+      );
+    }
     const apiKey = process.env.OPENAI_API_KEY;
 
     // ✅ OpenAI 비용 통제
