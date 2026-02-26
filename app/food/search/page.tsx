@@ -94,21 +94,18 @@ function FoodSearchContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasSearched, setHasSearched] = useState(false);
-
   // ✅ URL 쿼리 파라미터 감지 및 자동 검색
   useEffect(() => {
     const urlQuery = searchParams.get("q");
+    if (!urlQuery || urlQuery.trim().length < 2) return;
 
-    if (urlQuery && isInitialMount.current) {
-      setQuery(urlQuery);
-      setHasSearched(true);
+    setQuery(urlQuery.trim());
+    setHasSearched(true);
+    isInitialMount.current = true;
 
-      // ✅ 즉시 검색 실행
-      handleSearch(urlQuery);
-
-      isInitialMount.current = false;
-    }
-  }, [searchParams]);
+    handleSearch(urlQuery.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 검색 기록 불러오기
   useEffect(() => {
@@ -138,24 +135,19 @@ function FoodSearchContent() {
   };
 
   useEffect(() => {
-    if (isInitialMount.current && searchParams.get("q")) {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
       return;
     }
 
     if (query.length === 0) {
-      if (hasSearched) {
-        setResults([]);
-      }
-      setShowHistory(true);
+      setResults([]);
+      setHasSearched(false);
       setCurrentPage(1);
       return;
     }
 
-    if (query.length < 2) {
-      return;
-    }
-
-    setShowHistory(false);
+    if (query.length < 2) return;
 
     const timer = setTimeout(() => {
       handleSearch(query);
@@ -604,6 +596,7 @@ function FoodSearchContent() {
 function FoodSearchPageInner() {
   const ITEMS_PER_PAGE = 10;
   const searchParams = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
   const router = useRouter();
 
   const [query, setQuery] = useState("");
@@ -619,37 +612,39 @@ function FoodSearchPageInner() {
   const [filterSafeOnly, setFilterSafeOnly] = useState(false);
   const [filterSource, setFilterSource] = useState<string>("all"); // "all" | "openapi" | "db" | "openfood" | "ai"
   const [sortBy, setSortBy] = useState<string>("default"); // "default" | "name" | "safe_first"
-
+  const hasSearchedRef = useRef(false);
   useEffect(() => {
     setCurrentPage(1);
   }, [filterSafeOnly, filterSource, sortBy]);
 
-  // ✅ 초기 로드 시 캐시 복원
   useEffect(() => {
     const urlQuery = searchParams.get("q");
+    if (!urlQuery || urlQuery.trim().length < 2) return;
+    if (hasSearchedRef.current) return;
 
-    if (urlQuery) {
-      setQuery(urlQuery);
+    hasSearchedRef.current = true;
+    setQuery(urlQuery.trim());
+    setHasSearched(true);
 
-      // ✅ 캐시된 결과 확인
-      const cacheKey = `search_cache_${urlQuery}`;
-      const cached = sessionStorage.getItem(cacheKey);
+    const cacheKey = `search_cache_${urlQuery.trim()}`;
+    const cached = sessionStorage.getItem(cacheKey);
 
-      if (cached) {
+    if (cached) {
+      try {
         const cachedData = JSON.parse(cached);
-        const isExpired = Date.now() - cachedData.timestamp > 5 * 60 * 1000; // 5분
-
-        if (!isExpired) {
+        const isFresh = Date.now() - cachedData.timestamp < 5 * 60 * 1000;
+        if (isFresh && cachedData.items?.length > 0) {
           setAllResults(cachedData.items);
-          setHasSearched(true);
           setCurrentPage(cachedData.page || 1);
-        } else {
-          sessionStorage.removeItem(cacheKey);
-          performSearch(urlQuery);
+          return;
         }
-      }
+      } catch {}
+      sessionStorage.removeItem(cacheKey);
     }
-  }, []);
+
+    performSearch(urlQuery.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const performSearch = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.trim().length < 2) return;

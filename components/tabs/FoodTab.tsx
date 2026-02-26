@@ -50,8 +50,7 @@ function MiniNaverMap({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const NAVER_CLIENT_ID =
-      process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "";
+    const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "";
 
     if (window.naver?.maps) {
       setReady(true);
@@ -648,7 +647,7 @@ export default function FoodTab({
   // ─── Handlers ───
   const handleFoodSearch = () => {
     if (foodInput.trim())
-      router.push(`/can-i-eat?q=${encodeURIComponent(foodInput)}`);
+      router.push(`/food/search?q=${encodeURIComponent(foodInput.trim())}`);
   };
 
   const handleImageUpload = async (
@@ -665,7 +664,9 @@ export default function FoodTab({
     // ✅ 이미지 크기 사전 검증
     const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
     if (file.size > MAX_IMAGE_SIZE) {
-      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+      toast.error(
+        "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+      );
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -700,7 +701,9 @@ export default function FoodTab({
 
       // ── 413 이미지 크기 초과 ──
       if (response.status === 413) {
-        toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+        toast.error(
+          "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+        );
         return;
       }
 
@@ -819,7 +822,9 @@ export default function FoodTab({
     // ✅ 이미지 크기 사전 검증
     const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
     if (file.size > MAX_IMAGE_SIZE) {
-      toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+      toast.error(
+        "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+      );
       return;
     }
 
@@ -880,7 +885,9 @@ export default function FoodTab({
 
             // ✅ 413 이미지 크기 초과 처리
             if (response.status === 413) {
-              toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+              toast.error(
+                "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+              );
               return;
             }
 
