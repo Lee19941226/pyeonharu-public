@@ -4,7 +4,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
 const ipScanMap = new Map<string, number>();
 // 매시간 오래된 키 정리
-setInterval(() => { ipScanMap.clear(); }, 60 * 60 * 1000);
+setInterval(
+  () => {
+    ipScanMap.clear();
+  },
+  60 * 60 * 1000,
+);
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -72,7 +77,9 @@ export async function updateSession(request: NextRequest) {
     const ipCount = ipScanMap.get(ipKey) || 0;
     if (ipCount >= 10) {
       // IP당 일 10회 (쿠키 5회보다 여유)
-      console.log("🚫 IP 기반 스캔 제한 초과:", clientIp, ipCount);
+      if (process.env.NODE_ENV === "development") {
+        console.log("🚫 IP 기반 스캔 제한 초과 (dev only)");
+      }
       return NextResponse.json(
         {
           success: false,

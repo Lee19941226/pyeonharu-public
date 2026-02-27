@@ -87,7 +87,10 @@ export async function GET(req: NextRequest) {
 
     const userAgent = headersList.get("user-agent") || "unknown";
 
-    console.log(ipAddress, userAgent);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[dev] IP:", ipAddress, "UA:", userAgent);
+    }
+
     // ==========================================
     // Rate Limiting (phase=1 제외 - DB만 조회라 비용 없음)
     // ==========================================
@@ -947,15 +950,6 @@ JSON 배열 형식으로만 반환:
       .then(({ error }) => {
         if (error) {
           console.error("❌ 검색 로그 저장 실패:", error);
-        } else {
-          console.log(
-            `✅ 검색 로그 저장: ${normalizedQuery} (${deduped.length}개 결과)`,
-          );
-          if (user) {
-            console.log(`   사용자: ${user.email || user.id}`);
-          } else {
-            console.log(`   비로그인 (IP: ${ipAddress})`);
-          }
         }
       });
     // ==========================================

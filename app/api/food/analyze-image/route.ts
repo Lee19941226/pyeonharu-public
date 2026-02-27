@@ -25,7 +25,10 @@ export async function POST(req: NextRequest) {
     const rateCheck = checkOpenAIRateLimit("analyze-image");
     if (!rateCheck.allowed) {
       return NextResponse.json(
-        { success: false, error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        {
+          success: false,
+          error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+        },
         { status: 429 },
       );
     }
@@ -59,7 +62,6 @@ export async function POST(req: NextRequest) {
       : [];
 
     console.log("🤖 AI 이미지 분석 시작...");
-    console.log("👤 사용자 알레르기:", safeAllergens);
 
     // ==========================================
     // Step 1: OpenAI Vision으로 이미지 분석
@@ -304,11 +306,13 @@ export async function POST(req: NextRequest) {
 
     const hasUserAllergen = matchedUserAllergens.length > 0;
 
-    console.log("✅ 매칭 결과:", {
-      detectedAllergens,
-      matchedUserAllergens,
-      hasUserAllergen,
-    });
+    if (process.env.NODE_ENV === "development") {
+      console.log("✅ 매칭 결과:", {
+        detectedAllergens,
+        matchedUserAllergens,
+        hasUserAllergen,
+      });
+    }
 
     // ==========================================
     // Step 2.5: DB 캐시에서 제품명 검색
