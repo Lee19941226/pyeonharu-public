@@ -129,7 +129,10 @@ export default function HomePage() {
         if (main === "meal" && ["food", "restaurant", "diet"].includes(sub)) {
           setMainTab("meal");
           setMealSubTab(sub as MealSubTab);
-        } else if (main === "sick" && ["symptom", "hospital", "medicine"].includes(sub)) {
+        } else if (
+          main === "sick" &&
+          ["symptom", "hospital", "medicine"].includes(sub)
+        ) {
           setMainTab("sick");
           setSickSubTab(sub as SickSubTab);
         }
@@ -138,29 +141,35 @@ export default function HomePage() {
     } catch {}
     setHomeRestored(true);
     // 서브페이지에서 탭 선택 후 돌아온 경우
-    const navTab = localStorage.getItem('pyeonharu_nav_tab');
+    const navTab = localStorage.getItem("pyeonharu_nav_tab");
     if (navTab) {
-      localStorage.removeItem('pyeonharu_nav_tab');
-      const [m, s] = navTab.split(':');
-      if (m === 'meal' && ['food', 'restaurant', 'diet'].includes(s)) {
-        setMainTab('meal');
+      localStorage.removeItem("pyeonharu_nav_tab");
+      const [m, s] = navTab.split(":");
+      if (m === "meal" && ["food", "restaurant", "diet"].includes(s)) {
+        setMainTab("meal");
         setMealSubTab(s as any);
-      } else if (m === 'sick' && ['symptom', 'hospital', 'medicine'].includes(s)) {
-        setMainTab('sick');
+      } else if (
+        m === "sick" &&
+        ["symptom", "hospital", "medicine"].includes(s)
+      ) {
+        setMainTab("sick");
         setSickSubTab(s as any);
       }
     }
   }, []);
 
   // ✅ 현재 탭이 첫 화면으로 설정되어 있는지 확인
-  const currentTabKey = mainTab === "meal" ? `meal:${mealSubTab}` : `sick:${sickSubTab}`;
+  const currentTabKey =
+    mainTab === "meal" ? `meal:${mealSubTab}` : `sick:${sickSubTab}`;
   const isCurrentHome = currentTabKey === savedHomeKey;
 
   const setAsHome = () => {
     try {
       localStorage.setItem(HOME_TAB_KEY, currentTabKey);
       setSavedHomeKey(currentTabKey);
-      toast.success(`'${TAB_LABELS[currentTabKey] || currentTabKey}'을(를) 첫 화면으로 설정했어요`);
+      toast.success(
+        `'${TAB_LABELS[currentTabKey] || currentTabKey}'을(를) 첫 화면으로 설정했어요`,
+      );
     } catch {
       toast.error("설정 저장에 실패했습니다");
     }
@@ -417,13 +426,11 @@ export default function HomePage() {
           >
             {isCurrentHome ? (
               <>
-                <Check className="h-3.5 w-3.5" />
-                첫 화면
+                <Check className="h-3.5 w-3.5" />첫 화면
               </>
             ) : (
               <>
-                <Pin className="h-3.5 w-3.5" />
-                첫 화면으로 설정
+                <Pin className="h-3.5 w-3.5" />첫 화면으로 설정
               </>
             )}
           </button>
