@@ -27,7 +27,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
-
+import { Flag } from "lucide-react";
 interface Post {
   id: string;
   school_code: string;
@@ -98,7 +98,13 @@ export default function PostDetailPage({
   );
   const [submitting, setSubmitting] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
-
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    type: "post" | "comment";
+    commentId?: string;
+  } | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -182,6 +188,33 @@ export default function PostDetailPage({
       setComments(updateComments(comments));
     } catch {
       toast.error("좋아요 처리 실패");
+    }
+  };
+
+  const handleReport = async () => {
+    if (!reportTarget || !reportReason) return;
+    setIsReporting(true);
+    try {
+      const res = await fetch(`/api/community/${id}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: reportReason,
+          commentId: reportTarget.commentId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "신고 실패");
+      } else {
+        toast.success("신고가 접수되었습니다.");
+        setShowReportModal(false);
+        setReportReason("");
+      }
+    } catch {
+      toast.error("신고 처리 중 오류가 발생했습니다.");
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -364,7 +397,18 @@ export default function PostDetailPage({
                     />
                     좋아요 {post.like_count}
                   </Button>
-
+                  {user && !post.isOwner && (
+                    <button
+                      onClick={() => {
+                        setReportTarget({ type: "post" });
+                        setShowReportModal(true);
+                      }}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <Flag className="h-3.5 w-3.5" />
+                      신고
+                    </button>
+                  )}
                   {post.isOwner && (
                     <div className="flex gap-1">
                       <Button
@@ -490,6 +534,58 @@ export default function PostDetailPage({
         </div>
       </main>
       <MobileNav />
+      {/* 신고 모달 */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-4 text-base font-bold text-gray-900">
+              신고 사유 선택
+            </h2>
+            <div className="space-y-2">
+              {[
+                "스팸/광고",
+                "욕설/비방",
+                "허위정보",
+                "개인정보 노출",
+                "기타",
+              ].map((r) => (
+                <label
+                  key={r}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 hover:bg-gray-50"
+                >
+                  <input
+                    type="radio"
+                    name="reason"
+                    value={r}
+                    checked={reportReason === r}
+                    onChange={() => setReportReason(r)}
+                    className="accent-red-500"
+                  />
+                  <span className="text-sm">{r}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => {
+                  setShowReportModal(false);
+                  setReportReason("");
+                }}
+                className="flex-1 rounded-xl border py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleReport}
+                disabled={!reportReason || isReporting}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white disabled:opacity-40 hover:bg-red-600"
+              >
+                {isReporting ? "신고 중..." : "신고하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
