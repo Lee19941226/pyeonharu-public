@@ -931,6 +931,9 @@ export default function FoodTab({
     reader.readAsDataURL(file);
   };
 
+  // ─── 학교 등록 여부 판단 (커뮤니티 섹션용) ───
+  const hasSchool = mySchools.length > 0;
+
   // ─── Render ───
   return (
     <div className="w-full">
@@ -1187,27 +1190,52 @@ export default function FoodTab({
                 ))}
               </div>
             ) : communityPosts.length === 0 ? (
-              <Card
-                className="border shadow-none border-dashed cursor-pointer transition-colors hover:bg-muted/50"
-                onClick={() => router.push("/community")}
-              >
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                      <MessageCircle className="h-4 w-4 text-primary" />
+              /* ── 학교 미등록: 학교 등록 유도 / 학교 등록됨: 첫 글 작성 유도 ── */
+              !hasSchool ? (
+                <Card
+                  className="border shadow-none border-dashed border-orange-300 cursor-pointer transition-colors hover:bg-orange-50/50"
+                  onClick={() => router.push("/school")}
+                >
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100">
+                        <GraduationCap className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          학교를 등록해보세요
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          학교를 등록하면 급식 체크와 커뮤니티를 이용할 수 있어요
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        커뮤니티에 첫 글을 작성해보세요
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        학교를 등록하면 커뮤니티에 참여할 수 있어요
-                      </p>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card
+                  className="border shadow-none border-dashed cursor-pointer transition-colors hover:bg-muted/50"
+                  onClick={() => router.push("/community")}
+                >
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                        <MessageCircle className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          커뮤니티에 첫 글을 작성해보세요
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          같은 학교 친구들과 소통해보세요
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </CardContent>
-              </Card>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              )
             ) : (
               <Card className="border shadow-none overflow-hidden">
                 <CardContent className="p-0">
