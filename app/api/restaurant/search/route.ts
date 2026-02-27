@@ -128,6 +128,39 @@ function findAllergens(
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
+
+  const headersList = req.headers;
+  const ipAddress =
+    headersList.get("x-forwarded-for")?.split(",")[0] ||
+    headersList.get("x-real-ip") ||
+    "unknown";
+
+  const rateLimitKey = `restaurant:ip:${ipAddress}`;
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 60 * 1000);
+
+  const supabaseForRate = await createClient();
+  const { count: recentCount } = await supabaseForRate
+    .from("search_rate_limits")
+    .select("*", { count: "exact", head: true })
+    .eq("identifier", rateLimitKey)
+    .gte("searched_at", windowStart.toISOString());
+
+  if ((recentCount || 0) >= 20) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
+  // 비동기로 기록 (응답 대기 안 함)
+  supabaseForRate
+    .from("search_rate_limits")
+    .insert({ identifier: rateLimitKey, searched_at: now.toISOString() })
+    .then(({ error }) => {
+      if (error) console.error("rate limit 기록 실패:", error);
+    });
+
   const userLat = parseFloat(searchParams.get("lat") || "0");
   const userLng = parseFloat(searchParams.get("lng") || "0");
   const radius = searchParams.get("radius") || "2000";
