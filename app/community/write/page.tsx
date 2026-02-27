@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Loader2, Send, GraduationCap, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import Link from "next/link";
 import type { RichEditorRef } from "@/components/editor/rich-editor";
 
 const RichEditor = dynamic(() => import("@/components/editor/rich-editor"), {
@@ -205,9 +206,26 @@ function CommunityWriteContent() {
                 ))}
               </div>
               {mySchools.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  등록된 학교가 없습니다. 학교를 먼저 등록해주세요.
-                </p>
+                <div className="mt-2 rounded-lg border border-dashed border-orange-300 bg-orange-50/50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100">
+                      <GraduationCap className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        등록된 학교가 없습니다
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        글을 작성하려면 학교를 먼저 등록해주세요
+                      </p>
+                    </div>
+                    <Link href="/school">
+                      <Button size="sm" variant="outline" className="shrink-0 border-orange-300 text-orange-600 hover:bg-orange-100">
+                        학교 등록
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               )}
             </div>
 
