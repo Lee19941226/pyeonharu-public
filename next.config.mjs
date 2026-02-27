@@ -9,6 +9,12 @@
 그건 정상 동작이고 배포 환경에서만 실제 효과가 납니다.
 */
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
+
   typescript: {
     ignoreBuildErrors: false,
   },
