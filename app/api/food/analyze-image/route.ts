@@ -29,6 +29,41 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
+  const ipAddress =
+    req.headers.get("x-forwarded-for")?.split(",")[0] ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+
+  const identifier = user ? `user:${user.id}` : `ip:${ipAddress}`;
+  const limit = user ? 50 : 5;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const { count } = await supabase
+    .from("search_rate_limits")
+    .select("*", { count: "exact", head: true })
+    .eq("identifier", `analyze:${identifier}`)
+    .gte("searched_at", todayStart.toISOString());
+
+  if ((count || 0) >= limit) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: user
+          ? `오늘 이미지 분석 한도(${limit}회)를 초과했습니다.`
+          : "오늘 무료 분석 한도를 초과했습니다. 로그인하면 더 많이 사용할 수 있어요.",
+      },
+      { status: 429 },
+    );
+  }
+
+  supabase
+    .from("search_rate_limits")
+    .insert({
+      identifier: `analyze:${identifier}`,
+      searched_at: new Date().toISOString(),
+    })
+    .then(() => {});
   try {
     // ✅ OpenAI 비용 통제: 호출 제한
     const rateCheck = checkOpenAIRateLimit("analyze-image");
