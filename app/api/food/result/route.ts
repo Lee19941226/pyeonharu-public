@@ -267,7 +267,13 @@ JSON 형식으로만 응답:
         );
 
         try {
-          const serviceKey = process.env.FOOD_API_KEY || "";
+          const serviceKey = process.env.FOOD_API_KEY;
+          if (!serviceKey) {
+            return NextResponse.json(
+              { error: "서버 설정 오류입니다. 관리자에게 문의해주세요." },
+              { status: 500 },
+            );
+          }
           const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
 
           // 병렬 API 호출
@@ -496,7 +502,13 @@ JSON 형식으로만 응답:
         console.log("❌ DB 캐시 없음, Open API 조회 진행");
       }
 
-      const serviceKey = process.env.FOOD_API_KEY || "";
+      const serviceKey = process.env.FOOD_API_KEY;
+      if (!serviceKey) {
+        return NextResponse.json(
+          { error: "서버 설정 오류입니다. 관리자에게 문의해주세요." },
+          { status: 500 },
+        );
+      }
       const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
       // ==========================================
       // Open API 병렬 호출 (Promise.allSettled)
@@ -856,6 +868,7 @@ JSON 형식으로만 응답:
     // 대체 식품 추천
     // ==========================================
     const alternatives: any[] = [];
+
     // ==========================================
     // Open API 데이터 → DB 캐시 저장
     // ==========================================

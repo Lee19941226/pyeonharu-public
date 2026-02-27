@@ -4,11 +4,20 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req: NextRequest) {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "서버 설정 오류입니다. 관리자에게 문의해주세요.",
+      },
+      { status: 500 },
+    );
+  }
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
   // ─── 인증 체크 추가 ───
   const supabase = await createClient();
   const {

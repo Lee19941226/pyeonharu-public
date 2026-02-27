@@ -50,7 +50,16 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const query = searchParams.get("q") || "";
     const phase = searchParams.get("phase") || "full";
-    const serviceKey = process.env.FOOD_API_KEY || "";
+    const serviceKey = process.env.FOOD_API_KEY;
+    if (!serviceKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "서버 설정 오류입니다. 관리자에게 문의해주세요.",
+        },
+        { status: 500 },
+      );
+    }
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
 
     // ✅ OpenAI 비용 통제
