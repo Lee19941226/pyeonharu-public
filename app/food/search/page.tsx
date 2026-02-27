@@ -94,7 +94,7 @@ function FoodSearchContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasSearched, setHasSearched] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
     // 초기 상태 체크
@@ -300,7 +300,7 @@ function FoodSearchContent() {
                 </Button>
               )}
             </div>
-            {isOffline && (
+            {isOffline === true && (
               <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
                 <span className="text-base">📡</span>
                 <span>
