@@ -197,10 +197,7 @@ export async function GET(request: NextRequest) {
           <span style={{ fontSize: 14, color: "#9ca3af" }}>pyeonharu.com</span>
         </div>
       </div>,
-      {
-        width: 800,
-        height: 400,
-      },
+      { width: 1200, height: 630 },
     );
   } catch (e) {
     return new Response("OG 이미지 생성 실패", { status: 500 });

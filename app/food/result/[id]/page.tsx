@@ -27,6 +27,7 @@ import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
 import { getAiResult } from "@/lib/utils/ai-result-storage";
 import { classifyApiError, getToastDuration } from "@/lib/utils/api-error";
 import { DataSourceBadge } from "@/components/food/data-source-badge";
+import { shareToKakao } from "@/lib/utils/kakao-share";
 export default function FoodResultPage() {
   const params = useParams();
   const router = useRouter();
@@ -163,6 +164,8 @@ export default function FoodResultPage() {
         title,
         description,
         imageUrl: ogImageUrl.toString(),
+        imageWidth: 1200,
+        imageHeight: 630,
         link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
       },
       buttons: [
@@ -173,10 +176,7 @@ export default function FoodResultPage() {
       ],
     });
   };
-  console.log("Kakao:", window.Kakao);
-  console.log("isInitialized:", window.Kakao?.isInitialized());
-  console.log("Share:", window.Kakao?.Share);
-  console.log("sendDefault:", window.Kakao?.Share?.sendDefault);
+
   const loadFoodResult = async () => {
     try {
       setIsLoading(true);
