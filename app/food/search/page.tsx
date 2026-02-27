@@ -94,6 +94,23 @@ function FoodSearchContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    // 초기 상태 체크
+    setIsOffline(!navigator.onLine);
+
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
   // ✅ URL 쿼리 파라미터 감지 및 자동 검색
   useEffect(() => {
     const urlQuery = searchParams.get("q");
@@ -160,6 +177,12 @@ function FoodSearchContent() {
   const handleSearch = async (searchQuery: string) => {
     if (searchQuery.length < 2) return;
 
+    // 오프라인 체크
+    if (!navigator.onLine) {
+      setIsOffline(true);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setHasSearched(true);
 
@@ -277,7 +300,14 @@ function FoodSearchContent() {
                 </Button>
               )}
             </div>
-
+            {isOffline && (
+              <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                <span className="text-base">📡</span>
+                <span>
+                  인터넷 연결이 끊겼습니다. 연결 후 다시 검색해주세요.
+                </span>
+              </div>
+            )}
             {/* 빠른 액션 버튼 */}
             <div className="mb-8 flex gap-3">
               <Link href="/food" className="flex-1">
