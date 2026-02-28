@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 
 export async function GET() {
   const auth = await verifyAdmin();
   if (!auth.ok) return auth.response;
   const supabase = await createClient();
+
   let offset = 0;
   const batchSize = 1000;
   let totalUpdated = 0;
