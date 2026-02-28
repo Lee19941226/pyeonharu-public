@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 
 export async function GET(req: NextRequest) {
   try {
