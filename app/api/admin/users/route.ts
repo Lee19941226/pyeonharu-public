@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
-
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -9,38 +8,10 @@ const supabaseAdmin = createClient(
 
 const VALID_ROLES = ["user", "moderator", "admin", "super_admin"];
 
-// ─── 공통 인증 헬퍼 ───
-async function getAuthorizedUser(minRole: "admin" | "super_admin") {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return { user: null, profile: null, error: "인증 필요", status: 401 };
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile)
-    return { user: null, profile: null, error: "프로필 없음", status: 403 };
-
-  const allowedRoles =
-    minRole === "super_admin" ? ["super_admin"] : ["admin", "super_admin"];
-
-  if (!allowedRoles.includes(profile.role)) {
-    return { user: null, profile: null, error: "권한 없음", status: 403 };
-  }
-
-  return { user, profile, error: null, status: 200 };
-}
-
 export async function GET(request: Request) {
   try {
-    const { user, profile, error, status } = await getAuthorizedUser("admin");
-    if (error) return NextResponse.json({ error }, { status });
+    const auth = await verifyAdmin();
+    if (!auth.ok) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -138,9 +109,8 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     // super_admin만 등급 변경 가능
-    const { user, profile, error, status } =
-      await getAuthorizedUser("super_admin");
-    if (error) return NextResponse.json({ error }, { status });
+    const auth = await verifyAdmin("super_admin");
+    if (!auth.ok) return auth.response;
 
     const body = await request.json();
     const { targetUserId, newRole } = body;
@@ -149,7 +119,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
     }
 
-    if (targetUserId === user!.id && newRole !== "super_admin") {
+    if (targetUserId === auth.userId && newRole !== "super_admin") {
       return NextResponse.json(
         { error: "본인의 super_admin 권한은 해제할 수 없습니다" },
         { status: 400 },
