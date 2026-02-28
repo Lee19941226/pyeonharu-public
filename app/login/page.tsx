@@ -49,7 +49,8 @@ function LoginContent() {
       return;
     }
 
-    router.push("/");
+    const redirectTo = searchParams?.get("redirect") || "/";
+    router.push(redirectTo);
     router.refresh();
   };
 
@@ -59,10 +60,12 @@ function LoginContent() {
 
     try {
       const supabase = createClient();
+      const redirectTo = searchParams?.get("redirect") || "/";
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
         },
       });
 
