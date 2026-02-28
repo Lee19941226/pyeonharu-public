@@ -1,29 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 const supabaseAdmin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
-
-// 관리자 인증 헬퍼
-async function verifyAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["admin", "super_admin"].includes(profile.role)) return null;
-  return user;
-}
 
 // 문의 목록 조회 (관리자)
 export async function GET(req: NextRequest) {
@@ -55,7 +36,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const { data, count, error } = await query.range(offset, offset + limit - 1);
+    const { data, count, error } = await query.range(
+      offset,
+      offset + limit - 1,
+    );
 
     if (error) throw error;
 
@@ -83,7 +67,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("[admin/support]", error.message);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 }
 
@@ -125,7 +112,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true, inquiry: data });
   } catch (error: any) {
     console.error("[admin/support]", error.message);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 }
 
@@ -149,6 +139,9 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("[admin/support]", error.message);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 }

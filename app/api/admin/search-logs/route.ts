@@ -5,24 +5,8 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // 관리자 확인
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "인증 필요" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile || !["admin", "super_admin"].includes(profile.role)) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-    }
+    const auth = await verifyAdmin();
+    if (!auth.ok) return auth.response;
 
     // 쿼리 파라미터
     const searchParams = req.nextUrl.searchParams;
