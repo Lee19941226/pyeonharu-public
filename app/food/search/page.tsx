@@ -179,9 +179,17 @@ function FoodSearchContent() {
     }
   };
 
-  const clearSearchHistory = () => {
+  const clearSearchHistory = async () => {
     setSearchHistory([]);
     localStorage.removeItem("food_search_history");
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from("food_search_history").delete().eq("user_id", user.id);
   };
 
   useEffect(() => {
