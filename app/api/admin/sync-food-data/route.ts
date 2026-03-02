@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
 
     // Vercel Cron 또는 직접 호출 모두 검증
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const isCronRequest = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    if (!isCronRequest) {
       const auth = await verifyAdmin();
       if (!auth.ok) return auth.response;
     }
