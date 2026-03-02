@@ -9,10 +9,8 @@ const supabaseAdmin = createAdminClient(
 // 문의 목록 조회 (관리자)
 export async function GET(req: NextRequest) {
   try {
-    const user = await verifyAdmin();
-    if (!user) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-    }
+    const auth = await verifyAdmin();
+    if (!auth.ok) return auth.response;
 
     const searchParams = req.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
@@ -77,10 +75,8 @@ export async function GET(req: NextRequest) {
 // 문의 답변/상태 변경 (관리자)
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await verifyAdmin();
-    if (!user) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-    }
+    const auth = await verifyAdmin();
+    if (!auth.ok) return auth.response;
 
     const body = await req.json();
     const { inquiryId, status, admin_reply } = body;
@@ -122,10 +118,8 @@ export async function PATCH(req: NextRequest) {
 // 문의 삭제 (관리자)
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await verifyAdmin();
-    if (!user) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-    }
+    const auth = await verifyAdmin();
+    if (!auth.ok) return auth.response;
 
     const { inquiryId } = await req.json();
 
