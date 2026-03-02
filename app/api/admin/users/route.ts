@@ -76,12 +76,18 @@ export async function GET(request: Request) {
       }),
     );
 
-    const {
-      data: { users: authUsers },
-    } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
+    let authUsers: any[] = [];
+    let authPage = 1;
+    while (true) {
+      const { data } = await supabaseAdmin.auth.admin.listUsers({
+        page: authPage,
+        perPage: 1000,
+      });
+      if (!data?.users?.length) break;
+      authUsers = [...authUsers, ...data.users];
+      if (data.users.length < 1000) break;
+      authPage++;
+    }
 
     const emailMap: Record<string, string> = {};
     authUsers?.forEach((u) => {
