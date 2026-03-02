@@ -19,42 +19,71 @@ export async function GET(req: NextRequest) {
 
   try {
     // ==========================================
-    // 1단계: DB에서 유사 제품 검색 (키워드 기반)
+    // 0단계: safe_alternatives 검증 대체품 먼저
     // ==========================================
-    // 제품명에서 핵심 키워드 추출 (앞 2~3 글자)
-    const keyword = productName
-      .replace(/\(.*?\)/g, "")
-      .trim()
-      .slice(0, 4);
-
-    const { data: dbProducts } = await supabase
-      .from("food_search_cache")
-      .select("food_code, food_name, manufacturer, allergens, data_source")
-      .ilike("food_name", `%${keyword}%`)
-      .neq("food_code", code || "")
-      .limit(30);
-
     let dbAlternatives: any[] = [];
 
-    if (dbProducts && dbProducts.length > 0) {
-      dbAlternatives = dbProducts
-        .filter((p) => {
-          const pAllergens: string[] = p.allergens || [];
-          // 사용자 알레르기 없는 것만
-          return !pAllergens.some((pa) =>
-            userAllergenList.some((ua) => pa.includes(ua) || ua.includes(pa)),
-          );
-        })
-        .slice(0, 3)
-        .map((p) => ({
-          barcode: p.food_code,
-          productName: p.food_name,
+    if (userAllergenList.length > 0) {
+      const { data: safeData } = await supabase
+        .from("safe_alternatives")
+        .select("product_name, manufacturer, category, emoji, food_code")
+        .in("allergen", userAllergenList)
+        .eq("is_verified", true)
+        .limit(3);
+
+      if (safeData && safeData.length > 0) {
+        dbAlternatives = safeData.map((p) => ({
+          barcode: p.food_code || null,
+          productName: p.product_name,
           manufacturer: p.manufacturer || "",
-          allergens: p.allergens || [],
-          category: "유사 제품",
-          reason: "동일 계열 안전 제품",
-          dataSource: p.data_source,
+          allergens: [],
+          category: p.category,
+          reason: `${p.emoji} ${userAllergenList[0]} 없는 검증된 안전 제품`,
+          dataSource: "db",
         }));
+      }
+    }
+
+    // ==========================================
+    // 1단계: safe_alternatives 부족하면 food_search_cache 보완
+    // ==========================================
+    if (dbAlternatives.length < 3) {
+      const keyword = productName
+        .replace(/\(.*?\)/g, "")
+        .trim()
+        .slice(0, 4);
+
+      const existingNames = dbAlternatives.map((a) => a.productName);
+
+      const { data: dbProducts } = await supabase
+        .from("food_search_cache")
+        .select("food_code, food_name, manufacturer, allergens, data_source")
+        .ilike("food_name", `%${keyword}%`)
+        .neq("food_code", code || "")
+        .limit(30);
+
+      if (dbProducts && dbProducts.length > 0) {
+        const cacheAlternatives = dbProducts
+          .filter((p) => {
+            if (existingNames.includes(p.food_name)) return false; // 중복 제거
+            const pAllergens: string[] = p.allergens || [];
+            return !pAllergens.some((pa) =>
+              userAllergenList.some((ua) => pa.includes(ua) || ua.includes(pa)),
+            );
+          })
+          .slice(0, 3 - dbAlternatives.length)
+          .map((p) => ({
+            barcode: p.food_code,
+            productName: p.food_name,
+            manufacturer: p.manufacturer || "",
+            allergens: p.allergens || [],
+            category: "유사 제품",
+            reason: "동일 계열 안전 제품",
+            dataSource: p.data_source,
+          }));
+
+        dbAlternatives = [...dbAlternatives, ...cacheAlternatives];
+      }
     }
 
     // DB에서 3개 찾으면 AI 스킵
