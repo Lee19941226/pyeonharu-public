@@ -36,6 +36,7 @@ import type {
 } from "@/types/food";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
 import { classifyApiError, getToastDuration } from "@/lib/utils/api-error";
+
 const ITEMS_PER_PAGE = 10;
 
 const POPULAR_KEYWORDS = [
@@ -296,13 +297,46 @@ function FoodMainContent() {
     }
   };
 
-  const saveSearchHistory = (searchQuery: string) => {
+  const saveSearchHistory = async (searchQuery: string) => {
     const newHistory = [
       { query: searchQuery, timestamp: Date.now() },
       ...searchHistory.filter((h) => h.query !== searchQuery),
-    ].slice(0, 10);
+    ].slice(0, 20);
     setSearchHistory(newHistory);
     localStorage.setItem("food_search_history", JSON.stringify(newHistory));
+
+    // DB 저장 (로그인 사용자만)
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // 1. 동일 검색어 기존 기록 삭제 (중복 방지)
+    await supabase
+      .from("food_search_history")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("search_query", searchQuery);
+
+    // 2. 새 기록 삽입
+    await supabase.from("food_search_history").insert({
+      user_id: user.id,
+      search_query: searchQuery,
+      searched_at: new Date().toISOString(),
+    });
+
+    // 3. 최대 20개 초과 시 오래된 것 삭제
+    const { data: history } = await supabase
+      .from("food_search_history")
+      .select("id, searched_at")
+      .eq("user_id", user.id)
+      .order("searched_at", { ascending: false });
+
+    if (history && history.length > 20) {
+      const toDelete = history.slice(20).map((r) => r.id);
+      await supabase.from("food_search_history").delete().in("id", toDelete);
+    }
   };
 
   const clearSearchHistory = () => {
