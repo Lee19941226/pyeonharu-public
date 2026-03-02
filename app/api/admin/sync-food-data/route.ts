@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
 
     console.log("🚀 식약처 데이터 동기화 시작...");
 
-    while (true) {
+    const MAX_PAGES = 200;
+    while (pageNo <= MAX_PAGES) {
       const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", pageNo.toString());
