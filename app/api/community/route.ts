@@ -185,10 +185,10 @@ export async function POST(req: NextRequest) {
 
   // 하루 제한 체크
   const { count: dailyCount, error: dailyErr } = await supabase
-    .from("search_rate_limits")
+    .from("community_rate_limits")
     .select("*", { count: "exact", head: true })
     .eq("identifier", identifier)
-    .gte("searched_at", todayStart.toISOString());
+    .gte("created_at", todayStart.toISOString());
 
   if (dailyErr) {
     return NextResponse.json(
@@ -206,10 +206,10 @@ export async function POST(req: NextRequest) {
 
   // 1시간 제한 체크
   const { count: hourlyCount } = await supabase
-    .from("search_rate_limits")
+    .from("community_rate_limits")
     .select("*", { count: "exact", head: true })
     .eq("identifier", identifier)
-    .gte("searched_at", hourAgo.toISOString());
+    .gte("created_at", hourAgo.toISOString());
 
   if ((hourlyCount || 0) >= 5) {
     return NextResponse.json(
@@ -223,8 +223,8 @@ export async function POST(req: NextRequest) {
 
   // 기록 저장 (비동기, 응답 대기 안 함)
   supabase
-    .from("search_rate_limits")
-    .insert({ identifier, searched_at: now.toISOString() })
+    .from("community_rate_limits")
+    .insert({ identifier, created_at: now.toISOString() })
     .then(({ error }) => {
       if (error) console.error("커뮤니티 rate limit 기록 실패:", error);
     });

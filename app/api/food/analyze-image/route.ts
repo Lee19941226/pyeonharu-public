@@ -40,10 +40,10 @@ export async function POST(req: NextRequest) {
   todayStart.setHours(0, 0, 0, 0);
 
   const { count } = await supabase
-    .from("search_rate_limits")
+    .from("image_analyze_rate_limits")
     .select("*", { count: "exact", head: true })
     .eq("identifier", `analyze:${identifier}`)
-    .gte("searched_at", todayStart.toISOString());
+    .gte("analyzed_at", todayStart.toISOString());
 
   if ((count || 0) >= limit) {
     return NextResponse.json(
@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
   }
 
   supabase
-    .from("search_rate_limits")
+    .from("image_analyze_rate_limits")
     .insert({
       identifier: `analyze:${identifier}`,
-      searched_at: new Date().toISOString(),
+      analyzed_at: new Date().toISOString(),
     })
     .then(() => {});
   try {
