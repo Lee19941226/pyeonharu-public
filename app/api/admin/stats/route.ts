@@ -61,10 +61,6 @@ export async function GET(request: Request) {
         .select("user_id")
         .gte("scanned_at", todayStart),
       supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", todayStart),
-      supabase
         .from("community_posts")
         .select("user_id")
         .gte("created_at", todayStart),
@@ -94,10 +90,6 @@ export async function GET(request: Request) {
         .select("user_id")
         .gte("scanned_at", daysAgo(7)),
       supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", daysAgo(7)),
-      supabase
         .from("community_posts")
         .select("user_id")
         .gte("created_at", daysAgo(7)),
@@ -126,10 +118,6 @@ export async function GET(request: Request) {
         .from("food_scan_logs")
         .select("user_id")
         .gte("scanned_at", daysAgo(30)),
-      supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", daysAgo(30)),
       supabase
         .from("community_posts")
         .select("user_id")
@@ -161,10 +149,6 @@ export async function GET(request: Request) {
         .from("food_scan_logs")
         .select("user_id, scanned_at")
         .gte("scanned_at", daysAgo(days)),
-      supabase
-        .from("food_check_history")
-        .select("user_id, checked_at")
-        .gte("checked_at", daysAgo(days)),
       supabase
         .from("community_posts")
         .select("user_id, created_at")
@@ -361,11 +345,6 @@ export async function GET(request: Request) {
         .select("user_id")
         .gte("scanned_at", weekAgoStart)
         .lte("scanned_at", weekAgoEnd),
-      supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", weekAgoStart)
-        .lte("checked_at", weekAgoEnd),
       supabase
         .from("community_posts")
         .select("user_id")
