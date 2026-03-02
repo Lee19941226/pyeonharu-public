@@ -29,13 +29,9 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
-  const ipAddress =
-    req.headers.get("x-forwarded-for")?.split(",")[0] ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
 
-  const identifier = user ? `user:${user.id}` : `ip:${ipAddress}`;
-  const limit = user ? 50 : 5;
+  const identifier = `user:${user.id}`;
+  const limit = 50;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
