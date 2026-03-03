@@ -197,20 +197,6 @@ export async function GET(req: NextRequest) {
       }
     }
     if (phase === "1") {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const userAllergyData = user
-        ? await supabase
-            .from("user_allergies")
-            .select("allergen_name")
-            .eq("user_id", user.id)
-        : { data: [] };
-      const userAllergens = (userAllergyData.data || []).map(
-        (a: any) => a.allergen_name,
-      );
-
       try {
         const isChosungQuery = /^[ㄱ-ㅎ\s]+$/.test(query);
         let dbItems: any[] = [];
