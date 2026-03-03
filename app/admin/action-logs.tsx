@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Loader2,
   User,
+  UserPlus,
   Clock,
   Globe,
   Filter,
@@ -48,6 +49,11 @@ const ACTION_CONFIG: Record<
   string,
   { label: string; color: string; icon: typeof Search }
 > = {
+  signup: {
+    label: "신규 가입",
+    color: "bg-green-100 text-green-800",
+    icon: UserPlus,
+  },
   page_view: {
     label: "페이지 방문",
     color: "bg-emerald-100 text-emerald-700",
