@@ -61,15 +61,21 @@ function getXmlValue(xml: string, tag: string): string {
 // 파라미터: lat, lng, radius(m), department, numOfRows
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const lat = parseFloat(searchParams.get("lat") || "0")
-  const lng = parseFloat(searchParams.get("lng") || "0")
+  const lat = parseFloat(searchParams.get("lat") ?? "")
+  const lng = parseFloat(searchParams.get("lng") ?? "")
   const radiusM = parseInt(searchParams.get("radius") || "3000")
   const department = searchParams.get("department") || ""
   const numOfRows = searchParams.get("numOfRows") || "1000"
 
-  if (!lat || !lng) {
+  if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
     return NextResponse.json(
       { error: "lat, lng 파라미터가 필요합니다." },
+      { status: 400 }
+    )
+  }
+  if (isNaN(radiusM) || radiusM < 100 || radiusM > 5000) {
+    return NextResponse.json(
+      { error: "radius는 100~5000m 범위여야 합니다." },
       { status: 400 }
     )
   }

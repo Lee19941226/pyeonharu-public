@@ -112,6 +112,20 @@ export async function GET(request: NextRequest) {
 
   const userLat = parseFloat(lat);
   const userLng = parseFloat(lng);
+
+  if (isNaN(userLat) || isNaN(userLng) || userLat === 0 || userLng === 0) {
+    return NextResponse.json(
+      { error: "유효한 위치 정보가 필요합니다.", pharmacies: [] },
+      { status: 400 },
+    );
+  }
+  if (isNaN(radiusM) || radiusM < 100 || radiusM > 5000) {
+    return NextResponse.json(
+      { error: "radius는 100~5000m 범위여야 합니다.", pharmacies: [] },
+      { status: 400 },
+    );
+  }
+
   const radiusKm = radiusM / 1000;
 
   try {
