@@ -816,18 +816,6 @@ JSON 형식으로만 응답:
       // 사용자 알레르기 매칭
       // ==========================================
 
-      let userAllergens: any[] = [];
-      if (user) {
-        const { data: allergyData } = await supabase
-          .from("user_allergies")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (allergyData) {
-          userAllergens = allergyData;
-        }
-      }
-
       detectedAllergens = allergyNames
         .map((allergen: string) => {
           const match = userAllergens.find(
