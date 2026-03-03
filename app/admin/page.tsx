@@ -184,7 +184,7 @@ function OnlineUsersCard({
   const [showDetail, setShowDetail] = useState(false);
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm col-span-2 md:col-span-4 lg:col-span-6">
+    <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
@@ -261,8 +261,8 @@ function OnlineUsersCard({
       {/* 상세 목록 */}
       {showDetail && users.length > 0 && (
         <div className="mt-4 border rounded-lg overflow-hidden">
-          <div className="max-h-60 overflow-y-auto">
-            <table className="w-full text-xs">
+          <div className="max-h-60 overflow-auto">
+            <table className="w-full text-xs min-w-[600px]">
               <thead className="bg-muted/50 sticky top-0">
                 <tr>
                   <th className="text-left px-3 py-2 font-medium">상태</th>
@@ -444,13 +444,71 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-muted/30">
       {/* Header */}
       <div className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold">📊 편하루 관리자</h1>
-            <div className="flex items-center gap-0.5 rounded-lg border bg-card p-0.5">
+        <div className="container mx-auto px-4">
+          {/* Title + Controls */}
+          <div className="flex h-12 items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <h1 className="text-base sm:text-lg font-bold shrink-0">📊 편하루 관리자</h1>
+              {activeTab === "dashboard" && (
+                <div
+                  className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                    sseConnected
+                      ? "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400"
+                      : "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                  }`}
+                >
+                  <span className="relative flex h-2 w-2">
+                    {sseConnected ? (
+                      <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </>
+                    ) : (
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    )}
+                  </span>
+                  {sseConnected ? `${totalOnline}명 접속 중` : "연결 끊김"}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTab === "dashboard" && (
+                <>
+                  <AdminReportButton stats={stats} period={period} />
+                  <div className="hidden sm:flex items-center gap-1 rounded-lg border bg-card p-0.5">
+                    {[7, 14, 30, 90].map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setPeriod(d)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                          period === d
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {d}일
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={fetchStats}
+                    disabled={loading}
+                    className="rounded-lg border bg-card p-2 hover:bg-muted transition-colors"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          {/* Tab navigation (scrollable on mobile) */}
+          <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-2">
+            <div className="flex items-center gap-0.5 rounded-lg border bg-card p-0.5 w-fit">
               <button
                 onClick={() => setActiveTab("dashboard")}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === "dashboard"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -460,7 +518,7 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("users")}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === "users"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -470,7 +528,7 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("support")}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === "support"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -483,7 +541,7 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("actionLogs")}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === "actionLogs"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -496,7 +554,7 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("portfolioTokens")}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === "portfolioTokens"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -508,62 +566,6 @@ export default function AdminDashboard() {
                 </span>
               </button>
             </div>
-            {/* ✅ 헤더에 실시간 접속자 배지 */}
-            {activeTab === "dashboard" && (
-              <div
-                className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                  sseConnected
-                    ? "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400"
-                    : "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400"
-                }`}
-              >
-                <span className="relative flex h-2 w-2">
-                  {sseConnected ? (
-                    <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </>
-                  ) : (
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  )}
-                </span>
-                {sseConnected
-                  ? `${totalOnline}명 접속 중`
-                  : "연결 끊김"}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {activeTab === "dashboard" && (
-              <>
-                <AdminReportButton stats={stats} period={period} />
-                {/* 기간 선택 */}
-                <div className="flex items-center gap-1 rounded-lg border bg-card p-0.5">
-                  {[7, 14, 30, 90].map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => setPeriod(d)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                        period === d
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {d}일
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={fetchStats}
-                  disabled={loading}
-                  className="rounded-lg border bg-card p-2 hover:bg-muted transition-colors"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                  />
-                </button>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -583,6 +585,25 @@ export default function AdminDashboard() {
           </div>
         ) : stats ? (
           <>
+            {/* ═══ 모바일 기간 선택 ═══ */}
+            <div className="flex sm:hidden items-center justify-between">
+              <div className="flex items-center gap-1 rounded-lg border bg-card p-0.5">
+                {[7, 14, 30, 90].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setPeriod(d)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      period === d
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {d}일
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* ═══ 🟢 현재 접속자 (SSE 실시간) ═══ */}
             <OnlineUsersCard
               totalOnline={totalOnline}
