@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { Search, FileCode2, Hash, Clock, PanelLeftClose, PanelLeft, Layers } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Search, FileCode2, Hash, Clock, PanelLeftClose, PanelLeft, Layers, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FileTreeSidebar } from "./file-tree-sidebar";
@@ -9,15 +9,43 @@ import { CodeViewer } from "./code-viewer";
 import { ArchitectureOverview } from "./architecture-overview";
 import type { PortfolioData } from "@/lib/utils/portfolio-scanner";
 
-interface PortfolioBrowserProps {
-  data: PortfolioData;
-}
+const STORAGE_KEY = "portfolio_token";
 
-export function PortfolioBrowser({ data }: PortfolioBrowserProps) {
+export function PortfolioBrowser() {
+  const [data, setData] = useState<PortfolioData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"source" | "architecture">("source");
+
+  // 토큰으로 데이터 fetch
+  useEffect(() => {
+    const token = sessionStorage.getItem(STORAGE_KEY);
+    if (!token) {
+      setError("인증 토큰이 없습니다.");
+      setLoading(false);
+      return;
+    }
+
+    fetch("/api/portfolio/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "데이터를 불러올 수 없습니다.");
+        }
+        return res.json();
+      })
+      .then((d) => setData(d))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleNavigateToFile = useCallback((filePath: string) => {
     setActiveTab("source");
@@ -26,6 +54,7 @@ export function PortfolioBrowser({ data }: PortfolioBrowserProps) {
   }, []);
 
   const fileMap = useMemo(() => {
+    if (!data) return new Map();
     const map = new Map<string, (typeof data.categories)[0]["files"][0]>();
     for (const cat of data.categories) {
       for (const file of cat.files) {
@@ -33,9 +62,25 @@ export function PortfolioBrowser({ data }: PortfolioBrowserProps) {
       }
     }
     return map;
-  }, [data.categories]);
+  }, [data]);
 
   const selectedFile = selectedFilePath ? fileMap.get(selectedFilePath) ?? null : null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <p className="text-sm">{error || "데이터를 불러올 수 없습니다."}</p>
+      </div>
+    );
+  }
 
   const generatedDate = new Date(data.generatedAt);
   const formattedDate = `${generatedDate.getFullYear()}.${String(generatedDate.getMonth() + 1).padStart(2, "0")}.${String(generatedDate.getDate()).padStart(2, "0")}`;
@@ -108,7 +153,6 @@ export function PortfolioBrowser({ data }: PortfolioBrowserProps) {
                       searchQuery={searchQuery}
                       onFileSelect={(path) => {
                         setSelectedFilePath(path);
-                        // on mobile, auto-close sidebar
                         if (window.innerWidth < 768) {
                           setSidebarOpen(false);
                         }

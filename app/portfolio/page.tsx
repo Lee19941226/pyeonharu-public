@@ -1,5 +1,4 @@
 import { Metadata } from "next";
-import { scanProject } from "@/lib/utils/portfolio-scanner";
 import { PortfolioBrowser } from "@/components/portfolio/portfolio-browser";
 import { PortfolioTokenGate } from "@/components/portfolio/portfolio-token-gate";
 import { Header } from "@/components/layout/header";
@@ -14,8 +13,6 @@ export const metadata: Metadata = {
 export const dynamic = "force-static";
 
 export default function PortfolioPage() {
-  const data = scanProject(process.cwd());
-
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -32,7 +29,7 @@ export default function PortfolioPage() {
             </div>
           </section>
           <section className="container mx-auto px-4 py-6">
-            <PortfolioBrowser data={data} />
+            <PortfolioBrowser />
           </section>
         </PortfolioTokenGate>
       </main>
