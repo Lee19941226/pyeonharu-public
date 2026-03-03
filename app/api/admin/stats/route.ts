@@ -55,22 +55,28 @@ export async function GET(request: Request) {
     const todayStart = startOfDay(now);
     const wau7Start = daysAgo(7);
 
-    const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs] =
+    const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs, mauActionLogs] =
       await Promise.all([
         supabase.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", daysAgo(30)),
         supabase.from("community_posts").select("user_id, created_at").gte("created_at", daysAgo(30)),
         supabase.from("community_comments").select("user_id, created_at").gte("created_at", daysAgo(30)),
         supabase.from("diet_entries").select("user_id, created_at").gte("created_at", daysAgo(30)),
         supabase.from("food_search_logs").select("user_id, searched_at").gte("searched_at", daysAgo(30)),
+        supabase.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", daysAgo(30)),
       ]);
 
     // 타임스탬프 필드명이 테이블마다 다르므로 ts로 통일
+    // 비로그인 방문자는 ip_address로 고유 식별 (anon: 접두사)
     const allMauRows: { user_id: string; ts: string }[] = [
       ...(mauScanLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.scanned_at })),
       ...(mauPostLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
       ...(mauCommentLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
       ...(mauDietLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
       ...(mauSearchLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.searched_at })),
+      ...(mauActionLogs.data || []).map((r) => ({
+        user_id: r.user_id || `anon:${r.ip_address}`,
+        ts: r.created_at,
+      })),
     ];
 
     const dauUsers = new Set<string>();
@@ -108,6 +114,10 @@ export async function GET(request: Request) {
         .from("diet_entries")
         .select("user_id, created_at")
         .gte("created_at", daysAgo(days)),
+      supabase
+        .from("user_action_logs")
+        .select("user_id, ip_address, created_at")
+        .gte("created_at", daysAgo(days)),
     ]);
 
     const dailyActiveMap: Record<string, Set<string>> = {};
@@ -116,9 +126,10 @@ export async function GET(request: Request) {
         const ts =
           r.scanned_at || r.checked_at || r.created_at || r.searched_at;
         const date = ts?.slice(0, 10);
-        if (date && r.user_id) {
+        const uid = r.user_id || (r.ip_address ? `anon:${r.ip_address}` : null);
+        if (date && uid) {
           if (!dailyActiveMap[date]) dailyActiveMap[date] = new Set();
-          dailyActiveMap[date].add(r.user_id);
+          dailyActiveMap[date].add(uid);
         }
       });
     });
