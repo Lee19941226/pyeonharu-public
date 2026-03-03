@@ -67,26 +67,41 @@ export async function POST(req: NextRequest) {
   if (allergies?.length > 0) {
     for (const a of allergies) {
       if (!a.code?.trim() || !a.name?.trim()) {
+        // 유효성 검사 실패 시 생성된 구성원 롤백
+        await supabase.from("family_members").delete().eq("id", member.id);
         return NextResponse.json(
           { error: "알레르기 코드와 이름은 필수입니다." },
           { status: 400 },
         );
       }
       if (a.code.trim().length > 50 || a.name.trim().length > 50) {
+        // 유효성 검사 실패 시 생성된 구성원 롤백
+        await supabase.from("family_members").delete().eq("id", member.id);
         return NextResponse.json(
           { error: "알레르기 코드와 이름은 50자 이하여야 합니다." },
           { status: 400 },
         );
       }
     }
-    await supabase.from("family_member_allergies").insert(
-      allergies.map((a: any) => ({
-        member_id: member.id,
-        allergen_code: a.code.trim(),
-        allergen_name: a.name.trim(),
-        severity: a.severity || "medium",
-      })),
-    );
+    const { error: allergyError } = await supabase
+      .from("family_member_allergies")
+      .insert(
+        allergies.map((a: any) => ({
+          member_id: member.id,
+          allergen_code: a.code.trim(),
+          allergen_name: a.name.trim(),
+          severity: a.severity || "medium",
+        })),
+      );
+
+    if (allergyError) {
+      // 알레르기 저장 실패 시 생성된 구성원 롤백
+      await supabase.from("family_members").delete().eq("id", member.id);
+      return NextResponse.json(
+        { error: "알레르기 저장 실패: " + allergyError.message },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({ success: true, member });
@@ -114,7 +129,8 @@ export async function PATCH(req: NextRequest) {
   if (!member)
     return NextResponse.json({ error: "권한 없음" }, { status: 403 });
 
-  await supabase
+  // 구성원 정보 업데이트
+  const { error: updateError } = await supabase
     .from("family_members")
     .update({
       name: name.trim(),
@@ -124,7 +140,14 @@ export async function PATCH(req: NextRequest) {
     })
     .eq("id", id);
 
-  // 알레르기 전체 교체
+  if (updateError) {
+    return NextResponse.json(
+      { error: "구성원 정보 업데이트 실패: " + updateError.message },
+      { status: 500 },
+    );
+  }
+
+  // 알레르기 유효성 검사
   if (allergies?.length > 0) {
     for (const a of allergies) {
       if (!a.code?.trim() || !a.name?.trim()) {
@@ -141,16 +164,56 @@ export async function PATCH(req: NextRequest) {
       }
     }
   }
-  await supabase.from("family_member_allergies").delete().eq("member_id", id);
-  if (allergies?.length > 0) {
-    await supabase.from("family_member_allergies").insert(
-      allergies.map((a: any) => ({
-        member_id: id,
-        allergen_code: a.code.trim(),
-        allergen_name: a.name.trim(),
-        severity: a.severity || "medium",
-      })),
+
+  // 기존 알레르기 정보 백업 (롤백용)
+  const { data: existingAllergies } = await supabase
+    .from("family_member_allergies")
+    .select("allergen_code, allergen_name, severity")
+    .eq("member_id", id);
+
+  // 알레르기 삭제
+  const { error: deleteError } = await supabase
+    .from("family_member_allergies")
+    .delete()
+    .eq("member_id", id);
+
+  if (deleteError) {
+    return NextResponse.json(
+      { error: "알레르기 삭제 실패: " + deleteError.message },
+      { status: 500 },
     );
+  }
+
+  // 새 알레르기 삽입
+  if (allergies?.length > 0) {
+    const { error: insertError } = await supabase
+      .from("family_member_allergies")
+      .insert(
+        allergies.map((a: any) => ({
+          member_id: id,
+          allergen_code: a.code.trim(),
+          allergen_name: a.name.trim(),
+          severity: a.severity || "medium",
+        })),
+      );
+
+    if (insertError) {
+      // 삽입 실패 시 기존 알레르기 복원
+      if (existingAllergies && existingAllergies.length > 0) {
+        await supabase.from("family_member_allergies").insert(
+          existingAllergies.map((a) => ({
+            member_id: id,
+            allergen_code: a.allergen_code,
+            allergen_name: a.allergen_name,
+            severity: a.severity,
+          })),
+        );
+      }
+      return NextResponse.json(
+        { error: "알레르기 저장 실패: " + insertError.message },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({ success: true });
