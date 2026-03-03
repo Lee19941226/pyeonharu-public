@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// ─── 매직 넘버로 실제 이미지 형식 검출 ───
+function detectImageMime(buf: Uint8Array): string | null {
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  // GIF: 47 49 46 38 (GIF8)
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return "image/gif";
+  // WebP: RIFF....WEBP
+  if (buf.length > 11 &&
+      buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return "image/webp";
+  return null;
+}
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+};
+
 // POST /api/community/upload — 이미지 업로드
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -43,14 +65,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 이미지 타입 확인
-    const ALLOWED_TYPES = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
+    // ─── MIME 타입 + 매직 넘버 검증 ───
+    const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: "JPG, PNG, GIF, WEBP 형식만 업로드 가능합니다." },
@@ -58,13 +74,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ext = file.name.split(".").pop() || "jpg";
+    const fileBytes = await file.arrayBuffer();
+    const buf = new Uint8Array(fileBytes);
+    const detectedMime = detectImageMime(buf);
+    // image/jpg는 비표준 — image/jpeg로 정규화하여 비교
+    const normalizedType = file.type === "image/jpg" ? "image/jpeg" : file.type;
+    if (!detectedMime || detectedMime !== normalizedType) {
+      return NextResponse.json(
+        { error: "파일 형식이 유효하지 않습니다." },
+        { status: 400 },
+      );
+    }
+
+    const ext = MIME_TO_EXT[detectedMime] ?? "jpg";
     const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const { data, error } = await supabase.storage
       .from("community-images")
-      .upload(fileName, file, {
-        contentType: file.type,
+      .upload(fileName, Buffer.from(fileBytes), {
+        contentType: normalizedType,
         upsert: false,
       });
 

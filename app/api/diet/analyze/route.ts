@@ -4,6 +4,30 @@ import { createClient } from "@/lib/supabase/server";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// ─── 매직 넘버로 실제 이미지 형식 검출 ───
+function detectImageMime(buf: Uint8Array): string | null {
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  // WebP: RIFF....WEBP
+  if (buf.length > 11 &&
+      buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return "image/webp";
+  // HEIC/HEIF: ISO Base Media File (ftyp box at offset 4)
+  if (buf.length > 11 &&
+      buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return "image/heic";
+  return null;
+}
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+};
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -52,7 +76,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── MIME 타입 검증 ───
+    // ─── MIME 타입 + 매직 넘버 검증 ───
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
     if (!allowedTypes.includes(image.type)) {
       return NextResponse.json(
@@ -61,15 +85,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 이미지를 base64로 변환
     const bytes = await image.arrayBuffer();
+    const buf = new Uint8Array(bytes);
+    const detectedMime = detectImageMime(buf);
+    // HEIC와 HEIF는 동일한 ftyp 컨테이너를 사용하므로 함께 허용
+    const isHeicFamily =
+      detectedMime === "image/heic" &&
+      (image.type === "image/heic" || image.type === "image/heif");
+    if (!detectedMime || (detectedMime !== image.type && !isHeicFamily)) {
+      return NextResponse.json(
+        { error: "파일 형식이 유효하지 않습니다." },
+        { status: 400 },
+      );
+    }
+
     const base64 = Buffer.from(bytes).toString("base64");
-    const mimeType = image.type || "image/jpeg";
+    const mimeType = image.type;
 
     // ─── 이미지를 Supabase Storage에 업로드 ───
     let imageUrl: string | null = null;
     try {
-      const ext = image.name?.split(".").pop() || "jpg";
+      const ext = MIME_TO_EXT[detectedMime] ?? "jpg";
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
