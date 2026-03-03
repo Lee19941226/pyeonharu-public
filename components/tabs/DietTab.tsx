@@ -324,7 +324,7 @@ export default function DietTab() {
     };
     window.addEventListener("diet-entry-added", handler);
     return () => window.removeEventListener("diet-entry-added", handler);
-  }, [user, loadEntries]);
+  }, [user, loadEntries, loadDashboard]);
 
   const getDashRange = useCallback(() => {
     const today = new Date();

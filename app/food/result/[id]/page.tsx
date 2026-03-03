@@ -65,6 +65,8 @@ export default function FoodResultPage() {
   // ✅ result가 로드된 후에 즐겨찾기 확인
   useEffect(() => {
     if (result && result.foodCode) {
+      // checkFavorite는 result를 클로저로 캡처하며, result가 deps에 있어 stale 없음
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       checkFavorite();
     }
   }, [result]);
@@ -416,6 +418,8 @@ export default function FoodResultPage() {
     }
   };
   useEffect(() => {
+    // loadFoodResult는 params.id를 클로저로 캡처하며, params.id가 deps에 있어 stale 없음
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadFoodResult();
   }, [params.id]);
   const saveToHistory = async (result: FoodResult) => {
