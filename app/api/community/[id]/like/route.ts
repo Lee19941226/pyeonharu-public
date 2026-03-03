@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/utils/action-log";
 
 // POST /api/community/[id]/like — 게시글 좋아요 토글
 export async function POST(
@@ -46,6 +47,11 @@ export async function POST(
           { status: 500 },
         );
       }
+      logAction({
+        userId: user.id,
+        actionType: "community_like",
+        metadata: { post_id: postId, comment_id: commentId, liked: true },
+      });
       return NextResponse.json({ liked: true });
     }
   } else {
@@ -72,6 +78,11 @@ export async function POST(
           { status: 500 },
         );
       }
+      logAction({
+        userId: user.id,
+        actionType: "community_like",
+        metadata: { post_id: postId, liked: true },
+      });
       return NextResponse.json({ liked: true });
     }
   }

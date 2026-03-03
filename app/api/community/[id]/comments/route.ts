@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/utils/action-log";
 
 // ✅ 서버사이드 HTML 태그 제거 (XSS 방어)
 function stripHtml(str: string): string {
@@ -80,6 +81,12 @@ export async function POST(
     console.error("[community/comments]", error.message);
     return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
+
+  logAction({
+    userId: user.id,
+    actionType: "community_comment_create",
+    metadata: { comment_id: data.id, post_id: postId },
+  });
 
   // 작성자 닉네임 조회
   const { data: profile } = await supabase

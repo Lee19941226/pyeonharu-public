@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/utils/action-log";
 
 // POST /api/food/scan-log — 스캔 기록 저장
 export async function POST(req: NextRequest) {
@@ -50,6 +51,12 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+
+  logAction({
+    userId: user.id,
+    actionType: "food_scan",
+    metadata: { food_code: foodCode, food_name: foodName, is_safe: isSafe ?? true },
+  });
 
   return NextResponse.json({ success: true });
 }

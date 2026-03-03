@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/utils/action-log";
 
 // GET /api/diet/entries?date=2026-02-17
 export async function GET(req: NextRequest) {
@@ -110,6 +111,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  logAction({
+    userId: user.id,
+    actionType: "diet_entry_create",
+    metadata: { food_name: food_name.trim(), estimated_cal: Math.round(estimated_cal) },
+  });
+
   return NextResponse.json({ success: true, entry });
 }
 
@@ -189,6 +196,12 @@ export async function DELETE(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: "삭제 실패" }, { status: 500 });
   }
+
+  logAction({
+    userId: user.id,
+    actionType: "diet_entry_delete",
+    metadata: { entry_id: id },
+  });
 
   return NextResponse.json({ success: true });
 }

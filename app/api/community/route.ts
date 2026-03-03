@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/utils/action-log";
 
 // ✅ 서버사이드 HTML 태그 제거 (XSS 방어)
 function stripHtml(str: string): string {
@@ -288,6 +289,12 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+
+  logAction({
+    userId: user.id,
+    actionType: "community_post_create",
+    metadata: { post_id: data.id, title: stripHtml(title) },
+  });
 
   return NextResponse.json({ success: true, post: data });
 }
