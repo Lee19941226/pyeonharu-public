@@ -78,6 +78,9 @@ export default function CommunityPage() {
 
   const [hotSchools, setHotSchools] = useState<SchoolRank[]>([])
   const [rankMode, setRankMode] = useState<"score" | "posts" | "likes">("score")
+  const [weeklyAverages, setWeeklyAverages] = useState<{ posts: number; likes: number; comments: number; views: number } | null>(null)
+  const [mySchoolStats, setMySchoolStats] = useState<{ posts: number; likes: number; comments: number; views: number } | null>(null)
+  const [totalSchools, setTotalSchools] = useState(0)
 
   useEffect(() => {
     const supabase = createClient()
@@ -89,13 +92,22 @@ export default function CommunityPage() {
     loadRanking()
   }, [])
 
-  const loadRanking = async () => {
+  const loadRanking = async (schoolCode?: string) => {
     try {
-      const res = await fetch("/api/community/ranking")
+      const params = new URLSearchParams()
+      if (schoolCode) params.set("schoolCode", schoolCode)
+      const res = await fetch(`/api/community/ranking?${params}`)
       const data = await res.json()
       setHotSchools(data.ranking || [])
+      setWeeklyAverages(data.averages || null)
+      setMySchoolStats(data.mySchool || null)
+      setTotalSchools(data.totalSchools || 0)
     } catch { /* ignore */ }
   }
+
+  useEffect(() => {
+    if (selectedSchool) loadRanking(selectedSchool)
+  }, [selectedSchool])
 
   const loadMySchools = async () => {
     try {
@@ -412,39 +424,58 @@ export default function CommunityPage() {
                 </div>
               </div>
 
-              {/* 📊 활동 요약 */}
-              {hotSchools.length > 0 && (
+              {/* 📊 주간 활동 비교 */}
+              {weeklyAverages && (weeklyAverages.posts > 0 || weeklyAverages.likes > 0 || weeklyAverages.comments > 0) && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="bg-muted/50 px-3 py-2">
-                    <span className="text-xs font-bold text-foreground">📊 주간 활동</span>
+                    <span className="text-xs font-bold text-foreground">
+                      📊 주간 활동{mySchoolStats ? " 비교" : ""}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 divide-x">
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-lg font-bold text-primary">
-                        {hotSchools.reduce((sum, s) => sum + s.posts, 0)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">총 게시글</p>
-                    </div>
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-lg font-bold text-red-500">
-                        {hotSchools.reduce((sum, s) => sum + s.likes, 0)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">총 좋아요</p>
-                    </div>
+                  <div className="divide-y">
+                    {([
+                      { label: "게시글", key: "posts" as const, unit: "건" },
+                      { label: "좋아요", key: "likes" as const, unit: "개" },
+                      { label: "댓글", key: "comments" as const, unit: "개" },
+                    ]).map(({ label, key, unit }) => {
+                      const avg = weeklyAverages[key]
+                      const my = mySchoolStats?.[key]
+                      const diff = my !== undefined ? my - avg : null
+                      const pct = diff !== null && avg > 0 ? Math.round((diff / avg) * 100) : null
+
+                      return (
+                        <div key={key} className="px-3 py-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              평균 {avg}{unit}
+                            </span>
+                          </div>
+                          {my !== undefined && (
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="text-sm font-bold">우리 학교 {my}{unit}</span>
+                              {diff !== null && (
+                                <span className={`text-xs font-semibold ${
+                                  diff > 0 ? "text-red-500" : diff < 0 ? "text-blue-500" : "text-muted-foreground"
+                                }`}>
+                                  {diff > 0 ? "▲" : diff < 0 ? "▼" : "—"}
+                                  {pct !== null
+                                    ? ` ${diff > 0 ? "+" : ""}${pct}%`
+                                    : diff !== 0
+                                      ? ` ${diff > 0 ? "+" : ""}${diff}`
+                                      : ""}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                  <div className="grid grid-cols-2 divide-x border-t">
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-lg font-bold text-blue-500">
-                        {hotSchools.reduce((sum, s) => sum + s.comments, 0)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">총 댓글</p>
-                    </div>
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-lg font-bold text-foreground">
-                        {hotSchools.length}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">활동 학교</p>
-                    </div>
+                  <div className="border-t px-3 py-1.5 text-center">
+                    <span className="text-[10px] text-muted-foreground">
+                      전체 {totalSchools}개 학교 · 최근 7일
+                    </span>
                   </div>
                 </div>
               )}

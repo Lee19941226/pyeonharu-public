@@ -50,7 +50,12 @@ export async function GET(req: NextRequest) {
   // 학교 코드 → 이름 매핑
   const schoolCodes = Array.from(schoolMap.keys());
   if (schoolCodes.length === 0) {
-    return NextResponse.json({ ranking: [] });
+    return NextResponse.json({
+      ranking: [],
+      averages: { posts: 0, likes: 0, comments: 0, views: 0 },
+      totalSchools: 0,
+      mySchool: null,
+    });
   }
 
   const { data: schools } = await supabase
@@ -85,5 +90,31 @@ export async function GET(req: NextRequest) {
     })
     .slice(0, 10);
 
-  return NextResponse.json({ ranking });
+  // 전체 학교 평균 계산
+  const schoolCount = schoolMap.size;
+  const totals = { posts: 0, likes: 0, comments: 0, views: 0 };
+  for (const stats of schoolMap.values()) {
+    totals.posts += stats.posts;
+    totals.likes += stats.likes;
+    totals.comments += stats.comments;
+    totals.views += stats.views;
+  }
+  const averages = {
+    posts: schoolCount > 0 ? Math.round((totals.posts / schoolCount) * 10) / 10 : 0,
+    likes: schoolCount > 0 ? Math.round((totals.likes / schoolCount) * 10) / 10 : 0,
+    comments: schoolCount > 0 ? Math.round((totals.comments / schoolCount) * 10) / 10 : 0,
+    views: schoolCount > 0 ? Math.round((totals.views / schoolCount) * 10) / 10 : 0,
+  };
+
+  // 특정 학교 데이터 (top 10에 없을 수 있으므로 별도 조회)
+  const targetSchool = searchParams.get("schoolCode");
+  let mySchool: { posts: number; likes: number; comments: number; views: number } | null = null;
+  if (targetSchool) {
+    const stats = schoolMap.get(targetSchool);
+    mySchool = stats
+      ? { posts: stats.posts, likes: stats.likes, comments: stats.comments, views: stats.views }
+      : { posts: 0, likes: 0, comments: 0, views: 0 };
+  }
+
+  return NextResponse.json({ ranking, averages, totalSchools: schoolCount, mySchool });
 }
