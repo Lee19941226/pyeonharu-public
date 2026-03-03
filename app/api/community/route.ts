@@ -221,13 +221,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 기록 저장 (비동기, 응답 대기 안 함)
-  supabase
+  // 기록 저장 (실패 시 요청 차단)
+  const { error: rateLimitInsertErr } = await supabase
     .from("community_rate_limits")
-    .insert({ identifier, created_at: now.toISOString() })
-    .then(({ error }) => {
-      if (error) console.error("커뮤니티 rate limit 기록 실패:", error);
-    });
+    .insert({ identifier, created_at: now.toISOString() });
+
+  if (rateLimitInsertErr) {
+    console.error("커뮤니티 rate limit 기록 실패:", rateLimitInsertErr);
+    return NextResponse.json(
+      { error: "잠시 후 다시 시도해주세요." },
+      { status: 503 },
+    );
+  }
   const body = await req.json();
   const { schoolCode, title, content, imageUrls } = body;
 
