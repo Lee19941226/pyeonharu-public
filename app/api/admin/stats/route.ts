@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
-// 서버사이드 Supabase (service_role로 RLS 우회)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+// 서버사이드 Supabase (service_role로 RLS 우회) — 지연 초기화
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // 날짜 헬퍼
 function daysAgo(n: number) {
@@ -26,6 +28,7 @@ export async function GET(request: Request) {
   const period = searchParams.get("period") || "30"; // 기본 30일
   const days = parseInt(period);
   const supabase = await createServerClient();
+  const adminDb = getAdminClient(); // RLS 우회 (user_action_logs 조회용)
   const auth = await verifyAdmin();
   if (!auth.ok) return auth.response;
   try {
@@ -62,7 +65,7 @@ export async function GET(request: Request) {
         supabase.from("community_comments").select("user_id, created_at").gte("created_at", daysAgo(30)),
         supabase.from("diet_entries").select("user_id, created_at").gte("created_at", daysAgo(30)),
         supabase.from("food_search_logs").select("user_id, searched_at").gte("searched_at", daysAgo(30)),
-        supabase.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", daysAgo(30)),
+        adminDb.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", daysAgo(30)),
       ]);
 
     // 타임스탬프 필드명이 테이블마다 다르므로 ts로 통일
