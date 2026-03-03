@@ -7,6 +7,14 @@ import {
   Shield,
   UtensilsCrossed,
   FileCode2,
+  Pill,
+  Stethoscope,
+  MapPin,
+  GraduationCap,
+  Users,
+  Building2,
+  Bookmark,
+  BarChart3,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -184,6 +192,221 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     ],
     techStack: ["OpenAI Vision", "BMR Algorithm"],
     security: ["인증 필수 (로그인된 사용자만 접근 가능)"],
+  },
+  {
+    icon: <Pill className="h-5 w-5" />,
+    title: "의약품 검색",
+    summary: "공공데이터 API를 통한 의약품 정보 검색 및 HTML 정제",
+    steps: [
+      {
+        file: "app/api/medicine/route.ts",
+        description: "공공데이터 API 프록시, HTML 태그 정제 후 의약품 정보 반환",
+      },
+    ],
+    techStack: ["공공데이터 API (data.go.kr)", "XML/JSON 파싱"],
+    security: [
+      "입력값 검증 (itemName 필수, URL 인코딩)",
+      "HTML 태그 정제 (XSS 방지, cleanHtml 함수)",
+      "API 키 환경변수 관리 (로그에 KEY_HIDDEN 처리)",
+    ],
+  },
+  {
+    icon: <Stethoscope className="h-5 w-5" />,
+    title: "증상 분석",
+    summary: "AI 기반 증상 분석, 질환 추정, 진료과 추천 및 주변 병원 연결",
+    steps: [
+      {
+        file: "components/tabs/SymptomTab.tsx",
+        description: "4단계 UI (입력 → 분석중 → 결과 → 병원상세), 네이버 지도 연동",
+      },
+      {
+        file: "app/api/symptom-analyze/route.ts",
+        description: "GPT-4o-mini로 증상 분석, 질환/진료과/식이요법 JSON 응답",
+      },
+      {
+        file: "lib/utils/openai-rate-limit.ts",
+        description: "메모리 기반 OpenAI API 호출 제한 (분당 30회, 일 1000회)",
+      },
+    ],
+    techStack: ["OpenAI GPT-4o-mini", "Naver Map API", "Geolocation API", "Supabase"],
+    security: [
+      "다중 Rate Limiting (DB: 인증 20회/비인증 5회/일 + 메모리: OpenAI 비용 제어)",
+      "입력값 검증 (500자 제한, 타입 체크)",
+      "응급 상황 감지 (emergencyLevel에 따른 119 안내)",
+    ],
+  },
+  {
+    icon: <MapPin className="h-5 w-5" />,
+    title: "맛집 추천",
+    summary: "위치 기반 음식점 검색, 알레르기 위험도 판단, AI 메뉴 분석 및 리뷰",
+    steps: [
+      {
+        file: "app/api/restaurant/search/route.ts",
+        description: "소상공인 API로 반경 내 음식점 검색, 알레르기 위험도 매핑",
+      },
+      {
+        file: "app/api/restaurant/analyze/route.ts",
+        description: "GPT-4o-mini로 음식점 메뉴/알레르기 AI 분석",
+      },
+      {
+        file: "app/api/restaurant/geocode/route.ts",
+        description: "지역명 → 좌표 변환 (120+ 한국 지역 내장 DB)",
+      },
+      {
+        file: "app/api/restaurant/reverse-geocode/route.ts",
+        description: "좌표 → 지역명 역변환",
+      },
+      {
+        file: "app/api/restaurant/reviews/route.ts",
+        description: "음식점 리뷰 CRUD (1인 1리뷰 upsert 정책)",
+      },
+    ],
+    techStack: ["소상공인 상가정보 API", "OpenAI GPT-4o-mini", "Haversine 거리 공식", "Supabase"],
+    security: [
+      "IP 기반 Rate Limiting (20회/분, restaurant_rate_limits 테이블)",
+      "인증 필수 (AI 분석, 리뷰 작성/삭제)",
+      "소유권 검증 (본인 리뷰만 삭제 가능)",
+      "74개 카테고리-알레르겐 매핑으로 위험도 자동 판단",
+    ],
+  },
+  {
+    icon: <GraduationCap className="h-5 w-5" />,
+    title: "학교 급식",
+    summary: "NEIS 연동 급식 조회, 알레르기 교차 오염 감지, 이메일 알림",
+    steps: [
+      {
+        file: "app/school/page.tsx",
+        description: "학교 검색 및 등록 관리 (최대 5개교)",
+      },
+      {
+        file: "app/school/[id]/page.tsx",
+        description: "일간/주간 급식 상세 조회, 알레르기 매칭 시각화",
+      },
+      {
+        file: "app/api/school/meals/route.ts",
+        description: "NEIS API 급식 조회, 캐싱, 알레르기 교차 오염 감지",
+      },
+      {
+        file: "app/api/school/register/route.ts",
+        description: "학교 등록/해제/목록 API (사용자별 관리)",
+      },
+      {
+        file: "app/api/cron/daily-meal-check/route.ts",
+        description: "Vercel Cron 일일 급식 알레르기 이메일 알림",
+      },
+    ],
+    techStack: ["NEIS Open API", "Supabase", "Nodemailer (Gmail SMTP)", "Vercel Cron"],
+    security: [
+      "인증 필수 (학교 등록/알레르기 매칭)",
+      "크론 Bearer 토큰 검증 (CRON_SECRET)",
+      "19종 알레르기 코드 매핑 + 교차 오염 규칙 (계란↔닭고기, 우유↔쇠고기 등)",
+      "학교 등록 수 제한 (사용자당 5개교)",
+    ],
+  },
+  {
+    icon: <Users className="h-5 w-5" />,
+    title: "가족 관리",
+    summary: "가족 구성원별 알레르기 정보 관리 및 식품 안전 확인 연동",
+    steps: [
+      {
+        file: "app/family/page.tsx",
+        description: "가족 구성원 CRUD UI, 다중 알레르기 선택, 심각도 설정",
+      },
+      {
+        file: "app/api/family/route.ts",
+        description: "가족 구성원/알레르기 CRUD API (RPC 원자적 트랜잭션)",
+      },
+    ],
+    techStack: ["Supabase RPC", "Supabase RLS", "PostgreSQL"],
+    security: [
+      "소유권 검증 (owner_id 기반 접근 제어)",
+      "원자적 트랜잭션 (RPC로 알레르기 일괄 갱신, 실패 시 롤백)",
+      "구성원 10명 제한 (리소스 관리)",
+      "입력값 검증 (이름 10자, 알레르기 코드/명 50자 제한)",
+    ],
+  },
+  {
+    icon: <Building2 className="h-5 w-5" />,
+    title: "병원/약국 찾기",
+    summary: "지역별/위치 기반 병원 약국 검색, 공공 API 프록시, 거리순 정렬",
+    steps: [
+      {
+        file: "app/area/page.tsx",
+        description: "전국 17개 시도 지역 선택 랜딩 페이지",
+      },
+      {
+        file: "app/api/area/hospitals/route.ts",
+        description: "HIRA API 프록시, 시도코드 기반 병원 목록 조회",
+      },
+      {
+        file: "app/api/area/pharmacies/route.ts",
+        description: "국립중앙의료원 API 프록시, 시도명 기반 약국 목록 조회",
+      },
+      {
+        file: "app/api/hospitals/route.ts",
+        description: "위경도 기반 반경 내 병원 검색 (Haversine 거리 계산)",
+      },
+      {
+        file: "app/api/pharmacies/route.ts",
+        description: "위경도 기반 반경 내 약국 검색 (Fallback 시도명 재시도)",
+      },
+    ],
+    techStack: ["HIRA API", "국립중앙의료원 API", "Haversine 공식", "Naver Map", "ISR (1시간)"],
+    security: [
+      "지역 코드 화이트리스트 (17개 시도 REGIONS 객체)",
+      "반경 범위 제한 (100m ~ 5000m)",
+      "ISR 캐싱으로 API 호출 최소화 (1시간 revalidate)",
+      "API 키 환경변수 관리",
+    ],
+  },
+  {
+    icon: <Bookmark className="h-5 w-5" />,
+    title: "북마크",
+    summary: "병원, 약국, 음식의 즐겨찾기 관리 및 중복 방지",
+    steps: [
+      {
+        file: "app/bookmarks/page.tsx",
+        description: "3개 탭 (병원/약국/음식) 즐겨찾기 목록 및 삭제 관리",
+      },
+      {
+        file: "app/api/bookmarks/route.ts",
+        description: "병원/약국 즐겨찾기 CRUD API",
+      },
+      {
+        file: "app/api/bookmarks/check/route.ts",
+        description: "특정 항목의 즐겨찾기 여부 확인 API",
+      },
+      {
+        file: "app/api/food/favorites/route.ts",
+        description: "음식 즐겨찾기 CRUD API (별도 테이블)",
+      },
+    ],
+    techStack: ["Supabase RLS", "PostgreSQL Unique Constraint"],
+    security: [
+      "3중 인증 (미들웨어 보호 경로 + API 인증 + Supabase RLS)",
+      "중복 방지 (unique(user_id, item_id) 제약 조건, 409 Conflict)",
+      "타입 화이트리스트 (hospital/pharmacy만 허용)",
+    ],
+  },
+  {
+    icon: <BarChart3 className="h-5 w-5" />,
+    title: "주간 리포트",
+    summary: "주간 식품 스캔 통계, 위험 식품 감지, 일별 추이 차트",
+    steps: [
+      {
+        file: "app/reports/page.tsx",
+        description: "주간 리포트 UI (요약 카드, 일별 차트, 위험 식품 목록)",
+      },
+      {
+        file: "app/api/reports/weekly/route.ts",
+        description: "주간 스캔 데이터 집계, 전주 대비 비교, 위험 식품/즐겨찾기 분석",
+      },
+    ],
+    techStack: ["Supabase", "Custom 차트"],
+    security: [
+      "인증 필수 (보호 경로 미들웨어 + API 인증)",
+      "RLS 기반 데이터 격리 (본인 스캔 기록만 조회)",
+    ],
   },
 ];
 
