@@ -124,6 +124,12 @@ export async function GET(req: NextRequest) {
   // 복수 학교 필터
   if (schoolCodesParam) {
     const codes = schoolCodesParam.split(",").filter(Boolean);
+    if (codes.length > 20) {
+      return NextResponse.json(
+        { error: "학교 코드는 최대 20개까지 허용됩니다." },
+        { status: 400 },
+      );
+    }
     if (codes.length > 0) query = query.in("school_code", codes);
   } else if (schoolCode) {
     query = query.eq("school_code", schoolCode);
