@@ -93,7 +93,7 @@ export async function generateMetadata({
 
                 // 알레르기 정보 API
                 const allergyUrl = new URL(
-                  `${baseUrl}/getFoodQrAlrgInfoService01`,
+                  `${baseUrl}/getFoodQrAllrgyInfo01`,
                 );
                 allergyUrl.searchParams.append("serviceKey", serviceKey);
                 allergyUrl.searchParams.append("pageNo", "1");
