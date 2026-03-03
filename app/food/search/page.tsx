@@ -148,9 +148,14 @@ function FoodSearchContent() {
 
     // DB 저장 (로그인 사용자만)
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    let user;
+    try {
+      const { data } = await supabase.auth.getUser();
+      user = data.user;
+    } catch (e) {
+      console.error("❌ getUser 실패:", e);
+      return;
+    }
     if (!user) return;
 
     // 1. 동일 검색어 기존 기록 삭제 (중복 방지)
