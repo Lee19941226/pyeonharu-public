@@ -32,18 +32,19 @@ import { createClient } from "@/lib/supabase/client";
 interface SearchResult {
   foodCode: string;
   foodName: string;
-  manufacturer: string;
+  manufacturer?: string;
   allergens: string[];
   hasAllergen: boolean;
+  score: number;
+  matchReason: string;
+  dataSource?: "db" | "openapi" | "ai" | "openfood";
   searchType?: string;
-  dataSource?: string;
   rawMaterials?: string;
   weight?: string;
   ingredients?: string[];
   detectedIngredients?: string[];
   nutritionInfo?: NutritionInfo;
   matchedUserAllergens?: string[];
-  matchReason: string;
 }
 
 interface NutritionInfo {

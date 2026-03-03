@@ -18,6 +18,17 @@ interface ProductScore {
   detectedIngredients?: string[];
   weight?: string;
   rawMaterials?: string;
+  searchType?: string;
+  nutritionInfo?: {
+    calories?: string;
+    sodium?: string;
+    carbs?: string;
+    protein?: string;
+    fat?: string;
+    sugars?: string;
+    servingSize?: string;
+  };
+  matchedUserAllergens?: string[];
 }
 async function fetchWithTimeout(
   url: string,
