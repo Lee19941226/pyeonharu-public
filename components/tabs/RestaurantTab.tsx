@@ -511,6 +511,7 @@ export default function RestaurantTab() {
 
   const [addressInput, setAddressInput] = useState("");
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
+  const [navTarget, setNavTarget] = useState<Restaurant | null>(null);
 
   const [restaurantRatings, setRestaurantRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -1173,11 +1174,7 @@ export default function RestaurantTab() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const dest = encodeURIComponent(restaurant.roadAddress || restaurant.address);
-                                  const name = encodeURIComponent(restaurant.name);
-                                  // 카카오맵 길찾기 (목적지 좌표)
-                                  const kakaoUrl = `https://map.kakao.com/link/to/${name},${restaurant.lat},${restaurant.lng}`;
-                                  window.open(kakaoUrl, "_blank");
+                                  setNavTarget(restaurant);
                                 }}
                                 className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-blue-50 transition-colors"
                                 title="길찾기"
@@ -1272,6 +1269,63 @@ export default function RestaurantTab() {
         analysis={selectedRestaurant ? aiAnalysis[selectedRestaurant] || null : null}
         isAnalyzing={analyzingRestaurant !== null}
       />
+
+      {/* 길찾기 앱 선택 */}
+      {navTarget && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40"
+          onClick={() => setNavTarget(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-background p-5 pb-8 animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
+            <p className="text-sm font-semibold mb-1">길찾기</p>
+            <p className="text-xs text-muted-foreground mb-4 truncate">{navTarget.name}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  const name = encodeURIComponent(navTarget.name);
+                  window.open(
+                    `https://map.kakao.com/link/to/${name},${navTarget.lat},${navTarget.lng}`,
+                    "_blank",
+                  );
+                  setNavTarget(null);
+                }}
+                className="flex-1 flex flex-col items-center gap-2 rounded-xl border p-4 hover:bg-muted transition-colors"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FEE500]">
+                  <span className="text-lg font-bold text-[#3C1E1E]">K</span>
+                </div>
+                <span className="text-sm font-medium">카카오맵</span>
+              </button>
+              <button
+                onClick={() => {
+                  const name = encodeURIComponent(navTarget.name);
+                  window.open(
+                    `https://tmap.life/navigate?goalx=${navTarget.lng}&goaly=${navTarget.lat}&goalname=${name}`,
+                    "_blank",
+                  );
+                  setNavTarget(null);
+                }}
+                className="flex-1 flex flex-col items-center gap-2 rounded-xl border p-4 hover:bg-muted transition-colors"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EF4436]">
+                  <span className="text-lg font-bold text-white">T</span>
+                </div>
+                <span className="text-sm font-medium">Tmap</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setNavTarget(null)}
+              className="mt-4 w-full rounded-xl border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

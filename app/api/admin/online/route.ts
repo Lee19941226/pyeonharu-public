@@ -38,18 +38,20 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
-      // 초기 데이터 즉시 전송
-      const sendData = () => {
+      const sendData = async () => {
         try {
-          const users = onlineStore.getOnlineUsers();
-          const summary = onlineStore.getSummary();
+          const users = await onlineStore.getOnlineUsers();
+          const authenticated = users.filter((u) => u.isAuthenticated);
 
           const data = JSON.stringify({
-            ...summary,
+            totalOnline: users.length,
+            authenticatedCount: authenticated.length,
+            anonymousCount: users.length - authenticated.length,
             users: users.map((u) => ({
               userId: u.userId,
               nickname: u.nickname,
               isAuthenticated: u.isAuthenticated,
+              ipAddress: u.ipAddress,
               connectedAt: u.connectedAt,
               lastHeartbeat: u.lastHeartbeat,
             })),

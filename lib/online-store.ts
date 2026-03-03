@@ -1,135 +1,133 @@
 /**
- * 온라인 사용자 인메모리 저장소
+ * 온라인 사용자 Supabase 저장소
  *
- * 현재: Node.js 프로세스 메모리 (단일 서버/서버리스 인스턴스)
- * AWS 이관 시: Redis (ElastiCache) 또는 DynamoDB TTL로 교체
+ * 이전: Node.js 인메모리 Map (서버리스 인스턴스 간 공유 불가)
+ * 현재: Supabase online_users 테이블 (모든 인스턴스에서 공유)
  *
  * 각 사용자는 heartbeat를 주기적으로 보내고,
- * TIMEOUT_MS 내에 heartbeat가 없으면 오프라인으로 판정됩니다.
+ * TIMEOUT(60초) 내에 heartbeat가 없으면 오프라인으로 판정됩니다.
  */
+
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 export interface OnlineUser {
   userId: string;
   nickname: string | null;
   isAuthenticated: boolean;
+  ipAddress: string;
   lastHeartbeat: number; // timestamp ms
   connectedAt: number; // timestamp ms
 }
 
-// heartbeat 없으면 오프라인으로 판정하는 시간 (60초)
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_SECONDS = 60;
 
-// 정리 주기 (30초마다 만료된 사용자 제거)
-const CLEANUP_INTERVAL_MS = 30_000;
-
-class OnlineStore {
-  private users = new Map<string, OnlineUser>();
-  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-  constructor() {
-    this.startCleanup();
-  }
-
+export const onlineStore = {
   /**
-   * 사용자 heartbeat 등록/갱신
+   * 사용자 heartbeat 등록/갱신 (Supabase upsert)
    */
-  upsert(
+  async upsert(
     userId: string,
-    info: { nickname?: string | null; isAuthenticated?: boolean },
-  ): void {
-    const existing = this.users.get(userId);
-    const now = Date.now();
+    info: {
+      nickname?: string | null;
+      isAuthenticated?: boolean;
+      ipAddress?: string;
+    },
+  ): Promise<void> {
+    const now = new Date().toISOString();
 
-    this.users.set(userId, {
-      userId,
-      nickname: info.nickname ?? existing?.nickname ?? null,
-      isAuthenticated: info.isAuthenticated ?? existing?.isAuthenticated ?? false,
-      lastHeartbeat: now,
-      connectedAt: existing?.connectedAt ?? now,
-    });
-  }
+    const { error } = await supabaseAdmin.from("online_users").upsert(
+      {
+        user_id: userId,
+        nickname: info.nickname ?? null,
+        is_authenticated: info.isAuthenticated ?? false,
+        ip_address: info.ipAddress ?? "unknown",
+        last_heartbeat: now,
+        // connected_at는 INSERT 시에만 설정 (conflict 시 갱신하지 않음)
+      },
+      {
+        onConflict: "user_id",
+        ignoreDuplicates: false,
+      },
+    );
+
+    if (error) {
+      console.error("[online-store] upsert error:", error.message);
+    }
+  },
 
   /**
    * 사용자 명시적 퇴장
    */
-  remove(userId: string): void {
-    this.users.delete(userId);
-  }
+  async remove(userId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from("online_users")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("[online-store] remove error:", error.message);
+    }
+  },
 
   /**
-   * 현재 온라인 사용자 목록 (만료되지 않은)
+   * 현재 온라인 사용자 목록 (60초 이내 heartbeat)
    */
-  getOnlineUsers(): OnlineUser[] {
-    const now = Date.now();
-    const result: OnlineUser[] = [];
+  async getOnlineUsers(): Promise<OnlineUser[]> {
+    const cutoff = new Date(
+      Date.now() - TIMEOUT_SECONDS * 1000,
+    ).toISOString();
 
-    for (const [key, user] of this.users) {
-      if (now - user.lastHeartbeat < TIMEOUT_MS) {
-        result.push(user);
-      } else {
-        // 만료된 사용자 제거
-        this.users.delete(key);
-      }
+    const { data, error } = await supabaseAdmin
+      .from("online_users")
+      .select("*")
+      .gte("last_heartbeat", cutoff)
+      .order("last_heartbeat", { ascending: false });
+
+    if (error) {
+      console.error("[online-store] getOnlineUsers error:", error.message);
+      return [];
     }
 
-    return result;
-  }
+    // 만료된 사용자 정리 (fire-and-forget)
+    supabaseAdmin
+      .from("online_users")
+      .delete()
+      .lt("last_heartbeat", cutoff)
+      .then(({ error: cleanupErr }) => {
+        if (cleanupErr) {
+          console.error("[online-store] cleanup error:", cleanupErr.message);
+        }
+      });
+
+    return (data || []).map((row) => ({
+      userId: row.user_id,
+      nickname: row.nickname,
+      isAuthenticated: row.is_authenticated,
+      ipAddress: row.ip_address,
+      lastHeartbeat: new Date(row.last_heartbeat).getTime(),
+      connectedAt: new Date(row.connected_at).getTime(),
+    }));
+  },
 
   /**
    * 요약 통계
    */
-  getSummary(): {
+  async getSummary(): Promise<{
     totalOnline: number;
     authenticatedCount: number;
     anonymousCount: number;
-  } {
-    const users = this.getOnlineUsers();
+  }> {
+    const users = await this.getOnlineUsers();
     const authenticated = users.filter((u) => u.isAuthenticated);
     return {
       totalOnline: users.length,
       authenticatedCount: authenticated.length,
       anonymousCount: users.length - authenticated.length,
     };
-  }
-
-  /**
-   * 만료된 사용자 정리
-   */
-  private cleanup(): void {
-    const now = Date.now();
-    for (const [key, user] of this.users) {
-      if (now - user.lastHeartbeat >= TIMEOUT_MS) {
-        this.users.delete(key);
-      }
-    }
-  }
-
-  private startCleanup(): void {
-    if (this.cleanupTimer) return;
-    this.cleanupTimer = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS);
-    // 서버리스 환경에서 프로세스 종료 시 정리
-    if (typeof process !== "undefined") {
-      process.on("SIGTERM", () => this.stopCleanup());
-    }
-  }
-
-  private stopCleanup(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
-  }
-}
-
-// 싱글톤 인스턴스 (같은 서버 프로세스 내에서 공유)
-// globalThis를 사용해 Next.js HMR에서도 재생성 방지
-const globalForOnline = globalThis as unknown as {
-  __onlineStore?: OnlineStore;
+  },
 };
-
-export const onlineStore =
-  globalForOnline.__onlineStore ?? new OnlineStore();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForOnline.__onlineStore = onlineStore;
-}

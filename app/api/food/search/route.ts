@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { getChosung, normalizeChosungQuery } from "@/lib/utils/chosung";
 import { headers } from "next/headers";
+import { logAction } from "@/lib/utils/action-log";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
 interface ProductScore {
@@ -961,6 +962,13 @@ JSON 배열 형식으로만 반환:
           console.error("❌ 검색 로그 저장 실패:", error);
         }
       });
+
+    // 액션 로그
+    logAction({
+      userId: user?.id || null,
+      actionType: "food_search",
+      metadata: { query: normalizedQuery, result_count: deduped.length },
+    });
     // ==========================================
     // 반환
     // ==========================================

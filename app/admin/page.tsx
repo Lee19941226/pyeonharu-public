@@ -49,11 +49,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import UserManagement from "./user-management";
 import SupportManagement from "./support-management";
+import ActionLogs from "./action-logs";
 import AdminReportButton from "./admin-report-button";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
-type AdminTab = "dashboard" | "users" | "support";
+type AdminTab = "dashboard" | "users" | "support" | "actionLogs";
 
 // ─── Types ───
 interface Stats {
@@ -265,6 +266,7 @@ function OnlineUsersCard({
                   <th className="text-left px-3 py-2 font-medium">상태</th>
                   <th className="text-left px-3 py-2 font-medium">사용자</th>
                   <th className="text-left px-3 py-2 font-medium">유형</th>
+                  <th className="text-left px-3 py-2 font-medium">IP</th>
                   <th className="text-left px-3 py-2 font-medium">접속 시간</th>
                   <th className="text-left px-3 py-2 font-medium">마지막 활동</th>
                 </tr>
@@ -299,6 +301,9 @@ function OnlineUsersCard({
                           비회원
                         </span>
                       )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground font-mono text-[11px]">
+                      {user.ipAddress || "unknown"}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {new Date(user.connectedAt).toLocaleTimeString("ko-KR")}
@@ -474,6 +479,19 @@ export default function AdminDashboard() {
                   고객센터
                 </span>
               </button>
+              <button
+                onClick={() => setActiveTab("actionLogs")}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === "actionLogs"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  활동 로그
+                </span>
+              </button>
             </div>
             {/* ✅ 헤더에 실시간 접속자 배지 */}
             {activeTab === "dashboard" && (
@@ -540,6 +558,8 @@ export default function AdminDashboard() {
           <UserManagement />
         ) : activeTab === "support" ? (
           <SupportManagement />
+        ) : activeTab === "actionLogs" ? (
+          <ActionLogs />
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
