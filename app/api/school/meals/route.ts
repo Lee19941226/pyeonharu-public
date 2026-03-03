@@ -86,6 +86,30 @@ export async function GET(req: NextRequest) {
     }
 
     const targetDate = date || new Date().toISOString().slice(0, 10).replace(/-/g, "")
+
+    if (date) {
+      if (!/^\d{8}$/.test(date)) {
+        return NextResponse.json(
+          { error: "date 파라미터는 YYYYMMDD 형식의 8자리 숫자여야 합니다." },
+          { status: 400 },
+        )
+      }
+      const y = Number(date.slice(0, 4))
+      const m = Number(date.slice(4, 6))
+      const d = Number(date.slice(6, 8))
+      const parsed = new Date(y, m - 1, d)
+      if (
+        parsed.getFullYear() !== y ||
+        parsed.getMonth() + 1 !== m ||
+        parsed.getDate() !== d
+      ) {
+        return NextResponse.json(
+          { error: "유효하지 않은 날짜입니다." },
+          { status: 400 },
+        )
+      }
+    }
+
     const supabase = await createClient()
 
     // 이번 주 모드: 월~금 날짜 계산
