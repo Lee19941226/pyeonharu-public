@@ -59,3 +59,4 @@ npx cap add android
 
 mkdir out
 
+..
