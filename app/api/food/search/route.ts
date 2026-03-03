@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const query = searchParams.get("q") || "";
-    const phase = searchParams.get("phase") || "full";
+    const rawPhase = searchParams.get("phase");
+    const phase = rawPhase === "1" || rawPhase === "full" ? rawPhase : "full";
     const serviceKey = process.env.FOOD_API_KEY;
     if (!serviceKey) {
       return NextResponse.json(
