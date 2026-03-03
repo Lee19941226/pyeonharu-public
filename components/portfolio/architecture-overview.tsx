@@ -40,7 +40,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Lock className="h-5 w-5" />,
     title: "인증 (로그인/회원가입)",
     summary: "Supabase Auth 기반 OAuth 2.0 인증 및 세션 관리 흐름",
-    coreLogic: "미들웨어는 프록시 모듈에 위임만 하고, 프록시에서 세션 갱신·보호 경로 판단·IP 기반 Rate Limit을 일괄 처리하는 위임 패턴으로 순환 의존 없이 깔끔한 구조를 유지합니다.",
+    coreLogic: "사용자가 페이지를 요청하면 가장 먼저 '경비원' 역할의 미들웨어(모든 요청을 가로채는 중간 검사 코드)가 작동합니다. 이 경비원은 직접 판단하지 않고, 전문 담당자인 프록시 모듈(대리인 역할의 별도 파일)에게 '이 사람 로그인 했어? 이 페이지 들어가도 돼?'라고 물어봅니다. 프록시 모듈이 로그인 상태 확인(세션 갱신), 접근 가능 페이지 판단, 같은 IP에서 너무 많은 요청이 오는지 확인(Rate Limit)을 한꺼번에 처리합니다. 경비원과 담당자의 역할을 분리해서 코드가 서로 꼬이지 않는 깔끔한 구조를 유지합니다.",
     steps: [
       {
         file: "app/login/page.tsx",
@@ -78,7 +78,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Search className="h-5 w-5" />,
     title: "식품 안전 확인",
     summary: "공공 API와 AI 비전을 활용한 식품 성분 분석 및 안전성 확인",
-    coreLogic: "2단계 검색(Phase 1: DB 즉시 응답 → Phase 2: 외부 API + AI 백그라운드 보강) 후 결과를 비동기 upsert로 캐싱합니다. 검색할수록 자체 DB가 풍부해져 API 호출이 줄고, AI는 결과가 0건일 때만 최후 수단으로 호출되어 비용을 최소화합니다.",
+    coreLogic: "검색을 2단계로 나눕니다. 1단계에서는 우리 자체 데이터베이스(이전에 검색된 적 있는 식품 정보 저장소)만 뒤져서 0.1~0.3초 만에 결과를 먼저 보여줍니다. 2단계에서는 화면 뒤에서 외부 공공 API(식약처 등)를 동시에 호출해 더 풍부한 정보를 가져옵니다. 가져온 결과는 자체 DB에 자동 저장(캐싱)되므로, 같은 식품을 다시 검색하면 외부 API를 호출할 필요 없이 1단계에서 바로 나옵니다. 사용자가 많이 검색할수록 DB가 풍부해져 비용이 줄어드는 구조입니다. AI는 어디서도 결과를 못 찾았을 때(0건)만 최후 수단으로 호출되어 비싼 AI 비용을 최소화합니다.",
     steps: [
       {
         file: "app/food/page.tsx",
@@ -111,7 +111,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <MessageSquare className="h-5 w-5" />,
     title: "커뮤니티",
     summary: "리치 텍스트 에디터 기반 게시글/댓글 CRUD 및 XSS 방지",
-    coreLogic: "게시글 목록 로딩 시 Set 기반 배치 로딩으로 N+1 문제를 해결합니다. 게시글 수에 관계없이 프로필·좋아요·댓글 수를 고정 3회 쿼리로 조회한 뒤 Map에 O(1) 룩업으로 매핑합니다.",
+    coreLogic: "게시글 100개를 보여줄 때, 각 게시글마다 '작성자 정보 조회 → 좋아요 수 조회 → 댓글 수 조회'를 따로 하면 300번 DB를 호출하게 됩니다(N+1 문제). 이를 해결하기 위해 먼저 게시글에 등장하는 작성자 ID를 중복 없이 모은 뒤(Set 자료구조), 프로필·좋아요·댓글 수를 각각 딱 1번씩, 총 3번의 DB 호출로 한꺼번에 가져옵니다. 가져온 데이터는 '사전(Map)'처럼 ID로 바로 찾을 수 있게 정리해두어, 게시글이 10개든 1000개든 DB 호출 횟수는 항상 3회로 고정됩니다.",
     steps: [
       {
         file: "app/community/page.tsx",
@@ -141,7 +141,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Shield className="h-5 w-5" />,
     title: "관리자 대시보드",
     summary: "실시간 통계, 사용자 관리, SSE 기반 온라인 모니터링",
-    coreLogic: "SSE 스트림에서 request.signal(AbortController)로 클라이언트 연결 해제를 감지하여 interval을 자동 정리합니다. X-Accel-Buffering: no 헤더로 nginx 프록시 버퍼링도 비활성화하여 실시간성을 보장합니다.",
+    coreLogic: "관리자 화면에 접속자 수를 실시간으로 보여주기 위해 SSE(Server-Sent Events, 서버가 클라이언트에게 데이터를 계속 밀어주는 방식)를 사용합니다. 서버는 5초마다 접속자 데이터를 보내는 타이머를 돌리는데, 관리자가 브라우저를 닫으면 이 타이머가 계속 돌아 메모리가 낭비됩니다. 이를 방지하기 위해 브라우저 연결이 끊기는 순간을 자동 감지(AbortSignal)하여 타이머를 즉시 정리합니다. 또한 중간 서버(nginx 등)가 데이터를 모아서 한꺼번에 보내는 것을 막는 특수 헤더를 설정하여 데이터가 지연 없이 즉시 전달되도록 합니다.",
     steps: [
       {
         file: "app/admin/layout.tsx",
@@ -174,7 +174,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <UtensilsCrossed className="h-5 w-5" />,
     title: "식단 관리",
     summary: "AI 기반 식단 이미지 분석, 영양소 추정, BMR 계산 및 리포트",
-    coreLogic: "업로드된 이미지의 Magic Byte(FFD8FF=JPEG, 89504E47=PNG)를 직접 읽어 Content-Type 헤더 스푸핑을 방지합니다. Supabase Storage 업로드가 실패해도 분석은 계속 진행되는 Graceful Degradation 패턴을 적용했습니다.",
+    coreLogic: "파일 확장자나 브라우저가 알려주는 파일 종류(Content-Type)는 쉽게 속일 수 있어서, 악성 파일이 이미지인 척 업로드될 수 있습니다. 이를 막기 위해 파일의 첫 몇 바이트(Magic Byte)를 직접 읽어 진짜 이미지인지 확인합니다. 예를 들어 JPEG 파일은 항상 FFD8FF로 시작하고, PNG는 89504E47로 시작하는데, 이 고유 서명이 맞지 않으면 거부합니다. 또한 이미지 저장소 업로드가 실패하더라도 AI 분석 자체는 중단하지 않고 계속 진행하여, 부분적인 오류가 전체 기능을 망가뜨리지 않도록 설계했습니다.",
     steps: [
       {
         file: "app/diet/page.tsx",
@@ -204,7 +204,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Pill className="h-5 w-5" />,
     title: "의약품 검색",
     summary: "공공데이터 API를 통한 의약품 정보 검색 및 HTML 정제",
-    coreLogic: "공공데이터 API 응답에 포함된 HTML 태그·엔티티(&nbsp;, &lt; 등)를 cleanHtml 함수로 정제하여 XSS를 원천 차단하고, API 키를 로그에서 KEY_HIDDEN으로 마스킹합니다.",
+    coreLogic: "공공데이터 API가 돌려주는 의약품 설명에는 <b>, &nbsp; 같은 HTML 코드가 섞여 있습니다. 이를 그대로 화면에 표시하면 악성 스크립트가 실행될 수 있는 보안 위험(XSS)이 있어서, 모든 HTML 태그와 특수 코드를 깨끗하게 제거하는 정제 함수를 거칩니다. 또한 서버 로그에 API 호출 기록을 남길 때, 비밀 API 키가 노출되지 않도록 'KEY_HIDDEN'으로 자동 치환합니다.",
     steps: [
       {
         file: "app/api/medicine/route.ts",
@@ -222,7 +222,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Stethoscope className="h-5 w-5" />,
     title: "증상 분석",
     summary: "AI 기반 증상 분석, 질환 추정, 진료과 추천 및 주변 병원 연결",
-    coreLogic: "2계층 Rate Limiting으로 비용을 제어합니다. 1계층은 DB 기반(인증 20회/비인증 5회/일)으로 사용자별 제한, 2계층은 메모리 기반(분당 30회/일 1000회)으로 OpenAI API 비용 폭주를 방지합니다. 비인증 5회 제한은 자연스럽게 회원가입 전환을 유도합니다.",
+    coreLogic: "AI 분석은 호출할 때마다 비용이 발생하므로, 2겹의 방어막으로 과다 사용을 막습니다. 첫 번째 방어막은 데이터베이스에 '누가 오늘 몇 번 사용했는지' 기록하여 로그인 사용자는 하루 20회, 비로그인 사용자는 IP 주소 기준 하루 5회로 제한합니다. 두 번째 방어막은 서버 메모리에서 전체 호출 횟수를 세어, 1분에 30회·하루 1000회를 넘으면 일시 차단하여 예상치 못한 AI 비용 폭주를 막습니다. 비로그인 사용자의 5회 제한은 '더 사용하려면 회원가입하세요'라는 자연스러운 전환 유도 역할도 합니다.",
     steps: [
       {
         file: "components/tabs/SymptomTab.tsx",
@@ -248,7 +248,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <MapPin className="h-5 w-5" />,
     title: "맛집 추천",
     summary: "위치 기반 음식점 검색, 알레르기 위험도 판단, AI 메뉴 분석 및 리뷰",
-    coreLogic: "74개 음식 카테고리별 알레르겐 매핑 테이블을 양방향 퍼지 매칭(category.includes(key) || key.includes(category))으로 검색하여 safe/caution/danger 3단계 위험도를 자동 판정합니다. Haversine 구면 거리 공식으로 정확한 거리 계산 후 반경 필터링합니다.",
+    coreLogic: "'한식/백반' '일식/초밥' 등 74개 음식 카테고리별로 '어떤 알레르기 성분이 들어갈 가능성이 높은지' 매핑 테이블을 만들어 두었습니다. 음식점 카테고리가 정확히 일치하지 않아도 '초밥'이 '일식/초밥'에 포함되는지, 반대로 '일식/초밥'이 '초밥'에 포함되는지 양방향으로 확인하는 유연한 매칭을 합니다. 일치하는 알레르겐이 0개면 안전(safe), 1~2개면 주의(caution), 3개 이상이면 위험(danger)으로 자동 분류합니다. 거리 계산은 지구가 둥글다는 점을 반영한 Haversine 공식(구면 삼각법)을 사용하여 직선거리보다 정확한 실제 거리를 구합니다.",
     steps: [
       {
         file: "app/api/restaurant/search/route.ts",
@@ -283,7 +283,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <GraduationCap className="h-5 w-5" />,
     title: "학교 급식",
     summary: "NEIS 연동 급식 조회, 알레르기 교차 오염 감지, 이메일 알림",
-    coreLogic: "사용자 알레르기에서 교차 오염 맵(계란↔닭고기, 우유↔쇠고기, 갑각류 상호, 견과류 상호)을 역참조하여 위험 Set을 구축한 뒤, 메뉴별로 danger(직접 일치) → caution(교차 오염) → safe 3단계로 분류합니다. 직접 알레르기와 중복되는 교차 항목은 자동 제외하여 중복 경고를 방지합니다.",
+    coreLogic: "계란 알레르기가 있으면 닭고기도 위험할 수 있고, 우유 알레르기가 있으면 쇠고기도 주의해야 합니다. 이런 '연쇄 위험' 관계를 교차 오염 맵으로 정의해 두었습니다. 사용자의 알레르기 목록을 받으면, 이 맵을 거꾸로 뒤져서 '추가로 조심해야 할 성분 목록(위험 Set)'을 자동으로 만듭니다. 그런 다음 급식 메뉴 하나하나를 이 목록과 대조하여, 직접 알레르기 성분이면 위험(빨강), 교차 오염 가능성이면 주의(노랑), 해당 없으면 안전(초록)으로 3단계 분류합니다. 이미 '위험'으로 잡힌 성분은 '주의' 목록에서 자동 제외하여 같은 경고가 두 번 뜨지 않도록 합니다.",
     steps: [
       {
         file: "app/school/page.tsx",
@@ -318,7 +318,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Users className="h-5 w-5" />,
     title: "가족 관리",
     summary: "가족 구성원별 알레르기 정보 관리 및 식품 안전 확인 연동",
-    coreLogic: "알레르기 수정 시 기존 데이터 삭제 + 새 데이터 삽입을 Supabase RPC 함수로 단일 트랜잭션 처리합니다. RPC 실패 시 자동 롤백되어 부분 업데이트가 불가능하며, POST에서도 구성원 생성 후 알레르기 삽입 실패 시 생성된 구성원을 즉시 삭제하는 보상 트랜잭션을 구현했습니다.",
+    coreLogic: "가족 구성원의 알레르기 정보를 수정할 때, '기존 알레르기 전부 삭제 → 새 알레르기 전부 추가'를 하나의 묶음(트랜잭션)으로 처리합니다. 은행 송금처럼 '출금은 됐는데 입금이 안 된' 상황을 막기 위해, 중간에 하나라도 실패하면 전체를 되돌립니다(롤백). 새 구성원을 추가할 때도 마찬가지로, 구성원은 생성됐지만 알레르기 저장이 실패하면 방금 만든 구성원까지 즉시 삭제하여 불완전한 데이터가 남지 않도록 합니다.",
     steps: [
       {
         file: "app/family/page.tsx",
@@ -341,7 +341,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Building2 className="h-5 w-5" />,
     title: "병원/약국 찾기",
     summary: "지역별/위치 기반 병원 약국 검색, 공공 API 프록시, 거리순 정렬",
-    coreLogic: "좌표 → 가장 가까운 시도 추정 후 해당 시도의 공공 API를 호출하고, Haversine 공식으로 정확한 거리를 재계산하여 반경 필터링합니다. 약국 API는 행정구역 개편(강원특별자치도↔강원도)에 대응하는 Fallback 재시도 로직을 갖추고 있습니다.",
+    coreLogic: "사용자의 GPS 좌표를 받으면, 먼저 전국 17개 시도의 중심 좌표와 비교하여 '지금 서울에 있구나', '부산에 있구나'를 추정합니다. 그 시도의 병원/약국 목록을 공공 API에서 가져온 뒤, 지구가 둥글다는 점을 반영한 거리 공식(Haversine)으로 실제 거리를 다시 계산하여 설정한 반경(최대 5km) 안에 있는 곳만 거리순으로 보여줍니다. 약국 API는 '강원도'가 '강원특별자치도'로 바뀐 행정구역 개편에도 대응하여, 새 이름으로 검색해서 결과가 없으면 자동으로 옛 이름으로 다시 검색합니다.",
     steps: [
       {
         file: "app/area/page.tsx",
@@ -376,7 +376,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Bookmark className="h-5 w-5" />,
     title: "북마크",
     summary: "병원, 약국, 음식의 즐겨찾기 관리 및 중복 방지",
-    coreLogic: "미들웨어(보호 경로 리다이렉트) → API(getUser 인증) → Supabase RLS(Row Level Security) 3중 인증 체계로 데이터를 보호합니다. PostgreSQL unique(user_id, item_id) 제약 조건으로 DB 레벨에서 중복을 차단하고, 에러 코드 23505를 409 Conflict로 변환합니다.",
+    coreLogic: "즐겨찾기 데이터를 3겹의 보안으로 보호합니다. 1겹째: 비로그인 사용자가 /bookmarks 페이지에 접근하면 미들웨어가 자동으로 로그인 페이지로 보냅니다. 2겹째: API 코드에서 다시 한번 로그인 여부를 확인합니다. 3겹째: 데이터베이스 자체에 '본인 데이터만 읽고 쓸 수 있다'는 규칙(Row Level Security)이 걸려 있어, 설령 API를 우회하더라도 남의 즐겨찾기를 볼 수 없습니다. 또한 같은 병원을 두 번 즐겨찾기하는 것은 DB의 고유 제약 조건이 원천 차단하며, 이때 발생하는 DB 에러를 '이미 즐겨찾기에 있습니다'라는 사용자 친화적 메시지로 변환합니다.",
     steps: [
       {
         file: "app/bookmarks/page.tsx",
@@ -406,7 +406,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <BarChart3 className="h-5 w-5" />,
     title: "주간 리포트",
     summary: "주간 식품 스캔 통계, 위험 식품 감지, 일별 추이 차트",
-    coreLogic: "단일 API 호출에서 스캔 기록·위험 식품·Top 5·신규 즐겨찾기·일별 통계·전주 비교 6개 쿼리를 병렬 실행하여 한 번에 집계합니다. 전주 대비 스캔 수·위험 감지 수 변화량을 계산하여 추이를 시각화합니다.",
+    coreLogic: "주간 리포트 하나를 만들려면 이번 주 스캔 기록, 위험 식품 목록, 가장 많이 검색한 Top 5, 새로 추가한 즐겨찾기, 요일별 통계, 지난주 데이터까지 총 6가지 정보가 필요합니다. 이 6개 DB 조회를 하나씩 순서대로 하면 느리므로, 동시에 한꺼번에 실행(병렬 처리)하여 응답 속도를 높였습니다. 또한 '지난주 대비 스캔 수가 얼마나 늘었는지', '위험 식품 발견이 줄었는지' 등 전주와의 비교 수치를 계산하여 사용자가 자신의 식품 안전 습관 변화를 한눈에 볼 수 있게 합니다.",
     steps: [
       {
         file: "app/reports/page.tsx",
