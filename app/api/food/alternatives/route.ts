@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 
 export async function GET(req: NextRequest) {
+  console.log("test");
   const { searchParams } = req.nextUrl;
   const productName = searchParams.get("name");
   const allergens = searchParams.get("allergens"); // "우유,계란" 형태
