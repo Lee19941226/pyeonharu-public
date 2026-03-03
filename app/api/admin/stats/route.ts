@@ -10,17 +10,30 @@ function getAdminClient() {
   );
 }
 
-// 날짜 헬퍼
+// 날짜 헬퍼 (KST = UTC+9 기준)
+const KST_OFFSET = 9 * 3600_000;
+
 function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString();
 }
 
-function startOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+/** UTC ISO 문자열 → KST 날짜 (YYYY-MM-DD) */
+function toKSTDate(isoStr: string): string {
+  return new Date(new Date(isoStr).getTime() + KST_OFFSET).toISOString().slice(0, 10);
+}
+
+/** KST 기준 N일 전의 날짜 문자열 (YYYY-MM-DD) */
+function kstDateStr(daysAgoN: number): string {
+  return new Date(Date.now() + KST_OFFSET - daysAgoN * 86400_000).toISOString().slice(0, 10);
+}
+
+/** KST 기준 오늘 00:00:00의 UTC ISO 문자열 */
+function startOfDayKST(): string {
+  const kstNow = new Date(Date.now() + KST_OFFSET);
+  const midnightUTC = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) - KST_OFFSET;
+  return new Date(midnightUTC).toISOString();
 }
 
 export async function GET(request: Request) {
@@ -48,14 +61,13 @@ export async function GET(request: Request) {
     // 일별 집계
     const signupsByDate: Record<string, number> = {};
     dailySignups?.forEach((row) => {
-      const date = row.created_at?.slice(0, 10);
+      const date = row.created_at ? toKSTDate(row.created_at) : null;
       if (date) signupsByDate[date] = (signupsByDate[date] || 0) + 1;
     });
 
     // ═══ 2. 활성 사용자 (DAU/WAU/MAU) ═══
     // 각 테이블을 MAU 기준(30일)으로 1회만 조회 후 메모리 필터링 (쿼리 15회 → 5회)
-    const now = new Date();
-    const todayStart = startOfDay(now);
+    const todayStart = startOfDayKST();
     const wau7Start = daysAgo(7);
 
     const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs, mauActionLogs] =
@@ -117,7 +129,7 @@ export async function GET(request: Request) {
         .from("diet_entries")
         .select("user_id, created_at")
         .gte("created_at", daysAgo(days)),
-      supabase
+      adminDb
         .from("user_action_logs")
         .select("user_id, ip_address, created_at")
         .gte("created_at", daysAgo(days)),
@@ -128,7 +140,7 @@ export async function GET(request: Request) {
       res.data?.forEach((r: any) => {
         const ts =
           r.scanned_at || r.checked_at || r.created_at || r.searched_at;
-        const date = ts?.slice(0, 10);
+        const date = ts ? toKSTDate(ts) : null;
         const uid = r.user_id || (r.ip_address ? `anon:${r.ip_address}` : null);
         if (date && uid) {
           if (!dailyActiveMap[date]) dailyActiveMap[date] = new Set();
@@ -138,9 +150,7 @@ export async function GET(request: Request) {
     });
 
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = kstDateStr(i);
       dauTrend.push({
         date: dateStr,
         dau: dailyActiveMap[dateStr]?.size || 0,
@@ -174,9 +184,7 @@ export async function GET(request: Request) {
       { scans: number; checks: number; searches: number; diet: number }
     > = {};
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = kstDateStr(i);
       featureTrend[dateStr] = { scans: 0, checks: 0, searches: 0, diet: 0 };
     }
 
@@ -200,19 +208,19 @@ export async function GET(request: Request) {
     ]);
 
     scanLogs.data?.forEach((r) => {
-      const d = r.scanned_at?.slice(0, 10);
+      const d = r.scanned_at ? toKSTDate(r.scanned_at) : null;
       if (d && featureTrend[d]) featureTrend[d].scans++;
     });
     checkLogs.data?.forEach((r) => {
-      const d = r.checked_at?.slice(0, 10);
+      const d = r.checked_at ? toKSTDate(r.checked_at) : null;
       if (d && featureTrend[d]) featureTrend[d].checks++;
     });
     searchLogs.data?.forEach((r) => {
-      const d = r.searched_at?.slice(0, 10);
+      const d = r.searched_at ? toKSTDate(r.searched_at) : null;
       if (d && featureTrend[d]) featureTrend[d].searches++;
     });
     dietLogs.data?.forEach((r) => {
-      const d = r.created_at?.slice(0, 10);
+      const d = r.created_at ? toKSTDate(r.created_at) : null;
       if (d && featureTrend[d]) featureTrend[d].diet++;
     });
 
@@ -244,9 +252,7 @@ export async function GET(request: Request) {
     const communityTrend: Record<string, { posts: number; comments: number }> =
       {};
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      communityTrend[d.toISOString().slice(0, 10)] = { posts: 0, comments: 0 };
+      communityTrend[kstDateStr(i)] = { posts: 0, comments: 0 };
     }
 
     const [postLogs, commentLogs] = await Promise.all([
@@ -261,11 +267,11 @@ export async function GET(request: Request) {
     ]);
 
     postLogs.data?.forEach((r) => {
-      const d = r.created_at?.slice(0, 10);
+      const d = r.created_at ? toKSTDate(r.created_at) : null;
       if (d && communityTrend[d]) communityTrend[d].posts++;
     });
     commentLogs.data?.forEach((r) => {
-      const d = r.created_at?.slice(0, 10);
+      const d = r.created_at ? toKSTDate(r.created_at) : null;
       if (d && communityTrend[d]) communityTrend[d].comments++;
     });
 
