@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import { BackButtonHandler } from "@/components/back-button-handler";
 import { StatusBarInit } from "@/components/status-bar-init";
+import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -111,7 +112,9 @@ export default function RootLayout({
           <BackButtonHandler />
           <StatusBarInit />
           <HapticProvider>
-            {children}
+            <HeartbeatProvider>
+              {children}
+            </HeartbeatProvider>
             <Toaster />
           </HapticProvider>
         </AuthProvider>

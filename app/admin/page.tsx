@@ -22,6 +22,11 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Headphones,
+  Radio,
+  UserCheck,
+  UserX,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import {
   LineChart,
@@ -45,6 +50,7 @@ import { createClient } from "@/lib/supabase/client";
 import UserManagement from "./user-management";
 import SupportManagement from "./support-management";
 import AdminReportButton from "./admin-report-button";
+import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
 type AdminTab = "dashboard" | "users" | "support";
@@ -158,6 +164,174 @@ function ChartCard({
   );
 }
 
+// ─── 현재 접속자 카드 (SSE 기반) ───
+function OnlineUsersCard({
+  totalOnline,
+  authenticatedCount,
+  anonymousCount,
+  users,
+  connected,
+}: {
+  totalOnline: number;
+  authenticatedCount: number;
+  anonymousCount: number;
+  users: OnlineUser[];
+  connected: boolean;
+}) {
+  const [showDetail, setShowDetail] = useState(false);
+
+  return (
+    <div className="rounded-xl border bg-card p-5 shadow-sm col-span-2 md:col-span-4 lg:col-span-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+            <Radio className="h-5 w-5 text-green-500 animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              현재 접속자 (실시간)
+              {connected ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-normal text-green-600 bg-green-100 dark:bg-green-950/40 dark:text-green-400 px-1.5 py-0.5 rounded-full">
+                  <Wifi className="h-2.5 w-2.5" />
+                  SSE 연결됨
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-normal text-red-600 bg-red-100 dark:bg-red-950/40 dark:text-red-400 px-1.5 py-0.5 rounded-full">
+                  <WifiOff className="h-2.5 w-2.5" />
+                  연결 끊김
+                </span>
+              )}
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              SSE 기반 · 5초 간격 갱신 · AWS 이관 호환
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowDetail(!showDetail)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg border hover:bg-muted"
+        >
+          {showDetail ? "접기" : "상세 보기"}
+        </button>
+      </div>
+
+      {/* 요약 카드 */}
+      <div className="grid grid-cols-3 gap-3 mt-3">
+        <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+            </span>
+            <span className="text-xs font-medium text-green-700 dark:text-green-400">
+              전체 접속
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-green-700 dark:text-green-300 tabular-nums">
+            {totalOnline}
+          </p>
+        </div>
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1">
+            <UserCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+              회원
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums">
+            {authenticatedCount}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-800/30 p-3 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1">
+            <UserX className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              비회원
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-600 dark:text-gray-300 tabular-nums">
+            {anonymousCount}
+          </p>
+        </div>
+      </div>
+
+      {/* 상세 목록 */}
+      {showDetail && users.length > 0 && (
+        <div className="mt-4 border rounded-lg overflow-hidden">
+          <div className="max-h-60 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">상태</th>
+                  <th className="text-left px-3 py-2 font-medium">사용자</th>
+                  <th className="text-left px-3 py-2 font-medium">유형</th>
+                  <th className="text-left px-3 py-2 font-medium">접속 시간</th>
+                  <th className="text-left px-3 py-2 font-medium">마지막 활동</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {users.map((user, idx) => (
+                  <tr
+                    key={`${user.userId}-${idx}`}
+                    className="hover:bg-muted/30"
+                  >
+                    <td className="px-3 py-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-medium">
+                      {user.nickname ||
+                        (user.isAuthenticated
+                          ? user.userId.slice(0, 8) + "..."
+                          : "비회원")}
+                    </td>
+                    <td className="px-3 py-2">
+                      {user.isAuthenticated ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-medium">
+                          <UserCheck className="h-2.5 w-2.5" />
+                          회원
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] font-medium">
+                          <UserX className="h-2.5 w-2.5" />
+                          비회원
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {new Date(user.connectedAt).toLocaleTimeString("ko-KR")}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatTimeAgo(user.lastHeartbeat)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {showDetail && users.length === 0 && (
+        <div className="mt-4 text-center py-6 text-sm text-muted-foreground border rounded-lg">
+          현재 접속 중인 사용자가 없습니다
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 시간 경과 포맷 ───
+function formatTimeAgo(timestamp: number): string {
+  const diff = Math.floor((Date.now() - timestamp) / 1000);
+  if (diff < 10) return "방금";
+  if (diff < 60) return `${diff}초 전`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
+  return `${Math.floor(diff / 3600)}시간 전`;
+}
+
 // ─── 날짜 포맷 ───
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -187,6 +361,15 @@ export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
 
+  // ✅ SSE 실시간 접속자 구독
+  const {
+    totalOnline,
+    authenticatedCount,
+    anonymousCount,
+    users: onlineUsers,
+    connected: sseConnected,
+  } = useAdminSSE();
+
   // 관리자 확인
   useEffect(() => {
     const supabase = createClient();
@@ -195,7 +378,6 @@ export default function AdminDashboard() {
         router.push("/login");
         return;
       }
-      // profiles.role 기반 관리자 확인
       supabase
         .from("profiles")
         .select("role")
@@ -293,6 +475,30 @@ export default function AdminDashboard() {
                 </span>
               </button>
             </div>
+            {/* ✅ 헤더에 실시간 접속자 배지 */}
+            {activeTab === "dashboard" && (
+              <div
+                className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                  sseConnected
+                    ? "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400"
+                    : "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                }`}
+              >
+                <span className="relative flex h-2 w-2">
+                  {sseConnected ? (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </>
+                  ) : (
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  )}
+                </span>
+                {sseConnected
+                  ? `${totalOnline}명 접속 중`
+                  : "연결 끊김"}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "dashboard" && (
@@ -340,6 +546,15 @@ export default function AdminDashboard() {
           </div>
         ) : stats ? (
           <>
+            {/* ═══ 🟢 현재 접속자 (SSE 실시간) ═══ */}
+            <OnlineUsersCard
+              totalOnline={totalOnline}
+              authenticatedCount={authenticatedCount}
+              anonymousCount={anonymousCount}
+              users={onlineUsers}
+              connected={sseConnected}
+            />
+
             {/* ═══ 핵심 지표 카드 ═══ */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
               <StatCard
@@ -502,7 +717,7 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* 기능별 사용량 (Composed Chart - 라인 + 바 혼합) */}
+              {/* 기능별 사용량 (Composed Chart) */}
               <ChartCard
                 title="🔧 기능별 일일 사용량 (복합 차트)"
                 className="lg:col-span-2"
@@ -552,7 +767,7 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* 커뮤니티 활동 (이중선 그래프) */}
+              {/* 커뮤니티 활동 */}
               <ChartCard title="💬 커뮤니티 활동 추이">
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={stats.community.trend}>
