@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
 
     if (userId) query = query.eq("user_id", userId);
     if (actionType) query = query.eq("action_type", actionType);
-    if (ip) query = query.ilike("ip_address", `%${ip}%`);
+    if (ip) {
+      const safeIp = ip.replace(/[%_\\]/g, "");
+      if (safeIp) query = query.ilike("ip_address", `%${safeIp}%`);
+    }
 
     const { data: logs, count, error } = await query.range(offset, offset + limit - 1);
     if (error) throw error;
@@ -61,10 +64,11 @@ export async function GET(req: NextRequest) {
     let filteredLogs = logs || [];
     if (search) {
       // 닉네임 검색
+      const safeSearch = search.replace(/[%_\\]/g, "");
       const { data: matchedProfiles } = await supabaseAdmin
         .from("profiles")
         .select("id, nickname")
-        .ilike("nickname", `%${search}%`);
+        .ilike("nickname", `%${safeSearch}%`);
 
       const matchedIds = new Set(matchedProfiles?.map((p) => p.id) || []);
 

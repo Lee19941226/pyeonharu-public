@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { onlineStore } from "@/lib/online-store";
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 
 /**
  * GET /api/admin/online
@@ -9,30 +9,8 @@ import { onlineStore } from "@/lib/online-store";
  */
 export async function GET(request: NextRequest) {
   // 관리자 인증 확인
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return new Response(JSON.stringify({ error: "인증 필요" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["admin", "super_admin"].includes(profile.role)) {
-    return new Response(JSON.stringify({ error: "권한 없음" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  const auth = await verifyAdmin();
+  if (!auth.ok) return auth.response;
 
   // SSE 스트림 생성
   const encoder = new TextEncoder();

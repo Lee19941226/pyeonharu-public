@@ -55,7 +55,8 @@ export async function verifyAdmin(
     super_admin: 2,
   };
 
-  if (roleRank[profile.role as AdminRole] < roleRank[minRole]) {
+  const userRank = roleRank[profile.role as AdminRole];
+  if (userRank === undefined || userRank < roleRank[minRole]) {
     return {
       ok: false,
       response: NextResponse.json(
