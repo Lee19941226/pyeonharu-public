@@ -103,7 +103,7 @@ export default function FoodResultPage() {
 
     getUserInfo();
   }, []);
-  const shareToKakao = () => {
+  const handleKakaoShare = () => {
     if (!result) return;
 
     if (
@@ -136,45 +136,16 @@ export default function FoodResultPage() {
       ? `✅ 안전해요! 알레르기 성분이 없습니다`
       : `⚠️ 주의! ${allergenText} 알레르기 성분 포함`;
 
-    // ✅ Share 모듈 확인 후 분기
-    const kakao = window.Kakao;
-
-    if (!kakao) {
-      navigator.clipboard.writeText(shareUrl);
-      toast.success("링크를 복사했어요!");
-      return;
-    }
-
-    if (!kakao.isInitialized()) {
-      kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
-    }
-
-    // ✅ Share 없으면 즉시 링크 복사로 대체
-    if (!kakao.Share || typeof kakao.Share.sendDefault !== "function") {
-      console.warn("Kakao.Share 미지원 → 링크 복사");
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
-      });
-      return;
-    }
-
-    kakao.Share.sendDefault({
-      objectType: "feed",
-      content: {
-        title,
-        description,
-        imageUrl: ogImageUrl.toString(),
-        imageWidth: 1200,
-        imageHeight: 630,
-        link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-      },
-      buttons: [
-        {
-          title: "편하루에서 확인하기",
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-        },
-      ],
+    const shareResult = shareToKakao({
+      title,
+      description,
+      imageUrl: ogImageUrl.toString(),
+      shareUrl,
     });
+
+    if (shareResult && !shareResult.success) {
+      toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+    }
   };
 
   const loadFoodResult = async () => {
@@ -740,7 +711,7 @@ export default function FoodResultPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={shareToKakao}
+                  onClick={handleKakaoShare}
                   title="카카오톡 공유"
                   className="
     group
