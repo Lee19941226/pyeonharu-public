@@ -57,7 +57,10 @@ export async function PUT(req: NextRequest) {
 
   if (profileError) {
     console.error("profiles 업데이트 에러:", profileError);
-    // auth는 성공했으니 에러를 무시하고 성공 반환
+    return NextResponse.json(
+      { error: "프로필 업데이트 실패" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ success: true, name: trimmedName });
