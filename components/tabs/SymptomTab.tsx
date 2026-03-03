@@ -147,17 +147,6 @@ function SymptomContent() {
     }
   }, []);
 
-  // URL 쿼리 자동 분석
-  useEffect(() => {
-    const q = searchParams.get("q");
-    if (q && !hasAutoAnalyzed.current) {
-      hasAutoAnalyzed.current = true;
-      setSymptom(q);
-      const timer = setTimeout(() => runAnalysis(q), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [searchParams, runAnalysis]);
-
   const remaining = DAILY_LIMIT - usageCount;
   const limitReached = remaining <= 0;
 
@@ -215,6 +204,17 @@ function SymptomContent() {
     },
     [limitReached, userLocation],
   );
+
+  // URL 쿼리 자동 분석
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && !hasAutoAnalyzed.current) {
+      hasAutoAnalyzed.current = true;
+      setSymptom(q);
+      const timer = setTimeout(() => runAnalysis(q), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, runAnalysis]);
 
   // 병원 목록 → 지도 마커 변환
   const hospitalMarkers: MapMarker[] = hospitals.map((h) => ({

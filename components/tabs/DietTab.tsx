@@ -314,18 +314,6 @@ export default function DietTab() {
     if (user) loadEntries();
   }, [user, date, loadEntries]);
 
-  // ✅ 외부에서 식단 추가 시 데이터 새로고침
-  useEffect(() => {
-    const handler = () => {
-      if (user) {
-        loadEntries();
-        loadDashboard();
-      }
-    };
-    window.addEventListener("diet-entry-added", handler);
-    return () => window.removeEventListener("diet-entry-added", handler);
-  }, [user, loadEntries, loadDashboard]);
-
   const getDashRange = useCallback(() => {
     const today = new Date();
     const todayStr = today.toLocaleDateString("en-CA");
@@ -358,6 +346,18 @@ export default function DietTab() {
   useEffect(() => {
     if (user) loadDashboard();
   }, [user, loadDashboard]);
+
+  // ✅ 외부에서 식단 추가 시 데이터 새로고침
+  useEffect(() => {
+    const handler = () => {
+      if (user) {
+        loadEntries();
+        loadDashboard();
+      }
+    };
+    window.addEventListener("diet-entry-added", handler);
+    return () => window.removeEventListener("diet-entry-added", handler);
+  }, [user, loadEntries, loadDashboard]);
 
   const handlePhotoAnalyze = async (file: File) => {
     // ✅ 이미지 크기 사전 검증
