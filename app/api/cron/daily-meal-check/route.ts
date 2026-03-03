@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
   try {
     // Vercel Cron 보안 검증
     const authHeader = req.headers.get("authorization");
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
