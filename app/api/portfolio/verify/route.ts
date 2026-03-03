@@ -1,10 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     const normalized = token.trim().toLowerCase();
+    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("portfolio_access_tokens")
@@ -25,7 +28,21 @@ export async function POST(req: NextRequest) {
       .eq("token", normalized)
       .single();
 
-    if (error || !data) {
+    if (error) {
+      console.error("Portfolio token verify error:", error.message);
+      if (error.code === "PGRST116") {
+        return NextResponse.json(
+          { error: "유효하지 않은 토큰입니다." },
+          { status: 401 },
+        );
+      }
+      return NextResponse.json(
+        { error: "서버 오류가 발생했습니다." },
+        { status: 500 },
+      );
+    }
+
+    if (!data) {
       return NextResponse.json(
         { error: "유효하지 않은 토큰입니다." },
         { status: 401 },

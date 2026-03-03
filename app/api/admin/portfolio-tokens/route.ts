@@ -2,10 +2,12 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // 모호한 문자 제외한 문자셋
 const CHARSET = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -27,6 +29,7 @@ export async function GET() {
     const auth = await verifyAdmin();
     if (!auth.ok) return auth.response;
 
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from("portfolio_access_tokens")
       .select("*")
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
     const auth = await verifyAdmin();
     if (!auth.ok) return auth.response;
 
+    const supabase = getSupabase();
     const { label, token: customToken, validFrom, validUntil } = await req.json();
 
     if (!label || !validFrom || !validUntil) {
@@ -112,6 +116,7 @@ export async function PATCH(req: NextRequest) {
     const auth = await verifyAdmin();
     if (!auth.ok) return auth.response;
 
+    const supabase = getSupabase();
     const { id, is_revoked } = await req.json();
 
     if (!id || typeof is_revoked !== "boolean") {
@@ -145,6 +150,7 @@ export async function DELETE(req: NextRequest) {
     const auth = await verifyAdmin();
     if (!auth.ok) return auth.response;
 
+    const supabase = getSupabase();
     const { id } = await req.json();
 
     if (!id) {
