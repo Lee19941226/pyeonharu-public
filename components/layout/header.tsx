@@ -20,6 +20,7 @@ import {
   BarChart3,
   MessageSquare,
   Headphones,
+  Code2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -193,6 +194,15 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               관리자
             </Link>
           )}
+          {isLoggedIn && userRole === "super_admin" && (
+            <Link
+              href="/portfolio"
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+            >
+              <Code2 className="h-3.5 w-3.5" />
+              포트폴리오
+            </Link>
+          )}
           {isLoggedIn ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -307,6 +317,16 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
               >
                 <ShieldCheck className="h-4 w-4" />
                 관리자 페이지
+              </Link>
+            )}
+            {isLoggedIn && userRole === "super_admin" && (
+              <Link
+                href="/portfolio"
+                onClick={closeMobileMenu}
+                className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white"
+              >
+                <Code2 className="h-4 w-4" />
+                포트폴리오
               </Link>
             )}
             <div className="mb-4">
