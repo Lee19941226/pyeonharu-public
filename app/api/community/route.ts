@@ -109,9 +109,11 @@ export async function GET(req: NextRequest) {
     }
 
     const posts = await enrichPosts(supabase, merged, user?.id);
+    const enrichedMap = new Map(posts.map((p: any) => [p.id, p]));
+
     return NextResponse.json({
-      topLikes: await enrichPosts(supabase, byLikes || [], user?.id),
-      topViews: await enrichPosts(supabase, byViews || [], user?.id),
+      topLikes: (byLikes || []).map((p: any) => enrichedMap.get(p.id)).filter(Boolean),
+      topViews: (byViews || []).map((p: any) => enrichedMap.get(p.id)).filter(Boolean),
       posts,
     });
   }
