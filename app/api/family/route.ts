@@ -65,11 +65,25 @@ export async function POST(req: NextRequest) {
 
   // 알레르기 저장
   if (allergies?.length > 0) {
+    for (const a of allergies) {
+      if (!a.code?.trim() || !a.name?.trim()) {
+        return NextResponse.json(
+          { error: "알레르기 코드와 이름은 필수입니다." },
+          { status: 400 },
+        );
+      }
+      if (a.code.trim().length > 50 || a.name.trim().length > 50) {
+        return NextResponse.json(
+          { error: "알레르기 코드와 이름은 50자 이하여야 합니다." },
+          { status: 400 },
+        );
+      }
+    }
     await supabase.from("family_member_allergies").insert(
       allergies.map((a: any) => ({
         member_id: member.id,
-        allergen_code: a.code,
-        allergen_name: a.name,
+        allergen_code: a.code.trim(),
+        allergen_name: a.name.trim(),
         severity: a.severity || "medium",
       })),
     );
@@ -111,13 +125,29 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id);
 
   // 알레르기 전체 교체
+  if (allergies?.length > 0) {
+    for (const a of allergies) {
+      if (!a.code?.trim() || !a.name?.trim()) {
+        return NextResponse.json(
+          { error: "알레르기 코드와 이름은 필수입니다." },
+          { status: 400 },
+        );
+      }
+      if (a.code.trim().length > 50 || a.name.trim().length > 50) {
+        return NextResponse.json(
+          { error: "알레르기 코드와 이름은 50자 이하여야 합니다." },
+          { status: 400 },
+        );
+      }
+    }
+  }
   await supabase.from("family_member_allergies").delete().eq("member_id", id);
   if (allergies?.length > 0) {
     await supabase.from("family_member_allergies").insert(
       allergies.map((a: any) => ({
         member_id: id,
-        allergen_code: a.code,
-        allergen_name: a.name,
+        allergen_code: a.code.trim(),
+        allergen_name: a.name.trim(),
         severity: a.severity || "medium",
       })),
     );
