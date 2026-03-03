@@ -33,7 +33,17 @@ export async function POST(
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("community_likes").delete().eq("id", existing.id);
+      const { error } = await supabase
+        .from("community_likes")
+        .delete()
+        .eq("id", existing.id);
+      if (error) {
+        console.error("[community/like] 댓글 좋아요 삭제 실패:", error.message);
+        return NextResponse.json(
+          { error: "서버 오류가 발생했습니다." },
+          { status: 500 },
+        );
+      }
       return NextResponse.json({ liked: false });
     } else {
       const { error } = await supabase.from("community_likes").insert({
@@ -64,7 +74,17 @@ export async function POST(
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("community_likes").delete().eq("id", existing.id);
+      const { error } = await supabase
+        .from("community_likes")
+        .delete()
+        .eq("id", existing.id);
+      if (error) {
+        console.error("[community/like] 게시글 좋아요 삭제 실패:", error.message);
+        return NextResponse.json(
+          { error: "서버 오류가 발생했습니다." },
+          { status: 500 },
+        );
+      }
       return NextResponse.json({ liked: false });
     } else {
       const { error } = await supabase.from("community_likes").insert({

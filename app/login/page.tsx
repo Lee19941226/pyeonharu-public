@@ -50,7 +50,12 @@ function LoginContent() {
     }
 
     const redirectTo = searchParams?.get("redirect") || "/";
-    router.push(redirectTo);
+    const isInternalPath =
+      redirectTo.startsWith("/") &&
+      !redirectTo.startsWith("//") &&
+      !redirectTo.startsWith("/\\") &&
+      !redirectTo.includes("://");
+    router.push(isInternalPath ? redirectTo : "/");
     router.refresh();
   };
 
