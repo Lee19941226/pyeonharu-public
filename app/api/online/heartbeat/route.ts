@@ -34,14 +34,14 @@ export async function POST(request: NextRequest) {
         .eq("id", user.id)
         .single();
 
-      onlineStore.upsert(user.id, {
+      await onlineStore.upsert(user.id, {
         nickname: profile?.nickname || user.user_metadata?.nickname || null,
         isAuthenticated: true,
         ipAddress,
       });
     } else if (sessionId) {
       // 비로그인 사용자 (sessionId 기반)
-      onlineStore.upsert(`anon_${sessionId}`, {
+      await onlineStore.upsert(`anon_${sessionId}`, {
         nickname: null,
         isAuthenticated: false,
         ipAddress,
@@ -73,7 +73,7 @@ export async function DELETE(request: NextRequest) {
 
     const userId = user?.id || (sessionId ? `anon_${sessionId}` : null);
     if (userId) {
-      onlineStore.remove(userId);
+      await onlineStore.remove(userId);
     }
 
     return NextResponse.json({ ok: true });
