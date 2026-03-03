@@ -293,6 +293,8 @@ export function NaverMap({
       markersRef.current.push(marker);
     });
 
+    let fitBoundsTimer: ReturnType<typeof setTimeout> | null = null;
+
     if (fitBounds && markerData.length > 0) {
       if (userLocation) {
         bounds.extend(
@@ -300,12 +302,16 @@ export function NaverMap({
         );
       }
 
-      setTimeout(() => {
+      fitBoundsTimer = setTimeout(() => {
         if (mapInstanceRef.current) {
           mapInstanceRef.current.fitBounds(bounds, { padding: 50 });
         }
       }, 100);
     }
+
+    return () => {
+      if (fitBoundsTimer) clearTimeout(fitBoundsTimer);
+    };
   }, [
     markers,
     places,

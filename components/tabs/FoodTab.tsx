@@ -549,9 +549,13 @@ export default function FoodTab({
 
   // ─── 급식/커뮤니티 로드 ───
   useEffect(() => {
+    // loadMealData는 user를 클로저로 캡처하며, user가 deps에 있어 실제 stale 없음
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadMealData();
   }, [user]);
   useEffect(() => {
+    // 마운트 시 1회만 실행 의도적 패턴
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadCommunityPosts();
   }, []);
 

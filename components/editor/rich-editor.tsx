@@ -72,7 +72,7 @@ function SlashCommandMenu({
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [filtered, selectedIndex])
+  }, [filtered, selectedIndex, onClose])
 
   const selectItem = (index: number) => {
     const item = filtered[index]

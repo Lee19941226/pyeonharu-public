@@ -153,9 +153,10 @@ function SymptomContent() {
     if (q && !hasAutoAnalyzed.current) {
       hasAutoAnalyzed.current = true;
       setSymptom(q);
-      setTimeout(() => runAnalysis(q), 300);
+      const timer = setTimeout(() => runAnalysis(q), 300);
+      return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, [searchParams, runAnalysis]);
 
   const remaining = DAILY_LIMIT - usageCount;
   const limitReached = remaining <= 0;
