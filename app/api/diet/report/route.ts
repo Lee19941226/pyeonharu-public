@@ -18,8 +18,20 @@ export async function GET(req: NextRequest) {
   let endDate: string
 
   if (type === "custom") {
-    startDate = searchParams.get("startDate") || baseDate
-    endDate = searchParams.get("endDate") || baseDate
+    const rawStart = searchParams.get("startDate") || baseDate
+    const rawEnd = searchParams.get("endDate") || baseDate
+    const isoPattern = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
+    if (!isoPattern.test(rawStart) || isNaN(new Date(rawStart).getTime())) {
+      return NextResponse.json({ error: "startDate는 YYYY-MM-DD 형식이어야 합니다." }, { status: 400 })
+    }
+    if (!isoPattern.test(rawEnd) || isNaN(new Date(rawEnd).getTime())) {
+      return NextResponse.json({ error: "endDate는 YYYY-MM-DD 형식이어야 합니다." }, { status: 400 })
+    }
+    if (rawStart > rawEnd) {
+      return NextResponse.json({ error: "startDate는 endDate보다 이전이어야 합니다." }, { status: 400 })
+    }
+    startDate = rawStart
+    endDate = rawEnd
   } else if (type === "monthly") {
     const d = new Date(baseDate)
     startDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
