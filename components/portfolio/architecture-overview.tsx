@@ -15,6 +15,7 @@ import {
   Building2,
   Bookmark,
   BarChart3,
+  Lightbulb,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +29,7 @@ interface ArchitectureFlow {
   icon: React.ReactNode;
   title: string;
   summary: string;
+  coreLogic?: string;
   steps: FlowStep[];
   techStack: string[];
   security: string[];
@@ -38,6 +40,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Lock className="h-5 w-5" />,
     title: "인증 (로그인/회원가입)",
     summary: "Supabase Auth 기반 OAuth 2.0 인증 및 세션 관리 흐름",
+    coreLogic: "미들웨어는 프록시 모듈에 위임만 하고, 프록시에서 세션 갱신·보호 경로 판단·IP 기반 Rate Limit을 일괄 처리하는 위임 패턴으로 순환 의존 없이 깔끔한 구조를 유지합니다.",
     steps: [
       {
         file: "app/login/page.tsx",
@@ -75,6 +78,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Search className="h-5 w-5" />,
     title: "식품 안전 확인",
     summary: "공공 API와 AI 비전을 활용한 식품 성분 분석 및 안전성 확인",
+    coreLogic: "2단계 검색(Phase 1: DB 즉시 응답 → Phase 2: 외부 API + AI 백그라운드 보강) 후 결과를 비동기 upsert로 캐싱합니다. 검색할수록 자체 DB가 풍부해져 API 호출이 줄고, AI는 결과가 0건일 때만 최후 수단으로 호출되어 비용을 최소화합니다.",
     steps: [
       {
         file: "app/food/page.tsx",
@@ -107,6 +111,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <MessageSquare className="h-5 w-5" />,
     title: "커뮤니티",
     summary: "리치 텍스트 에디터 기반 게시글/댓글 CRUD 및 XSS 방지",
+    coreLogic: "게시글 목록 로딩 시 Set 기반 배치 로딩으로 N+1 문제를 해결합니다. 게시글 수에 관계없이 프로필·좋아요·댓글 수를 고정 3회 쿼리로 조회한 뒤 Map에 O(1) 룩업으로 매핑합니다.",
     steps: [
       {
         file: "app/community/page.tsx",
@@ -136,6 +141,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Shield className="h-5 w-5" />,
     title: "관리자 대시보드",
     summary: "실시간 통계, 사용자 관리, SSE 기반 온라인 모니터링",
+    coreLogic: "SSE 스트림에서 request.signal(AbortController)로 클라이언트 연결 해제를 감지하여 interval을 자동 정리합니다. X-Accel-Buffering: no 헤더로 nginx 프록시 버퍼링도 비활성화하여 실시간성을 보장합니다.",
     steps: [
       {
         file: "app/admin/layout.tsx",
@@ -168,6 +174,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <UtensilsCrossed className="h-5 w-5" />,
     title: "식단 관리",
     summary: "AI 기반 식단 이미지 분석, 영양소 추정, BMR 계산 및 리포트",
+    coreLogic: "업로드된 이미지의 Magic Byte(FFD8FF=JPEG, 89504E47=PNG)를 직접 읽어 Content-Type 헤더 스푸핑을 방지합니다. Supabase Storage 업로드가 실패해도 분석은 계속 진행되는 Graceful Degradation 패턴을 적용했습니다.",
     steps: [
       {
         file: "app/diet/page.tsx",
@@ -197,6 +204,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Pill className="h-5 w-5" />,
     title: "의약품 검색",
     summary: "공공데이터 API를 통한 의약품 정보 검색 및 HTML 정제",
+    coreLogic: "공공데이터 API 응답에 포함된 HTML 태그·엔티티(&nbsp;, &lt; 등)를 cleanHtml 함수로 정제하여 XSS를 원천 차단하고, API 키를 로그에서 KEY_HIDDEN으로 마스킹합니다.",
     steps: [
       {
         file: "app/api/medicine/route.ts",
@@ -214,6 +222,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Stethoscope className="h-5 w-5" />,
     title: "증상 분석",
     summary: "AI 기반 증상 분석, 질환 추정, 진료과 추천 및 주변 병원 연결",
+    coreLogic: "2계층 Rate Limiting으로 비용을 제어합니다. 1계층은 DB 기반(인증 20회/비인증 5회/일)으로 사용자별 제한, 2계층은 메모리 기반(분당 30회/일 1000회)으로 OpenAI API 비용 폭주를 방지합니다. 비인증 5회 제한은 자연스럽게 회원가입 전환을 유도합니다.",
     steps: [
       {
         file: "components/tabs/SymptomTab.tsx",
@@ -239,6 +248,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <MapPin className="h-5 w-5" />,
     title: "맛집 추천",
     summary: "위치 기반 음식점 검색, 알레르기 위험도 판단, AI 메뉴 분석 및 리뷰",
+    coreLogic: "74개 음식 카테고리별 알레르겐 매핑 테이블을 양방향 퍼지 매칭(category.includes(key) || key.includes(category))으로 검색하여 safe/caution/danger 3단계 위험도를 자동 판정합니다. Haversine 구면 거리 공식으로 정확한 거리 계산 후 반경 필터링합니다.",
     steps: [
       {
         file: "app/api/restaurant/search/route.ts",
@@ -273,6 +283,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <GraduationCap className="h-5 w-5" />,
     title: "학교 급식",
     summary: "NEIS 연동 급식 조회, 알레르기 교차 오염 감지, 이메일 알림",
+    coreLogic: "사용자 알레르기에서 교차 오염 맵(계란↔닭고기, 우유↔쇠고기, 갑각류 상호, 견과류 상호)을 역참조하여 위험 Set을 구축한 뒤, 메뉴별로 danger(직접 일치) → caution(교차 오염) → safe 3단계로 분류합니다. 직접 알레르기와 중복되는 교차 항목은 자동 제외하여 중복 경고를 방지합니다.",
     steps: [
       {
         file: "app/school/page.tsx",
@@ -307,6 +318,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Users className="h-5 w-5" />,
     title: "가족 관리",
     summary: "가족 구성원별 알레르기 정보 관리 및 식품 안전 확인 연동",
+    coreLogic: "알레르기 수정 시 기존 데이터 삭제 + 새 데이터 삽입을 Supabase RPC 함수로 단일 트랜잭션 처리합니다. RPC 실패 시 자동 롤백되어 부분 업데이트가 불가능하며, POST에서도 구성원 생성 후 알레르기 삽입 실패 시 생성된 구성원을 즉시 삭제하는 보상 트랜잭션을 구현했습니다.",
     steps: [
       {
         file: "app/family/page.tsx",
@@ -329,6 +341,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Building2 className="h-5 w-5" />,
     title: "병원/약국 찾기",
     summary: "지역별/위치 기반 병원 약국 검색, 공공 API 프록시, 거리순 정렬",
+    coreLogic: "좌표 → 가장 가까운 시도 추정 후 해당 시도의 공공 API를 호출하고, Haversine 공식으로 정확한 거리를 재계산하여 반경 필터링합니다. 약국 API는 행정구역 개편(강원특별자치도↔강원도)에 대응하는 Fallback 재시도 로직을 갖추고 있습니다.",
     steps: [
       {
         file: "app/area/page.tsx",
@@ -363,6 +376,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <Bookmark className="h-5 w-5" />,
     title: "북마크",
     summary: "병원, 약국, 음식의 즐겨찾기 관리 및 중복 방지",
+    coreLogic: "미들웨어(보호 경로 리다이렉트) → API(getUser 인증) → Supabase RLS(Row Level Security) 3중 인증 체계로 데이터를 보호합니다. PostgreSQL unique(user_id, item_id) 제약 조건으로 DB 레벨에서 중복을 차단하고, 에러 코드 23505를 409 Conflict로 변환합니다.",
     steps: [
       {
         file: "app/bookmarks/page.tsx",
@@ -392,6 +406,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     icon: <BarChart3 className="h-5 w-5" />,
     title: "주간 리포트",
     summary: "주간 식품 스캔 통계, 위험 식품 감지, 일별 추이 차트",
+    coreLogic: "단일 API 호출에서 스캔 기록·위험 식품·Top 5·신규 즐겨찾기·일별 통계·전주 비교 6개 쿼리를 병렬 실행하여 한 번에 집계합니다. 전주 대비 스캔 수·위험 감지 수 변화량을 계산하여 추이를 시각화합니다.",
     steps: [
       {
         file: "app/reports/page.tsx",
@@ -487,6 +502,19 @@ function FlowCard({
             </div>
           ))}
         </div>
+
+        {/* Core Logic */}
+        {flow.coreLogic && (
+          <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                핵심 로직
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">{flow.coreLogic}</p>
+          </div>
+        )}
 
         {/* Tech stack */}
         <div>
