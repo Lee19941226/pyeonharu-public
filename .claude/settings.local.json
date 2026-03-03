@@ -9,7 +9,8 @@
       "mcp__supabase__execute_sql",
       "mcp__supabase__list_migrations",
       "mcp__supabase__apply_migration",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(node:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
