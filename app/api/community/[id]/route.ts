@@ -34,10 +34,13 @@ export async function GET(
 
   if (!viewedCookie) {
     newViewCount += 1;
-    await supabase
+    const { error: viewCountError } = await supabase
       .from("community_posts")
       .update({ view_count: newViewCount })
       .eq("id", id);
+    if (viewCountError) {
+      console.error("[Community] 조회수 업데이트 실패:", viewCountError.message);
+    }
   }
 
   // 작성자 닉네임 조회
