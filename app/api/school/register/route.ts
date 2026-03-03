@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       office_code: officeCode,
       school_name: schoolName,
       school_address: schoolAddress || "",
+      is_primary: (count || 0) === 0,
     }).select().single()
 
     if (error) {
