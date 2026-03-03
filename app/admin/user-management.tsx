@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import {
   Search,
   ChevronLeft,
@@ -255,86 +255,86 @@ export default function UserManagement() {
               {data?.users.map((user) => {
                 const isExpanded = expandedUser === user.id;
                 return (
-                  <tr key={user.id} className="group">
-                    <td colSpan={6} className="p-0">
-                      <div>
-                        {/* 메인 행 */}
-                        <div
-                          className="flex items-center border-b cursor-pointer hover:bg-muted/30 transition-colors"
-                          onClick={() =>
-                            setExpandedUser(isExpanded ? null : user.id)
-                          }
-                        >
-                          <div className="flex-1 flex items-center gap-3 px-4 py-3 min-w-[160px]">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                              {user.nickname?.charAt(0) || "?"}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">
-                                {user.nickname || "이름 없음"}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground truncate md:hidden">
-                                {user.email}
-                              </p>
-                            </div>
+                  <Fragment key={user.id}>
+                    <tr
+                      className="group border-b cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() =>
+                        setExpandedUser(isExpanded ? null : user.id)
+                      }
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+                            {user.nickname?.charAt(0) || "?"}
                           </div>
-                          <div className="px-4 py-3 hidden md:block min-w-[180px]">
-                            <p className="text-muted-foreground truncate text-xs">
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">
+                              {user.nickname || "이름 없음"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate md:hidden">
                               {user.email}
                             </p>
                           </div>
-                          <div className="px-4 py-3 min-w-[120px]">
-                            <RoleBadge role={user.role || "user"} />
-                          </div>
-                          <div className="px-4 py-3 text-center hidden lg:block min-w-[100px]">
-                            <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-                              <span title="스캔">
-                                <ScanLine className="inline h-3 w-3" />{" "}
-                                {user.scanCount}
-                              </span>
-                              <span title="게시글">
-                                <MessageSquare className="inline h-3 w-3" />{" "}
-                                {user.postCount}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="px-4 py-3 hidden lg:block min-w-[100px]">
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(user.created_at).toLocaleDateString(
-                                "ko-KR",
-                              )}
-                            </p>
-                          </div>
-                          <div className="px-4 py-3 min-w-[140px]">
-                            <select
-                              value={user.role || "user"}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                if (e.target.value !== user.role) {
-                                  setConfirmDialog({
-                                    userId: user.id,
-                                    userName: user.nickname || user.email,
-                                    currentRole: user.role || "user",
-                                    newRole: e.target.value,
-                                  });
-                                }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              disabled={changingRole === user.id}
-                              className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
-                            >
-                              {ROLES.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                  {r.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
                         </div>
-
-                        {/* 확장 상세 */}
-                        {isExpanded && (
-                          <div className="border-b bg-muted/20 px-4 py-3 space-y-2 text-xs">
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <p className="text-muted-foreground truncate text-xs">
+                          {user.email}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <RoleBadge role={user.role || "user"} />
+                      </td>
+                      <td className="px-4 py-3 text-center hidden lg:table-cell">
+                        <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                          <span title="스캔">
+                            <ScanLine className="inline h-3 w-3" />{" "}
+                            {user.scanCount}
+                          </span>
+                          <span title="게시글">
+                            <MessageSquare className="inline h-3 w-3" />{" "}
+                            {user.postCount}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(user.created_at).toLocaleDateString(
+                            "ko-KR",
+                          )}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <select
+                          value={user.role || "user"}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.value !== user.role) {
+                              setConfirmDialog({
+                                userId: user.id,
+                                userName: user.nickname || user.email,
+                                currentRole: user.role || "user",
+                                newRole: e.target.value,
+                              });
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={changingRole === user.id}
+                          className="h-8 rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                    {/* 확장 상세 */}
+                    {isExpanded && (
+                      <tr key={`${user.id}-detail`} className="border-b">
+                        <td colSpan={6} className="bg-muted/20 px-4 py-3">
+                          <div className="space-y-2 text-xs">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <div>
                                 <span className="text-muted-foreground">
@@ -393,10 +393,10 @@ export default function UserManagement() {
                               </span>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
