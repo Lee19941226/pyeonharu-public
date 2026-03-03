@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
+const supabaseService = createServiceClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -132,7 +137,7 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
     // 캐시 저장
     // ==========================================
     try {
-      await supabase.from("ai_guide_cache").insert({
+      await supabaseService.from("ai_guide_cache").insert({
         allergen_code: cacheKey,
         severity: severity,
         guide_content: guide,

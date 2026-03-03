@@ -146,7 +146,10 @@ export async function GET(req: NextRequest) {
   if (error) {
     console.error("community_posts 조회 에러:", error);
     console.error("[community]", error.message);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 
   const posts = await enrichPosts(supabase, data || [], user?.id);
@@ -172,7 +175,59 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
+  // ─── Rate Limit: 하루 20개, 1시간 5개 ───
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
+  const identifier = `community:post:${user.id}`;
+
+  // 하루 제한 체크
+  const { count: dailyCount, error: dailyErr } = await supabase
+    .from("community_rate_limits")
+    .select("*", { count: "exact", head: true })
+    .eq("identifier", identifier)
+    .gte("created_at", todayStart.toISOString());
+
+  if (dailyErr) {
+    return NextResponse.json(
+      { error: "잠시 후 다시 시도해주세요." },
+      { status: 503 },
+    );
+  }
+
+  if ((dailyCount || 0) >= 20) {
+    return NextResponse.json(
+      { error: "오늘 게시글 작성 한도(20개)를 초과했습니다." },
+      { status: 429 },
+    );
+  }
+
+  // 1시간 제한 체크
+  const { count: hourlyCount } = await supabase
+    .from("community_rate_limits")
+    .select("*", { count: "exact", head: true })
+    .eq("identifier", identifier)
+    .gte("created_at", hourAgo.toISOString());
+
+  if ((hourlyCount || 0) >= 5) {
+    return NextResponse.json(
+      {
+        error:
+          "1시간에 5개까지만 작성할 수 있습니다. 잠시 후 다시 시도해주세요.",
+      },
+      { status: 429 },
+    );
+  }
+
+  // 기록 저장 (비동기, 응답 대기 안 함)
+  supabase
+    .from("community_rate_limits")
+    .insert({ identifier, created_at: now.toISOString() })
+    .then(({ error }) => {
+      if (error) console.error("커뮤니티 rate limit 기록 실패:", error);
+    });
   const body = await req.json();
   const { schoolCode, title, content, imageUrls } = body;
 
@@ -223,7 +278,10 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error("[community]", error.message);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ success: true, post: data });

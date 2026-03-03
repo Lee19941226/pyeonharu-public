@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 // 서버사이드 Supabase (service_role로 RLS 우회)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,19 +26,8 @@ export async function GET(request: Request) {
   const period = searchParams.get("period") || "30"; // 기본 30일
   const days = parseInt(period);
   const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (!profile || !["admin", "super_admin"].includes(profile.role)) {
-    return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-  }
+  const auth = await verifyAdmin();
+  if (!auth.ok) return auth.response;
   try {
     // ═══ 1. 사용자 통계 ═══
     // 전체 가입자 수
@@ -72,10 +61,6 @@ export async function GET(request: Request) {
         .select("user_id")
         .gte("scanned_at", todayStart),
       supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", todayStart),
-      supabase
         .from("community_posts")
         .select("user_id")
         .gte("created_at", todayStart),
@@ -105,10 +90,6 @@ export async function GET(request: Request) {
         .select("user_id")
         .gte("scanned_at", daysAgo(7)),
       supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", daysAgo(7)),
-      supabase
         .from("community_posts")
         .select("user_id")
         .gte("created_at", daysAgo(7)),
@@ -137,10 +118,6 @@ export async function GET(request: Request) {
         .from("food_scan_logs")
         .select("user_id")
         .gte("scanned_at", daysAgo(30)),
-      supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", daysAgo(30)),
       supabase
         .from("community_posts")
         .select("user_id")
@@ -172,10 +149,6 @@ export async function GET(request: Request) {
         .from("food_scan_logs")
         .select("user_id, scanned_at")
         .gte("scanned_at", daysAgo(days)),
-      supabase
-        .from("food_check_history")
-        .select("user_id, checked_at")
-        .gte("checked_at", daysAgo(days)),
       supabase
         .from("community_posts")
         .select("user_id, created_at")
@@ -372,11 +345,6 @@ export async function GET(request: Request) {
         .select("user_id")
         .gte("scanned_at", weekAgoStart)
         .lte("scanned_at", weekAgoEnd),
-      supabase
-        .from("food_check_history")
-        .select("user_id")
-        .gte("checked_at", weekAgoStart)
-        .lte("checked_at", weekAgoEnd),
       supabase
         .from("community_posts")
         .select("user_id")

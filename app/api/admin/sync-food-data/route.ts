@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,23 +10,10 @@ export async function GET(req: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
 
     // Vercel Cron 또는 직접 호출 모두 검증
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      // 관리자 로그인 체크로 fallback
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user)
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      if (!profile || !["admin", "super_admin"].includes(profile.role)) {
-        return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-      }
+    const isCronRequest = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    if (!isCronRequest) {
+      const auth = await verifyAdmin();
+      if (!auth.ok) return auth.response;
     }
 
     const supabase = await createClient();
@@ -37,7 +25,8 @@ export async function GET(req: NextRequest) {
 
     console.log("🚀 식약처 데이터 동기화 시작...");
 
-    while (true) {
+    const MAX_PAGES = 200;
+    while (pageNo <= MAX_PAGES) {
       const url = new URL(`${baseUrl}/getFoodQrProdMnfInfo01`);
       url.searchParams.append("serviceKey", serviceKey);
       url.searchParams.append("pageNo", pageNo.toString());

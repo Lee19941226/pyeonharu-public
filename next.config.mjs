@@ -80,7 +80,7 @@ const nextConfig = {
               "default-src 'self'",
 
               // 스크립트: self + 카카오SDK + 네이버지도 + Google 애드센스 + 인라인(Next.js 필수)
-              "script-src 'self' 'unsafe-inline' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://*.pstatic.net https://www.googletagmanager.com https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
+              "script-src 'self' 'unsafe-inline' https://developers.kakao.com https://t1.kakaocdn.net https://openapi.map.naver.com https://oapi.map.naver.com https://*.map.naver.net https://*.pstatic.net https://www.googletagmanager.com https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
 
               // 스타일: self + 인라인(Tailwind)
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",

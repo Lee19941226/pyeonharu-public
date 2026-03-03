@@ -29,21 +29,17 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
-  const ipAddress =
-    req.headers.get("x-forwarded-for")?.split(",")[0] ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
 
-  const identifier = user ? `user:${user.id}` : `ip:${ipAddress}`;
-  const limit = user ? 50 : 5;
+  const identifier = `user:${user.id}`;
+  const limit = 50;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
   const { count } = await supabase
-    .from("search_rate_limits")
+    .from("image_analyze_rate_limits")
     .select("*", { count: "exact", head: true })
     .eq("identifier", `analyze:${identifier}`)
-    .gte("searched_at", todayStart.toISOString());
+    .gte("analyzed_at", todayStart.toISOString());
 
   if ((count || 0) >= limit) {
     return NextResponse.json(
@@ -58,10 +54,10 @@ export async function POST(req: NextRequest) {
   }
 
   supabase
-    .from("search_rate_limits")
+    .from("image_analyze_rate_limits")
     .insert({
       identifier: `analyze:${identifier}`,
-      searched_at: new Date().toISOString(),
+      analyzed_at: new Date().toISOString(),
     })
     .then(() => {});
   try {

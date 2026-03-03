@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
 
   const supabaseForRate = await createClient();
   const { count: recentCount } = await supabaseForRate
-    .from("search_rate_limits")
+    .from("restaurant_rate_limits")
     .select("*", { count: "exact", head: true })
     .eq("identifier", rateLimitKey)
     .gte("searched_at", windowStart.toISOString());
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
 
   // 비동기로 기록 (응답 대기 안 함)
   supabaseForRate
-    .from("search_rate_limits")
+    .from("restaurant_rate_limits")
     .insert({ identifier: rateLimitKey, searched_at: now.toISOString() })
     .then(({ error }) => {
       if (error) console.error("rate limit 기록 실패:", error);

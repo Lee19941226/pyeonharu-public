@@ -46,7 +46,15 @@ export async function updateSession(request: NextRequest) {
   // ==========================================
   // 보호 경로 체크
   // ==========================================
-  const protectedPaths = ["/mypage", "/bookmarks", "/food/profile", "/family"];
+  const protectedPaths = [
+    "/mypage", // 마이페이지
+    "/bookmarks", // 즐겨찾기
+    "/food/profile", // 식품 프로필
+    "/family", // 가족 관리
+    "/admin", // 관리자
+    "/reports", // 주간 리포트
+    "/community/write", // 게시글 작성
+  ];
 
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path),

@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
 
     // ✅ 관리자 권한 체크 제거 (또는 API 키 체크로 변경)
-    const { authorization } = Object.fromEntries(req.headers);
-    const apiKey = process.env.ADMIN_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "서버 설정 오류" }, { status: 500 });
-    }
-
-    if (authorization !== `Bearer ${apiKey}`) {
-      return NextResponse.json({ error: "인증 필요" }, { status: 401 });
-    }
+    const auth = await verifyAdmin();
+    if (!auth.ok) return auth.response;
 
     console.log("🔄 불완전한 캐시 데이터 보완 시작...");
 

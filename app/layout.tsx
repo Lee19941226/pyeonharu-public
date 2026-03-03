@@ -96,21 +96,17 @@ export default function RootLayout({
           as="style"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
-        <Script
-          strategy="beforeInteractive"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
-          crossOrigin="anonymous"
-        />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="font-sans antialiased bg-background text-foreground">
         <Script
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
           src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
         />
         <Script
           strategy="afterInteractive"
-          src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
+          crossOrigin="anonymous"
         />
         <AuthProvider>
           <BackButtonHandler />

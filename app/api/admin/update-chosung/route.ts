@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
+import { verifyAdmin } from "@/lib/utils/admin-auth";
 
 export async function GET() {
+  const auth = await verifyAdmin();
+  if (!auth.ok) return auth.response;
   const supabase = await createClient();
-  // ─── 관리자 인증 체크 ───
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
-  }
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (!profile || !["admin", "super_admin"].includes(profile.role)) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-  }
+
   let offset = 0;
   const batchSize = 1000;
   let totalUpdated = 0;
