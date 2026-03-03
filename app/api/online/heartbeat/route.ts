@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { onlineStore } from "@/lib/online-store";
+import { headers } from "next/headers";
 
 /**
  * POST /api/online/heartbeat
@@ -11,6 +12,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const sessionId = body.sessionId as string | undefined;
+
+    // IP 주소 추출
+    const headersList = await headers();
+    const ipAddress =
+      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      headersList.get("x-real-ip") ||
+      "unknown";
 
     // 로그인 사용자 확인
     const supabase = await createClient();
@@ -29,12 +37,14 @@ export async function POST(request: NextRequest) {
       onlineStore.upsert(user.id, {
         nickname: profile?.nickname || user.user_metadata?.nickname || null,
         isAuthenticated: true,
+        ipAddress,
       });
     } else if (sessionId) {
       // 비로그인 사용자 (sessionId 기반)
       onlineStore.upsert(`anon_${sessionId}`, {
         nickname: null,
         isAuthenticated: false,
+        ipAddress,
       });
     } else {
       return NextResponse.json({ ok: false }, { status: 400 });

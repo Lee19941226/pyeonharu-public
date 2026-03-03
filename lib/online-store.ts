@@ -12,6 +12,7 @@ export interface OnlineUser {
   userId: string;
   nickname: string | null;
   isAuthenticated: boolean;
+  ipAddress: string;
   lastHeartbeat: number; // timestamp ms
   connectedAt: number; // timestamp ms
 }
@@ -35,7 +36,7 @@ class OnlineStore {
    */
   upsert(
     userId: string,
-    info: { nickname?: string | null; isAuthenticated?: boolean },
+    info: { nickname?: string | null; isAuthenticated?: boolean; ipAddress?: string },
   ): void {
     const existing = this.users.get(userId);
     const now = Date.now();
@@ -44,6 +45,7 @@ class OnlineStore {
       userId,
       nickname: info.nickname ?? existing?.nickname ?? null,
       isAuthenticated: info.isAuthenticated ?? existing?.isAuthenticated ?? false,
+      ipAddress: info.ipAddress ?? existing?.ipAddress ?? "unknown",
       lastHeartbeat: now,
       connectedAt: existing?.connectedAt ?? now,
     });

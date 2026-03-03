@@ -18,6 +18,8 @@ import {
   UserCog,
   ChevronDown,
   ChevronUp,
+  Eye,
+  Download,
 } from "lucide-react";
 
 // ─── Types ───
@@ -46,6 +48,11 @@ const ACTION_CONFIG: Record<
   string,
   { label: string; color: string; icon: typeof Search }
 > = {
+  page_view: {
+    label: "페이지 방문",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Eye,
+  },
   food_search: {
     label: "음식 검색",
     color: "bg-cyan-100 text-cyan-700",
@@ -124,6 +131,7 @@ export default function ActionLogs() {
   const [period, setPeriod] = useState(30);
   const [actionType, setActionType] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -161,6 +169,48 @@ export default function ActionLogs() {
   const totalActions = data
     ? Object.values(data.actionCounts).reduce((a, b) => a + b, 0)
     : 0;
+
+  const handleDownloadExcel = async () => {
+    setDownloading(true);
+    try {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "10000",
+        period: String(period),
+        ...(search && { search }),
+        ...(actionType && { actionType }),
+        ...(ip && { ip }),
+      });
+      const res = await fetch(`/api/admin/action-logs?${params}`);
+      if (!res.ok) return;
+      const result: ActionLogsResponse = await res.json();
+
+      // BOM + CSV 생성
+      const BOM = "\uFEFF";
+      const header = ["시간", "사용자", "액션", "IP", "User-Agent", "메타데이터"];
+      const rows = result.logs.map((log) => [
+        new Date(log.created_at).toLocaleString("ko-KR"),
+        log.nickname || "비로그인",
+        getActionConfig(log.action_type).label,
+        log.ip_address,
+        `"${(log.user_agent || "").replace(/"/g, '""')}"`,
+        `"${JSON.stringify(log.metadata).replace(/"/g, '""')}"`,
+      ]);
+
+      const csv = BOM + [header, ...rows].map((r) => r.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `action-logs-${period}days-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Download error:", e);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -202,6 +252,16 @@ export default function ActionLogs() {
               </option>
             ))}
           </select>
+
+          {/* Excel 다운로드 */}
+          <button
+            onClick={handleDownloadExcel}
+            disabled={downloading || !data}
+            className="h-10 rounded-lg border bg-card px-3 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Download className={`h-4 w-4 ${downloading ? "animate-spin" : ""}`} />
+            {downloading ? "다운로드 중..." : "Excel"}
+          </button>
         </div>
 
         {/* 검색 바 */}

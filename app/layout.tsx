@@ -9,6 +9,7 @@ import "./globals.css";
 import { BackButtonHandler } from "@/components/back-button-handler";
 import { StatusBarInit } from "@/components/status-bar-init";
 import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
+import { PageTrackerProvider } from "@/components/providers/page-tracker-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -113,7 +114,9 @@ export default function RootLayout({
           <StatusBarInit />
           <HapticProvider>
             <HeartbeatProvider>
-              {children}
+              <PageTrackerProvider>
+                {children}
+              </PageTrackerProvider>
             </HeartbeatProvider>
             <Toaster />
           </HapticProvider>

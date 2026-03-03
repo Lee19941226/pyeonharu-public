@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
               userId: u.userId,
               nickname: u.nickname,
               isAuthenticated: u.isAuthenticated,
+              ipAddress: u.ipAddress,
               connectedAt: u.connectedAt,
               lastHeartbeat: u.lastHeartbeat,
             })),

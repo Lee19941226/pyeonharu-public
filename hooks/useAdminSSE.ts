@@ -6,6 +6,7 @@ export interface OnlineUser {
   userId: string;
   nickname: string | null;
   isAuthenticated: boolean;
+  ipAddress: string;
   connectedAt: number;
   lastHeartbeat: number;
 }

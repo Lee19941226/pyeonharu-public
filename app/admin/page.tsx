@@ -266,6 +266,7 @@ function OnlineUsersCard({
                   <th className="text-left px-3 py-2 font-medium">상태</th>
                   <th className="text-left px-3 py-2 font-medium">사용자</th>
                   <th className="text-left px-3 py-2 font-medium">유형</th>
+                  <th className="text-left px-3 py-2 font-medium">IP</th>
                   <th className="text-left px-3 py-2 font-medium">접속 시간</th>
                   <th className="text-left px-3 py-2 font-medium">마지막 활동</th>
                 </tr>
@@ -300,6 +301,9 @@ function OnlineUsersCard({
                           비회원
                         </span>
                       )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground font-mono text-[11px]">
+                      {user.ipAddress || "unknown"}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {new Date(user.connectedAt).toLocaleTimeString("ko-KR")}
