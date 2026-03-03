@@ -324,6 +324,13 @@ JSON 형식으로만 응답:
               })(),
             ]);
 
+          if (rawMaterialResult.status === "rejected")
+            console.error("❌ 원재료 API 실패:", rawMaterialResult.reason);
+          if (allergyResult.status === "rejected")
+            console.error("❌ 알레르기 API 실패:", allergyResult.reason);
+          if (nutritionResult.status === "rejected")
+            console.error("❌ 영양정보 API 실패:", nutritionResult.reason);
+
           const rawMaterialItems =
             rawMaterialResult.status === "fulfilled"
               ? rawMaterialResult.value
