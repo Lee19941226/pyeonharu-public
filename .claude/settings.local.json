@@ -14,7 +14,10 @@
       "Bash(rg:*)",
       "Bash(cd:*)",
       "Bash(git:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "mcp__supabase__apply_migration",
+      "Bash(npm run:*)",
+      "Bash(node:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

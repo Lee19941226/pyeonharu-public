@@ -447,23 +447,37 @@ export default function FoodResultPage() {
       // 로그인 사용자 → Supabase에 저장
       // ==========================================
       if (user) {
-        const { error } = await supabase.from("food_check_history").insert({
-          user_id: user.id,
-          member_id: null, // 나중에 가족 기능 추가 시 사용
-          barcode: historyItem.barcode,
-          product_name: historyItem.product_name,
-          manufacturer: historyItem.manufacturer,
-          is_safe: historyItem.is_safe,
-          detected_allergens: historyItem.detected_allergens,
-          checked_at: historyItem.checked_at,
-        });
+        // 5분 내 동일 barcode 중복 저장 방지
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: recent } = await supabase
+          .from("food_check_history")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("barcode", historyItem.barcode)
+          .gte("checked_at", fiveMinAgo)
+          .limit(1);
 
-        if (error) {
-          console.error("❌ Supabase 저장 실패:", error);
-          // ✅ DB 실패 시 localStorage에 fallback
-          saveToLocalStorage(historyItem);
+        if (recent && recent.length > 0) {
+          console.log("⏭️ 5분 내 동일 식품 기록 있음, 저장 스킵");
         } else {
-          console.log("✅ Supabase에 스캔 기록 저장 완료");
+          const { error } = await supabase.from("food_check_history").insert({
+            user_id: user.id,
+            member_id: null, // 나중에 가족 기능 추가 시 사용
+            barcode: historyItem.barcode,
+            product_name: historyItem.product_name,
+            manufacturer: historyItem.manufacturer,
+            is_safe: historyItem.is_safe,
+            detected_allergens: historyItem.detected_allergens,
+            checked_at: historyItem.checked_at,
+          });
+
+          if (error) {
+            console.error("❌ Supabase 저장 실패:", error);
+            // ✅ DB 실패 시 localStorage에 fallback
+            saveToLocalStorage(historyItem);
+          } else {
+            console.log("✅ Supabase에 스캔 기록 저장 완료");
+          }
         }
 
         // DB에도 스캔 로그 저장 (주간 리포트용 - 기존 유지)

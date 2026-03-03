@@ -95,10 +95,13 @@ export async function POST(req: NextRequest) {
       );
 
     if (allergyError) {
-      // 알레르기 저장 실패 시 생성된 구성원 롤백
+      console.error(
+        "[family POST] 알레르기 저장 실패, member 롤백:",
+        allergyError,
+      );
       await supabase.from("family_members").delete().eq("id", member.id);
       return NextResponse.json(
-        { error: "알레르기 저장 실패: " + allergyError.message },
+        { error: "알레르기 저장 실패" },
         { status: 500 },
       );
     }
@@ -141,13 +144,11 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id);
 
   if (updateError) {
-    return NextResponse.json(
-      { error: "구성원 정보 업데이트 실패: " + updateError.message },
-      { status: 500 },
-    );
+    console.error("[family PATCH] family_members 수정 실패:", updateError);
+    return NextResponse.json({ error: "구성원 수정 실패" }, { status: 500 });
   }
 
-  // 알레르기 유효성 검사
+  // 알레르기 전체 교체
   if (allergies?.length > 0) {
     for (const a of allergies) {
       if (!a.code?.trim() || !a.name?.trim()) {
@@ -165,55 +166,22 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  // 기존 알레르기 정보 백업 (롤백용)
-  const { data: existingAllergies } = await supabase
-    .from("family_member_allergies")
-    .select("allergen_code, allergen_name, severity")
-    .eq("member_id", id);
+  // 알레르기 전체 교체 — RPC로 delete → insert 원자적 처리
+  const { error: rpcError } = await supabase.rpc(
+    "update_family_member_allergies",
+    {
+      p_member_id: id,
+      p_allergies: (allergies ?? []).map((a: any) => ({
+        allergen_code: a.code.trim(),
+        allergen_name: a.name.trim(),
+        severity: a.severity || "medium",
+      })),
+    },
+  );
 
-  // 알레르기 삭제
-  const { error: deleteError } = await supabase
-    .from("family_member_allergies")
-    .delete()
-    .eq("member_id", id);
-
-  if (deleteError) {
-    return NextResponse.json(
-      { error: "알레르기 삭제 실패: " + deleteError.message },
-      { status: 500 },
-    );
-  }
-
-  // 새 알레르기 삽입
-  if (allergies?.length > 0) {
-    const { error: insertError } = await supabase
-      .from("family_member_allergies")
-      .insert(
-        allergies.map((a: any) => ({
-          member_id: id,
-          allergen_code: a.code.trim(),
-          allergen_name: a.name.trim(),
-          severity: a.severity || "medium",
-        })),
-      );
-
-    if (insertError) {
-      // 삽입 실패 시 기존 알레르기 복원
-      if (existingAllergies && existingAllergies.length > 0) {
-        await supabase.from("family_member_allergies").insert(
-          existingAllergies.map((a) => ({
-            member_id: id,
-            allergen_code: a.allergen_code,
-            allergen_name: a.allergen_name,
-            severity: a.severity,
-          })),
-        );
-      }
-      return NextResponse.json(
-        { error: "알레르기 저장 실패: " + insertError.message },
-        { status: 500 },
-      );
-    }
+  if (rpcError) {
+    console.error("[family PATCH] 알레르기 교체 실패:", rpcError);
+    return NextResponse.json({ error: "알레르기 저장 실패" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

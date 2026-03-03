@@ -138,7 +138,7 @@ function FoodSearchContent() {
     }
   };
 
-  const saveSearchHistory = async (searchQuery: string) => {
+  const saveSearchHistory = async (searchQuery: string, firstItem?: SearchResult) => {
     const newHistory = [
       { query: searchQuery, timestamp: Date.now() },
       ...searchHistory.filter((h) => h.query !== searchQuery),
@@ -169,6 +169,8 @@ function FoodSearchContent() {
     await supabase.from("food_search_history").insert({
       user_id: user.id,
       search_query: searchQuery,
+      food_code: firstItem?.foodCode ?? null,
+      food_name: firstItem?.foodName ?? null,
       searched_at: new Date().toISOString(),
     });
 
@@ -242,7 +244,7 @@ function FoodSearchContent() {
       if (data.success) {
         setResults(data.items);
         setCurrentPage(1);
-        saveSearchHistory(searchQuery);
+        saveSearchHistory(searchQuery, data.items[0]);
       } else {
         console.error("Search failed:", data.error);
         setResults([]);
