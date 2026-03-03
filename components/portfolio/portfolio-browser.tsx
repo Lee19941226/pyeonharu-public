@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search, FileCode2, Hash, Clock, PanelLeftClose, PanelLeft } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Search, FileCode2, Hash, Clock, PanelLeftClose, PanelLeft, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FileTreeSidebar } from "./file-tree-sidebar";
 import { CodeViewer } from "./code-viewer";
+import { ArchitectureOverview } from "./architecture-overview";
 import type { PortfolioData } from "@/lib/utils/portfolio-scanner";
 
 interface PortfolioBrowserProps {
@@ -15,6 +17,13 @@ export function PortfolioBrowser({ data }: PortfolioBrowserProps) {
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<"source" | "architecture">("source");
+
+  const handleNavigateToFile = useCallback((filePath: string) => {
+    setActiveTab("source");
+    setSelectedFilePath(filePath);
+    setSidebarOpen(true);
+  }, []);
 
   const fileMap = useMemo(() => {
     const map = new Map<string, (typeof data.categories)[0]["files"][0]>();
@@ -56,78 +65,97 @@ export function PortfolioBrowser({ data }: PortfolioBrowserProps) {
         </div>
       </div>
 
-      {/* Main layout */}
-      <div className="flex gap-4" style={{ height: "calc(100vh - 16rem)" }}>
-        {/* Sidebar */}
-        <div
-          className={`shrink-0 flex flex-col border rounded-lg bg-background overflow-hidden transition-all ${
-            sidebarOpen ? "w-72 lg:w-80" : "w-0 border-0"
-          }`}
-        >
-          {sidebarOpen && (
-            <>
-              {/* Search */}
-              <div className="border-b p-2">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="파일 검색..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-8 pl-8 text-sm"
-                  />
-                </div>
-              </div>
-              {/* File tree */}
-              <div className="flex-1 overflow-hidden">
-                <FileTreeSidebar
-                  categories={data.categories}
-                  selectedFilePath={selectedFilePath}
-                  searchQuery={searchQuery}
-                  onFileSelect={(path) => {
-                    setSelectedFilePath(path);
-                    // on mobile, auto-close sidebar
-                    if (window.innerWidth < 768) {
-                      setSidebarOpen(false);
-                    }
-                  }}
-                />
-              </div>
-            </>
-          )}
-        </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "source" | "architecture")}>
+        <TabsList>
+          <TabsTrigger value="source">
+            <FileCode2 className="h-4 w-4" />
+            소스코드
+          </TabsTrigger>
+          <TabsTrigger value="architecture">
+            <Layers className="h-4 w-4" />
+            아키텍처
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Code viewer area */}
-        <div className="flex flex-1 flex-col min-w-0">
-          {/* Toggle button */}
-          <div className="mb-2 flex items-center gap-2">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        <TabsContent value="source">
+          <div className="flex gap-4" style={{ height: "calc(100vh - 16rem)" }}>
+            {/* Sidebar */}
+            <div
+              className={`shrink-0 flex flex-col border rounded-lg bg-background overflow-hidden transition-all ${
+                sidebarOpen ? "w-72 lg:w-80" : "w-0 border-0"
+              }`}
             >
-              {sidebarOpen ? (
+              {sidebarOpen && (
                 <>
-                  <PanelLeftClose className="h-4 w-4" />
-                  <span className="hidden sm:inline">사이드바 닫기</span>
-                </>
-              ) : (
-                <>
-                  <PanelLeft className="h-4 w-4" />
-                  <span className="hidden sm:inline">사이드바 열기</span>
+                  {/* Search */}
+                  <div className="border-b p-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="파일 검색..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-8 pl-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                  {/* File tree */}
+                  <div className="flex-1 overflow-hidden">
+                    <FileTreeSidebar
+                      categories={data.categories}
+                      selectedFilePath={selectedFilePath}
+                      searchQuery={searchQuery}
+                      onFileSelect={(path) => {
+                        setSelectedFilePath(path);
+                        // on mobile, auto-close sidebar
+                        if (window.innerWidth < 768) {
+                          setSidebarOpen(false);
+                        }
+                      }}
+                    />
+                  </div>
                 </>
               )}
-            </button>
-            {selectedFile && (
-              <span className="truncate text-xs text-muted-foreground">
-                {selectedFile.path}
-              </span>
-            )}
-          </div>
+            </div>
 
-          {/* Code viewer */}
-          <CodeViewer file={selectedFile} />
-        </div>
-      </div>
+            {/* Code viewer area */}
+            <div className="flex flex-1 flex-col min-w-0">
+              {/* Toggle button */}
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {sidebarOpen ? (
+                    <>
+                      <PanelLeftClose className="h-4 w-4" />
+                      <span className="hidden sm:inline">사이드바 닫기</span>
+                    </>
+                  ) : (
+                    <>
+                      <PanelLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline">사이드바 열기</span>
+                    </>
+                  )}
+                </button>
+                {selectedFile && (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {selectedFile.path}
+                  </span>
+                )}
+              </div>
+
+              {/* Code viewer */}
+              <CodeViewer file={selectedFile} />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="architecture">
+          <ArchitectureOverview onNavigateToFile={handleNavigateToFile} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
