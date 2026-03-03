@@ -289,7 +289,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("type", "json");
                 url.searchParams.append("brcd_no", code);
                 const data = await fetchWithTimeout(url.toString());
-                return data.body?.items || [];
+                return data?.body?.items || [];
               })(),
 
               // 알레르기
@@ -303,7 +303,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("type", "json");
                 url.searchParams.append("brcd_no", code);
                 const data = await fetchWithTimeout(url.toString());
-                return data.body?.items || [];
+                return data?.body?.items || [];
               })(),
 
               // 영양정보
@@ -320,7 +320,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("type", "json");
                 url.searchParams.append("brcd_no", code);
                 const data = await fetchWithTimeout(url.toString());
-                return data.body?.items || [];
+                return data?.body?.items || [];
               })(),
             ]);
 
@@ -531,7 +531,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
           const data = await fetchWithTimeout(url.toString());
-          return data.body?.items?.[0] || null;
+          return data?.body?.items?.[0] || null;
         })(),
 
         // API 2: 알레르기정보
@@ -543,7 +543,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
           const data = await fetchWithTimeout(url.toString());
-          return data.body?.items || [];
+          return data?.body?.items || [];
         })(),
 
         // API 3: 원재료정보
@@ -555,7 +555,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
           const data = await fetchWithTimeout(url.toString());
-          return data.body?.items || [];
+          return data?.body?.items || [];
         })(),
 
         // API 4: 영양표시정보
@@ -567,7 +567,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
           const data = await fetchWithTimeout(url.toString());
-          return data.body?.items || [];
+          return data?.body?.items || [];
         })(),
 
         // API 5: 주의사항정보
@@ -579,7 +579,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("type", "json");
           url.searchParams.append("brcd_no", code);
           const data = await fetchWithTimeout(url.toString());
-          return data.body?.items?.[0] || null;
+          return data?.body?.items?.[0] || null;
         })(),
       ]);
 
