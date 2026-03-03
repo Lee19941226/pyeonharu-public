@@ -62,13 +62,15 @@ export async function GET(req: NextRequest) {
     }
     const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
 
-    // ✅ OpenAI 비용 통제
-    const rateCheck = checkOpenAIRateLimit("food-search");
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
-        { status: 429 },
-      );
+    // ✅ OpenAI 비용 통제 (phase=1은 DB만 조회하므로 스킵)
+    if (phase !== "1") {
+      const rateCheck = checkOpenAIRateLimit("food-search");
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+          { status: 429 },
+        );
+      }
     }
 
     const openai = new OpenAI({
