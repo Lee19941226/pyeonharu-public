@@ -827,64 +827,34 @@ JSON 배열 형식으로만 반환:
     );
 
     // ==========================================
-    // ✅ Open API 결과 → DB 캐시 저장 (NEW!)
+    // DB 캐시 저장 (openapi / ai / openfood 통합 1회 upsert)
     // ==========================================
-    const openApiToCache = deduped.filter((r) => r.dataSource === "openapi");
-    if (openApiToCache.length > 0) {
-      console.log(
-        `💾 Open API 결과 ${openApiToCache.length}개 DB 캐시 저장 시작...`,
-      );
+    const toCache = deduped.filter((r) =>
+      ["openapi", "ai", "openfood"].includes(r.dataSource),
+    );
+    if (toCache.length > 0) {
+      console.log(`💾 검색 결과 ${toCache.length}개 DB 캐시 저장 시작...`);
 
       supabase
         .from("food_search_cache")
         .upsert(
-          openApiToCache.map((item) => ({
-            food_code: item.foodCode,
-            food_name: item.foodName,
-            manufacturer: item.manufacturer || null,
-            allergens: item.allergens || [],
-            raw_materials: null, // 검색 시점엔 원재료 없음
-            weight: item.weight || null,
-            data_source: "openapi",
-            chosung: getChosung(item.foodName),
-            created_at: new Date().toISOString(),
-          })),
-          { onConflict: "food_code" },
-        )
-        .then(({ error }) => {
-          if (error) {
-            console.error("❌ Open API 결과 DB 캐시 저장 실패:", error);
-          } else {
-            console.log("✅ Open API 결과 DB 캐시 저장 완료");
-          }
-        });
-    }
-
-    // ==========================================
-    // AI 결과 → DB 캐시 저장
-    // ==========================================
-    const aiToCache = deduped.filter((r) => r.dataSource === "ai");
-    if (aiToCache.length > 0) {
-      console.log(`💾 AI 결과 ${aiToCache.length}개 DB 캐시 저장 시작...`);
-
-      supabase
-        .from("food_search_cache")
-        .upsert(
-          aiToCache.map((item) => {
+          toCache.map((item) => {
             const rawMaterials =
-              item.rawMaterials ||
-              item.ingredients?.join(", ") ||
-              item.detectedIngredients?.join(", ") ||
-              "";
+              item.dataSource === "openapi"
+                ? null
+                : item.rawMaterials ||
+                  item.ingredients?.join(", ") ||
+                  item.detectedIngredients?.join(", ") ||
+                  null;
 
             return {
               food_code: item.foodCode,
               food_name: item.foodName,
               manufacturer: item.manufacturer || null,
               allergens: item.allergens || [],
-              raw_materials: rawMaterials || null,
-              weight: item.weight || null,
-              data_source: "ai",
+              raw_materials: rawMaterials,
+              weight: item.dataSource === "openfood" ? null : item.weight || null,
+              data_source: item.dataSource,
               chosung: getChosung(item.foodName),
               created_at: new Date().toISOString(),
             };
@@ -893,43 +863,9 @@ JSON 배열 형식으로만 반환:
         )
         .then(({ error }) => {
           if (error) {
-            console.error("❌ AI 결과 DB 캐시 저장 실패:", error);
+            console.error("❌ DB 캐시 저장 실패:", error);
           } else {
-            console.log("✅ AI 결과 DB 캐시 저장 완료");
-          }
-        });
-    }
-
-    // ==========================================
-    // Open Food Facts 결과 → DB 캐시 저장
-    // ==========================================
-    const openFoodToCache = deduped.filter((r) => r.dataSource === "openfood");
-    if (openFoodToCache.length > 0) {
-      console.log(
-        `💾 OpenFood 결과 ${openFoodToCache.length}개 DB 캐시 저장 시작...`,
-      );
-
-      supabase
-        .from("food_search_cache")
-        .upsert(
-          openFoodToCache.map((item) => ({
-            food_code: item.foodCode,
-            food_name: item.foodName,
-            manufacturer: item.manufacturer || null,
-            allergens: item.allergens || [],
-            raw_materials: item.rawMaterials || null,
-            weight: null,
-            data_source: "openfood",
-            chosung: getChosung(item.foodName),
-            created_at: new Date().toISOString(),
-          })),
-          { onConflict: "food_code" },
-        )
-        .then(({ error }) => {
-          if (error) {
-            console.error("❌ OpenFood 결과 DB 캐시 저장 실패:", error);
-          } else {
-            console.log("✅ OpenFood 결과 DB 캐시 저장 완료");
+            console.log("✅ DB 캐시 저장 완료");
           }
         });
     }
