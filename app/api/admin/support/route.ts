@@ -6,6 +6,11 @@ const supabaseAdmin = createAdminClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+/** PostgREST .or() 필터 인젝션 방지 */
+function sanitizeFilterValue(value: string): string {
+  return value.replace(/[,.()"\\]/g, "");
+}
+
 // 문의 목록 조회 (관리자)
 export async function GET(req: NextRequest) {
   try {
@@ -29,8 +34,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (search) {
+      const safeSearch = sanitizeFilterValue(search);
       query = query.or(
-        `title.ilike.%${search}%,name.ilike.%${search}%,email.ilike.%${search}%`,
+        `title.ilike.%${safeSearch}%,name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`,
       );
     }
 

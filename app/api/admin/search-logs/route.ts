@@ -29,9 +29,12 @@ export async function GET(req: NextRequest) {
       .gte("searched_at", startDate.toISOString())
       .order("searched_at", { ascending: false });
 
-    // 검색어 필터링
+    // 검색어 필터링 (특수문자 이스케이프)
     if (searchQuery) {
-      query = query.ilike("search_query", `%${searchQuery}%`);
+      const safeQuery = searchQuery.replace(/[%_\\]/g, "");
+      if (safeQuery) {
+        query = query.ilike("search_query", `%${safeQuery}%`);
+      }
     }
 
     const {

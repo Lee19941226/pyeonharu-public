@@ -8,6 +8,11 @@ const supabaseAdmin = createClient(
 
 const VALID_ROLES = ["user", "moderator", "admin", "super_admin"];
 
+/** PostgREST .or() 필터 인젝션 방지: 특수문자 제거 */
+function sanitizeFilterValue(value: string): string {
+  return value.replace(/[,.()"\\]/g, "");
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await verifyAdmin();
@@ -28,8 +33,10 @@ export async function GET(request: Request) {
       );
 
     if (search) {
+      const safeSearch = sanitizeFilterValue(search);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(safeSearch);
       query = query.or(
-        `nickname.ilike.%${search}%,id.eq.${search.length === 36 ? search : "00000000-0000-0000-0000-000000000000"}`,
+        `nickname.ilike.%${safeSearch}%,id.eq.${isUuid ? safeSearch : "00000000-0000-0000-0000-000000000000"}`,
       );
     }
     if (roleFilter && VALID_ROLES.includes(roleFilter)) {
@@ -76,23 +83,18 @@ export async function GET(request: Request) {
       }),
     );
 
-    let authUsers: any[] = [];
-    let authPage = 1;
-    while (true) {
-      const { data } = await supabaseAdmin.auth.admin.listUsers({
-        page: authPage,
-        perPage: 1000,
-      });
-      if (!data?.users?.length) break;
-      authUsers = [...authUsers, ...data.users];
-      if (data.users.length < 1000) break;
-      authPage++;
-    }
-
+    // 현재 페이지 유저의 이메일만 조회 (전체 유저 순회 방지)
     const emailMap: Record<string, string> = {};
-    authUsers?.forEach((u) => {
-      if (u.email) emailMap[u.id] = u.email;
-    });
+    await Promise.all(
+      enrichedUsers.map(async (u) => {
+        try {
+          const { data } = await supabaseAdmin.auth.admin.getUserById(u.id);
+          if (data?.user?.email) emailMap[u.id] = data.user.email;
+        } catch {
+          // skip
+        }
+      }),
+    );
 
     const finalUsers = enrichedUsers.map((u) => ({
       ...u,
