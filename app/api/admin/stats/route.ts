@@ -50,95 +50,42 @@ export async function GET(request: Request) {
     });
 
     // ═══ 2. 활성 사용자 (DAU/WAU/MAU) ═══
-    // food_scan_logs, food_check_history, community_posts, diet_entries 기반
+    // 각 테이블을 MAU 기준(30일)으로 1회만 조회 후 메모리 필터링 (쿼리 15회 → 5회)
     const now = new Date();
-
-    // DAU - 오늘 활동한 고유 사용자
     const todayStart = startOfDay(now);
-    const dauSets = await Promise.all([
-      supabase
-        .from("food_scan_logs")
-        .select("user_id")
-        .gte("scanned_at", todayStart),
-      supabase
-        .from("community_posts")
-        .select("user_id")
-        .gte("created_at", todayStart),
-      supabase
-        .from("community_comments")
-        .select("user_id")
-        .gte("created_at", todayStart),
-      supabase
-        .from("diet_entries")
-        .select("user_id")
-        .gte("created_at", todayStart),
-      supabase
-        .from("food_search_logs")
-        .select("user_id")
-        .gte("searched_at", todayStart),
-    ]);
+    const wau7Start = daysAgo(7);
+
+    const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs] =
+      await Promise.all([
+        supabase.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", daysAgo(30)),
+        supabase.from("community_posts").select("user_id, created_at").gte("created_at", daysAgo(30)),
+        supabase.from("community_comments").select("user_id, created_at").gte("created_at", daysAgo(30)),
+        supabase.from("diet_entries").select("user_id, created_at").gte("created_at", daysAgo(30)),
+        supabase.from("food_search_logs").select("user_id, searched_at").gte("searched_at", daysAgo(30)),
+      ]);
+
+    // 타임스탬프 필드명이 테이블마다 다르므로 ts로 통일
+    const allMauRows: { user_id: string; ts: string }[] = [
+      ...(mauScanLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.scanned_at })),
+      ...(mauPostLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
+      ...(mauCommentLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
+      ...(mauDietLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
+      ...(mauSearchLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.searched_at })),
+    ];
+
     const dauUsers = new Set<string>();
-    dauSets.forEach((res) =>
-      res.data?.forEach((r) => r.user_id && dauUsers.add(r.user_id)),
-    );
-    const dau = dauUsers.size;
-
-    // WAU - 최근 7일
-    const wauSets = await Promise.all([
-      supabase
-        .from("food_scan_logs")
-        .select("user_id")
-        .gte("scanned_at", daysAgo(7)),
-      supabase
-        .from("community_posts")
-        .select("user_id")
-        .gte("created_at", daysAgo(7)),
-      supabase
-        .from("community_comments")
-        .select("user_id")
-        .gte("created_at", daysAgo(7)),
-      supabase
-        .from("diet_entries")
-        .select("user_id")
-        .gte("created_at", daysAgo(7)),
-      supabase
-        .from("food_search_logs")
-        .select("user_id")
-        .gte("searched_at", daysAgo(7)),
-    ]);
     const wauUsers = new Set<string>();
-    wauSets.forEach((res) =>
-      res.data?.forEach((r) => r.user_id && wauUsers.add(r.user_id)),
-    );
-    const wau = wauUsers.size;
-
-    // MAU - 최근 30일
-    const mauSets = await Promise.all([
-      supabase
-        .from("food_scan_logs")
-        .select("user_id")
-        .gte("scanned_at", daysAgo(30)),
-      supabase
-        .from("community_posts")
-        .select("user_id")
-        .gte("created_at", daysAgo(30)),
-      supabase
-        .from("community_comments")
-        .select("user_id")
-        .gte("created_at", daysAgo(30)),
-      supabase
-        .from("diet_entries")
-        .select("user_id")
-        .gte("created_at", daysAgo(30)),
-      supabase
-        .from("food_search_logs")
-        .select("user_id")
-        .gte("searched_at", daysAgo(30)),
-    ]);
     const mauUsers = new Set<string>();
-    mauSets.forEach((res) =>
-      res.data?.forEach((r) => r.user_id && mauUsers.add(r.user_id)),
-    );
+
+    allMauRows.forEach(({ user_id, ts }) => {
+      if (!user_id || !ts) return;
+      mauUsers.add(user_id);
+      if (ts >= wau7Start) wauUsers.add(user_id);
+      if (ts >= todayStart) dauUsers.add(user_id);
+    });
+
+    const dau = dauUsers.size;
+    const wau = wauUsers.size;
     const mau = mauUsers.size;
 
     // ═══ 3. 일별 활성 사용자 추이 (DAU 트렌드) ═══
@@ -358,11 +305,8 @@ export async function GET(request: Request) {
 
     const returnedUsers = new Set<string>();
     if (weekAgoUsers.size > 0) {
-      dauSets.forEach((res) => {
-        res.data?.forEach((r) => {
-          if (r.user_id && weekAgoUsers.has(r.user_id))
-            returnedUsers.add(r.user_id);
-        });
+      dauUsers.forEach((userId) => {
+        if (weekAgoUsers.has(userId)) returnedUsers.add(userId);
       });
     }
 
