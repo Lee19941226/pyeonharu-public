@@ -47,14 +47,16 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const origin = requestUrl.origin;
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (!code) {
+    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  }
 
-    if (error) {
-      console.error("[auth/callback] 세션 교환 실패:", error.message);
-      return NextResponse.redirect(`${origin}/login?error=auth_failed`);
-    }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    console.error("[auth/callback] 세션 교환 실패:", error.message);
+    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
   }
 
   // ✅ 안전한 리다이렉트 경로만 허용 (Open Redirect 방지)
