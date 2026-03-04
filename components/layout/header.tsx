@@ -52,18 +52,20 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       .getUser()
       .then(({ data: { user } }) => {
         if (user) {
-          setNickname(
-            user.user_metadata?.name ||
-              user.user_metadata?.full_name ||
-              user.email?.split("@")[0] ||
-              "사용자",
-          );
+          // profiles 테이블에서 nickname과 role을 함께 가져옴 (OAuth 재로그인 시 덮어씌워지는 문제 방지)
           supabase
             .from("profiles")
-            .select("role")
+            .select("nickname, role")
             .eq("id", user.id)
             .single()
             .then(({ data }) => {
+              setNickname(
+                data?.nickname ||
+                  user.user_metadata?.name ||
+                  user.user_metadata?.full_name ||
+                  user.email?.split("@")[0] ||
+                  "사용자",
+              );
               setUserRole(data?.role || "user");
             });
         }
@@ -78,19 +80,21 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         const user = session.user;
-        setNickname(
-          user.user_metadata?.name ||
-            user.user_metadata?.full_name ||
-            user.email?.split("@")[0] ||
-            "사용자",
-        );
         const supabase2 = createClient();
+        // profiles 테이블에서 nickname과 role을 함께 가져옴
         supabase2
           .from("profiles")
-          .select("role")
+          .select("nickname, role")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
+            setNickname(
+              data?.nickname ||
+                user.user_metadata?.name ||
+                user.user_metadata?.full_name ||
+                user.email?.split("@")[0] ||
+                "사용자",
+            );
             setUserRole(data?.role || "user");
           });
       } else {

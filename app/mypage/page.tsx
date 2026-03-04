@@ -317,7 +317,14 @@ export default function MyPage() {
         }
 
         if (authUser) {
-          const name = authUser.user_metadata?.name || "사용자";
+          // profiles 테이블에서 nickname을 우선 사용 (OAuth 재로그인 시 덮어씌워지는 문제 방지)
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("nickname")
+            .eq("id", authUser.id)
+            .single();
+
+          const name = profile?.nickname || authUser.user_metadata?.name || "사용자";
           setUser({ email: authUser.email || "", name });
           setEditName(name);
         }
