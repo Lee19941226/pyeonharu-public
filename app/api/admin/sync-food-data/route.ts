@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("❌ 동기화 오류:", error);
     return NextResponse.json(
-      { success: false, error: "동기화 중 오류 발생" },
+      { error: "동기화 중 오류 발생" },
       { status: 500 },
     );
   }

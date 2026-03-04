@@ -156,6 +156,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Insights error:", error);
-    return NextResponse.json({ success: false }, { status: 500 });
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

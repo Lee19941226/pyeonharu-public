@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("💥 일괄 보완 오류:", error);
     return NextResponse.json(
-      { success: false, error: "일괄 보완 실패" },
+      { error: "일괄 보완 실패" },
       { status: 500 },
     );
   }

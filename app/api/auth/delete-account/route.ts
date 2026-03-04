@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json(
-        { success: false, message: "인증되지 않은 사용자입니다." },
+        { error: "인증되지 않은 사용자입니다." },
         { status: 401 },
       );
     }
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (deleteError) {
       console.error("[DeleteAccount] Admin delete error:", deleteError);
       return NextResponse.json(
-        { success: false, message: "회원 탈퇴 처리 중 오류가 발생했습니다." },
+        { error: "회원 탈퇴 처리 중 오류가 발생했습니다." },
         { status: 500 },
       );
     }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[DeleteAccount] Unexpected error:", error);
     return NextResponse.json(
-      { success: false, message: "회원 탈퇴 중 오류가 발생했습니다." },
+      { error: "회원 탈퇴 중 오류가 발생했습니다." },
       { status: 500 },
     );
   }

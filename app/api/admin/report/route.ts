@@ -78,7 +78,7 @@ ${JSON.stringify(stats.signups.trend.slice(-7))}
   } catch (error: any) {
     console.error("Admin report error:", error);
     return NextResponse.json(
-      { error: error.message || "분석 실패" },
+      { error: "분석 실패" },
       { status: 500 },
     );
   }

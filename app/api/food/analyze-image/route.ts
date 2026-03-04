@@ -7,10 +7,7 @@ import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
-      {
-        success: false,
-        error: "서버 설정 오류입니다. 관리자에게 문의해주세요.",
-      },
+      { error: "서버 설정 오류입니다. 관리자에게 문의해주세요." },
       { status: 500 },
     );
   }
@@ -25,7 +22,7 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json(
-      { success: false, error: "로그인이 필요합니다." },
+      { error: "로그인이 필요합니다." },
       { status: 401 },
     );
   }
@@ -44,7 +41,6 @@ export async function POST(req: NextRequest) {
   if ((count || 0) >= limit) {
     return NextResponse.json(
       {
-        success: false,
         error: user
           ? `오늘 이미지 분석 한도(${limit}회)를 초과했습니다.`
           : "오늘 무료 분석 한도를 초과했습니다. 로그인하면 더 많이 사용할 수 있어요.",
@@ -65,10 +61,7 @@ export async function POST(req: NextRequest) {
     const rateCheck = checkOpenAIRateLimit("analyze-image");
     if (!rateCheck.allowed) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
-        },
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
         { status: 429 },
       );
     }
@@ -79,7 +72,7 @@ export async function POST(req: NextRequest) {
     // ─── 입력 검증 ───
     if (!imageBase64 || typeof imageBase64 !== "string") {
       return NextResponse.json(
-        { success: false, error: "이미지 데이터가 필요합니다." },
+        { error: "이미지 데이터가 필요합니다." },
         { status: 400 },
       );
     }
@@ -88,11 +81,8 @@ export async function POST(req: NextRequest) {
     const MAX_BASE64_LENGTH = 10 * 1024 * 1024; // 10MB
     if (imageBase64.length > MAX_BASE64_LENGTH) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
-        },
-        { status: 413 },
+        { error: "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요." },
+        { status: 400 },
       );
     }
 
@@ -315,10 +305,7 @@ export async function POST(req: NextRequest) {
     } catch (aiError) {
       console.error("❌ AI 분석 실패:", aiError);
       return NextResponse.json(
-        {
-          success: false,
-          error: "AI 이미지 분석에 실패했습니다. 다시 시도해주세요.",
-        },
+        { error: "AI 이미지 분석에 실패했습니다. 다시 시도해주세요." },
         { status: 500 },
       );
     }
@@ -626,13 +613,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("💥 전체 분석 에러:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "이미지 분석 중 오류가 발생했습니다",
-      },
+      { error: "이미지 분석 중 오류가 발생했습니다." },
       { status: 500 },
     );
   }

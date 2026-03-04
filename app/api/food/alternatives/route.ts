@@ -173,6 +173,6 @@ JSON만 반환 (다른 텍스트 없이):
     });
   } catch (error) {
     console.error("대체품 추천 오류:", error);
-    return NextResponse.json({ success: false, alternatives: [] });
+    return NextResponse.json({ error: "대체품 추천 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

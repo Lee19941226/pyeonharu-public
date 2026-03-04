@@ -66,10 +66,7 @@ export async function GET(req: NextRequest) {
     const serviceKey = process.env.FOOD_API_KEY;
     if (!serviceKey) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "서버 설정 오류입니다. 관리자에게 문의해주세요.",
-        },
+        { error: "서버 설정 오류입니다. 관리자에게 문의해주세요." },
         { status: 500 },
       );
     }
@@ -148,7 +145,6 @@ export async function GET(req: NextRequest) {
       if ((minuteCount || 0) >= minuteLimit) {
         return NextResponse.json(
           {
-            success: false,
             error: user
               ? `검색이 너무 빠릅니다. 잠시 후 다시 시도해주세요. (분당 ${minuteLimit}회 제한)`
               : `검색이 너무 빠릅니다. 잠시 후 다시 시도해주세요. (분당 ${minuteLimit}회 제한)\n로그인하시면 더 많이 검색할 수 있어요.`,
@@ -179,7 +175,6 @@ export async function GET(req: NextRequest) {
       if ((dailyCount || 0) >= dailyLimit) {
         return NextResponse.json(
           {
-            success: false,
             error: user
               ? `오늘 검색 한도(${dailyLimit}회)를 초과했습니다. 내일 다시 이용해주세요.`
               : `오늘 무료 검색 한도(${dailyLimit}회)를 초과했습니다. 로그인하시면 더 많이 검색할 수 있어요.`,
@@ -916,7 +911,7 @@ JSON 배열 형식으로만 반환:
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(
-      { success: false, error: "검색 중 오류가 발생했습니다" },
+      { error: "검색 중 오류가 발생했습니다" },
       { status: 500 },
     );
   }

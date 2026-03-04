@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
   if (dailyErr) {
     return NextResponse.json(
       { error: "잠시 후 다시 시도해주세요." },
-      { status: 503 },
+      { status: 500 },
     );
   }
 
@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
     console.error("커뮤니티 rate limit 기록 실패:", rateLimitInsertErr);
     return NextResponse.json(
       { error: "잠시 후 다시 시도해주세요." },
-      { status: 503 },
+      { status: 500 },
     );
   }
   const body = await req.json();

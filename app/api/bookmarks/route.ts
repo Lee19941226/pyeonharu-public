@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
       if (error.code === "23505") {
         return NextResponse.json({ error: "이미 즐겨찾기에 추가되어 있습니다." }, { status: 409 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 })
     }
   } else if (type === "pharmacy") {
     const { error } = await supabase.from("pharmacy_bookmarks").insert({
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       if (error.code === "23505") {
         return NextResponse.json({ error: "이미 즐겨찾기에 추가되어 있습니다." }, { status: 409 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 })
     }
   } else {
     return NextResponse.json({ error: "type은 hospital 또는 pharmacy여야 합니다." }, { status: 400 })
@@ -144,7 +144,7 @@ export async function DELETE(req: NextRequest) {
     .eq(idCol, itemId)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })

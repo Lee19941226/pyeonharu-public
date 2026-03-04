@@ -44,10 +44,10 @@ export async function GET(req: NextRequest) {
       resultData.result.detectedAllergens.length === 0
     ) {
       console.log("❌ 위험한 알레르기 없음");
-      return NextResponse.json({
-        success: false,
-        error: "위험한 알레르기 성분이 없습니다",
-      });
+      return NextResponse.json(
+        { error: "위험한 알레르기 성분이 없습니다" },
+        { status: 404 },
+      );
     }
 
     const allergen = resultData.result.detectedAllergens[0]?.name || "알레르기";
@@ -126,7 +126,7 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
     } catch (e) {
       console.error("JSON 파싱 실패:", e);
       return NextResponse.json(
-        { success: false, error: "AI 응답을 파싱할 수 없습니다" },
+        { error: "AI 응답을 파싱할 수 없습니다" },
         { status: 500 },
       );
     }
@@ -155,10 +155,7 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
   } catch (error) {
     console.error("💥 Guide generation error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "가이드 생성 실패",
-      },
+      { error: "가이드 생성 실패" },
       { status: 500 },
     );
   }

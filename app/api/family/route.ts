@@ -24,7 +24,7 @@ export async function GET() {
     .order("created_at");
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   return NextResponse.json({ success: true, members: members || [] });
 }
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
 
   // 알레르기 저장
   if (allergies?.length > 0) {
@@ -205,6 +205,6 @@ export async function DELETE(req: NextRequest) {
     .eq("owner_id", user.id);
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   return NextResponse.json({ success: true });
 }

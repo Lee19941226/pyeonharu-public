@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   // 비로그인이면 무시 (localStorage에만 저장됨)
   if (!user) {
-    return NextResponse.json({ success: false, reason: "not_logged_in" });
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
   const body = await req.json();

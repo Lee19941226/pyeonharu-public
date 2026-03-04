@@ -158,10 +158,10 @@ export async function GET(req: NextRequest) {
   }
 
   if (!match) {
-    return NextResponse.json({
-      success: false,
-      error: "해당 지역을 찾을 수 없습니다. 시/구/동 이름으로 검색해주세요.",
-    })
+    return NextResponse.json(
+      { error: "해당 지역을 찾을 수 없습니다. 시/구/동 이름으로 검색해주세요." },
+      { status: 404 },
+    )
   }
 
   return NextResponse.json({

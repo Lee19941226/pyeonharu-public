@@ -666,7 +666,7 @@ JSON 형식으로만 응답:
       // ==========================================
       if (allergyItems.length === 0 && !productInfo) {
         return NextResponse.json(
-          { success: false, error: "식품 정보를 찾을 수 없습니다" },
+          { error: "식품 정보를 찾을 수 없습니다" },
           { status: 404 },
         );
       }
@@ -947,10 +947,7 @@ JSON 형식으로만 응답:
   } catch (error) {
     console.error("💥 Result error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "결과 조회 실패",
-      },
+      { error: "결과 조회 실패" },
       { status: 500 },
     );
   }

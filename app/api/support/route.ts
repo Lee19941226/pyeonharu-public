@@ -10,7 +10,7 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ success: false, error: "로그인이 필요합니다" }, { status: 401 });
+      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
     const { data, error } = await supabase
@@ -23,7 +23,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, inquiries: data });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     if (!name?.trim() || !email?.trim() || !title?.trim() || !content?.trim()) {
       return NextResponse.json(
-        { success: false, error: "필수 항목을 모두 입력해주세요" },
+        { error: "필수 항목을 모두 입력해주세요" },
         { status: 400 },
       );
     }
@@ -63,6 +63,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, inquiry: data });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
