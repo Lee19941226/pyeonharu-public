@@ -35,6 +35,32 @@ function getChosung(str: string): string {
   }
   return result;
 }
+/** 괄호 깊이를 고려한 원재료 파싱 (쉼표를 기준으로 분리하되 괄호 내부 쉼표는 무시) */
+function parseRawMaterials(text: string): string[] {
+  const items: string[] = [];
+  let current = "";
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === "(" || char === "{" || char === "[") {
+      depth++;
+      current += char;
+    } else if (char === ")" || char === "}" || char === "]") {
+      depth--;
+      current += char;
+    } else if ((char === "," || char === "，") && depth === 0) {
+      const trimmed = current.trim();
+      if (trimmed) items.push(trimmed);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  const trimmed = current.trim();
+  if (trimmed) items.push(trimmed);
+  return items;
+}
+
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -68,6 +94,7 @@ export async function GET(req: NextRequest) {
   let nutritionDetails: any[] = [];
   let nutrition = {};
   let servingSize = "";
+  let rawMaterialsStr = ""; // 원재료 원본 문자열 (프론트 fallback용)
   try {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
@@ -114,10 +141,8 @@ export async function GET(req: NextRequest) {
 
       // 원재료 파싱
       if (cachedData.raw_materials) {
-        ingredients = cachedData.raw_materials
-          .split(/[,\(\)]+/)
-          .map((i: string) => i.trim())
-          .filter((i: string) => i.length > 0);
+        rawMaterialsStr = cachedData.raw_materials;
+        ingredients = parseRawMaterials(cachedData.raw_materials).slice(0, 30);
       }
       // 영양정보 추가
       nutritionDetails = cachedData.nutrition_details || [];
@@ -347,34 +372,8 @@ JSON 형식으로만 응답:
             const rawText = rawMaterialItems[0].PRVW_CN || "";
             if (rawText) {
               updateData.raw_materials = rawText;
-
-              // 현재 세션에도 반영
-              function parseIngredients(text: string): string[] {
-                const items: string[] = [];
-                let current = "";
-                let depth = 0;
-                for (let i = 0; i < text.length; i++) {
-                  const char = text[i];
-                  if (char === "(" || char === "{" || char === "[") {
-                    depth++;
-                    current += char;
-                  } else if (char === ")" || char === "}" || char === "]") {
-                    depth--;
-                    current += char;
-                  } else if ((char === "," || char === "，") && depth === 0) {
-                    const trimmed = current.trim();
-                    if (trimmed) items.push(trimmed);
-                    current = "";
-                  } else {
-                    current += char;
-                  }
-                }
-                const trimmed = current.trim();
-                if (trimmed) items.push(trimmed);
-                return items;
-              }
-
-              ingredients = parseIngredients(rawText).slice(0, 30);
+              rawMaterialsStr = rawText;
+              ingredients = parseRawMaterials(rawText).slice(0, 30);
             }
           }
 
@@ -711,45 +710,9 @@ JSON 형식으로만 응답:
 
       console.log("📦 원재료 원본 길이:", rawMaterialsText.length);
 
-      // ✅ 정교한 원재료 파싱 함수
-      function parseIngredients(text: string): string[] {
-        const items: string[] = [];
-        let current = "";
-        let depth = 0;
-
-        for (let i = 0; i < text.length; i++) {
-          const char = text[i];
-
-          if (char === "(" || char === "{" || char === "[") {
-            depth++;
-            current += char;
-          } else if (char === ")" || char === "}" || char === "]") {
-            depth--;
-            current += char;
-          } else if ((char === "," || char === "，") && depth === 0) {
-            // 괄호 밖의 쉼표만 분리
-            const trimmed = current.trim();
-            if (trimmed) {
-              items.push(trimmed);
-            }
-            current = "";
-          } else {
-            current += char;
-          }
-        }
-
-        // 마지막 항목
-        const trimmed = current.trim();
-        if (trimmed) {
-          items.push(trimmed);
-        }
-
-        return items;
-      }
-
-      // 원재료 추출 부분 수정
+      rawMaterialsStr = rawMaterialsText;
       ingredients = rawMaterialsText
-        ? parseIngredients(rawMaterialsText).slice(0, 30)
+        ? parseRawMaterials(rawMaterialsText).slice(0, 30)
         : [];
 
       console.log("📝 파싱된 원재료:", ingredients.length, "개");
@@ -921,6 +884,7 @@ JSON 형식으로만 응답:
       userAllergens: userAllergens.map((ua) => ua.allergen_name),
       detectedAllergens,
       ingredients: ingredients,
+      rawMaterials: rawMaterialsStr || undefined,
       nutrition: nutrition,
       nutritionDetails:
         nutritionDetails.length > 0 ? nutritionDetails : undefined,

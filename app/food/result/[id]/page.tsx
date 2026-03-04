@@ -296,6 +296,7 @@ export default function FoodResultPage() {
               analysisResult.ingredients ||
               analysisResult.detectedIngredients ||
               [],
+            rawMaterials: analysisResult.rawMaterials || undefined,
             isSafe: !analysisResult.hasUserAllergen,
             dataSource: analysisResult.dataSource || "ai",
             detectedIngredients: analysisResult.detectedIngredients || [],
@@ -1187,7 +1188,7 @@ export default function FoodResultPage() {
                   }
 
                   // ✅ 2순위: rawMaterials 파싱 (OpenAPI, Nutrition)
-                  if (result.rawMaterials && result.rawMaterials.length > 10) {
+                  if (result.rawMaterials && result.rawMaterials.length > 0) {
                     const parsedIngredients = result.rawMaterials
                       .split(/[,、]/) // 쉼표, 중점으로 분리
                       .map((item) => item.trim())
