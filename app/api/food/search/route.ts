@@ -5,6 +5,7 @@ import { getChosung, normalizeChosungQuery } from "@/lib/utils/chosung";
 import { headers } from "next/headers";
 import { logAction } from "@/lib/utils/action-log";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+import { correctFoodTypo, jamoSimilarity } from "@/lib/utils/korean-typo";
 
 interface ProductScore {
   foodCode: string;
@@ -903,6 +904,19 @@ JSON 배열 형식으로만 반환:
     // ==========================================
     // 반환
     // ==========================================
+    if (deduped.length === 0) {
+      const correctedQuery = correctFoodTypo(normalizedQuery);
+      return NextResponse.json({
+        success: true,
+        items: [],
+        totalCount: 0,
+        ...(correctedQuery && {
+          correctedQuery,
+          similarity: jamoSimilarity(normalizedQuery, correctedQuery),
+        }),
+      });
+    }
+
     return NextResponse.json({
       success: true,
       items: deduped,

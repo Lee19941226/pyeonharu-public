@@ -692,6 +692,7 @@ function FoodSearchPageInner() {
   const [filterSource, setFilterSource] = useState<string>("all"); // "all" | "openapi" | "db" | "openfood" | "ai"
   const [sortBy, setSortBy] = useState<string>("default"); // "default" | "name" | "safe_first"
   const hasSearchedRef = useRef(false);
+  const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
   useEffect(() => {
     setCurrentPage(1);
   }, [filterSafeOnly, filterSource, sortBy]);
@@ -732,6 +733,7 @@ function FoodSearchPageInner() {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
+    setCorrectedQuery(null);
     setIsLoading(true);
     setHasSearched(true);
     setCurrentPage(1);
@@ -788,6 +790,11 @@ function FoodSearchPageInner() {
         setSearchProgress({ step: "완료!", progress: 100 });
         setAllResults(items);
         setCurrentPage(1);
+        setCorrectedQuery(
+          items.length === 0 && phase2Data.correctedQuery
+            ? phase2Data.correctedQuery
+            : null,
+        );
         const cacheKey = `search_cache_${searchQuery.trim()}`;
         sessionStorage.setItem(
           cacheKey,
@@ -828,6 +835,13 @@ function FoodSearchPageInner() {
         setSearchProgress({ step: "", progress: 0 });
       }, 300);
     }
+  };
+
+  const handleCorrectSearch = (corrected: string) => {
+    setQuery(corrected);
+    setCorrectedQuery(null);
+    router.push(`/food/search?q=${encodeURIComponent(corrected)}`);
+    performSearch(corrected);
   };
 
   // ✅ 검색 폼 제출
@@ -1321,6 +1335,19 @@ function FoodSearchPageInner() {
                     ) : (
                       // 검색 자체 결과 없음
                       <>
+                        {correctedQuery && (
+                          <button
+                            onClick={() => handleCorrectSearch(correctedQuery)}
+                            className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition-all hover:border-amber-400 hover:bg-amber-100 active:scale-95"
+                          >
+                            <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
+                            혹시{" "}
+                            <span className="underline underline-offset-2">
+                              &apos;{correctedQuery}&apos;
+                            </span>
+                            {" "}을(를) 검색하셨나요?
+                          </button>
+                        )}
                         <div className="mb-4 text-4xl">🔍</div>
                         <p className="text-lg font-medium">
                           검색 결과가 없습니다

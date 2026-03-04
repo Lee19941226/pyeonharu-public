@@ -87,6 +87,7 @@ function FoodMainContent() {
     percentage: 0,
   });
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
   // useEffect - URL 쿼리 파라미터 감지
   useEffect(() => {
     const urlQuery = searchParams.get("q");
@@ -377,6 +378,7 @@ function FoodMainContent() {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
+    setCorrectedQuery(null);
     setIsLoading(true);
     setHasSearched(true);
 
@@ -407,6 +409,9 @@ function FoodMainContent() {
         saveSearchHistory(searchQuery);
       } else if (phase1Data.items?.length === 0) {
         // DB도 없고 외부 API도 없으면 AI fallback
+        if (phase2Data.correctedQuery) {
+          setCorrectedQuery(phase2Data.correctedQuery);
+        }
         toast.info("등록된 제품이 없습니다. AI로 분석 중...");
 
         try {
@@ -486,6 +491,13 @@ function FoodMainContent() {
     } else {
       router.push("/food", { scroll: false });
     }
+  };
+
+  const handleCorrectSearch = (corrected: string) => {
+    setQuery(corrected);
+    setCorrectedQuery(null);
+    updateURL(corrected);
+    performSearch(corrected);
   };
 
   const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
@@ -827,6 +839,19 @@ function FoodMainContent() {
                   results.length === 0 && (
                     <Card>
                       <CardContent className="flex flex-col items-center py-12">
+                        {correctedQuery && (
+                          <button
+                            onClick={() => handleCorrectSearch(correctedQuery)}
+                            className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition-all hover:border-amber-400 hover:bg-amber-100 active:scale-95"
+                          >
+                            <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
+                            혹시{" "}
+                            <span className="underline underline-offset-2">
+                              &apos;{correctedQuery}&apos;
+                            </span>
+                            {" "}을(를) 검색하셨나요?
+                          </button>
+                        )}
                         <div className="mb-4 text-6xl">🔍</div>
                         <h3 className="mb-2 text-lg font-semibold">
                           검색 결과가 없습니다
