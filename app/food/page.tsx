@@ -111,7 +111,7 @@ function FoodMainContent() {
       setCurrentPage(1);
       return;
     }
-    if (query.length < 2) return;
+    if (query.length < 1) return;
     setShowHistory(false);
 
     // ✅ isInitialMount일 때는 이미 실행했으므로 스킵
@@ -361,7 +361,7 @@ function FoodMainContent() {
       setCurrentPage(1);
       return;
     }
-    if (query.length < 2) return;
+    if (query.length < 1) return;
     setShowHistory(false);
     const timer = setTimeout(() => {
       performSearch(query);
@@ -371,7 +371,7 @@ function FoodMainContent() {
   }, [query]);
 
   const performSearch = async (searchQuery: string) => {
-    if (searchQuery.length < 2) return;
+    if (searchQuery.length < 1) return;
 
     // 이전 요청 취소
     abortControllerRef.current?.abort();
@@ -835,7 +835,7 @@ function FoodMainContent() {
                 )}
                 {!isLoading &&
                   hasSearched &&
-                  query.length >= 2 &&
+                  query.length >= 1 &&
                   results.length === 0 && (
                     <Card>
                       <CardContent className="flex flex-col items-center py-12">

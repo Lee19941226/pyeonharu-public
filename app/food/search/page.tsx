@@ -213,7 +213,7 @@ function FoodSearchContent() {
       return;
     }
 
-    if (query.length < 2) return;
+    if (query.length < 1) return;
 
     const timer = setTimeout(() => {
       handleSearch(query);
@@ -224,7 +224,7 @@ function FoodSearchContent() {
 
   // 검색 실행
   const handleSearch = async (searchQuery: string) => {
-    if (searchQuery.length < 2) return;
+    if (searchQuery.length < 1) return;
 
     // 오프라인 체크
     if (!navigator.onLine) {
@@ -635,7 +635,7 @@ function FoodSearchContent() {
             {/* 검색 결과 없음 */}
             {!isLoading &&
               hasSearched &&
-              query.length >= 2 &&
+              query.length >= 1 &&
               results.length === 0 && (
                 <Card>
                   <CardContent className="flex flex-col items-center py-12">
@@ -848,7 +848,7 @@ function FoodSearchPageInner() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < 1) {
       return;
     }
 

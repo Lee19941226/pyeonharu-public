@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    if (!query || query.length < 2) {
+    if (!query || query.length < 1) {
       return NextResponse.json({ success: true, items: [], totalCount: 0 });
     }
 
@@ -550,7 +550,7 @@ export async function GET(req: NextRequest) {
     const totalResults =
       dbItems.length + openApiItems.length + openFoodItems.length;
 
-    if (totalResults === 0) {
+    if (totalResults === 0 && query.length >= 2) {
       console.log("🤖 결과 부족, AI 호출 시작...");
       try {
         const aiResponse = await openai.chat.completions.create({
