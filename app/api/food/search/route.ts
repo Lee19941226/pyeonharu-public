@@ -550,7 +550,7 @@ export async function GET(req: NextRequest) {
     const totalResults =
       dbItems.length + openApiItems.length + openFoodItems.length;
 
-    if (totalResults === 0 && query.length >= 2) {
+    if (totalResults === 0 && query.length >= 1) {
       console.log("🤖 결과 부족, AI 호출 시작...");
       try {
         const aiResponse = await openai.chat.completions.create({
