@@ -116,7 +116,7 @@ function FoodSearchContent() {
   // ✅ URL 쿼리 파라미터 감지 및 자동 검색
   useEffect(() => {
     const urlQuery = searchParams.get("q");
-    if (!urlQuery || urlQuery.trim().length < 2) return;
+    if (!urlQuery || urlQuery.trim().length < 1) return;
 
     setQuery(urlQuery.trim());
     setHasSearched(true);
@@ -699,7 +699,7 @@ function FoodSearchPageInner() {
 
   useEffect(() => {
     const urlQuery = searchParams.get("q");
-    if (!urlQuery || urlQuery.trim().length < 2) return;
+    if (!urlQuery || urlQuery.trim().length < 1) return;
     if (hasSearchedRef.current) return;
 
     hasSearchedRef.current = true;
@@ -727,7 +727,7 @@ function FoodSearchPageInner() {
   }, [searchParams]);
 
   const performSearch = async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.trim().length < 2) return;
+    if (!searchQuery || searchQuery.trim().length < 1) return;
 
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
