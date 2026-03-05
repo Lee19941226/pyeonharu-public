@@ -1003,7 +1003,7 @@ export default function FoodTab({
                   </p>
                 </div>
                 {!isDragging && (
-                  <Button onClick={(e) => { e.stopPropagation(); setShowUploadSheet(true); }} size="sm">
+                  <Button onClick={(e) => { e.stopPropagation(); setShowUploadSheet(true); }} size="sm" className="cursor-pointer">
                     <Camera className="mr-2 h-4 w-4" />
                     업로드
                   </Button>
