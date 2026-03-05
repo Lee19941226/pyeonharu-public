@@ -24,6 +24,7 @@ import {
   Shuffle,
   Share2,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
@@ -270,101 +271,123 @@ export function MobileNav() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         data-tour="bottom-nav"
       >
-        <div className="mx-auto flex h-16 max-w-md items-center justify-around px-4">
-          {/* 1. 안전확인 카메라 */}
-          <button
+        <motion.div
+          className="mx-auto flex max-w-md items-end justify-around px-3 py-2 gap-2"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: {},
+            visible: { transition: { staggerChildren: 0.1 } },
+          }}
+        >
+          {/* 1. 안전확인 카드 */}
+          <motion.button
             onClick={() => openSheet("allergy")}
             disabled={isProcessing}
-            className={cn(
-              "relative -mt-4 flex h-[56px] w-[56px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
-              isProcessing && cameraMode === "allergy"
-                ? "bg-primary/70 text-primary-foreground"
-                : "bg-primary text-primary-foreground",
-            )}
             aria-label="식품 안전 확인"
+            variants={{
+              hidden: { opacity: 0, y: 20 },
+              visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+            }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md"
           >
-            {isProcessing && cameraMode === "allergy" ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <Camera className="h-6 w-6" />
-            )}
-            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 shadow-sm">
-              <ShieldCheck className="h-3 w-3 text-white" />
+            <div className="relative flex items-center justify-center rounded-xl bg-green-50 p-2">
+              {isProcessing && cameraMode === "allergy" ? (
+                <Loader2 className="h-7 w-7 animate-spin text-green-600" />
+              ) : (
+                <ShieldCheck className="h-7 w-7 text-green-600" />
+              )}
+              <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 shadow-sm">
+                <Camera className="h-2.5 w-2.5 text-white" />
+              </div>
             </div>
-          </button>
+            <span className="text-sm font-medium text-gray-700">
+              {isProcessing && cameraMode === "allergy" ? "분석중..." : "안전확인"}
+            </span>
+          </motion.button>
 
-          {/* 2. 메뉴 추천 */}
-          <button
+          {/* 2. 메뉴추천 카드 */}
+          <motion.button
             onClick={fetchRecommend}
             disabled={recommendLoading}
-            className={cn(
-              "relative -mt-4 flex h-[56px] w-[56px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
-              recommendLoading
-                ? "bg-violet-400 text-white"
-                : "bg-violet-500 text-white",
-            )}
             aria-label="AI 메뉴 추천"
+            variants={{
+              hidden: { opacity: 0, y: 20 },
+              visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+            }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md"
           >
-            {recommendLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <ClipboardList className="h-6 w-6" />
-            )}
-            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 shadow-sm">
-              <Sparkles className="h-3 w-3 text-white" />
+            <div className="relative flex items-center justify-center rounded-xl bg-purple-50 p-2">
+              {recommendLoading ? (
+                <Loader2 className="h-7 w-7 animate-spin text-purple-600" />
+              ) : (
+                <ClipboardList className="h-7 w-7 text-purple-600" />
+              )}
+              <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 shadow-sm">
+                <Sparkles className="h-2.5 w-2.5 text-white" />
+              </div>
             </div>
-          </button>
+            <span className="text-sm font-medium text-gray-700">
+              {recommendLoading ? "추천중..." : "메뉴추천"}
+            </span>
+          </motion.button>
 
-          {/* 3. 식단관리 카메라 */}
-          <button
+          {/* 3. 식단관리 카드 */}
+          <motion.button
             onClick={() => openSheet("diet")}
             disabled={isProcessing}
-            className={cn(
-              "relative -mt-4 flex h-[56px] w-[56px] items-center justify-center rounded-full shadow-lg transition-transform active:scale-95",
-              isProcessing && cameraMode === "diet"
-                ? "bg-orange-300 text-white"
-                : "bg-orange-400 text-white",
-            )}
             aria-label="식단 관리 촬영"
+            variants={{
+              hidden: { opacity: 0, y: 20 },
+              visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+            }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md"
           >
-            {isProcessing && cameraMode === "diet" ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <Camera className="h-6 w-6" />
-            )}
-            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 shadow-sm text-[8px] font-bold text-white">
-              🍽️
+            <div className="relative flex items-center justify-center rounded-xl bg-orange-50 p-2">
+              {isProcessing && cameraMode === "diet" ? (
+                <Loader2 className="h-7 w-7 animate-spin text-orange-600" />
+              ) : (
+                <UtensilsCrossed className="h-7 w-7 text-orange-600" />
+              )}
+              <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-400 shadow-sm">
+                <Camera className="h-2.5 w-2.5 text-white" />
+              </div>
             </div>
-          </button>
-        </div>
-
-        {/* 버튼 아래 라벨 */}
-        <div className="absolute bottom-1 left-0 right-0 flex justify-around max-w-md mx-auto px-4 pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-          <span className="text-[9px] text-muted-foreground w-14 text-center">
-            {isProcessing && cameraMode === "allergy" ? "분석중..." : "안전확인"}
-          </span>
-          <span className="text-[9px] text-muted-foreground w-14 text-center">
-            {recommendLoading ? "추천중..." : "메뉴추천"}
-          </span>
-          <span className="text-[9px] text-muted-foreground w-14 text-center">
-            {isProcessing && cameraMode === "diet" ? "분석중..." : "식단관리"}
-          </span>
-        </div>
+            <span className="text-sm font-medium text-gray-700">
+              {isProcessing && cameraMode === "diet" ? "분석중..." : "식단관리"}
+            </span>
+          </motion.button>
+        </motion.div>
       </nav>
 
       {/* 바코드 스캔용 hidden div */}
       <div id="qr-reader-nav-hidden" className="hidden" />
 
       {/* ═══ 카메라/앨범 선택 바텀시트 ═══ */}
-      {showSheet && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden"
-          onClick={() => setShowSheet(false)}
-        >
-          <div
-            className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3"
+      <AnimatePresence>
+        {showSheet && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-end justify-center md:hidden"
+            onClick={() => setShowSheet(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+          <motion.div
+            className="w-full max-w-md rounded-t-2xl bg-background p-5 space-y-3"
             style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
             onClick={(e) => e.stopPropagation()}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
             <div className="text-center">
@@ -409,17 +432,30 @@ export function MobileNav() {
               className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors">
               취소
             </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ═══ AI 메뉴 추천 모달 (풀 리포트) ═══ */}
-      {showRecommendModal && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowRecommendModal(false)}>
-          <div
-            className="w-full max-w-md max-h-[85vh] animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background overflow-hidden flex flex-col"
+      <AnimatePresence>
+        {showRecommendModal && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-end justify-center"
+            onClick={() => setShowRecommendModal(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+          <motion.div
+            className="w-full max-w-md max-h-[85vh] rounded-t-2xl bg-background overflow-hidden flex flex-col"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             onClick={(e) => e.stopPropagation()}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             {/* 모달 헤더 */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-violet-50 to-amber-50/50 shrink-0">
@@ -601,9 +637,10 @@ export function MobileNav() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
