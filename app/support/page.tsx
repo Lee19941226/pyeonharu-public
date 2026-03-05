@@ -419,7 +419,7 @@ function SupportContent() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                문의 접수하기
+                {submitting ? "제출 중..." : "문의 접수하기"}
               </Button>
             </CardContent>
           </Card>

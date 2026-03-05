@@ -8,7 +8,7 @@ function loadKakaoSDK(): Promise<void> {
   sdkLoadPromise = new Promise<void>((resolve, reject) => {
     // If layout.tsx already injected the script tag, attach to it
     const existing = document.querySelector<HTMLScriptElement>(
-      'script[src*="kakaocdn.net/kakaojs"]'
+      'script[src*="kakao_js_sdk"]'
     );
     if (existing) {
       existing.addEventListener("load", () => resolve(), { once: true });
@@ -21,7 +21,7 @@ function loadKakaoSDK(): Promise<void> {
     }
     const script = document.createElement("script");
     script.src =
-      "https://t1.kakaocdn.net/kakaojs/2.7.4/kakao.min.js";
+      "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Kakao SDK load failed"));

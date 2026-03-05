@@ -107,7 +107,7 @@ export default function RootLayout({
         />
         <Script
           strategy="afterInteractive"
-          src="https://t1.kakaocdn.net/kakaojs/2.7.4/kakao.min.js"
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
         />
         <Script
           strategy="afterInteractive"

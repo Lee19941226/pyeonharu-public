@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   X,
   Check,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -86,6 +87,7 @@ export default function FamilyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MemberForm>(DEFAULT_FORM);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadMembers();
@@ -174,14 +176,21 @@ export default function FamilyPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`${name}님을 삭제하시겠습니까?`)) return;
-    const res = await fetch("/api/family", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if ((await res.json()).success) {
-      toast.success("삭제 완료");
-      loadMembers();
+    setDeletingId(id);
+    try {
+      const res = await fetch("/api/family", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if ((await res.json()).success) {
+        toast.success("삭제 완료");
+        loadMembers();
+      } else {
+        toast.error("삭제에 실패했습니다");
+      }
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -274,17 +283,25 @@ export default function FamilyPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-11 w-11"
                           onClick={() => openEdit(m)}
+                          aria-label={`${m.name} 수정`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-destructive hover:text-destructive"
+                          className="h-11 w-11 text-destructive hover:text-destructive"
                           onClick={() => handleDelete(m.id, m.name)}
+                          disabled={deletingId === m.id}
+                          aria-label={`${m.name} 삭제`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {deletingId === m.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -302,8 +319,12 @@ export default function FamilyPage() {
                   <h2 className="font-bold text-lg">
                     {editingId ? "구성원 수정" : "구성원 추가"}
                   </h2>
-                  <button onClick={() => setShowForm(false)}>
-                    <X className="h-5 w-5 text-muted-foreground" />
+                  <button
+                    onClick={() => setShowForm(false)}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label="폼 닫기"
+                  >
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
 
@@ -317,7 +338,9 @@ export default function FamilyPage() {
                         onClick={() =>
                           setForm((f) => ({ ...f, avatar_emoji: emoji }))
                         }
-                        className={`flex h-10 w-10 items-center justify-center rounded-full text-xl transition-all ${
+                        aria-label={`아바타 ${emoji} 선택`}
+                        aria-pressed={form.avatar_emoji === emoji}
+                        className={`flex h-11 w-11 items-center justify-center rounded-full text-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                           form.avatar_emoji === emoji
                             ? "bg-primary/20 ring-2 ring-primary"
                             : "bg-gray-100 hover:bg-gray-200"

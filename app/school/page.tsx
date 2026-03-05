@@ -242,8 +242,9 @@ export default function SchoolPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="ml-2 shrink-0 text-muted-foreground hover:text-destructive"
+                            className="ml-2 h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
                             onClick={() => handleUnregister(school.school_code, school.school_name)}
+                            aria-label={`${school.school_name} 학교 해제`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -302,16 +303,17 @@ export default function SchoolPage() {
                               </div>
                               <div className="flex shrink-0 gap-1">
                                 {registered ? (
-                                  <Button variant="outline" size="sm" disabled className="text-xs">
+                                  <Button variant="outline" size="sm" disabled className="h-11 px-3 text-xs">
                                     등록됨
                                   </Button>
                                 ) : (
                                   <Button
                                     variant="default"
                                     size="sm"
-                                    className="text-xs"
+                                    className="h-11 px-3 text-xs"
                                     disabled={registeringCode === school.schoolCode}
                                     onClick={() => handleRegister(school)}
+                                    aria-label={`${school.schoolName} 학교 등록`}
                                   >
                                     {registeringCode === school.schoolCode ? (
                                       <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -324,8 +326,9 @@ export default function SchoolPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-xs"
+                                  className="h-11 px-3 text-xs"
                                   onClick={() => router.push(`/school/${school.officeCode}-${school.schoolCode}`)}
+                                  aria-label={`${school.schoolName} 급식 정보 보기`}
                                 >
                                   급식 보기
                                 </Button>

@@ -35,7 +35,7 @@ import {
   Check,
   AlertTriangle,
 } from "lucide-react";
-import { ensureKakaoReady } from "@/lib/utils/kakao-share";
+import { shareToKakao } from "@/lib/utils/kakao-share";
 
 function getTimePeriod(dateStr: string) {
   const h = new Date(dateStr).getHours();
@@ -883,10 +883,6 @@ export default function DietTab() {
   const shareToday = async () => {
     setIsSharingToday(true);
     try {
-      if (!(await ensureKakaoReady())) {
-        toast.error("카카오톡 공유를 사용할 수 없습니다");
-        return;
-      }
       if (
         window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1"
@@ -911,24 +907,18 @@ export default function DietTab() {
         : bmr > 0
           ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`
           : `총 ${totalCal.toLocaleString()}kcal 섭취`;
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`,
-          description: `${foodList}${moreText} | ${statusText}`,
-          imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
-          imageWidth: 1200,
-          imageHeight: 630,
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-        },
-        buttons: [
-          {
-            title: "편하루에서 식단 관리하기",
-            link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-          },
-        ],
+      const shareResult = await shareToKakao({
+        title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`,
+        description: `${foodList}${moreText} | ${statusText}`,
+        imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
+        shareUrl,
+        buttonText: "편하루에서 식단 관리하기",
       });
-      toast.success("카카오톡으로 공유되었습니다");
+      if (shareResult.success) {
+        toast.success("카카오톡으로 공유되었습니다");
+      } else {
+        toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+      }
       setShowShareMenu(false);
     } catch (err) {
       console.error("[카카오 공유 실패]", err);
@@ -942,10 +932,6 @@ export default function DietTab() {
   const shareReport = async () => {
     setIsSharingReport(true);
     try {
-      if (!(await ensureKakaoReady())) {
-        toast.error("카카오톡 공유를 사용할 수 없습니다");
-        return;
-      }
       if (
         window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1"
@@ -980,24 +966,18 @@ export default function DietTab() {
             .map((f) => f.name)
             .join(", ")}`;
       }
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title,
-          description,
-          imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
-          imageWidth: 1200,
-          imageHeight: 630,
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-        },
-        buttons: [
-          {
-            title: "편하루에서 식단 관리하기",
-            link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-          },
-        ],
+      const shareResult = await shareToKakao({
+        title,
+        description,
+        imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
+        shareUrl,
+        buttonText: "편하루에서 식단 관리하기",
       });
-      toast.success("카카오톡으로 공유되었습니다");
+      if (shareResult.success) {
+        toast.success("카카오톡으로 공유되었습니다");
+      } else {
+        toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+      }
       setShowShareMenu(false);
     } catch (err) {
       console.error("[카카오 공유 실패]", err);

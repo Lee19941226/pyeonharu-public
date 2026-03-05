@@ -20,6 +20,7 @@ import {
   Scale,
   Shuffle,
   Share2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,7 +28,7 @@ import {
   openDeliveryApp,
   isMobileDevice,
 } from "@/lib/utils/delivery";
-import { ensureKakaoReady } from "@/lib/utils/kakao-share";
+import { shareToKakao } from "@/lib/utils/kakao-share";
 
 interface Reasoning {
   taste: string;
@@ -124,10 +125,6 @@ export default function MealRecommend() {
       toast.error("공유할 추천 결과가 없습니다");
       return;
     }
-    if (!(await ensureKakaoReady())) {
-      toast.error("카카오톡 공유를 사용할 수 없습니다");
-      return;
-    }
     if (
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1"
@@ -157,26 +154,14 @@ export default function MealRecommend() {
       description += ` | ${data.analysis.calorieSituation}`;
     if (description.length > 150)
       description = description.slice(0, 147) + "...";
-    try {
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: {
-          title,
-          description,
-          imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
-          imageWidth: 1200, // 512 → 1200
-          imageHeight: 630,
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-        },
-        buttons: [
-          {
-            title: "편하루에서 메뉴 추천받기",
-            link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-          },
-        ],
-      });
-    } catch (err) {
-      console.error("[카카오 공유 실패]", err);
+    const result = await shareToKakao({
+      title,
+      description,
+      imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
+      shareUrl,
+      buttonText: "편하루에서 메뉴 추천받기",
+    });
+    if (!result.success) {
       toast.error("공유에 실패했습니다");
     }
   };
@@ -289,9 +274,18 @@ export default function MealRecommend() {
 
       {/* 에러 */}
       {error && !loading && (
-        <div className="flex items-center gap-2 p-3">
-          <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-          <p className="text-[10px] text-red-600">{error}</p>
+        <div className="flex flex-col items-center gap-2 p-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+            <p className="text-[10px] text-red-600">{error}</p>
+          </div>
+          <button
+            onClick={fetchRecommend}
+            className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <RefreshCw className="h-3 w-3" />
+            다시 시도
+          </button>
         </div>
       )}
 
