@@ -7,6 +7,7 @@ import { stripHtml, maskProfanity } from "@/lib/utils/profanity-filter";
 // GET /api/doctor-reviews
 // 용도 1) 의사 탭: 검색 — ?q=병명/의사명 &department=진료과
 // 용도 2) 병원 상세: 해당 병원 의사 리뷰 — ?hospital=병원명
+// 용도 3) 의사 개별 리뷰: ?doctor=의사명&hospitalName=병원명
 // =============================================
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
@@ -15,6 +16,8 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q")?.trim() || "";
   const department = searchParams.get("department")?.trim() || "";
   const hospital = searchParams.get("hospital")?.trim() || "";
+  const doctorParam = searchParams.get("doctor")?.trim() || "";
+  const hospitalNameParam = searchParams.get("hospitalName")?.trim() || "";
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
   const offset = (page - 1) * limit;
@@ -33,6 +36,38 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("[doctor-reviews GET hospital]", error.message);
+      return NextResponse.json(
+        { error: "서버 오류가 발생했습니다." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      reviews: (reviews || []).map((r) => ({
+        id: r.id,
+        doctorName: r.doctor_name,
+        department: r.department,
+        diseaseName: r.disease_name,
+        rating: r.rating,
+        content: r.content,
+        isVerified: r.is_verified || false,
+        isMine: user ? r.user_id === user.id : false,
+        createdAt: r.created_at,
+      })),
+    });
+  }
+
+  // ── 의사 개별 리뷰 조회: 특정 의사의 리뷰 목록 ──
+  if (doctorParam && hospitalNameParam) {
+    const { data: reviews, error } = await supabase
+      .from("doctor_reviews")
+      .select("*")
+      .eq("doctor_name", doctorParam)
+      .eq("hospital_name", hospitalNameParam)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[doctor-reviews GET doctor]", error.message);
       return NextResponse.json(
         { error: "서버 오류가 발생했습니다." },
         { status: 500 },
@@ -91,6 +126,8 @@ export async function GET(req: NextRequest) {
       ratings: number[];
       diseaseRatings: Record<string, number[]>;
       latestDate: string;
+      hospitalLat: number | null;
+      hospitalLng: number | null;
     }
   > = {};
 
@@ -104,9 +141,16 @@ export async function GET(req: NextRequest) {
         ratings: [],
         diseaseRatings: {},
         latestDate: r.created_at,
+        hospitalLat: r.hospital_lat || null,
+        hospitalLng: r.hospital_lng || null,
       };
     }
     grouped[key].ratings.push(r.rating);
+    // 좌표가 없으면 다른 리뷰에서 가져오기
+    if (!grouped[key].hospitalLat && r.hospital_lat) {
+      grouped[key].hospitalLat = r.hospital_lat;
+      grouped[key].hospitalLng = r.hospital_lng;
+    }
     if (r.disease_name) {
       if (!grouped[key].diseaseRatings[r.disease_name]) {
         grouped[key].diseaseRatings[r.disease_name] = [];
@@ -138,6 +182,8 @@ export async function GET(req: NextRequest) {
         reviewCount: g.ratings.length,
         diseases: diseaseStats,
         latestDate: g.latestDate,
+        hospitalLat: g.hospitalLat,
+        hospitalLng: g.hospitalLng,
       };
     })
     // 평균 별점 내림차순, 리뷰 수 내림차순
@@ -170,7 +216,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { hospitalName, hospitalAddress, doctorName, department, diseaseName, rating, content, verificationImageUrl } =
+  const { hospitalName, hospitalAddress, doctorName, department, diseaseName, rating, content, verificationImageUrl, hospitalLat, hospitalLng } =
     body;
 
   if (!hospitalName?.trim()) {
@@ -223,6 +269,8 @@ export async function POST(req: NextRequest) {
         disease_name: stripHtml(diseaseName).slice(0, 100),
         rating: Math.round(rating),
         content: cleanContent || null,
+        hospital_lat: hospitalLat ? Number(hospitalLat) : null,
+        hospital_lng: hospitalLng ? Number(hospitalLng) : null,
         is_verified: !!verificationImageUrl,
         verification_image_url: verificationImageUrl || null,
         review_date: today,

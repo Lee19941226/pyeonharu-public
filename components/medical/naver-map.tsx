@@ -430,7 +430,7 @@ export function NaverMap({
 
   return (
     <div
-      className="relative w-full rounded-lg overflow-hidden"
+      className="relative w-full rounded-lg overflow-hidden isolate"
       style={{ height }}
     >
       <div ref={mapRef} className="h-full w-full" />
