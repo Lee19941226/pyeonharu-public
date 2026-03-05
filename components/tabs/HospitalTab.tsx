@@ -314,11 +314,11 @@ export default function HospitalTab() {
   });
 
   return (
-    <div className="w-full">
+    <div className="mx-auto max-w-2xl px-4 py-4">
       <div className="flex-1">
         {/* Search Header */}
-        <div className="border-b border-border bg-card">
-          <div className="container mx-auto px-4 py-4">
+        <div className="border-b border-border bg-card rounded-lg">
+          <div className="px-4 py-4">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-xl font-bold">내 주변 병원/약국</h1>
               <Button
@@ -398,10 +398,10 @@ export default function HospitalTab() {
 
         {/* Content */}
         {!isLoading && (
-          <div className="flex flex-1 flex-col md:flex-row">
+          <div className="flex flex-1 flex-col">
             {/* Map */}
             <div
-              className={`relative h-[50vh] md:h-[calc(100vh-180px)] md:flex-1 ${
+              className={`relative h-[50vh] rounded-lg overflow-hidden ${
                 viewMode === "list" ? "hidden md:block" : ""
               }`}
             >
@@ -425,9 +425,9 @@ export default function HospitalTab() {
 
             {/* List */}
             <div
-              className={`md:w-96 md:overflow-auto md:border-l md:border-border ${
+              className={`max-h-[60vh] overflow-auto ${
                 viewMode === "map" ? "hidden md:block" : ""
-              } ${filteredPlaces.length > 0 ? "md:h-[calc(100vh-180px)]" : ""}`}
+              }`}
             >
               {error && filteredPlaces.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center px-4">
