@@ -2,13 +2,27 @@
 
 import { useRef, useEffect, useState } from "react"
 import Link from "next/link"
-import { Building2, Cross, MapPin, Phone, ChevronRight, ChevronDown, ExternalLink, MapPinned } from "lucide-react"
+import { Building2, Cross, MapPin, Phone, ChevronRight, ChevronDown, ExternalLink, MapPinned, Star } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { BookmarkButton } from "@/components/medical/bookmark-button"
 import { cn } from "@/lib/utils"
 import type { Place } from "@/components/tabs/HospitalTab"
+
+function makeKey(name: string, address: string): string {
+  const raw = `${name.trim()}::${address.trim()}`.toLowerCase()
+  let hash = 0
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash |= 0
+  }
+  return Math.abs(hash).toString(36)
+}
+
+// 모듈 레벨 캐시
+const ratingsCache: Record<string, { avg: number; count: number }> = {}
 
 interface PlaceListProps {
   places: Place[]
@@ -20,10 +34,32 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
   const selectedRef = useRef<HTMLDivElement>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [ratings, setRatings] = useState<Record<string, { avg: number; count: number }>>(ratingsCache)
 
   useEffect(() => {
     setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
   }, [])
+
+  // 평점 일괄 조회
+  useEffect(() => {
+    if (places.length === 0) return
+    const keys = places.map((p) => makeKey(p.name, p.address))
+    // 캐시에 없는 키만 필터
+    const uncachedKeys = keys.filter((k) => !ratingsCache[k])
+    if (uncachedKeys.length === 0) {
+      setRatings({ ...ratingsCache })
+      return
+    }
+    fetch(`/api/restaurant/reviews?keys=${uncachedKeys.join(",")}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ratings) {
+          Object.assign(ratingsCache, data.ratings)
+        }
+        setRatings({ ...ratingsCache })
+      })
+      .catch(() => {})
+  }, [places])
 
   // 선택된 카드로 스크롤
   useEffect(() => {
@@ -106,6 +142,16 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
                   {place.type === "hospital" ? <Building2 className="h-3.5 w-3.5" /> : <Cross className="h-3.5 w-3.5" />}
                 </div>
                 <h3 className={cn("text-sm font-semibold truncate flex-1 min-w-0", isSelected && "text-primary")}>{place.name}</h3>
+                {(() => {
+                  const k = makeKey(place.name, place.address)
+                  const r = ratings[k]
+                  return (
+                    <span className="flex items-center gap-0.5 shrink-0">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span className="text-[11px] font-medium">{r ? r.avg : "0.0"}</span>
+                    </span>
+                  )
+                })()}
                 <span className="text-[11px] text-primary font-medium shrink-0">{place.distance}</span>
                 <Badge variant={place.isOpen ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
                   {place.isOpen ? "영업중" : "종료"}
