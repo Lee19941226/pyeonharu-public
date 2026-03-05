@@ -20,6 +20,7 @@ import {
   Scale,
   Shuffle,
   Share2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -289,9 +290,18 @@ export default function MealRecommend() {
 
       {/* 에러 */}
       {error && !loading && (
-        <div className="flex items-center gap-2 p-3">
-          <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-          <p className="text-[10px] text-red-600">{error}</p>
+        <div className="flex flex-col items-center gap-2 p-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+            <p className="text-[10px] text-red-600">{error}</p>
+          </div>
+          <button
+            onClick={fetchRecommend}
+            className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <RefreshCw className="h-3 w-3" />
+            다시 시도
+          </button>
         </div>
       )}
 

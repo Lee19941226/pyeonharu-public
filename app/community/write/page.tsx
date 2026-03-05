@@ -262,7 +262,7 @@ function CommunityWriteContent() {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              {isEdit ? "수정하기" : "작성하기"}
+              {submitting ? "제출 중..." : isEdit ? "수정하기" : "작성하기"}
             </Button>
           </div>
         </div>

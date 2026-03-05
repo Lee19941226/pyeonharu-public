@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   X,
   Check,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -86,6 +87,7 @@ export default function FamilyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MemberForm>(DEFAULT_FORM);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadMembers();
@@ -174,14 +176,21 @@ export default function FamilyPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`${name}님을 삭제하시겠습니까?`)) return;
-    const res = await fetch("/api/family", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if ((await res.json()).success) {
-      toast.success("삭제 완료");
-      loadMembers();
+    setDeletingId(id);
+    try {
+      const res = await fetch("/api/family", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if ((await res.json()).success) {
+        toast.success("삭제 완료");
+        loadMembers();
+      } else {
+        toast.error("삭제에 실패했습니다");
+      }
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -283,8 +292,13 @@ export default function FamilyPage() {
                           size="icon"
                           className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(m.id, m.name)}
+                          disabled={deletingId === m.id}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {deletingId === m.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
