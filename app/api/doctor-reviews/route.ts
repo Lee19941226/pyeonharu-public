@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 의사별 집계 (doctor_name + hospital_name 기준 그룹핑)
+  // 의사별 집계 (doctor_name + hospital_name 기준 그룹핑) + 질병별 평점
   const grouped: Record<
     string,
     {
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
       hospitalName: string;
       department: string;
       ratings: number[];
-      diseases: Set<string>;
+      diseaseRatings: Record<string, number[]>;
       latestDate: string;
     }
   > = {};
@@ -101,12 +101,17 @@ export async function GET(req: NextRequest) {
         hospitalName: r.hospital_name,
         department: r.department,
         ratings: [],
-        diseases: new Set(),
+        diseaseRatings: {},
         latestDate: r.created_at,
       };
     }
     grouped[key].ratings.push(r.rating);
-    if (r.disease_name) grouped[key].diseases.add(r.disease_name);
+    if (r.disease_name) {
+      if (!grouped[key].diseaseRatings[r.disease_name]) {
+        grouped[key].diseaseRatings[r.disease_name] = [];
+      }
+      grouped[key].diseaseRatings[r.disease_name].push(r.rating);
+    }
     if (r.created_at > grouped[key].latestDate) {
       grouped[key].latestDate = r.created_at;
     }
@@ -116,13 +121,21 @@ export async function GET(req: NextRequest) {
     .map((g) => {
       const sum = g.ratings.reduce((a, b) => a + b, 0);
       const avg = Math.round((sum / g.ratings.length) * 10) / 10;
+      const diseaseStats = Object.entries(g.diseaseRatings)
+        .map(([name, ratings]) => ({
+          name,
+          avgRating: Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10,
+          count: ratings.length,
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
       return {
         doctorName: g.doctorName,
         hospitalName: g.hospitalName,
         department: g.department,
         avgRating: avg,
         reviewCount: g.ratings.length,
-        diseases: Array.from(g.diseases).slice(0, 5),
+        diseases: diseaseStats,
         latestDate: g.latestDate,
       };
     })

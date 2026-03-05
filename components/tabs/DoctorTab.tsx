@@ -23,13 +23,19 @@ const QUICK_DEPARTMENTS = [
   "정신건강의학과",
 ];
 
+interface DiseaseStat {
+  name: string;
+  avgRating: number;
+  count: number;
+}
+
 interface DoctorSummary {
   doctorName: string;
   hospitalName: string;
   department: string;
   avgRating: number;
   reviewCount: number;
-  diseases: string[];
+  diseases: DiseaseStat[];
 }
 
 export default function DoctorTab() {
@@ -132,8 +138,7 @@ export default function DoctorTab() {
               <span className="w-24 shrink-0">의사명</span>
               <span className="w-20 shrink-0">진료과</span>
               <span className="flex-1 min-w-0">소속 병원</span>
-              <span className="w-16 shrink-0 text-center">평점</span>
-              <span className="w-12 shrink-0 text-center">리뷰</span>
+              <span className="w-10 shrink-0 text-center">종합</span>
             </div>
             {/* 테이블 바디 */}
             {doctors.map((doctor, idx) => (
@@ -142,16 +147,23 @@ export default function DoctorTab() {
                   <span className="w-24 shrink-0 text-sm font-semibold truncate">{doctor.doctorName}</span>
                   <Badge variant="secondary" className="w-20 shrink-0 justify-center text-[10px] px-1.5 py-0">{doctor.department}</Badge>
                   <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
-                  <div className="w-16 shrink-0 flex items-center justify-center gap-0.5">
+                  <div className="w-10 shrink-0 flex items-center justify-center gap-0.5">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                     <span className="text-xs font-semibold">{doctor.avgRating}</span>
                   </div>
-                  <span className="w-12 shrink-0 text-xs text-muted-foreground text-center">{doctor.reviewCount}개</span>
                 </div>
+                {/* 질병별 평점 */}
                 {doctor.diseases.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
+                  <div className="mt-1.5 pl-1 space-y-0.5">
                     {doctor.diseases.map((d) => (
-                      <Badge key={d} variant="outline" className="text-[10px] px-1.5 py-0">{d}</Badge>
+                      <div key={d.name} className="flex items-center gap-1.5 text-[11px]">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{d.name}</Badge>
+                        <div className="flex items-center gap-0.5">
+                          <Star className={`h-2.5 w-2.5 ${d.avgRating >= 4 ? "fill-green-500 text-green-500" : d.avgRating >= 3 ? "fill-amber-400 text-amber-400" : "fill-red-400 text-red-400"}`} />
+                          <span className={`font-medium ${d.avgRating >= 4 ? "text-green-600" : d.avgRating >= 3 ? "text-amber-600" : "text-red-500"}`}>{d.avgRating}</span>
+                        </div>
+                        <span className="text-muted-foreground">({d.count}건)</span>
+                      </div>
                     ))}
                   </div>
                 )}
