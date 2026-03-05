@@ -259,6 +259,7 @@ export default function DietTab() {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const entriesCacheRef = useRef<Map<string, { entries: DietEntry[]; totalCal: number; bmr: number; isOver: boolean; overAmount: number }>>(new Map());
 
   const [user, setUser] = useState<any>(null);
   const [entries, setEntries] = useState<DietEntry[]>([]);
@@ -328,6 +329,25 @@ export default function DietTab() {
 
   const loadEntries = useCallback(async () => {
     if (!user) return;
+
+    // 캐시 히트: API 호출 스킵
+    const cached = entriesCacheRef.current.get(date);
+    if (cached) {
+      setEntries(cached.entries);
+      setTotalCal(cached.totalCal);
+      setBmr(cached.bmr);
+      if (cached.isOver && !warningShownToday) {
+        const key = `diet_warning_${date}`;
+        if (typeof window !== "undefined" && !sessionStorage.getItem(key)) {
+          setShowWarning(true);
+          sessionStorage.setItem(key, "1");
+          setWarningShownToday(true);
+        }
+      }
+      return;
+    }
+
+    // 캐시 미스: fetch
     setIsLoading(true);
     try {
       const res = await fetch(`/api/diet/entries?date=${date}`);
@@ -336,6 +356,14 @@ export default function DietTab() {
         setEntries(data.entries);
         setTotalCal(data.totalCal);
         setBmr(data.bmr);
+        // 캐시 저장
+        entriesCacheRef.current.set(date, {
+          entries: data.entries,
+          totalCal: data.totalCal,
+          bmr: data.bmr,
+          isOver: !!data.isOver,
+          overAmount: data.overAmount ?? 0,
+        });
         if (data.isOver && !warningShownToday) {
           const key = `diet_warning_${date}`;
           if (typeof window !== "undefined" && !sessionStorage.getItem(key)) {
@@ -354,6 +382,11 @@ export default function DietTab() {
   useEffect(() => {
     if (user) loadEntries();
   }, [user, date, loadEntries]);
+
+  const reloadEntries = useCallback(() => {
+    entriesCacheRef.current.delete(date);
+    loadEntries();
+  }, [date, loadEntries]);
 
   const getDashRange = useCallback(() => {
     const today = new Date();
@@ -392,13 +425,13 @@ export default function DietTab() {
   useEffect(() => {
     const handler = () => {
       if (user) {
-        loadEntries();
+        reloadEntries();
         loadDashboard();
       }
     };
     window.addEventListener("diet-entry-added", handler);
     return () => window.removeEventListener("diet-entry-added", handler);
-  }, [user, loadEntries, loadDashboard]);
+  }, [user, reloadEntries, loadDashboard]);
 
   const handlePhotoAnalyze = async (file: File) => {
     // ✅ 이미지 크기 사전 검증
@@ -431,7 +464,7 @@ export default function DietTab() {
         toast.success(
           `${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`,
         );
-        loadEntries();
+        reloadEntries();
         loadDashboard();
       } else toast.error(data.error || "분석 실패");
     } catch {
@@ -523,7 +556,7 @@ export default function DietTab() {
       const imageUrl = await uploadDietImage(file, entryId);
       if (imageUrl) {
         toast.success("사진이 추가되었습니다");
-        loadEntries();
+        reloadEntries();
         loadDashboard();
       }
     } finally {
@@ -656,7 +689,7 @@ export default function DietTab() {
 
       if (successCount > 0) {
         toast.success(`🍱 급식 ${successCount}개 메뉴 추가 완료!`);
-        loadEntries();
+        reloadEntries();
         loadDashboard();
         closeMealSelect();
       } else {
@@ -718,7 +751,7 @@ export default function DietTab() {
           `${imageUrl ? "📸" : "📝"} ${manualName} (${manualCal}kcal)`,
         );
         closeManualInput();
-        loadEntries();
+        reloadEntries();
         loadDashboard();
       } else toast.error(data.error);
     } catch {
@@ -735,7 +768,7 @@ export default function DietTab() {
       const data = await res.json();
       if (data.success) {
         toast.success("삭제됨");
-        loadEntries();
+        reloadEntries();
         loadDashboard();
       }
     } catch {
@@ -774,7 +807,7 @@ export default function DietTab() {
       if (data.success) {
         toast.success(`칼로리 ${newCal}kcal로 수정됨`);
         cancelEditCal();
-        loadEntries();
+        reloadEntries();
         loadDashboard();
       } else {
         toast.error(data.error || "수정 실패");
