@@ -197,9 +197,42 @@ interface UserSchool {
   school_code: string;
   office_code: string;
   school_name: string;
-  school_address: string;
+  school_address: string | null;
   is_primary: boolean;
+  family_member_id: string | null;
 }
+
+interface FamilyMember {
+  id: string;
+  name: string;
+  relation: string;
+  avatar_emoji: string;
+}
+
+interface SchoolOwner {
+  emoji: string;
+  name: string;
+  relation: string;
+  memberId: string | null;
+}
+
+interface MemberSchoolGroup {
+  memberId: string;
+  memberName: string;
+  memberEmoji: string;
+  memberRelation: string;
+  schools: UserSchool[];
+}
+
+interface SchoolListData {
+  ownSchools: UserSchool[];
+  memberSchools: MemberSchoolGroup[];
+}
+
+type MealCheckedMember =
+  | { type: "self" }
+  | { type: "member"; memberId: string; name: string; relation: string; avatarEmoji: string }
+  | { type: "unknown" };
 
 interface MealMenuItem {
   name: string;
@@ -295,9 +328,12 @@ export default function DietTab() {
   // ✅ 학교 급식 자동 입력 상태
   const [showSchoolSelect, setShowSchoolSelect] = useState(false);
   const [showMealSelect, setShowMealSelect] = useState(false);
-  const [userSchools, setUserSchools] = useState<UserSchool[]>([]);
+  const [schoolListData, setSchoolListData] = useState<SchoolListData>({ ownSchools: [], memberSchools: [] });
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<UserSchool | null>(null);
+  const [selectedSchoolOwner, setSelectedSchoolOwner] = useState<SchoolOwner | null>(null);
   const [schoolMeals, setSchoolMeals] = useState<MealData[]>([]);
+  const [mealCheckedMember, setMealCheckedMember] = useState<MealCheckedMember>({ type: "unknown" });
   const [isLoadingSchools, setIsLoadingSchools] = useState(false);
   const [isLoadingMeals, setIsLoadingMeals] = useState(false);
   const [selectedMealItems, setSelectedMealItems] = useState<Set<string>>(new Set());
@@ -566,14 +602,17 @@ export default function DietTab() {
     }
   };
 
-  // ✅ 학교 목록 불러오기
+  // ✅ 학교 목록 불러오기 (본인 + 구성원별 그룹)
   const loadUserSchools = async () => {
     setIsLoadingSchools(true);
     try {
-      const res = await fetch("/api/school/register");
+      const res = await fetch("/api/school");
       const data = await res.json();
-      if (data.schools) {
-        setUserSchools(data.schools);
+      if (data.ownSchools !== undefined) {
+        setSchoolListData({
+          ownSchools: data.ownSchools,
+          memberSchools: data.memberSchools ?? [],
+        });
       }
     } catch {
       toast.error("학교 목록을 불러오지 못했습니다");
@@ -582,20 +621,48 @@ export default function DietTab() {
     }
   };
 
-  // ✅ 학교 급식 불러오기
-  const loadSchoolMeals = async (school: UserSchool) => {
+  // ✅ 가족 구성원 목록 불러오기 (학교 없는 구성원 표시용)
+  const loadFamilyMembers = async () => {
+    try {
+      const res = await fetch("/api/family");
+      const data = await res.json();
+      if (data.success && data.members) {
+        setFamilyMembers(
+          data.members.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            relation: m.relation,
+            avatar_emoji: m.avatar_emoji,
+          }))
+        );
+      }
+    } catch {
+      // 구성원 목록 오류는 무시 (선택적 기능)
+    }
+  };
+
+  // ✅ 학교 급식 불러오기 (memberId 지원)
+  const loadSchoolMeals = async (school: UserSchool, memberId: string | null) => {
     setIsLoadingMeals(true);
     setSchoolMeals([]);
+    setMealCheckedMember({ type: "unknown" });
     try {
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const res = await fetch(
-        `/api/school/meals?schoolCode=${school.school_code}&officeCode=${school.office_code}&date=${today}`
-      );
+      const params = new URLSearchParams({
+        schoolCode: school.school_code,
+        officeCode: school.office_code,
+        date: today,
+      });
+      if (memberId) params.set("memberId", memberId);
+      const res = await fetch(`/api/school/meals?${params}`);
       const data = await res.json();
       if (data.meals && data.meals.length > 0) {
         setSchoolMeals(data.meals);
       } else {
         toast.info("오늘 급식 정보가 없습니다");
+      }
+      if (data.checkedMember) {
+        setMealCheckedMember(data.checkedMember);
       }
     } catch {
       toast.error("급식 정보를 불러오지 못했습니다");
@@ -604,12 +671,13 @@ export default function DietTab() {
     }
   };
 
-  // ✅ 학교 선택 핸들러
-  const handleSchoolSelect = async (school: UserSchool) => {
+  // ✅ 학교 선택 핸들러 (소유자 정보 포함)
+  const handleSchoolSelect = async (school: UserSchool, owner: SchoolOwner) => {
     setSelectedSchool(school);
+    setSelectedSchoolOwner(owner);
     setShowSchoolSelect(false);
     setShowMealSelect(true);
-    await loadSchoolMeals(school);
+    await loadSchoolMeals(school, owner.memberId);
   };
 
   // ✅ 급식 메뉴 아이템 토글
@@ -690,15 +758,17 @@ export default function DietTab() {
   const closeMealSelect = () => {
     setShowMealSelect(false);
     setSelectedSchool(null);
+    setSelectedSchoolOwner(null);
     setSchoolMeals([]);
     setSelectedMealItems(new Set());
+    setMealCheckedMember({ type: "unknown" });
   };
 
   // ✅ 학교 급식에서 선택 버튼 클릭
   const handleOpenSchoolMeal = async () => {
     setShowRecordSheet(false);
     setShowSchoolSelect(true);
-    await loadUserSchools();
+    await Promise.all([loadUserSchools(), loadFamilyMembers()]);
   };
 
   const closeManualInput = () => {
@@ -1958,12 +2028,12 @@ export default function DietTab() {
                 급식을 불러올 학교를 선택하세요
               </p>
             </div>
-            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto">
               {isLoadingSchools ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              ) : userSchools.length === 0 ? (
+              ) : schoolListData.ownSchools.length === 0 && schoolListData.memberSchools.length === 0 ? (
                 <div className="text-center py-8">
                   <School className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">등록된 학교가 없습니다</p>
@@ -1983,31 +2053,137 @@ export default function DietTab() {
                   </Button>
                 </div>
               ) : (
-                userSchools.map((school) => (
-                  <button
-                    key={school.id}
-                    onClick={() => handleSchoolSelect(school)}
-                    className="flex w-full items-center gap-3 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors text-left"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-                      <School className="h-5 w-5 text-green-600" />
+                <>
+                  {/* 본인 학교 섹션 */}
+                  {schoolListData.ownSchools.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground px-1">🙋 내 학교</p>
+                      {schoolListData.ownSchools.map((school) => (
+                        <button
+                          key={school.id}
+                          onClick={() =>
+                            handleSchoolSelect(school, {
+                              emoji: "🙋",
+                              name: "나",
+                              relation: "본인",
+                              memberId: null,
+                            })
+                          }
+                          className="flex w-full items-center gap-3 rounded-xl border p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                            <School className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold truncate">{school.school_name}</p>
+                              {school.is_primary && (
+                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-green-100 text-green-700">
+                                  메인
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {school.school_address || "주소 정보 없음"}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold truncate">{school.school_name}</p>
-                        {school.is_primary && (
-                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-green-100 text-green-700">
-                            메인
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {school.school_address || "주소 정보 없음"}
+                  )}
+
+                  {/* 가족 구성원별 학교 섹션 */}
+                  {schoolListData.memberSchools.map((group) => (
+                    <div key={group.memberId} className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground px-1">
+                        {group.memberEmoji} {group.memberName} ({group.memberRelation})
                       </p>
+                      {group.schools.length === 0 ? (
+                        <button
+                          onClick={() => {
+                            setShowSchoolSelect(false);
+                            router.push("/school");
+                          }}
+                          className="flex w-full items-center gap-3 rounded-xl border border-dashed p-3.5 hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                            <Plus className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-muted-foreground">학교 등록하기</p>
+                            <p className="text-xs text-muted-foreground/70">
+                              {group.memberName}의 학교를 등록해주세요
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        </button>
+                      ) : (
+                        group.schools.map((school) => (
+                          <button
+                            key={school.id}
+                            onClick={() =>
+                              handleSchoolSelect(school, {
+                                emoji: group.memberEmoji,
+                                name: group.memberName,
+                                relation: group.memberRelation,
+                                memberId: group.memberId,
+                              })
+                            }
+                            className="flex w-full items-center gap-3 rounded-xl border p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left"
+                          >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-xl">
+                              {group.memberEmoji}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold truncate">{school.school_name}</p>
+                                {school.is_primary && (
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-blue-100 text-blue-700">
+                                    메인
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {school.school_address || "주소 정보 없음"}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          </button>
+                        ))
+                      )}
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ))
+                  ))}
+
+                  {/* 가족 구성원 중 memberSchools에 없는 구성원 표시 */}
+                  {familyMembers
+                    .filter((m) => !schoolListData.memberSchools.some((g) => g.memberId === m.id))
+                    .map((member) => (
+                      <div key={member.id} className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground px-1">
+                          {member.avatar_emoji} {member.name} ({member.relation})
+                        </p>
+                        <button
+                          onClick={() => {
+                            setShowSchoolSelect(false);
+                            router.push("/school");
+                          }}
+                          className="flex w-full items-center gap-3 rounded-xl border border-dashed p-3.5 hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-xl">
+                            {member.avatar_emoji}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-muted-foreground">학교 등록하기</p>
+                            <p className="text-xs text-muted-foreground/70">
+                              {member.name}의 학교를 등록해주세요
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        </button>
+                      </div>
+                    ))}
+                </>
               )}
             </div>
             <button
@@ -2034,6 +2210,9 @@ export default function DietTab() {
               <div>
                 <h3 className="text-lg font-bold">🍱 오늘의 급식</h3>
                 <p className="text-xs text-muted-foreground">
+                  {selectedSchoolOwner && selectedSchoolOwner.memberId !== null
+                    ? `${selectedSchoolOwner.emoji} ${selectedSchoolOwner.name}(${selectedSchoolOwner.relation}) · `
+                    : ""}
                   {selectedSchool?.school_name} · {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
                 </p>
               </div>
@@ -2044,6 +2223,22 @@ export default function DietTab() {
                 <X className="h-5 w-5" />
               </button>
             </div>
+
+            {/* 알레르기 체크 기준 배너 */}
+            {mealCheckedMember.type === "member" && (
+              <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2">
+                <span className="text-base">{mealCheckedMember.avatarEmoji}</span>
+                <p className="text-xs text-blue-700">
+                  <span className="font-semibold">{mealCheckedMember.name}</span> 알레르기 기준으로 체크
+                </p>
+              </div>
+            )}
+            {mealCheckedMember.type === "self" && (
+              <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
+                <span className="text-base">🙋</span>
+                <p className="text-xs text-green-700">내 알레르기 기준으로 체크</p>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto space-y-4 -mx-1 px-1">
               {isLoadingMeals ? (
