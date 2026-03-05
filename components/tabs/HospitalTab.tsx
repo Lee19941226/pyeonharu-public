@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { NaverMap } from "@/components/medical/naver-map";
 import { SearchFilters } from "@/components/medical/search-filters";
 import { PlaceList } from "@/components/medical/place-list";
@@ -26,6 +26,14 @@ export interface Place {
   lng: number;
 }
 
+function zoomToRadius(zoom: number): number {
+  if (zoom >= 16) return 500;
+  if (zoom === 15) return 1000;
+  if (zoom === 14) return 2000;
+  if (zoom === 13) return 3000;
+  return 5000;
+}
+
 export default function HospitalTab() {
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [placeType, setPlaceType] = useState<PlaceType | "all">("all");
@@ -35,10 +43,14 @@ export default function HospitalTab() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapZoom, setMapZoom] = useState(14);
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const hasLoadedOnce = useRef(false);
 
   // 현재 위치 가져오기
   useEffect(() => {
@@ -85,10 +97,25 @@ export default function HospitalTab() {
     return day !== 0 && hour >= 9 && hour < 18;
   }, []);
 
-  const fetchPlaces = useCallback(async () => {
-    if (!userLocation) return;
+  const handleZoomChange = useCallback((zoom: number) => {
+    setMapZoom(zoom);
+  }, []);
 
-    setIsLoading(true);
+  const handleCenterChange = useCallback((center: { lat: number; lng: number }) => {
+    setMapCenter(center);
+  }, []);
+
+  const fetchPlaces = useCallback(async () => {
+    const searchCenter = mapCenter ?? userLocation;
+    if (!searchCenter) return;
+
+    const searchRadius = zoomToRadius(mapZoom);
+
+    if (!hasLoadedOnce.current) {
+      setIsLoading(true);
+    } else {
+      setIsRefetching(true);
+    }
     setError(null);
 
     try {
@@ -97,7 +124,7 @@ export default function HospitalTab() {
       if (placeType === "all" || placeType === "hospital") {
         try {
           const hospitalRes = await fetch(
-            `/api/hospitals?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=3000`,
+            `/api/hospitals?lat=${searchCenter.lat}&lng=${searchCenter.lng}&radius=${searchRadius}`,
           );
           if (hospitalRes.ok) {
             const hospitalData = await hospitalRes.json();
@@ -127,8 +154,8 @@ export default function HospitalTab() {
                 if (lat === 0 || lng === 0) return;
 
                 const dist = calculateDistance(
-                  userLocation.lat,
-                  userLocation.lng,
+                  searchCenter.lat,
+                  searchCenter.lng,
                   lat,
                   lng,
                 );
@@ -181,7 +208,7 @@ export default function HospitalTab() {
       if (placeType === "all" || placeType === "pharmacy") {
         try {
           const pharmacyRes = await fetch(
-            `/api/pharmacies?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=3000`,
+            `/api/pharmacies?lat=${searchCenter.lat}&lng=${searchCenter.lng}&radius=${searchRadius}`,
           );
           if (pharmacyRes.ok) {
             const pharmacyData = await pharmacyRes.json();
@@ -209,8 +236,8 @@ export default function HospitalTab() {
                 if (lat === 0 || lng === 0) return;
 
                 const dist = calculateDistance(
-                  userLocation.lat,
-                  userLocation.lng,
+                  searchCenter.lat,
+                  searchCenter.lng,
                   lat,
                   lng,
                 );
@@ -251,6 +278,7 @@ export default function HospitalTab() {
       });
 
       setPlaces(results);
+      hasLoadedOnce.current = true;
 
       if (results.length === 0) {
         setError("주변에 검색된 병원/약국이 없습니다.");
@@ -260,8 +288,9 @@ export default function HospitalTab() {
       setError("데이터를 불러오는데 실패했습니다.");
     } finally {
       setIsLoading(false);
+      setIsRefetching(false);
     }
-  }, [userLocation, placeType, calculateDistance, checkIsOpen]);
+  }, [userLocation, mapCenter, mapZoom, placeType, calculateDistance, checkIsOpen]);
 
   useEffect(() => {
     if (userLocation) {
@@ -372,7 +401,7 @@ export default function HospitalTab() {
           <div className="flex flex-1 flex-col md:flex-row">
             {/* Map */}
             <div
-              className={`h-[50vh] md:h-[calc(100vh-180px)] md:flex-1 ${
+              className={`relative h-[50vh] md:h-[calc(100vh-180px)] md:flex-1 ${
                 viewMode === "list" ? "hidden md:block" : ""
               }`}
             >
@@ -381,7 +410,17 @@ export default function HospitalTab() {
                 selectedPlace={selectedPlace}
                 onSelectPlace={(place: any) => setSelectedPlace(place)}
                 userLocation={userLocation}
+                onZoomChange={handleZoomChange}
+                onCenterChange={handleCenterChange}
               />
+              {isRefetching && (
+                <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-20 pointer-events-none rounded-lg">
+                  <div className="bg-white rounded-lg px-4 py-2 flex items-center gap-2 shadow-lg">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm font-medium">재검색 중...</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* List */}
