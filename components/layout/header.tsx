@@ -103,7 +103,20 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       }
       setIsLoaded(true);
     });
-    return () => subscription.unsubscribe();
+
+    // 마이페이지에서 닉네임 변경 시 즉시 반영
+    const handleProfileUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.nickname) {
+        setNickname(detail.nickname);
+      }
+    };
+    window.addEventListener("profile-updated", handleProfileUpdate);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("profile-updated", handleProfileUpdate);
+    };
   }, []);
 
   useEffect(() => {
