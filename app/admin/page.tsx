@@ -56,7 +56,12 @@ import AdminReportButton from "./admin-report-button";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
-type AdminTab = "dashboard" | "users" | "support" | "actionLogs" | "portfolioTokens";
+type AdminTab =
+  | "dashboard"
+  | "users"
+  | "support"
+  | "actionLogs"
+  | "portfolioTokens";
 
 // ─── Types ───
 interface Stats {
@@ -270,7 +275,9 @@ function OnlineUsersCard({
                   <th className="text-left px-3 py-2 font-medium">유형</th>
                   <th className="text-left px-3 py-2 font-medium">IP</th>
                   <th className="text-left px-3 py-2 font-medium">접속 시간</th>
-                  <th className="text-left px-3 py-2 font-medium">마지막 활동</th>
+                  <th className="text-left px-3 py-2 font-medium">
+                    마지막 활동
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -448,7 +455,9 @@ export default function AdminDashboard() {
           {/* Title + Controls */}
           <div className="flex h-12 items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-base sm:text-lg font-bold shrink-0">📊 편하루 관리자</h1>
+              <h1 className="text-base sm:text-lg font-bold shrink-0">
+                📊 편하루 관리자
+              </h1>
               {activeTab === "dashboard" && (
                 <div
                   className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
