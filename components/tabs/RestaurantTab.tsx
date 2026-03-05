@@ -547,11 +547,10 @@ export default function RestaurantTab() {
       return;
     }
 
-    // ✅ 모바일에서 빠른 위치 응답을 위한 옵션
     const geoOptions: PositionOptions = {
-      enableHighAccuracy: false,  // 네트워크 위치 우선 (GPS보다 빠름)
-      timeout: 10000,             // 10초 타임아웃
-      maximumAge: 60000,          // 1분 캐시 허용
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
     };
 
     navigator.geolocation.getCurrentPosition(
@@ -587,7 +586,7 @@ export default function RestaurantTab() {
             () => {
               toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
           );
         } else {
           toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");

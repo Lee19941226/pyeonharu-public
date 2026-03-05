@@ -141,6 +141,7 @@ function SymptomContent() {
             lng: pos.coords.longitude,
           }),
         () => setUserLocation({ lat: 37.5665, lng: 126.978 }), // 서울 기본값
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     } else {
       setUserLocation({ lat: 37.5665, lng: 126.978 });

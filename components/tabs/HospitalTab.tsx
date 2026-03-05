@@ -53,6 +53,7 @@ export default function HospitalTab() {
         () => {
           setUserLocation({ lat: 37.5665, lng: 126.978 });
         },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     } else {
       setUserLocation({ lat: 37.5665, lng: 126.978 });

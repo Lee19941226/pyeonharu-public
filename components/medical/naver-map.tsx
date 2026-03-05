@@ -355,6 +355,7 @@ export function NaverMap({
       (error) => {
         console.error("위치 정보를 가져올 수 없습니다:", error);
       },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }, []);
 
