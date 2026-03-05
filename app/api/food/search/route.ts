@@ -94,6 +94,8 @@ export async function GET(req: NextRequest) {
 
     const supabase = await createClient();
     const normalizedQuery = query.toLowerCase().trim();
+    // PostgREST .or() 파서에서 특수문자가 구분자로 해석되는 것을 방지
+    const safeQuery = normalizedQuery.replace(/[,.()"'\\]/g, "");
 
     const {
       data: { user },
@@ -125,15 +127,15 @@ export async function GET(req: NextRequest) {
       let dailyLimit: number;
 
       if (user) {
-        // 로그인 사용자: 분당 30회, 하루 500회
+        // 무료 로그인: 분당 5회, 하루 10회
         identifier = `user:${user.id}`;
-        minuteLimit = 30;
-        dailyLimit = 500;
+        minuteLimit = 5;
+        dailyLimit = 10;
       } else {
-        // 비로그인: IP 기반, 분당 10회, 하루 50회
+        // 비회원: IP 기반, 분당 2회, 하루 3회
         identifier = `ip:${ipAddress}`;
-        minuteLimit = 10;
-        dailyLimit = 50;
+        minuteLimit = 2;
+        dailyLimit = 3;
       }
 
       // ── 1분 내 요청 수 체크 ──
@@ -222,7 +224,7 @@ export async function GET(req: NextRequest) {
             .from("food_search_cache")
             .select("*")
             .or(
-              `food_name.ilike.%${normalizedQuery}%,raw_materials.ilike.%${normalizedQuery}%`,
+              `food_name.ilike.%${safeQuery}%,raw_materials.ilike.%${safeQuery}%`,
             )
             .limit(30);
           dbItems = data || [];
@@ -269,7 +271,7 @@ export async function GET(req: NextRequest) {
           const textQuery = supabase
             .from("food_search_cache")
             .select("*")
-            .or(`food_name.ilike.%${query}%,raw_materials.ilike.%${query}%`)
+            .or(`food_name.ilike.%${safeQuery}%,raw_materials.ilike.%${safeQuery}%`)
             .limit(30);
 
           // 2. 초성 검색 (쿼리에 한글 자음만 있으면)

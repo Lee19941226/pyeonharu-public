@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -11,12 +14,58 @@ export async function POST(req: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) {
+
+    // ─── DB 기반 Rate Limit (비회원 1회/일, 로그인 2회/일) ───
+    let identifier: string;
+    let dailyLimit: number;
+
+    if (user) {
+      identifier = `text-analyze:user:${user.id}`;
+      dailyLimit = 2;
+    } else {
+      const headersList = await headers();
+      const ip =
+        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        headersList.get("x-real-ip") ||
+        "unknown";
+      identifier = `text-analyze:ip:${ip}`;
+      dailyLimit = 1;
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { count } = await supabase
+      .from("image_analyze_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", identifier)
+      .gte("analyzed_at", todayStart.toISOString());
+
+    if ((count || 0) >= dailyLimit) {
       return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
+        {
+          error: user
+            ? `오늘 텍스트 분석 한도(${dailyLimit}회)를 초과했습니다.`
+            : `일일 무료 분석 횟수(${dailyLimit}회)를 초과했습니다. 로그인하시면 더 많이 사용할 수 있어요.`,
+        },
+        { status: 429 },
       );
     }
+
+    supabase
+      .from("image_analyze_rate_limits")
+      .insert({ identifier, analyzed_at: new Date().toISOString() })
+      .then(() => {});
+
+    // ─── 인메모리 Rate Limit (보조) ───
+    const rateCheck = checkOpenAIRateLimit("analyze-text");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 },
+      );
+    }
+
     const { query } = await req.json();
 
     if (!query || typeof query !== "string" || !query.trim()) {

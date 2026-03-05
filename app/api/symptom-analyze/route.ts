@@ -2,6 +2,48 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+
+// 잔여 횟수 조회
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const headersList = await headers();
+
+    const today = new Date().toISOString().split("T")[0];
+    let identifier: string;
+    let dailyLimit: number;
+
+    if (user) {
+      identifier = `user:${user.id}:${today}`;
+      dailyLimit = 3; // 무료 로그인: 3회/일
+    } else {
+      const ip =
+        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        headersList.get("x-real-ip") ||
+        "unknown";
+      identifier = `ip:${ip}:${today}`;
+      dailyLimit = 1; // 비회원: 1회/일
+    }
+
+    const { count } = await supabase
+      .from("symptom_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", identifier);
+
+    const used = count || 0;
+    return NextResponse.json({
+      used,
+      limit: dailyLimit,
+      remaining: Math.max(dailyLimit - used, 0),
+    });
+  } catch {
+    return NextResponse.json({ used: 0, limit: 1, remaining: 1 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -16,17 +58,17 @@ export async function POST(req: NextRequest) {
     let dailyLimit: number;
 
     if (user) {
-      // 로그인 사용자: user_id 기반, 하루 20회
+      // 무료 로그인: 3회/일
       identifier = `user:${user.id}:${today}`;
-      dailyLimit = 20;
+      dailyLimit = 3;
     } else {
-      // 비로그인: IP 기반, 하루 5회
+      // 비회원: 1회/일
       const ip =
         headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         headersList.get("x-real-ip") ||
         "unknown";
       identifier = `ip:${ip}:${today}`;
-      dailyLimit = 5;
+      dailyLimit = 1;
     }
 
     const { count } = await supabase

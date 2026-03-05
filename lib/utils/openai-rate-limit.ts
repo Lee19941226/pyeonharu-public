@@ -1,7 +1,9 @@
 /**
- * 서버사이드 OpenAI API 호출 제한 유틸
- * 메모리 기반 — Vercel Serverless에서는 인스턴스별 독립 카운트
- * 완벽한 방어는 아니지만 단일 인스턴스 폭주를 방지합니다.
+ * 서버사이드 OpenAI API 호출 제한 유틸 (보조 방어선)
+ * ⚠️ 메모리 기반 — Vercel Serverless에서는 인스턴스별 독립 카운트이므로
+ *    콜드스타트 시 리셋됩니다. 비용 통제의 1차 방어는 각 API route의
+ *    DB 기반 rate limit (image_analyze_rate_limits, search_rate_limits 등)이며,
+ *    이 유틸은 단일 인스턴스 내 폭주 방지용 2차 방어선입니다.
  */
 
 interface RateBucket {
