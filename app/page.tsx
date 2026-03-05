@@ -49,7 +49,7 @@ const TAB_LABELS: Record<string, string> = {
   "meal:restaurant": "식사 > 음식점",
   "meal:diet": "식사 > 식단관리",
   "sick:symptom": "아파요 > 증상",
-  "sick:hospital": "아파요 > 병원",
+  "sick:hospital": "아파요 > 병원/약국",
   "sick:medicine": "아파요 > 약",
   "sick:doctor": "아파요 > 의사",
 };
@@ -371,7 +371,7 @@ export default function HomePage() {
                   active={sickSubTab === "hospital"}
                   onClick={() => setSickSubTab("hospital")}
                   icon={Building2}
-                  label="병원"
+                  label="병원/약국"
                 />
                 <SubTabButton
                   active={sickSubTab === "doctor"}

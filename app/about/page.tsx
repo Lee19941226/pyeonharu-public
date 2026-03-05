@@ -63,7 +63,7 @@ const sickFeatures = [
   {
     icon: Building2,
     title: "병원 찾기",
-    tab: "아파요 > 병원",
+    tab: "아파요 > 병원/약국",
     description:
       "현재 위치 기반으로 가까운 병원을 찾아줍니다. 진료과 필터, 전화 연결, 길찾기까지 바로 할 수 있습니다.",
     highlights: ["위치 기반 검색", "진료과 필터", "전화·길찾기"],

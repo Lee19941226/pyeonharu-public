@@ -424,17 +424,15 @@ function HospitalDetailContent() {
               </div>
               <h1 className="text-2xl font-bold">{name}</h1>
               {/* 평균 별점 */}
-              {reviewCount > 0 && (
-                <div className="mt-2 flex items-center gap-2">
-                  <StarRating rating={Math.round(avgRating)} />
-                  <span className="text-sm font-medium text-amber-600">
-                    {avgRating}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    ({reviewCount}개 리뷰)
-                  </span>
-                </div>
-              )}
+              <div className="mt-2 flex items-center gap-2">
+                <StarRating rating={Math.round(avgRating)} />
+                <span className="text-sm font-medium text-amber-600">
+                  {reviewCount > 0 ? avgRating : "0.0"}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  ({reviewCount}개 리뷰)
+                </span>
+              </div>
             </div>
 
             {/* 액션 버튼 */}

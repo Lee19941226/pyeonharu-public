@@ -6,7 +6,8 @@ import { SearchFilters } from "@/components/medical/search-filters";
 import { PlaceList } from "@/components/medical/place-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Map, List, Loader2, RefreshCw, Search } from "lucide-react";
+import { Map, List, Loader2, RefreshCw, Search, MapPin } from "lucide-react";
+import { toast } from "sonner";
 
 export type PlaceType = "hospital" | "pharmacy";
 export type ViewMode = "map" | "list";
@@ -50,6 +51,9 @@ export default function HospitalTab() {
   const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [addressInput, setAddressInput] = useState("");
+  const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
+  const [locationName, setLocationName] = useState("");
   const hasLoadedOnce = useRef(false);
 
   // 현재 위치 가져오기
@@ -104,6 +108,27 @@ export default function HospitalTab() {
   const handleCenterChange = useCallback((center: { lat: number; lng: number }) => {
     setMapCenter(center);
   }, []);
+
+  const searchByAddress = async () => {
+    if (!addressInput.trim()) return;
+    setIsGeocodingAddress(true);
+    try {
+      const res = await fetch(`/api/restaurant/geocode?q=${encodeURIComponent(addressInput.trim())}`);
+      const data = await res.json();
+      if (data.success) {
+        setUserLocation({ lat: data.lat, lng: data.lng });
+        setMapCenter({ lat: data.lat, lng: data.lng });
+        setLocationName(data.name);
+        setAddressInput("");
+      } else {
+        toast.error(data.error || "해당 지역을 찾을 수 없어요");
+      }
+    } catch {
+      toast.error("주소 검색에 실패했습니다");
+    } finally {
+      setIsGeocodingAddress(false);
+    }
+  };
 
   const fetchPlaces = useCallback(async () => {
     const searchCenter = mapCenter ?? userLocation;
@@ -332,6 +357,36 @@ export default function HospitalTab() {
                 />
                 새로고침
               </Button>
+            </div>
+
+            {/* 기준 위치 설정 */}
+            <div className="mb-3 rounded-lg border bg-muted/30 p-2.5">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                {locationName ? (
+                  <span className="text-xs font-medium text-foreground truncate flex-1">{locationName}</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground flex-1">현재 위치 기준</span>
+                )}
+              </div>
+              <div className="mt-1.5 flex gap-1">
+                <Input
+                  placeholder="시/구/동 (예: 강남)"
+                  value={addressInput}
+                  onChange={(e) => setAddressInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && searchByAddress()}
+                  className="h-7 text-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 shrink-0 text-xs px-2"
+                  onClick={searchByAddress}
+                  disabled={isGeocodingAddress || !addressInput.trim()}
+                >
+                  {isGeocodingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : "이동"}
+                </Button>
+              </div>
             </div>
 
             {/* 검색창 */}

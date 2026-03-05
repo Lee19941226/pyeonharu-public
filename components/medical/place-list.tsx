@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from "react"
 import Link from "next/link"
-import { Building2, Cross, MapPin, Phone, Clock, ChevronRight, ChevronDown, ExternalLink, Navigation } from "lucide-react"
+import { Building2, Cross, MapPin, Phone, ChevronRight, ChevronDown, ExternalLink, Navigation } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -84,176 +84,109 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
             key={place.id}
             ref={isSelected ? selectedRef : undefined}
             className={cn(
-              "cursor-pointer transition-all hover:shadow-md",
-              isSelected && "ring-2 ring-primary shadow-lg bg-primary/5"
+              "cursor-pointer transition-all hover:shadow-sm",
+              isSelected && "ring-2 ring-primary bg-primary/5"
             )}
             onClick={() => onSelectPlace(place)}
           >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="mb-2 flex items-center gap-2">
-                    {place.type === "hospital" ? (
-                      <div className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg",
-                        isSelected ? "bg-blue-200 text-blue-700" : "bg-blue-100 text-blue-600"
-                      )}>
-                        <Building2 className="h-4 w-4" />
-                      </div>
-                    ) : (
-                      <div className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg",
-                        isSelected ? "bg-green-200 text-green-700" : "bg-green-100 text-green-600"
-                      )}>
-                        <Cross className="h-4 w-4" />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className={cn("font-semibold", isSelected && "text-primary")}>{place.name}</h3>
-                      <p className="text-xs text-muted-foreground">{place.distance}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{place.address}</span>
-                    </p>
-                    {place.phone && (
-                      <p className="flex items-center gap-1">
-                        <Phone className="h-3 w-3 shrink-0" />
-                        <a
-                          href={`tel:${place.phone}`}
-                          className="truncate hover:text-primary hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {place.phone}
-                        </a>
-                      </p>
-                    )}
-                    <p className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{place.openTime} - {place.closeTime}</span>
-                    </p>
-                  </div>
-
-                  {place.departments && place.departments.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {place.departments.slice(0, 3).map((dept) => (
-                        <Badge key={dept} variant="secondary" className="text-xs">
-                          {dept}
-                        </Badge>
-                      ))}
-                      {place.departments.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{place.departments.length - 3}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
+            <CardContent className="px-3 py-2.5">
+              {/* 헤더: 아이콘 + 이름 + 거리 + 상태 */}
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                  place.type === "hospital"
+                    ? (isSelected ? "bg-blue-200 text-blue-700" : "bg-blue-100 text-blue-600")
+                    : (isSelected ? "bg-green-200 text-green-700" : "bg-green-100 text-green-600")
+                )}>
+                  {place.type === "hospital" ? <Building2 className="h-3.5 w-3.5" /> : <Cross className="h-3.5 w-3.5" />}
                 </div>
+                <h3 className={cn("text-sm font-semibold truncate flex-1 min-w-0", isSelected && "text-primary")}>{place.name}</h3>
+                <span className="text-[11px] text-primary font-medium shrink-0">{place.distance}</span>
+                <Badge variant={place.isOpen ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                  {place.isOpen ? "영업중" : "종료"}
+                </Badge>
+                <BookmarkButton
+                  type={place.type}
+                  id={place.id}
+                  name={place.name}
+                  address={place.address}
+                  phone={place.phone}
+                  category={place.departments?.[0]}
+                  lat={place.lat}
+                  lng={place.lng}
+                />
+              </div>
 
-                <div className="flex flex-col items-end gap-2">
-                  <Badge variant={place.isOpen ? "default" : "secondary"}>
-                    {place.isOpen ? "영업중" : "영업종료"}
+              {/* 주소 + 진료과목 한 줄 */}
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="truncate">{place.address}</span>
+                {place.departments && place.departments.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                    {place.departments[0]}
                   </Badge>
-                  <BookmarkButton
-                    type={place.type}
-                    id={place.id}
-                    name={place.name}
-                    address={place.address}
-                    phone={place.phone}
-                    category={place.departments?.[0]}
-                    lat={place.lat}
-                    lng={place.lng}
-                  />
-                </div>
+                )}
               </div>
 
               {/* 상세정보 토글 */}
-              <div className="mt-3 border-t border-border pt-3">
+              <div className="mt-1.5 border-t border-border pt-1.5">
                 <button
-                  className="flex w-full items-center justify-between text-sm text-primary hover:underline"
+                  className="flex w-full items-center justify-between text-xs text-primary hover:underline"
                   onClick={(e) => handleToggleDetail(e, place.id)}
                 >
-                  상세정보 보기
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                  상세정보
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
                 </button>
 
-                {/* 확장된 상세정보 */}
                 {isExpanded && (
-                  <div className="mt-3 space-y-3" onClick={(e) => e.stopPropagation()}>
-                    {/* 기본 정보 */}
-                    <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground">기본 정보</p>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">유형</span>
-                          <span className="font-medium">{place.type === "hospital" ? "병원" : "약국"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">거리</span>
-                          <span className="font-medium">{place.distance}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">영업시간</span>
-                          <span className="font-medium">{place.openTime} - {place.closeTime}</span>
-                        </div>
-                        {place.departments && place.departments.length > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">진료과목</span>
-                            <span className="font-medium">{place.departments.join(", ")}</span>
-                          </div>
-                        )}
+                  <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs rounded-lg bg-muted/50 p-2.5">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">유형</span>
+                        <span className="font-medium">{place.type === "hospital" ? "병원" : "약국"}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">영업시간</span>
+                        <span className="font-medium">{place.openTime}-{place.closeTime}</span>
+                      </div>
+                      {place.phone && (
+                        <div className="flex justify-between col-span-2">
+                          <span className="text-muted-foreground">전화</span>
+                          <a href={`tel:${place.phone}`} className="font-medium hover:text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                            {place.phone}
+                          </a>
+                        </div>
+                      )}
                     </div>
 
-                    {/* 바로가기 버튼들 */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       {place.phone && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 gap-1.5"
-                          asChild
-                        >
+                        <Button variant="outline" size="sm" className="flex-1 gap-1 h-7 text-xs" asChild>
                           <a href={`tel:${place.phone}`}>
-                            <Phone className="h-3.5 w-3.5" />
+                            <Phone className="h-3 w-3" />
                             전화
                           </a>
                         </Button>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-1.5"
-                        asChild
-                      >
+                      <Button variant="outline" size="sm" className="flex-1 gap-1 h-7 text-xs" asChild>
                         <a href={getNaverMapLink(place)} target="_blank" rel="noopener noreferrer">
-                          <Navigation className="h-3.5 w-3.5" />
+                          <Navigation className="h-3 w-3" />
                           네이버지도
                         </a>
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-1.5"
-                        asChild
-                      >
+                      <Button variant="outline" size="sm" className="flex-1 gap-1 h-7 text-xs" asChild>
                         <a href={getKakaoMapLink(place)} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3.5 w-3.5" />
+                          <ExternalLink className="h-3 w-3" />
                           카카오맵
                         </a>
                       </Button>
                     </div>
 
-                    {/* 상세 페이지 링크 */}
                     <Link
                       href={getDetailPageLink(place)}
-                      className="flex items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+                      className="flex items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
                     >
-                      상세 페이지로 이동
-                      <ChevronRight className="h-3.5 w-3.5" />
+                      상세 페이지에서 리뷰 남기기
+                      <ChevronRight className="h-3 w-3" />
                     </Link>
                   </div>
                 )}
