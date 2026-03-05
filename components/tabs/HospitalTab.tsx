@@ -340,7 +340,7 @@ export default function HospitalTab() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-4">
-      <div className="flex-1">
+      <div>
         {/* Search Header */}
         <div className="border-b border-border bg-card rounded-lg">
           <div className="px-4 py-4">
@@ -453,7 +453,7 @@ export default function HospitalTab() {
 
         {/* Content */}
         {!isLoading && (
-          <div className="flex flex-1 flex-col">
+          <div className="flex flex-col">
             {/* Map */}
             <div
               className={`relative h-[50vh] rounded-lg overflow-hidden ${
