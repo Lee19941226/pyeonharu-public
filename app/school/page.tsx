@@ -189,7 +189,7 @@ export default function SchoolPage() {
                     placeholder="학교 이름 검색 (예: 군포초등학교)"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleSearch()}
+                    onKeyDown={e => e.key === "Enter" && !isSearching && handleSearch()}
                     className="pl-10"
                   />
                 </div>
