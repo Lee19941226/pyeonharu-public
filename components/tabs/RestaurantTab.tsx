@@ -547,11 +547,10 @@ export default function RestaurantTab() {
       return;
     }
 
-    // ✅ 모바일에서 빠른 위치 응답을 위한 옵션
     const geoOptions: PositionOptions = {
-      enableHighAccuracy: false,  // 네트워크 위치 우선 (GPS보다 빠름)
-      timeout: 10000,             // 10초 타임아웃
-      maximumAge: 60000,          // 1분 캐시 허용
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
     };
 
     navigator.geolocation.getCurrentPosition(
@@ -587,7 +586,7 @@ export default function RestaurantTab() {
             () => {
               toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
           );
         } else {
           toast.info("위치 권한을 허용하면 주변 음식점을 검색할 수 있어요");
@@ -1302,11 +1301,28 @@ export default function RestaurantTab() {
               </button>
               <button
                 onClick={() => {
-                  const name = encodeURIComponent(navTarget.name);
-                  window.open(
-                    `https://tmap.life/navigate?goalx=${navTarget.lng}&goaly=${navTarget.lat}&goalname=${name}`,
-                    "_blank",
-                  );
+                  const goalName = encodeURIComponent(navTarget.name);
+                  const goalX = navTarget.lng;
+                  const goalY = navTarget.lat;
+
+                  const appUrl = userCoords
+                    ? `tmap://route?startX=${userCoords.lng}&startY=${userCoords.lat}&goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`
+                    : `tmap://route?goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`;
+                  const webUrl = `https://tmap.life/route?goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`;
+
+                  // 앱 미설치 시 1.5초 후 웹으로 fallback
+                  const fallbackTimer = setTimeout(() => {
+                    window.open(webUrl, "_blank");
+                  }, 1500);
+
+                  document.addEventListener("visibilitychange", function onHide() {
+                    if (document.hidden) {
+                      clearTimeout(fallbackTimer);
+                      document.removeEventListener("visibilitychange", onHide);
+                    }
+                  });
+
+                  window.location.href = appUrl;
                   setNavTarget(null);
                 }}
                 className="flex-1 flex flex-col items-center gap-2 rounded-xl border p-4 hover:bg-muted transition-colors"

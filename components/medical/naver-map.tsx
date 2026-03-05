@@ -35,6 +35,8 @@ interface NaverMapProps {
   onSelectPlace?: (place: unknown) => void;
   userLocation?: { lat: number; lng: number } | null;
   height?: string;
+  onZoomChange?: (zoom: number) => void;
+  onCenterChange?: (center: { lat: number; lng: number }) => void;
 }
 
 export function NaverMap({
@@ -48,6 +50,8 @@ export function NaverMap({
   onSelectPlace,
   userLocation = null,
   height = "100%",
+  onZoomChange,
+  onCenterChange,
 }: NaverMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -56,6 +60,10 @@ export function NaverMap({
   const userMarkerRef = useRef<any>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const onZoomChangeRef = useRef(onZoomChange);
+  const onCenterChangeRef = useRef(onCenterChange);
+  useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
+  useEffect(() => { onCenterChangeRef.current = onCenterChange; }, [onCenterChange]);
 
   useEffect(() => {
     const NAVER_CLIENT_ID =
@@ -104,6 +112,34 @@ export function NaverMap({
       mapRef.current,
       mapOptions,
     );
+
+    const zoomListener = window.naver.maps.Event.addListener(
+      mapInstanceRef.current,
+      "zoom_changed",
+      () => {
+        const currentZoom = mapInstanceRef.current?.getZoom();
+        if (currentZoom !== undefined) onZoomChangeRef.current?.(currentZoom);
+      },
+    );
+
+    const dragEndListener = window.naver.maps.Event.addListener(
+      mapInstanceRef.current,
+      "dragend",
+      () => {
+        const currentCenter = mapInstanceRef.current?.getCenter();
+        if (currentCenter) {
+          onCenterChangeRef.current?.({
+            lat: currentCenter.lat(),
+            lng: currentCenter.lng(),
+          });
+        }
+      },
+    );
+
+    return () => {
+      window.naver.maps.Event.removeListener(zoomListener);
+      window.naver.maps.Event.removeListener(dragEndListener);
+    };
   }, [isMapLoaded, centerLat, centerLng, zoom]);
 
   useEffect(() => {
@@ -355,6 +391,7 @@ export function NaverMap({
       (error) => {
         console.error("위치 정보를 가져올 수 없습니다:", error);
       },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }, []);
 

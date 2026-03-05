@@ -78,7 +78,7 @@ export function MapPlaceholder({
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(() => {
               // 현재 위치로 이동 (실제 지도 연동 시 구현)
-            })
+            }, undefined, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
           }
         }}
       >
