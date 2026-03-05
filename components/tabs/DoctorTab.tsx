@@ -8,6 +8,8 @@ import {
   Star,
   Loader2,
   UserRound,
+  ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 
 const QUICK_DEPARTMENTS = [
@@ -38,12 +40,26 @@ interface DoctorSummary {
   diseases: DiseaseStat[];
 }
 
+interface DoctorReviewDetail {
+  id: string;
+  doctorName: string;
+  department: string;
+  diseaseName: string;
+  rating: number;
+  content: string;
+  isVerified: boolean;
+  createdAt: string;
+}
+
 export default function DoctorTab() {
   const [query, setQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
   const [doctors, setDoctors] = useState<DoctorSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [detailReviews, setDetailReviews] = useState<DoctorReviewDetail[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetchDoctors = useCallback(async (q: string, dept: string) => {
     setIsLoading(true);
@@ -79,6 +95,29 @@ export default function DoctorTab() {
 
   const handleDeptToggle = (dept: string) => {
     setSelectedDept((prev) => (prev === dept ? "" : dept));
+  };
+
+  const handleToggleExpand = async (doctor: DoctorSummary) => {
+    const key = `${doctor.doctorName}::${doctor.hospitalName}`;
+    if (expandedKey === key) {
+      setExpandedKey(null);
+      return;
+    }
+    setExpandedKey(key);
+    setDetailLoading(true);
+    try {
+      const params = new URLSearchParams({
+        doctor: doctor.doctorName,
+        hospitalName: doctor.hospitalName,
+      });
+      const res = await fetch(`/api/doctor-reviews?${params.toString()}`);
+      const data = await res.json();
+      setDetailReviews(data.reviews || []);
+    } catch {
+      setDetailReviews([]);
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   return (
@@ -141,34 +180,79 @@ export default function DoctorTab() {
               <span className="w-10 shrink-0 text-center">종합</span>
             </div>
             {/* 테이블 바디 */}
-            {doctors.map((doctor, idx) => (
-              <div key={`${doctor.doctorName}-${doctor.hospitalName}-${idx}`} className="border-b last:border-b-0 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-24 shrink-0 text-sm font-semibold truncate">{doctor.doctorName}</span>
-                  <Badge variant="secondary" className="w-20 shrink-0 justify-center text-[10px] px-1.5 py-0">{doctor.department}</Badge>
-                  <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
-                  <div className="w-10 shrink-0 flex items-center justify-center gap-0.5">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    <span className="text-xs font-semibold">{doctor.avgRating}</span>
-                  </div>
-                </div>
-                {/* 질병별 평점 */}
-                {doctor.diseases.length > 0 && (
-                  <div className="mt-1.5 pl-1 space-y-0.5">
-                    {doctor.diseases.map((d) => (
-                      <div key={d.name} className="flex items-center gap-1.5 text-[11px]">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{d.name}</Badge>
-                        <div className="flex items-center gap-0.5">
-                          <Star className={`h-2.5 w-2.5 ${d.avgRating >= 4 ? "fill-green-500 text-green-500" : d.avgRating >= 3 ? "fill-amber-400 text-amber-400" : "fill-red-400 text-red-400"}`} />
-                          <span className={`font-medium ${d.avgRating >= 4 ? "text-green-600" : d.avgRating >= 3 ? "text-amber-600" : "text-red-500"}`}>{d.avgRating}</span>
+            {doctors.map((doctor, idx) => {
+              const key = `${doctor.doctorName}::${doctor.hospitalName}`;
+              const isExpanded = expandedKey === key;
+              return (
+                <div key={`${doctor.doctorName}-${doctor.hospitalName}-${idx}`} className="border-b last:border-b-0">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors"
+                    onClick={() => handleToggleExpand(doctor)}
+                  >
+                    <span className="w-24 shrink-0 text-sm font-semibold truncate">{doctor.doctorName}</span>
+                    <Badge variant="secondary" className="w-20 shrink-0 justify-center text-[10px] px-1.5 py-0">{doctor.department}</Badge>
+                    <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
+                    <div className="w-10 shrink-0 flex items-center justify-center gap-0.5">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span className="text-xs font-semibold">{doctor.avgRating}</span>
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                  </button>
+                  {/* 질병별 평점 */}
+                  {doctor.diseases.length > 0 && (
+                    <div className="px-3 pb-1.5 pl-4 space-y-0.5">
+                      {doctor.diseases.map((d) => (
+                        <div key={d.name} className="flex items-center gap-1.5 text-[11px]">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{d.name}</Badge>
+                          <div className="flex items-center gap-0.5">
+                            <Star className={`h-2.5 w-2.5 ${d.avgRating >= 4 ? "fill-green-500 text-green-500" : d.avgRating >= 3 ? "fill-amber-400 text-amber-400" : "fill-red-400 text-red-400"}`} />
+                            <span className={`font-medium ${d.avgRating >= 4 ? "text-green-600" : d.avgRating >= 3 ? "text-amber-600" : "text-red-500"}`}>{d.avgRating}</span>
+                          </div>
+                          <span className="text-muted-foreground">({d.count}건)</span>
                         </div>
-                        <span className="text-muted-foreground">({d.count}건)</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                      ))}
+                    </div>
+                  )}
+                  {/* 펼쳐진 리뷰 상세 */}
+                  {isExpanded && (
+                    <div className="border-t bg-muted/20 px-3 py-2 space-y-2">
+                      {detailLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : detailReviews.length === 0 ? (
+                        <p className="py-2 text-center text-xs text-muted-foreground">리뷰 내용이 없습니다</p>
+                      ) : (
+                        detailReviews.map((r) => (
+                          <div key={r.id} className="rounded-md border bg-background p-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">{r.diseaseName}</Badge>
+                              <div className="flex items-center gap-0.5">
+                                <Star className={`h-2.5 w-2.5 ${r.rating >= 4 ? "fill-green-500 text-green-500" : r.rating >= 3 ? "fill-amber-400 text-amber-400" : "fill-red-400 text-red-400"}`} />
+                                <span className={`text-[11px] font-medium ${r.rating >= 4 ? "text-green-600" : r.rating >= 3 ? "text-amber-600" : "text-red-500"}`}>{r.rating}</span>
+                              </div>
+                              {r.isVerified && (
+                                <Badge variant="secondary" className="text-[10px] px-1 py-0 text-green-700 bg-green-100">
+                                  <ShieldCheck className="mr-0.5 h-2.5 w-2.5" />
+                                  인증
+                                </Badge>
+                              )}
+                              <span className="ml-auto text-[10px] text-muted-foreground">
+                                {new Date(r.createdAt).toLocaleDateString("ko-KR")}
+                              </span>
+                            </div>
+                            {r.content && (
+                              <p className="text-xs text-foreground/80">{r.content}</p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
