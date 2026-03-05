@@ -52,7 +52,7 @@ function PharmacyDetailContent() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="border-b border-border bg-card">
           <div className="container mx-auto px-4 py-4">
             <Button variant="ghost" size="sm" asChild>

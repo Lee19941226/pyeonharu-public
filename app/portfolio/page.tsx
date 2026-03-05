@@ -16,7 +16,7 @@ export default function PortfolioPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <PortfolioTokenGate>
           <section className="bg-gradient-to-b from-indigo-50/50 to-background py-8 md:py-12 dark:from-indigo-950/20">
             <div className="container mx-auto px-4">

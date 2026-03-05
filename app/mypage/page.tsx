@@ -425,9 +425,13 @@ export default function MyPage() {
         <Header />
         <main className="flex flex-1 flex-col items-center justify-center gap-4">
           <p className="text-sm text-muted-foreground">
-            {error || "로그인이 필요합니다."}
+            {error ? "데이터를 불러오지 못했습니다. 다시 시도해주세요." : "로그인이 필요합니다."}
           </p>
-          <Button onClick={() => router.push("/login")}>로그인</Button>
+          {error ? (
+            <Button onClick={() => window.location.reload()}>다시 시도</Button>
+          ) : (
+            <Button onClick={() => router.push("/login")}>로그인</Button>
+          )}
         </main>
         <MobileNav />
       </div>
@@ -438,7 +442,7 @@ export default function MyPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-6">
           <div className="mx-auto max-w-lg space-y-4">
             {/* Profile Header */}

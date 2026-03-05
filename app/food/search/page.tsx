@@ -312,7 +312,7 @@ function FoodSearchContent() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-8">
           <div className="mx-auto max-w-4xl">
             {/* 헤더 */}
@@ -694,6 +694,7 @@ function FoodSearchPageInner() {
   const [sortBy, setSortBy] = useState<string>("default"); // "default" | "name" | "safe_first"
   const hasSearchedRef = useRef(false);
   const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   useEffect(() => {
     setCurrentPage(1);
   }, [filterSafeOnly, filterSource, sortBy]);
@@ -735,6 +736,7 @@ function FoodSearchPageInner() {
     const signal = abortControllerRef.current.signal;
 
     setCorrectedQuery(null);
+    setSearchError(null);
     setIsLoading(true);
     setHasSearched(true);
     setCurrentPage(1);
@@ -817,6 +819,7 @@ function FoodSearchPageInner() {
       // phase1 결과가 있으면 그걸로 유지 (외부 API 실패)
       if (allResults.length === 0) {
         setAllResults([]);
+        setSearchError("검색 중 오류가 발생했습니다. 다시 시도해주세요.");
         toast.error(errInfo.message, {
           duration: getToastDuration(errInfo.type),
         });
@@ -945,7 +948,7 @@ function FoodSearchPageInner() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-8">
           {/* ✅ max-w 줄임: 4xl → 3xl */}
           <div className="mx-auto max-w-3xl">
@@ -1346,6 +1349,24 @@ function FoodSearchPageInner() {
                           필터 초기화
                         </button>
                       </>
+                    ) : searchError ? (
+                      // 오류 상태
+                      <>
+                        <div className="mb-4 text-4xl">⚠️</div>
+                        <p className="font-medium text-gray-700">
+                          검색 중 오류가 발생했습니다
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          잠시 후 다시 시도해주세요
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="mt-4"
+                          onClick={() => query && performSearch(query)}
+                        >
+                          다시 시도
+                        </Button>
+                      </>
                     ) : (
                       // 검색 자체 결과 없음
                       <>
@@ -1401,7 +1422,7 @@ export default function FoodSearchPage() {
       fallback={
         <div className="flex min-h-screen flex-col bg-background">
           <Header />
-          <main className="flex-1 pb-16 md:pb-0">
+          <main className="flex-1 pb-20 md:pb-0">
             <div className="container mx-auto px-4 py-8">
               <div className="mx-auto max-w-3xl text-center py-12">
                 <div className="mb-4 text-4xl">🔍</div>

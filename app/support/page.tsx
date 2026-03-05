@@ -169,7 +169,7 @@ function SupportContent() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
-        <main className="flex flex-1 items-center justify-center px-4 pb-16">
+        <main className="flex flex-1 items-center justify-center px-4 pb-20">
           <div className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -196,7 +196,7 @@ function SupportContent() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto max-w-2xl px-4 py-6">
           {/* 헤더 */}
           <div className="mb-6">
