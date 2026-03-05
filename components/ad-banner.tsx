@@ -102,8 +102,8 @@ export function AdBanner({
 }
 
 function FallbackBanner({ className }: { className?: string }) {
-  const handleShare = () => {
-    const result = shareToKakao({
+  const handleShare = async () => {
+    const result = await shareToKakao({
       title: "편하루 - 식사를 편하게",
       description:
         "메뉴 선정부터 병원 찾기까지, 편하루가 도와드려요. 친구에게 공유하고 동창들과 커뮤니티도 이용해보세요!",
