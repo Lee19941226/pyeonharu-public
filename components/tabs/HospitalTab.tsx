@@ -27,6 +27,10 @@ export interface Place {
   lng: number;
 }
 
+// ── 모듈 레벨 캐시 (SPA 내비게이션 간 유지, 5분 TTL) ──
+const CACHE_TTL = 5 * 60 * 1000;
+const placesCache: Record<string, { data: Place[]; ts: number }> = {};
+
 function zoomToRadius(zoom: number): number {
   if (zoom >= 16) return 500;
   if (zoom === 15) return 1000;
@@ -54,6 +58,7 @@ export default function HospitalTab() {
   const [addressInput, setAddressInput] = useState("");
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
   const [locationName, setLocationName] = useState("");
+  const [listPage, setListPage] = useState(1);
   const hasLoadedOnce = useRef(false);
 
   // 현재 위치 가져오기
@@ -130,11 +135,27 @@ export default function HospitalTab() {
     }
   };
 
+  const skipCacheRef = useRef(false);
+
   const fetchPlaces = useCallback(async () => {
     const searchCenter = mapCenter ?? userLocation;
     if (!searchCenter) return;
 
     const searchRadius = zoomToRadius(mapZoom);
+    const cacheKey = `${searchCenter.lat.toFixed(4)}::${searchCenter.lng.toFixed(4)}::${searchRadius}::${placeType}`;
+
+    if (!skipCacheRef.current) {
+      const cached = placesCache[cacheKey];
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        setPlaces(cached.data);
+        setIsLoading(false);
+        hasLoadedOnce.current = true;
+        if (cached.data.length === 0) setError("주변에 검색된 병원/약국이 없습니다.");
+        else setError(null);
+        return;
+      }
+    }
+    skipCacheRef.current = false;
 
     if (!hasLoadedOnce.current) {
       setIsLoading(true);
@@ -304,6 +325,7 @@ export default function HospitalTab() {
 
       setPlaces(results);
       hasLoadedOnce.current = true;
+      placesCache[cacheKey] = { data: results, ts: Date.now() };
 
       if (results.length === 0) {
         setError("주변에 검색된 병원/약국이 없습니다.");
@@ -323,6 +345,28 @@ export default function HospitalTab() {
     }
   }, [userLocation, placeType, fetchPlaces]);
 
+  // 새로고침: GPS 재요청 + 캐시 무시
+  const handleRefresh = useCallback(() => {
+    skipCacheRef.current = true;
+    setLocationName("");
+    setMapCenter(null);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
+          setUserLocation(newLoc);
+        },
+        () => {
+          // GPS 실패 시 현재 위치 그대로 재검색
+          fetchPlaces();
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      );
+    } else {
+      fetchPlaces();
+    }
+  }, [fetchPlaces]);
+
   // 필터링: 영업 중 + 검색어
   const filteredPlaces = places.filter((place) => {
     if (showOpenOnly && !place.isOpen) return false;
@@ -338,6 +382,17 @@ export default function HospitalTab() {
     return true;
   });
 
+  // 페이징
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredPlaces.length / PAGE_SIZE));
+  const safeListPage = Math.min(listPage, totalPages);
+  const pagedPlaces = filteredPlaces.slice((safeListPage - 1) * PAGE_SIZE, safeListPage * PAGE_SIZE);
+
+  // 필터/검색 변경 시 페이지 리셋
+  useEffect(() => {
+    setListPage(1);
+  }, [searchQuery, showOpenOnly, placeType, places]);
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-4">
       <div>
@@ -349,7 +404,7 @@ export default function HospitalTab() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={fetchPlaces}
+                onClick={handleRefresh}
                 disabled={isLoading}
               >
                 <RefreshCw
@@ -480,23 +535,50 @@ export default function HospitalTab() {
 
             {/* List */}
             <div
-              className={`overflow-auto ${
-                viewMode === "map" ? "hidden md:block md:max-h-[60vh]" : ""
+              className={`${
+                viewMode === "map" ? "hidden md:block" : ""
               }`}
             >
               {error && filteredPlaces.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                   <p className="text-muted-foreground mb-4">{error}</p>
-                  <Button onClick={fetchPlaces} variant="outline">
+                  <Button onClick={handleRefresh} variant="outline">
                     다시 검색
                   </Button>
                 </div>
               ) : (
-                <PlaceList
-                  places={filteredPlaces}
-                  selectedPlace={selectedPlace}
-                  onSelectPlace={setSelectedPlace}
-                />
+                <>
+                  <PlaceList
+                    places={pagedPlaces}
+                    selectedPlace={selectedPlace}
+                    onSelectPlace={setSelectedPlace}
+                  />
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 py-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        disabled={safeListPage <= 1}
+                        onClick={() => setListPage((p) => p - 1)}
+                      >
+                        이전
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {safeListPage} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        disabled={safeListPage >= totalPages}
+                        onClick={() => setListPage((p) => p + 1)}
+                      >
+                        다음
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

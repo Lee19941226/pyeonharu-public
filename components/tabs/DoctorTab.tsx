@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Search,
   Star,
@@ -10,6 +11,7 @@ import {
   UserRound,
   ChevronDown,
   ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 
 const QUICK_DEPARTMENTS = [
@@ -51,6 +53,11 @@ interface DoctorReviewDetail {
   createdAt: string;
 }
 
+// ── 모듈 레벨 캐시 (SPA 내비게이션 간 유지, 5분 TTL) ──
+const CACHE_TTL = 5 * 60 * 1000;
+const doctorListCache = new Map<string, { data: DoctorSummary[]; ts: number }>();
+const doctorDetailCache = new Map<string, { data: DoctorReviewDetail[]; ts: number }>();
+
 export default function DoctorTab() {
   const [query, setQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
@@ -61,9 +68,17 @@ export default function DoctorTab() {
   const [detailReviews, setDetailReviews] = useState<DoctorReviewDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchDoctors = useCallback(async (q: string, dept: string) => {
-    setIsLoading(true);
+  const fetchDoctors = useCallback(async (q: string, dept: string, skipCache = false) => {
     setHasSearched(true);
+    const cacheKey = `${q}::${dept}`;
+    if (!skipCache) {
+      const cached = doctorListCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        setDoctors(cached.data);
+        return;
+      }
+    }
+    setIsLoading(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
@@ -72,7 +87,9 @@ export default function DoctorTab() {
 
       const res = await fetch(`/api/doctor-reviews?${params.toString()}`);
       const data = await res.json();
-      setDoctors(data.doctors || []);
+      const result = data.doctors || [];
+      setDoctors(result);
+      doctorListCache.set(cacheKey, { data: result, ts: Date.now() });
     } catch {
       setDoctors([]);
     } finally {
@@ -104,6 +121,12 @@ export default function DoctorTab() {
       return;
     }
     setExpandedKey(key);
+    // 캐시 히트 → 즉시 표시
+    const cached = doctorDetailCache.get(key);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setDetailReviews(cached.data);
+      return;
+    }
     setDetailLoading(true);
     try {
       const params = new URLSearchParams({
@@ -112,7 +135,9 @@ export default function DoctorTab() {
       });
       const res = await fetch(`/api/doctor-reviews?${params.toString()}`);
       const data = await res.json();
-      setDetailReviews(data.reviews || []);
+      const reviews = data.reviews || [];
+      setDetailReviews(reviews);
+      doctorDetailCache.set(key, { data: reviews, ts: Date.now() });
     } catch {
       setDetailReviews([]);
     } finally {
@@ -120,10 +145,16 @@ export default function DoctorTab() {
     }
   };
 
+  const handleRefresh = () => {
+    doctorDetailCache.clear();
+    setExpandedKey(null);
+    fetchDoctors(query, selectedDept, true);
+  };
+
   return (
     <div className="container mx-auto px-4 pt-3">
       <div className="mx-auto max-w-2xl">
-        {/* 검색 */}
+        {/* 검색 + 새로고침 */}
         <div className="mb-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -134,9 +165,21 @@ export default function DoctorTab() {
               className="pl-9"
             />
           </div>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            병원 상세 페이지에서 의사 리뷰를 남기면 여기에 모여요
-          </p>
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              병원 상세 페이지에서 의사 리뷰를 남기면 여기에 모여요
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} />
+              새로고침
+            </Button>
+          </div>
         </div>
 
         {/* 진료과 필터 */}
