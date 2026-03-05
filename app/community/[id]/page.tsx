@@ -28,6 +28,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
 import { Flag } from "lucide-react";
+import { AdBanner } from "@/components/ad-banner";
 interface Post {
   id: string;
   school_code: string;
@@ -433,6 +434,8 @@ export default function PostDetailPage({
                 </div>
               </CardContent>
             </Card>
+
+            <AdBanner />
 
             {/* 댓글 섹션 */}
             <div>

@@ -14,6 +14,7 @@ import {
   ImageIcon, ArrowUpDown,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { AdBanner } from "@/components/ad-banner"
 
 interface Post {
   id: string
@@ -344,6 +345,8 @@ export default function CommunityPage() {
                 )}
               </>
             )}
+
+          <AdBanner className="mt-4" />
 
           </div>
 

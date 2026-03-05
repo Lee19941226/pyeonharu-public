@@ -10,6 +10,7 @@ import { BackButtonHandler } from "@/components/back-button-handler";
 import { StatusBarInit } from "@/components/status-bar-init";
 import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
 import { PageTrackerProvider } from "@/components/providers/page-tracker-provider";
+import { AdBanner } from "@/components/ad-banner";
 
 export const metadata: Metadata = {
   title: {
@@ -109,6 +110,7 @@ export default function RootLayout({
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
           crossOrigin="anonymous"
         />
+        <AdBanner className="mx-auto max-w-5xl" />
         <AuthProvider>
           <BackButtonHandler />
           <StatusBarInit />
@@ -122,6 +124,7 @@ export default function RootLayout({
           </HapticProvider>
         </AuthProvider>
         <Analytics />
+        <AdBanner className="mx-auto max-w-5xl" />
         <Script
           id="sw-register"
           strategy="afterInteractive"
