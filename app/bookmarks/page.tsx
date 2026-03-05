@@ -23,20 +23,21 @@ import {
 
 interface HospitalBookmark {
   id: string;
-  hospital_id: string;
-  hospital_name: string;
-  hospital_address: string;
-  hospital_phone: string;
-  created_at: string;
+  name: string;
+  address: string;
+  phone: string;
+  category: string;
+  bookmarkId: string;
+  createdAt: string;
 }
 
 interface PharmacyBookmark {
   id: string;
-  pharmacy_id: string;
-  pharmacy_name: string;
-  pharmacy_address: string;
-  pharmacy_phone: string;
-  created_at: string;
+  name: string;
+  address: string;
+  phone: string;
+  bookmarkId: string;
+  createdAt: string;
 }
 
 interface FoodBookmark {
@@ -129,11 +130,11 @@ export default function BookmarksPage() {
         if (res.ok) {
           if (type === "hospital") {
             setHospitals((prev) =>
-              prev.filter((h) => h.hospital_id !== itemId),
+              prev.filter((h) => h.id !== itemId),
             );
           } else {
             setPharmacies((prev) =>
-              prev.filter((p) => p.pharmacy_id !== itemId),
+              prev.filter((p) => p.id !== itemId),
             );
           }
         }
@@ -268,16 +269,16 @@ export default function BookmarksPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <h3 className="font-semibold">
-                              {item.hospital_name}
+                              {item.name}
                             </h3>
-                            {item.hospital_address && (
+                            {item.address && (
                               <p className="mt-1 text-sm text-muted-foreground">
-                                {item.hospital_address}
+                                {item.address}
                               </p>
                             )}
-                            {item.hospital_phone && (
+                            {item.phone && (
                               <p className="mt-1 text-sm text-muted-foreground">
-                                {item.hospital_phone}
+                                {item.phone}
                               </p>
                             )}
                           </div>
@@ -285,7 +286,7 @@ export default function BookmarksPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() =>
-                              handleRemove("hospital", item.hospital_id)
+                              handleRemove("hospital", item.id)
                             }
                           >
                             <Trash2 className="h-4 w-4" />
@@ -303,16 +304,16 @@ export default function BookmarksPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <h3 className="font-semibold">
-                              {item.pharmacy_name}
+                              {item.name}
                             </h3>
-                            {item.pharmacy_address && (
+                            {item.address && (
                               <p className="mt-1 text-sm text-muted-foreground">
-                                {item.pharmacy_address}
+                                {item.address}
                               </p>
                             )}
-                            {item.pharmacy_phone && (
+                            {item.phone && (
                               <p className="mt-1 text-sm text-muted-foreground">
-                                {item.pharmacy_phone}
+                                {item.phone}
                               </p>
                             )}
                           </div>
@@ -320,7 +321,7 @@ export default function BookmarksPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() =>
-                              handleRemove("pharmacy", item.pharmacy_id)
+                              handleRemove("pharmacy", item.id)
                             }
                           >
                             <Trash2 className="h-4 w-4" />
