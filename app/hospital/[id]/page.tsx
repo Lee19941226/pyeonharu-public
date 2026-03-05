@@ -9,6 +9,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookmarkButton } from "@/components/medical/bookmark-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   MapPin,
@@ -22,7 +37,10 @@ import {
   MessageSquare,
   Trash2,
   Edit3,
+  UserRound,
+  Flag,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // ─── restaurant_key 생성 (기존 로직 재활용) ───
 function makeHospitalKey(name: string, address: string): string {
@@ -81,11 +99,36 @@ function StarRating({
   );
 }
 
+const REPORT_REASONS = [
+  "스팸/광고",
+  "욕설/비방",
+  "허위정보",
+  "개인정보 노출",
+  "기타",
+];
+
+const DEPARTMENTS = [
+  "내과", "외과", "소아청소년과", "산부인과", "정형외과",
+  "피부과", "이비인후과", "안과", "비뇨의학과", "신경과",
+  "정신건강의학과", "재활의학과", "가정의학과", "치과", "한의원", "기타",
+];
+
 // ─── 리뷰 타입 ───
 interface Review {
   id: string;
   rating: number;
   memo: string;
+  isMine: boolean;
+  createdAt: string;
+}
+
+interface DoctorReview {
+  id: string;
+  doctorName: string;
+  department: string;
+  diseaseName: string;
+  rating: number;
+  content: string;
   isMine: boolean;
   createdAt: string;
 }
@@ -116,7 +159,115 @@ function HospitalDetailContent() {
   const [newMemo, setNewMemo] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
 
+  // 의사 리뷰 상태
+  const [doctorReviews, setDoctorReviews] = useState<DoctorReview[]>([]);
+  const [showDoctorForm, setShowDoctorForm] = useState(false);
+  const [drDoctorName, setDrDoctorName] = useState("");
+  const [drDepartment, setDrDepartment] = useState("");
+  const [drDiseaseName, setDrDiseaseName] = useState("");
+  const [drRating, setDrRating] = useState(0);
+  const [drContent, setDrContent] = useState("");
+  const [drLoading, setDrLoading] = useState(false);
+  // 신고
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportTargetId, setReportTargetId] = useState("");
+  const [reportReason, setReportReason] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+
   const hospitalKey = name && address ? makeHospitalKey(name, address) : "";
+
+  // 의사 리뷰 조회
+  const fetchDoctorReviews = useCallback(async () => {
+    if (!name) return;
+    try {
+      const res = await fetch(
+        `/api/doctor-reviews?hospital=${encodeURIComponent(name)}`,
+      );
+      const data = await res.json();
+      if (data.reviews) setDoctorReviews(data.reviews);
+    } catch {
+      // 무시
+    }
+  }, [name]);
+
+  useEffect(() => {
+    fetchDoctorReviews();
+  }, [fetchDoctorReviews]);
+
+  // 의사 리뷰 작성
+  const handleDoctorReviewSubmit = async () => {
+    if (!drDoctorName.trim()) { toast.error("의사명을 입력해주세요."); return; }
+    if (!drDepartment) { toast.error("진료과를 선택해주세요."); return; }
+    if (!drDiseaseName.trim()) { toast.error("병명을 입력해주세요."); return; }
+    if (drRating === 0) { toast.error("별점을 선택해주세요."); return; }
+
+    setDrLoading(true);
+    try {
+      const res = await fetch("/api/doctor-reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hospitalName: name.trim(),
+          hospitalAddress: address.trim(),
+          doctorName: drDoctorName.trim(),
+          department: drDepartment,
+          diseaseName: drDiseaseName.trim(),
+          rating: drRating,
+          content: drContent.trim(),
+        }),
+      });
+      if (res.status === 401) { toast.error("로그인이 필요합니다."); return; }
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "저장에 실패했습니다."); return; }
+
+      toast.success("의사 리뷰가 등록되었습니다.");
+      setShowDoctorForm(false);
+      setDrDoctorName(""); setDrDepartment(""); setDrDiseaseName("");
+      setDrRating(0); setDrContent("");
+      fetchDoctorReviews();
+    } catch {
+      toast.error("저장에 실패했습니다.");
+    } finally {
+      setDrLoading(false);
+    }
+  };
+
+  // 의사 리뷰 삭제
+  const handleDoctorReviewDelete = async (reviewId: string) => {
+    if (!confirm("의사 리뷰를 삭제하시겠어요?")) return;
+    try {
+      const res = await fetch(`/api/doctor-reviews?id=${reviewId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("삭제되었습니다.");
+        fetchDoctorReviews();
+      }
+    } catch {
+      toast.error("삭제에 실패했습니다.");
+    }
+  };
+
+  // 신고
+  const handleReport = async () => {
+    if (!reportReason) { toast.error("신고 사유를 선택해주세요."); return; }
+    setReportLoading(true);
+    try {
+      const res = await fetch(`/api/doctor-reviews/${reportTargetId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reportReason }),
+      });
+      if (res.status === 401) toast.error("로그인이 필요합니다.");
+      else if (res.status === 409) toast.error("이미 신고한 리뷰입니다.");
+      else if (!res.ok) toast.error("신고 처리에 실패했습니다.");
+      else toast.success("신고가 접수되었습니다.");
+      setReportDialogOpen(false);
+      setReportReason("");
+    } catch {
+      toast.error("신고 처리에 실패했습니다.");
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   // 리뷰 조회
   const fetchReviews = useCallback(async () => {
@@ -538,6 +689,181 @@ function HospitalDetailContent() {
               </CardContent>
             </Card>
 
+            {/* 의사 리뷰 섹션 */}
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <UserRound className="h-5 w-5" />
+                    의사 리뷰 ({doctorReviews.length})
+                  </CardTitle>
+                  {!showDoctorForm && (
+                    <Button
+                      size="sm"
+                      onClick={() => setShowDoctorForm(true)}
+                    >
+                      <Edit3 className="mr-1 h-3.5 w-3.5" />
+                      의사 리뷰 작성
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* 의사 리뷰 작성 폼 */}
+                {showDoctorForm && (
+                  <div className="mb-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <p className="mb-3 text-sm font-medium">
+                      어떤 의사에게 진료받았나요?
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs">의사명</Label>
+                        <Input
+                          placeholder="홍길동"
+                          value={drDoctorName}
+                          onChange={(e) => setDrDoctorName(e.target.value)}
+                          maxLength={50}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">진료과</Label>
+                        <Select value={drDepartment} onValueChange={setDrDepartment}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="진료과 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DEPARTMENTS.map((d) => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">병명 (의사가 알려준 진단명)</Label>
+                        <Input
+                          placeholder="예: 소아 요로감염, 위염"
+                          value={drDiseaseName}
+                          onChange={(e) => setDrDiseaseName(e.target.value)}
+                          maxLength={100}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">평점</Label>
+                        <StarRating
+                          rating={drRating}
+                          size="md"
+                          interactive
+                          onChange={setDrRating}
+                        />
+                        {drRating > 0 && (
+                          <span className="text-sm font-medium text-amber-600">
+                            {drRating}점
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <Label className="text-xs">한줄 후기 (선택)</Label>
+                        <textarea
+                          value={drContent}
+                          onChange={(e) => setDrContent(e.target.value.slice(0, 500))}
+                          placeholder="진료 경험을 공유해주세요"
+                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          rows={3}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {drContent.length}/500
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowDoctorForm(false)}
+                      >
+                        취소
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleDoctorReviewSubmit}
+                        disabled={drLoading}
+                      >
+                        {drLoading ? "저장 중..." : "등록"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 의사 리뷰 목록 */}
+                {doctorReviews.length === 0 && !showDoctorForm ? (
+                  <div className="py-8 text-center">
+                    <UserRound className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">
+                      아직 의사 리뷰가 없습니다
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      진료받은 의사 선생님에 대한 후기를 남겨보세요!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {doctorReviews.map((dr) => (
+                      <div
+                        key={dr.id}
+                        className={`rounded-lg border p-3 ${dr.isMine ? "border-primary/30 bg-primary/5" : "border-border"}`}
+                      >
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">
+                              {dr.doctorName}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {dr.department}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {dr.diseaseName}
+                            </Badge>
+                            {dr.isMine && (
+                              <Badge variant="secondary" className="text-xs border-primary/30">
+                                내 리뷰
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <StarRating rating={dr.rating} />
+                            {dr.isMine ? (
+                              <button
+                                className="text-destructive hover:text-destructive/80"
+                                onClick={() => handleDoctorReviewDelete(dr.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setReportTargetId(dr.id);
+                                  setReportDialogOpen(true);
+                                }}
+                              >
+                                <Flag className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {dr.content && (
+                          <p className="text-sm text-foreground/80">{dr.content}</p>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(dr.createdAt).toLocaleDateString("ko-KR")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <p className="text-center text-sm text-muted-foreground">
               정보가 정확하지 않을 수 있습니다. 방문 전 전화로 확인해주세요.
             </p>
@@ -545,6 +871,36 @@ function HospitalDetailContent() {
         </div>
       </main>
       <MobileNav />
+
+      {/* 신고 다이얼로그 */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>리뷰 신고</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Select value={reportReason} onValueChange={setReportReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="신고 사유 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {REPORT_REASONS.map((reason) => (
+                  <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              className="w-full"
+              variant="destructive"
+              onClick={handleReport}
+              disabled={reportLoading || !reportReason}
+            >
+              <Flag className="mr-2 h-4 w-4" />
+              신고하기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

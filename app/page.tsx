@@ -14,6 +14,7 @@ import {
   Loader2,
   Pin,
   Check,
+  UserRound,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -29,6 +30,7 @@ import DietTab from "@/components/tabs/DietTab";
 import SymptomTab from "@/components/tabs/SymptomTab";
 import HospitalTab from "@/components/tabs/HospitalTab";
 import MedicineTab from "@/components/tabs/MedicineTab";
+import DoctorTab from "@/components/tabs/DoctorTab";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 import MealRecommend from "@/components/meal-recommend";
 import { toast } from "sonner";
@@ -36,7 +38,7 @@ import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
-type SickSubTab = "symptom" | "hospital" | "medicine";
+type SickSubTab = "symptom" | "hospital" | "medicine" | "doctor";
 
 // ── 첫 화면 설정 키 ──
 const HOME_TAB_KEY = "pyeonharu_home_tab";
@@ -49,6 +51,7 @@ const TAB_LABELS: Record<string, string> = {
   "sick:symptom": "아파요 > 증상",
   "sick:hospital": "아파요 > 병원",
   "sick:medicine": "아파요 > 약",
+  "sick:doctor": "아파요 > 의사",
 };
 
 function TabButton({
@@ -131,7 +134,7 @@ export default function HomePage() {
           setMealSubTab(sub as MealSubTab);
         } else if (
           main === "sick" &&
-          ["symptom", "hospital", "medicine"].includes(sub)
+          ["symptom", "hospital", "medicine", "doctor"].includes(sub)
         ) {
           setMainTab("sick");
           setSickSubTab(sub as SickSubTab);
@@ -371,6 +374,12 @@ export default function HomePage() {
                   label="병원"
                 />
                 <SubTabButton
+                  active={sickSubTab === "doctor"}
+                  onClick={() => setSickSubTab("doctor")}
+                  icon={UserRound}
+                  label="의사"
+                />
+                <SubTabButton
                   active={sickSubTab === "medicine"}
                   onClick={() => setSickSubTab("medicine")}
                   icon={Pill}
@@ -410,6 +419,7 @@ export default function HomePage() {
         </div>
         {activeTab === "symptom" && <SymptomTab />}
         {activeTab === "hospital" && <HospitalTab />}
+        {activeTab === "doctor" && <DoctorTab />}
       </main>
 
       {/* ═══ 첫 화면 설정 고정 버튼 (로딩 완료 후 표시) ═══ */}
