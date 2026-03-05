@@ -30,6 +30,9 @@ import {
   Download,
   Share2,
   Plus,
+  School,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 
 function getTimePeriod(dateStr: string) {
@@ -205,6 +208,33 @@ interface DietEntry {
   image_url: string | null;
   recorded_at: string;
 }
+
+interface UserSchool {
+  id: string;
+  school_code: string;
+  office_code: string;
+  school_name: string;
+  school_address: string;
+  is_primary: boolean;
+}
+
+interface MealMenuItem {
+  name: string;
+  allergenNumbers: string[];
+  allergenNames: string[];
+  status?: "safe" | "danger" | "caution" | "unknown";
+  matchedAllergens?: string[];
+  crossAllergens?: string[];
+}
+
+interface MealData {
+  mealType: string;
+  mealTypeName: string;
+  menu: MealMenuItem[];
+  calInfo: string;
+  ntrInfo: string;
+  originInfo: string;
+}
 interface DailyStat {
   date: string;
   totalCal: number;
@@ -275,6 +305,17 @@ export default function DietTab() {
   // ✅ 새로 추가
   const [showRecordSheet, setShowRecordSheet] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+
+  // ✅ 학교 급식 자동 입력 상태
+  const [showSchoolSelect, setShowSchoolSelect] = useState(false);
+  const [showMealSelect, setShowMealSelect] = useState(false);
+  const [userSchools, setUserSchools] = useState<UserSchool[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<UserSchool | null>(null);
+  const [schoolMeals, setSchoolMeals] = useState<MealData[]>([]);
+  const [isLoadingSchools, setIsLoadingSchools] = useState(false);
+  const [isLoadingMeals, setIsLoadingMeals] = useState(false);
+  const [selectedMealItems, setSelectedMealItems] = useState<Set<string>>(new Set());
+  const [isAddingMeals, setIsAddingMeals] = useState(false);
 
   // 카카오 SDK는 공유 시점에 ensureKakaoInit()로 초기화
 
@@ -506,6 +547,141 @@ export default function DietTab() {
     } catch {
       window.open(imageUrl, "_blank");
     }
+  };
+
+  // ✅ 학교 목록 불러오기
+  const loadUserSchools = async () => {
+    setIsLoadingSchools(true);
+    try {
+      const res = await fetch("/api/school/register");
+      const data = await res.json();
+      if (data.schools) {
+        setUserSchools(data.schools);
+      }
+    } catch {
+      toast.error("학교 목록을 불러오지 못했습니다");
+    } finally {
+      setIsLoadingSchools(false);
+    }
+  };
+
+  // ✅ 학교 급식 불러오기
+  const loadSchoolMeals = async (school: UserSchool) => {
+    setIsLoadingMeals(true);
+    setSchoolMeals([]);
+    try {
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const res = await fetch(
+        `/api/school/meals?schoolCode=${school.school_code}&officeCode=${school.office_code}&date=${today}`
+      );
+      const data = await res.json();
+      if (data.meals && data.meals.length > 0) {
+        setSchoolMeals(data.meals);
+      } else {
+        toast.info("오늘 급식 정보가 없습니다");
+      }
+    } catch {
+      toast.error("급식 정보를 불러오지 못했습니다");
+    } finally {
+      setIsLoadingMeals(false);
+    }
+  };
+
+  // ✅ 학교 선택 핸들러
+  const handleSchoolSelect = async (school: UserSchool) => {
+    setSelectedSchool(school);
+    setShowSchoolSelect(false);
+    setShowMealSelect(true);
+    await loadSchoolMeals(school);
+  };
+
+  // ✅ 급식 메뉴 아이템 토글
+  const toggleMealItem = (menuName: string) => {
+    setSelectedMealItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(menuName)) {
+        newSet.delete(menuName);
+      } else {
+        newSet.add(menuName);
+      }
+      return newSet;
+    });
+  };
+
+  // ✅ 선택한 급식 메뉴를 식단에 추가
+  const handleAddSelectedMeals = async () => {
+    if (selectedMealItems.size === 0) {
+      toast.error("추가할 메뉴를 선택해주세요");
+      return;
+    }
+
+    setIsAddingMeals(true);
+    try {
+      // 선택된 메뉴들의 칼로리 계산 (급식 전체 칼로리를 메뉴 수로 나누어 추정)
+      let totalMealCal = 0;
+      let totalMenuCount = 0;
+
+      for (const meal of schoolMeals) {
+        const calMatch = meal.calInfo.match(/(\d+(?:\.\d+)?)/);
+        if (calMatch) {
+          totalMealCal += parseFloat(calMatch[1]);
+        }
+        totalMenuCount += meal.menu.length;
+      }
+
+      const avgCalPerItem = totalMenuCount > 0 ? Math.round(totalMealCal / totalMenuCount) : 100;
+
+      // 선택된 각 메뉴를 식단에 추가
+      const menuNames = Array.from(selectedMealItems);
+      let successCount = 0;
+
+      for (const menuName of menuNames) {
+        try {
+          const res = await fetch("/api/diet/entries", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              food_name: menuName,
+              estimated_cal: avgCalPerItem,
+            }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            successCount++;
+          }
+        } catch {
+          // 개별 실패는 무시하고 계속 진행
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`🍱 급식 ${successCount}개 메뉴 추가 완료!`);
+        loadEntries();
+        loadDashboard();
+        closeMealSelect();
+      } else {
+        toast.error("메뉴 추가에 실패했습니다");
+      }
+    } catch {
+      toast.error("급식 추가 중 오류가 발생했습니다");
+    } finally {
+      setIsAddingMeals(false);
+    }
+  };
+
+  // ✅ 급식 모달 닫기
+  const closeMealSelect = () => {
+    setShowMealSelect(false);
+    setSelectedSchool(null);
+    setSchoolMeals([]);
+    setSelectedMealItems(new Set());
+  };
+
+  // ✅ 학교 급식에서 선택 버튼 클릭
+  const handleOpenSchoolMeal = async () => {
+    setShowRecordSheet(false);
+    setShowSchoolSelect(true);
+    await loadUserSchools();
   };
 
   const closeManualInput = () => {
@@ -1454,6 +1630,20 @@ export default function DietTab() {
                   </p>
                 </div>
               </button>
+              <button
+                onClick={handleOpenSchoolMeal}
+                className="flex w-full items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors border-green-200 bg-green-50/50"
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-green-500/10">
+                  <School className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-green-700">학교 급식에서 선택</p>
+                  <p className="text-xs text-muted-foreground">
+                    등록된 학교의 오늘 급식 메뉴 불러오기
+                  </p>
+                </div>
+              </button>
             </div>
             <button
               onClick={() => setShowRecordSheet(false)}
@@ -1711,6 +1901,244 @@ export default function DietTab() {
                 1일 1회 표시
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ 학교 선택 모달 */}
+      {showSchoolSelect && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50"
+          onClick={() => setShowSchoolSelect(false)}
+        >
+          <div
+            className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3"
+            style={{
+              paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
+            <div className="text-center">
+              <h3 className="text-base font-bold">🏫 학교 선택</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                급식을 불러올 학교를 선택하세요
+              </p>
+            </div>
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {isLoadingSchools ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : userSchools.length === 0 ? (
+                <div className="text-center py-8">
+                  <School className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">등록된 학교가 없습니다</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    학교 페이지에서 학교를 먼저 등록해주세요
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => {
+                      setShowSchoolSelect(false);
+                      router.push("/school");
+                    }}
+                  >
+                    학교 등록하러 가기
+                  </Button>
+                </div>
+              ) : (
+                userSchools.map((school) => (
+                  <button
+                    key={school.id}
+                    onClick={() => handleSchoolSelect(school)}
+                    className="flex w-full items-center gap-3 rounded-xl border p-4 hover:bg-muted/50 active:bg-muted transition-colors text-left"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                      <School className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold truncate">{school.school_name}</p>
+                        {school.is_primary && (
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-green-100 text-green-700">
+                            메인
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {school.school_address || "주소 정보 없음"}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              )}
+            </div>
+            <button
+              onClick={() => setShowSchoolSelect(false)}
+              className="flex w-full items-center justify-center rounded-xl border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ 급식 메뉴 선택 모달 */}
+      {showMealSelect && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={closeMealSelect}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-background p-5 space-y-4 max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">🍱 오늘의 급식</h3>
+                <p className="text-xs text-muted-foreground">
+                  {selectedSchool?.school_name} · {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
+                </p>
+              </div>
+              <button
+                onClick={closeMealSelect}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 -mx-1 px-1">
+              {isLoadingMeals ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                  <p className="text-sm text-muted-foreground">급식 정보 불러오는 중...</p>
+                </div>
+              ) : schoolMeals.length === 0 ? (
+                <div className="text-center py-12">
+                  <Utensils className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">오늘 급식 정보가 없습니다</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    주말이나 공휴일에는 급식이 없을 수 있어요
+                  </p>
+                </div>
+              ) : (
+                schoolMeals.map((meal) => (
+                  <div key={meal.mealType} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="secondary"
+                        className={`text-xs ${
+                          meal.mealTypeName === "조식"
+                            ? "bg-amber-100 text-amber-700"
+                            : meal.mealTypeName === "중식"
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {meal.mealTypeName}
+                      </Badge>
+                      {meal.calInfo && (
+                        <span className="text-xs text-muted-foreground">{meal.calInfo}</span>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {meal.menu.map((item, idx) => {
+                        const isSelected = selectedMealItems.has(item.name);
+                        const isDanger = item.status === "danger";
+                        const isCaution = item.status === "caution";
+                        return (
+                          <button
+                            key={`${meal.mealType}-${idx}`}
+                            onClick={() => toggleMealItem(item.name)}
+                            className={`flex w-full items-center gap-2 rounded-lg border p-2.5 transition-all text-left ${
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : isDanger
+                                  ? "border-red-200 bg-red-50/50"
+                                  : isCaution
+                                    ? "border-yellow-200 bg-yellow-50/50"
+                                    : "hover:bg-muted/50"
+                            }`}
+                          >
+                            <div
+                              className={`flex h-5 w-5 items-center justify-center rounded border ${
+                                isSelected
+                                  ? "bg-primary border-primary text-white"
+                                  : "border-muted-foreground/30"
+                              }`}
+                            >
+                              {isSelected && <Check className="h-3 w-3" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm truncate">{item.name}</span>
+                                {isDanger && (
+                                  <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                                )}
+                                {isCaution && (
+                                  <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />
+                                )}
+                              </div>
+                              {item.allergenNames.length > 0 && (
+                                <p className="text-[10px] text-muted-foreground truncate">
+                                  {item.allergenNames.join(", ")}
+                                </p>
+                              )}
+                            </div>
+                            {isDanger && (
+                              <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
+                                알레르기
+                              </Badge>
+                            )}
+                            {isCaution && (
+                              <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-yellow-100 text-yellow-700">
+                                주의
+                              </Badge>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {schoolMeals.length > 0 && (
+              <div className="flex gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={closeMealSelect}
+                >
+                  취소
+                </Button>
+                <Button
+                  className="flex-[2] gap-1"
+                  disabled={selectedMealItems.size === 0 || isAddingMeals}
+                  onClick={handleAddSelectedMeals}
+                >
+                  {isAddingMeals ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      추가 중...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      {selectedMealItems.size > 0
+                        ? `${selectedMealItems.size}개 메뉴 추가`
+                        : "메뉴 선택"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}

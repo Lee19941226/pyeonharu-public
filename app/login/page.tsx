@@ -49,6 +49,13 @@ function LoginContent() {
       return;
     }
 
+    // 로그인 액션 로깅 (fire-and-forget)
+    fetch("/api/auth/log-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "email" }),
+    }).catch(() => {});
+
     const redirectTo = searchParams?.get("redirect") || "/";
     const isInternalPath =
       redirectTo.startsWith("/") &&

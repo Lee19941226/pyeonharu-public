@@ -60,16 +60,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=auth_failed`);
   }
 
-  // 신규 가입 감지: created_at이 60초 이내이면 신규 가입자
+  // 신규 가입 vs 기존 로그인 감지
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
+    const provider = user.app_metadata?.provider || "unknown";
     const createdAt = new Date(user.created_at).getTime();
     const now = Date.now();
     if (now - createdAt < 60_000) {
-      const provider = user.app_metadata?.provider || "unknown";
+      // 신규 가입 (created_at이 60초 이내)
       logAction({
         userId: user.id,
         actionType: "signup",
+        metadata: { provider, email: user.email },
+      });
+    } else {
+      // 기존 사용자 로그인
+      logAction({
+        userId: user.id,
+        actionType: "login",
         metadata: { provider, email: user.email },
       });
     }

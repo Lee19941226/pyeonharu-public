@@ -317,7 +317,14 @@ export default function MyPage() {
         }
 
         if (authUser) {
-          const name = authUser.user_metadata?.name || "사용자";
+          // profiles 테이블에서 nickname을 우선 사용 (OAuth 재로그인 시 덮어씌워지는 문제 방지)
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("nickname")
+            .eq("id", authUser.id)
+            .single();
+
+          const name = profile?.nickname || authUser.user_metadata?.name || "사용자";
           setUser({ email: authUser.email || "", name });
           setEditName(name);
         }
@@ -347,6 +354,8 @@ export default function MyPage() {
       const data = await res.json();
       if (data.success) {
         setUser((prev) => (prev ? { ...prev, name: editName.trim() } : null));
+        // 헤더 등 다른 컴포넌트에 닉네임 변경 알림
+        window.dispatchEvent(new CustomEvent("profile-updated", { detail: { nickname: editName.trim() } }));
         toast.success("프로필이 저장되었습니다");
       } else {
         toast.error(data.error || "저장 실패");

@@ -7,6 +7,7 @@ const supabaseAdmin = createClient(
 );
 
 export type ActionType =
+  | "login"
   | "signup"
   | "page_view"
   | "food_search"
