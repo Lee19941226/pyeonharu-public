@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Search,
   Star,
@@ -127,28 +126,36 @@ export default function DoctorTab() {
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="rounded-lg border">
+            {/* 테이블 헤더 */}
+            <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+              <span className="w-24 shrink-0">의사명</span>
+              <span className="w-20 shrink-0">진료과</span>
+              <span className="flex-1 min-w-0">소속 병원</span>
+              <span className="w-16 shrink-0 text-center">평점</span>
+              <span className="w-12 shrink-0 text-center">리뷰</span>
+            </div>
+            {/* 테이블 바디 */}
             {doctors.map((doctor, idx) => (
-              <Card key={`${doctor.doctorName}-${doctor.hospitalName}-${idx}`}>
-                <CardContent className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <UserRound className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <h3 className="text-sm font-semibold truncate">{doctor.doctorName}</h3>
-                    <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">{doctor.department}</Badge>
-                    <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />
-                    <span className="text-xs font-semibold shrink-0">{doctor.avgRating}</span>
-                    <span className="text-[10px] text-muted-foreground shrink-0">({doctor.reviewCount})</span>
+              <div key={`${doctor.doctorName}-${doctor.hospitalName}-${idx}`} className="border-b last:border-b-0 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-24 shrink-0 text-sm font-semibold truncate">{doctor.doctorName}</span>
+                  <Badge variant="secondary" className="w-20 shrink-0 justify-center text-[10px] px-1.5 py-0">{doctor.department}</Badge>
+                  <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
+                  <div className="w-16 shrink-0 flex items-center justify-center gap-0.5">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                    <span className="text-xs font-semibold">{doctor.avgRating}</span>
                   </div>
-                  {doctor.diseases.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1 pl-6">
-                      {doctor.diseases.map((d) => (
-                        <Badge key={d} variant="outline" className="text-[10px] px-1.5 py-0">{d}</Badge>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  <span className="w-12 shrink-0 text-xs text-muted-foreground text-center">{doctor.reviewCount}개</span>
+                </div>
+                {doctor.diseases.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {doctor.diseases.map((d) => (
+                      <Badge key={d} variant="outline" className="text-[10px] px-1.5 py-0">{d}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
