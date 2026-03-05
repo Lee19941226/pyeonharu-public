@@ -188,7 +188,7 @@ export default function FamilyPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto max-w-2xl px-4 py-6">
           {/* 헤더 */}
           <div className="mb-6 flex items-center justify-between">
