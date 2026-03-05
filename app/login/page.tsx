@@ -31,6 +31,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const reason = searchParams?.get("reason");
   const [showScanLimitBanner, setShowScanLimitBanner] = useState(false);
+  const [showDuplicateLoginBanner, setShowDuplicateLoginBanner] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,8 +50,8 @@ function LoginContent() {
       return;
     }
 
-    // 로그인 액션 로깅 (fire-and-forget)
-    fetch("/api/auth/log-login", {
+    // 세션 토큰 쿠키 설정을 위해 await
+    await fetch("/api/auth/log-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider: "email" }),
@@ -95,6 +96,12 @@ function LoginContent() {
     if (reason === "scan_limit") {
       setShowScanLimitBanner(true);
     }
+    if (reason === "duplicate_login") {
+      setShowDuplicateLoginBanner(true);
+      // 잔여 Supabase 쿠키 정리
+      const supabase = createClient();
+      supabase.auth.signOut();
+    }
   }, [reason]);
 
   return (
@@ -131,6 +138,25 @@ function LoginContent() {
                   <li>✓ 알레르기 프로필 관리</li>
                   <li>✓ 멀티 디바이스 동기화</li>
                 </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {/* 중복 로그인 배너 */}
+      {showDuplicateLoginBanner && (
+        <Card className="mb-6 border-red-500 bg-red-50">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 shrink-0 text-red-600" />
+              <div>
+                <h3 className="font-semibold text-red-900">
+                  다른 기기에서 로그인되어 자동 로그아웃되었습니다.
+                </h3>
+                <p className="mt-2 text-sm text-red-800">
+                  계정 보안을 위해 동시에 하나의 기기에서만 로그인할 수 있습니다.
+                  다시 로그인해주세요.
+                </p>
               </div>
             </div>
           </CardContent>

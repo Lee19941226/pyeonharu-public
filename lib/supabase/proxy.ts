@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { validateSession } from "@/lib/utils/session-manager";
 
 // ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
 const ipScanMap = new Map<string, number>();
@@ -60,6 +61,55 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // ==========================================
+  // 중복 로그인 검증 (세션 토큰 비교)
+  // ==========================================
+  const pathname = request.nextUrl.pathname;
+  const skipSessionCheck =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/api/auth/");
+
+  if (user && !skipSessionCheck) {
+    const sessionTokenCookie = request.cookies.get("session_token")?.value;
+
+    if (sessionTokenCookie) {
+      try {
+        const isValid = await validateSession(
+          supabase,
+          user.id,
+          sessionTokenCookie,
+        );
+
+        if (!isValid) {
+          const isApiRequest =
+            pathname.startsWith("/api/") ||
+            request.headers.get("accept")?.includes("application/json");
+
+          if (isApiRequest) {
+            const apiResponse = NextResponse.json(
+              { error: "duplicate_login" },
+              { status: 401 },
+            );
+            apiResponse.cookies.delete("session_token");
+            return apiResponse;
+          }
+
+          // 페이지 요청 → 로그인 페이지로 리다이렉트
+          const url = request.nextUrl.clone();
+          url.pathname = "/login";
+          url.searchParams.set("reason", "duplicate_login");
+          const redirectResponse = NextResponse.redirect(url);
+          redirectResponse.cookies.delete("session_token");
+          return redirectResponse;
+        }
+      } catch {
+        // DB 쿼리 실패 → fail-open (접근 허용)
+      }
+    }
+  }
 
   // ==========================================
   // 보호 경로 체크

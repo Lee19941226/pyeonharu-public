@@ -64,6 +64,13 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
         return;
       }
 
+      // 세션 토큰 쿠키 설정을 위해 await
+      await fetch("/api/auth/log-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "email" }),
+      }).catch(() => {});
+
       handleClose();
       onSuccess?.();
       router.refresh();
