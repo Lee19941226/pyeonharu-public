@@ -18,6 +18,7 @@ import {
   Share2,
   AlertCircle,
 } from "lucide-react"
+import { NaverMap } from "@/components/medical/naver-map"
 
 function PharmacyDetailContent() {
   const searchParams = useSearchParams()
@@ -77,8 +78,19 @@ function PharmacyDetailContent() {
             </div>
             <Card className="mb-6">
               <CardContent className="p-0">
-                <div className="relative h-72 w-full overflow-hidden rounded-t-lg bg-muted">
-                  <iframe src={`https://map.naver.com/v5/embed/search/${encodeURIComponent(name + " " + address)}`} className="h-full w-full border-0" loading="lazy" allowFullScreen />
+                <div className="relative h-56 w-full overflow-hidden rounded-t-lg">
+                  {lat && lng ? (
+                    <NaverMap
+                      center={{ lat: parseFloat(lat), lng: parseFloat(lng) }}
+                      zoom={16}
+                      markers={[{ id: "detail", lat: parseFloat(lat), lng: parseFloat(lng), label: name }]}
+                      height="100%"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-muted">
+                      <p className="text-sm text-muted-foreground">위치 정보가 없습니다</p>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4">
                   <div className="flex items-start gap-3">

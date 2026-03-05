@@ -7,10 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Search,
   Star,
-  MessageSquare,
   Loader2,
   UserRound,
-  Building2,
 } from "lucide-react";
 
 const QUICK_DEPARTMENTS = [
@@ -129,52 +127,26 @@ export default function DoctorTab() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {doctors.map((doctor, idx) => (
               <Card key={`${doctor.doctorName}-${doctor.hospitalName}-${idx}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <UserRound className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <h3 className="font-semibold truncate">
-                          {doctor.doctorName}
-                        </h3>
-                        <Badge variant="secondary" className="shrink-0 text-xs">
-                          {doctor.department}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1.5">
-                        <Building2 className="h-3.5 w-3.5" />
-                        <span className="truncate">{doctor.hospitalName}</span>
-                      </div>
-                      {doctor.diseases.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {doctor.diseases.map((d) => (
-                            <Badge
-                              key={d}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {d}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="ml-3 shrink-0 text-right">
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                        <span className="text-sm font-semibold">
-                          {doctor.avgRating}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MessageSquare className="h-3 w-3" />
-                        {doctor.reviewCount}
-                      </div>
-                    </div>
+                <CardContent className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <h3 className="text-sm font-semibold truncate">{doctor.doctorName}</h3>
+                    <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">{doctor.department}</Badge>
+                    <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                    <span className="text-xs font-semibold shrink-0">{doctor.avgRating}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">({doctor.reviewCount})</span>
                   </div>
+                  {doctor.diseases.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1 pl-6">
+                      {doctor.diseases.map((d) => (
+                        <Badge key={d} variant="outline" className="text-[10px] px-1.5 py-0">{d}</Badge>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
