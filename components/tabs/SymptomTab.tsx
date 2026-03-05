@@ -679,6 +679,20 @@ function ResultScreen({
 
         {/* C 추천 병원 카드 */}
         <div className="mb-6 space-y-3">
+          {hospitals.length === 0 && (
+            <Card>
+              <CardContent className="flex flex-col items-center py-8 text-center">
+                <MapPin className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                <p className="font-medium text-muted-foreground">주변 병원 정보를 찾지 못했어요</p>
+                <p className="mt-1 text-sm text-muted-foreground">위치 권한을 허용하거나 직접 검색해보세요</p>
+                <Button variant="outline" size="sm" className="mt-4" asChild>
+                  <a href={`/search?department=${encodeURIComponent(result.department)}`}>
+                    병원 직접 검색하기
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           {hospitals.map((h) => (
             <Card
               key={h.id}

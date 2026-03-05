@@ -7,12 +7,14 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Trash2, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { HistoryItem } from "@/types/food";
 
 export default function HistoryPage() {
   const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadHistory();
@@ -30,6 +32,7 @@ export default function HistoryPage() {
       );
       setHistory(sorted);
     }
+    setIsLoading(false);
   };
 
   // 전체 삭제
@@ -95,7 +98,24 @@ export default function HistoryPage() {
             </div>
 
             {/* 히스토리 목록 */}
-            {history.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                          <Skeleton className="h-3 w-1/4" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : history.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Clock className="mb-4 h-12 w-12 text-muted-foreground" />

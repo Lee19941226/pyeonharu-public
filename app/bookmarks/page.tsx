@@ -149,9 +149,27 @@ export default function BookmarksPage() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
-        <main className="flex flex-1 items-center justify-center">
-          <Skeleton className="h-8 w-32" />
+        <main className="flex-1 pb-20 md:pb-0">
+          <div className="container mx-auto px-4 py-6">
+            <div className="mx-auto max-w-2xl">
+              <div className="mb-4 flex items-center justify-between">
+                <Skeleton className="h-8 w-28" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <div className="mb-4 flex gap-2">
+                <Skeleton className="h-10 flex-1" />
+                <Skeleton className="h-10 flex-1" />
+                <Skeleton className="h-10 flex-1" />
+              </div>
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
+          </div>
         </main>
+        <MobileNav />
       </div>
     );
   }

@@ -91,6 +91,7 @@ export default function SchoolPage() {
 
     setIsSearching(true)
     setHasSearched(true)
+    setResults([])
     try {
       const res = await fetch(`/api/school/search?q=${encodeURIComponent(query)}`)
       const data = await res.json()

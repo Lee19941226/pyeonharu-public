@@ -7,6 +7,7 @@ import { PlaceList } from "@/components/medical/place-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Map, List, Loader2, RefreshCw, Search, MapPin } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 export type PlaceType = "hospital" | "pharmacy";
@@ -498,11 +499,20 @@ export default function HospitalTab() {
 
         {/* Loading State */}
         {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-muted-foreground">
-              주변 병원/약국을 검색하는 중...
-            </span>
+          <div className="mt-4 space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-lg border bg-card p-4">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="h-6 w-12 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
