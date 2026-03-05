@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { validateSession } from "@/lib/utils/session-manager";
 
 // ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
 const ipScanMap = new Map<string, number>();
@@ -77,11 +76,14 @@ export async function updateSession(request: NextRequest) {
 
     if (sessionTokenCookie) {
       try {
-        const isValid = await validateSession(
-          supabase,
-          user.id,
-          sessionTokenCookie,
-        );
+        const { data, error } = await supabase
+          .from("active_sessions")
+          .select("session_token")
+          .eq("user_id", user.id)
+          .single();
+
+        // 레코드 없음 or 쿼리 실패 → 안전 허용
+        const isValid = error || !data ? true : data.session_token === sessionTokenCookie;
 
         if (!isValid) {
           const isApiRequest =
