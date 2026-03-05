@@ -207,6 +207,9 @@ export async function POST(req: NextRequest) {
     ? maskProfanity(stripHtml(content)).slice(0, 500)
     : "";
 
+  // 같은 날짜 + 같은 병원 + 같은 의사 → upsert (하루 1건)
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD
+
   const { data, error } = await supabase
     .from("doctor_reviews")
     .upsert(
@@ -219,9 +222,10 @@ export async function POST(req: NextRequest) {
         disease_name: stripHtml(diseaseName).slice(0, 100),
         rating: Math.round(rating),
         content: cleanContent || null,
+        review_date: today,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,hospital_name,doctor_name" },
+      { onConflict: "user_id,hospital_name,doctor_name,review_date" },
     )
     .select("id, rating, doctor_name, disease_name")
     .single();

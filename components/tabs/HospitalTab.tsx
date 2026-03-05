@@ -480,8 +480,8 @@ export default function HospitalTab() {
 
             {/* List */}
             <div
-              className={`max-h-[60vh] overflow-auto ${
-                viewMode === "map" ? "hidden md:block" : ""
+              className={`overflow-auto ${
+                viewMode === "map" ? "hidden md:block md:max-h-[60vh]" : ""
               }`}
             >
               {error && filteredPlaces.length === 0 ? (
