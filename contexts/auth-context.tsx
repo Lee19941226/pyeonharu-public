@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -45,6 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // 중복 로그인 감지 시 한 번만 처리하기 위한 플래그
+  const duplicateLoginHandled = useRef(false)
+
   useEffect(() => {
     const initAuth = async () => {
       setIsLoading(true)
@@ -68,6 +71,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [refreshUser])
+
+  // 글로벌 fetch 인터셉터: duplicate_login 401 응답 감지
+  useEffect(() => {
+    const originalFetch = window.fetch
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args)
+
+      // /api/ 경로에 대한 401 응답만 검사
+      const url = typeof args[0] === "string" ? args[0] : args[0] instanceof Request ? args[0].url : ""
+      if (response.status === 401 && url.includes("/api/")) {
+        try {
+          const cloned = response.clone()
+          const body = await cloned.json()
+          if (body?.error === "duplicate_login" && !duplicateLoginHandled.current) {
+            duplicateLoginHandled.current = true
+            const supabase = createClient()
+            await supabase.auth.signOut()
+            setUser(null)
+            window.location.href = "/login?reason=duplicate_login"
+          }
+        } catch {
+          // JSON 파싱 실패 시 무시
+        }
+      }
+
+      return response
+    }
+
+    return () => {
+      window.fetch = originalFetch
+    }
+  }, [])
 
   const openLoginModal = useCallback(() => {
     setIsLoginModalOpen(true)
