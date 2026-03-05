@@ -161,6 +161,7 @@ export async function GET(
     response.cookies.set(`viewed_${id}`, "1", {
       maxAge: 60 * 60 * 24, // 24시간
       httpOnly: true,
+      secure: true,
       sameSite: "lax",
     });
   }
