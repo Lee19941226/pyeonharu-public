@@ -105,11 +105,7 @@ export default function RootLayout({
           strategy="afterInteractive"
           src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
         />
-        <Script
-          strategy="afterInteractive"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
-          crossOrigin="anonymous"
-        />
+        {/* AdSense 스크립트는 광고 컴포넌트(AdBanner)에서 직접 로드합니다 */}
         <AuthProvider>
           <BackButtonHandler />
           <StatusBarInit />

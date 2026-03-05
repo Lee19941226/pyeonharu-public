@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { shareToKakao } from "@/lib/utils/kakao-share";
 import { toast } from "sonner";
 
@@ -77,17 +78,26 @@ export function AdBanner({
   }
 
   return (
-    <div ref={containerRef} className={adState === "filled" ? "" : "hidden"}>
-      <ins
-        className={`adsbygoogle ${className}`}
-        style={{ display: "block" }}
-        data-ad-client="ca-pub-4884937144207124"
-        data-ad-slot="4131902108"
-        data-ad-format={format}
-        data-full-width-responsive={responsive ? "true" : "false"}
-        {...(isDev && { "data-adtest": "on" })}
+    <>
+      {/* AdSense 스크립트 - 광고 컴포넌트가 렌더링되는 페이지에서만 로드 */}
+      <Script
+        id="adsense-script"
+        strategy="afterInteractive"
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
+        crossOrigin="anonymous"
       />
-    </div>
+      <div ref={containerRef} className={adState === "filled" ? "" : "hidden"}>
+        <ins
+          className={`adsbygoogle ${className}`}
+          style={{ display: "block" }}
+          data-ad-client="ca-pub-4884937144207124"
+          data-ad-slot="4131902108"
+          data-ad-format={format}
+          data-full-width-responsive={responsive ? "true" : "false"}
+          {...(isDev && { "data-adtest": "on" })}
+        />
+      </div>
+    </>
   );
 }
 
