@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from "react"
 import Link from "next/link"
-import { Building2, Cross, MapPin, Phone, ChevronRight, ChevronDown, ExternalLink, Navigation } from "lucide-react"
+import { Building2, Cross, MapPin, Phone, ChevronRight, ChevronDown, ExternalLink, MapPinned } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,11 @@ interface PlaceListProps {
 export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListProps) {
   const selectedRef = useRef<HTMLDivElement>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+  }, [])
 
   // 선택된 카드로 스크롤
   useEffect(() => {
@@ -46,14 +51,14 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
     setExpandedId((prev) => (prev === placeId ? null : placeId))
   }
 
-  // 네이버 지도 길찾기 링크
-  const getNaverMapLink = (place: Place) => {
-    return `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}?c=${place.lng},${place.lat},15,0,0,0,dh`
+  // Tmap 앱 길찾기 딥링크 (모바일 전용)
+  const getTmapLink = (place: Place) => {
+    return `tmap://route?goalname=${encodeURIComponent(place.name)}&goalx=${place.lng}&goaly=${place.lat}`
   }
 
-  // 카카오맵 길찾기 링크
+  // 카카오맵 앱 길찾기 딥링크
   const getKakaoMapLink = (place: Place) => {
-    return `https://map.kakao.com/link/to/${encodeURIComponent(place.name)},${place.lat},${place.lng}`
+    return `kakaomap://route?ep=${place.lat},${place.lng}&by=CAR`
   }
 
   // 상세 페이지 링크 (쿼리스트링으로 데이터 전달)
@@ -168,17 +173,19 @@ export function PlaceList({ places, selectedPlace, onSelectPlace }: PlaceListPro
                         </Button>
                       )}
                       <Button variant="outline" size="sm" className="flex-1 gap-1 h-7 text-xs" asChild>
-                        <a href={getNaverMapLink(place)} target="_blank" rel="noopener noreferrer">
-                          <Navigation className="h-3 w-3" />
-                          네이버지도
-                        </a>
-                      </Button>
-                      <Button variant="outline" size="sm" className="flex-1 gap-1 h-7 text-xs" asChild>
-                        <a href={getKakaoMapLink(place)} target="_blank" rel="noopener noreferrer">
+                        <a href={getKakaoMapLink(place)}>
                           <ExternalLink className="h-3 w-3" />
                           카카오맵
                         </a>
                       </Button>
+                      {isMobile && (
+                        <Button variant="outline" size="sm" className="flex-1 gap-1 h-7 text-xs" asChild>
+                          <a href={getTmapLink(place)}>
+                            <MapPinned className="h-3 w-3" />
+                            Tmap
+                          </a>
+                        </Button>
+                      )}
                     </div>
 
                     <Link

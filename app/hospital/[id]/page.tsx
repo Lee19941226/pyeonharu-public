@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout/header";
@@ -169,6 +169,14 @@ function HospitalDetailContent() {
   const [drRating, setDrRating] = useState(0);
   const [drContent, setDrContent] = useState("");
   const [drLoading, setDrLoading] = useState(false);
+  const [drManualInput, setDrManualInput] = useState(false);
+
+  // 기존 리뷰에서 의사명 목록 추출
+  const existingDoctorNames = useMemo(() => {
+    const names = new Set(doctorReviews.map((r) => r.doctorName));
+    return Array.from(names).sort();
+  }, [doctorReviews]);
+
   // 신고
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportTargetId, setReportTargetId] = useState("");
@@ -224,7 +232,7 @@ function HospitalDetailContent() {
       toast.success("의사 리뷰가 등록되었습니다.");
       setShowDoctorForm(false);
       setDrDoctorName(""); setDrDepartment(""); setDrDiseaseName("");
-      setDrRating(0); setDrContent("");
+      setDrRating(0); setDrContent(""); setDrManualInput(false);
       fetchDoctorReviews();
     } catch {
       toast.error("저장에 실패했습니다.");
@@ -723,12 +731,49 @@ function HospitalDetailContent() {
                     <div className="space-y-3">
                       <div>
                         <Label className="text-xs">의사명</Label>
-                        <Input
-                          placeholder="홍길동"
-                          value={drDoctorName}
-                          onChange={(e) => setDrDoctorName(e.target.value)}
-                          maxLength={50}
-                        />
+                        {existingDoctorNames.length > 0 && !drManualInput ? (
+                          <div className="space-y-1.5">
+                            <Select
+                              value={drDoctorName}
+                              onValueChange={(v) => {
+                                if (v === "__manual__") {
+                                  setDrManualInput(true);
+                                  setDrDoctorName("");
+                                } else {
+                                  setDrDoctorName(v);
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="의사 선택" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {existingDoctorNames.map((n) => (
+                                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                                ))}
+                                <SelectItem value="__manual__">직접 입력</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <Input
+                              placeholder="홍길동"
+                              value={drDoctorName}
+                              onChange={(e) => setDrDoctorName(e.target.value)}
+                              maxLength={50}
+                            />
+                            {existingDoctorNames.length > 0 && (
+                              <button
+                                type="button"
+                                className="text-xs text-primary hover:underline"
+                                onClick={() => { setDrManualInput(false); setDrDoctorName(""); }}
+                              >
+                                목록에서 선택
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">진료과</Label>
