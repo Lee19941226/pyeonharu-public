@@ -1275,7 +1275,7 @@ export default function FoodResultPage() {
             <Card className="mb-6">
               <CardContent className="p-6">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                  📝 원재료명 및 함량
+                  📝 원재료명
                 </h3>
 
                 {(() => {
