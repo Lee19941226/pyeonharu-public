@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import { BackButtonHandler } from "@/components/back-button-handler";
 import { StatusBarInit } from "@/components/status-bar-init";
+import { OAuthDeepLinkHandler } from "@/components/oauth-deep-link-handler";
 import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
 import { PageTrackerProvider } from "@/components/providers/page-tracker-provider";
 import { AdSidebar } from "@/components/ad-sidebar";
@@ -118,6 +119,7 @@ export default function RootLayout({
         <AuthProvider>
           <BackButtonHandler />
           <StatusBarInit />
+          <OAuthDeepLinkHandler />
           <HapticProvider>
             <HeartbeatProvider>
               <PageTrackerProvider>{children}</PageTrackerProvider>

@@ -7,6 +7,14 @@ const config: CapacitorConfig = {
   server: {
     url: "https://www.pyeonharu.com",
     cleartext: true,
+    allowNavigation: [
+      "*.supabase.co",
+      "accounts.google.com",
+      "*.google.com",
+      "kauth.kakao.com",
+      "accounts.kakao.com",
+      "*.kakao.com",
+    ],
   },
 };
 
