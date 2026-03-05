@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1270,14 +1271,23 @@ export default function RestaurantTab() {
       />
 
       {/* 길찾기 앱 선택 */}
-      {navTarget && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40"
-          onClick={() => setNavTarget(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-t-2xl bg-background p-5 pb-8 animate-in slide-in-from-bottom duration-200"
+      <AnimatePresence>
+        {navTarget && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-end justify-center"
+            onClick={() => setNavTarget(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+          >
+          <motion.div
+            className="w-full max-w-md rounded-t-2xl bg-background p-5 pb-8"
             onClick={(e) => e.stopPropagation()}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
             <p className="text-sm font-semibold mb-1">길찾기</p>
@@ -1339,9 +1349,10 @@ export default function RestaurantTab() {
             >
               취소
             </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </div>
     </div>
   );

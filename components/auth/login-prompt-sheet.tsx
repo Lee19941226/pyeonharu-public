@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { X, ShieldCheck, Infinity, Bell, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface LoginPromptSheetProps {
   open: boolean;
@@ -40,8 +41,6 @@ export function LoginPromptSheet({
 }: LoginPromptSheetProps) {
   const router = useRouter();
 
-  if (!open) return null;
-
   const title =
     reason === "scan_limit"
       ? "오늘 무료 스캔을 모두 사용했어요"
@@ -57,15 +56,26 @@ export function LoginPromptSheet({
         : "알레르기 프로필, 스캔 기록 등 더 많은 기능을 이용하세요";
 
   return (
-    <>
-      {/* 딤 배경 */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* 딤 배경 */}
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
 
-      {/* 바텀시트 */}
-      <div className="fixed inset-x-0 bottom-0 z-50 animate-in slide-in-from-bottom-4 duration-300">
+          {/* 바텀시트 */}
+          <motion.div
+            className="fixed inset-x-0 bottom-0 z-50"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          >
         <div className="mx-auto max-w-lg rounded-t-2xl bg-white px-6 pb-8 pt-5 shadow-2xl">
           {/* 핸들 */}
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
@@ -132,7 +142,9 @@ export function LoginPromptSheet({
             </Button>
           </div>
         </div>
-      </div>
-    </>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
