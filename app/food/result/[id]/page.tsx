@@ -107,7 +107,7 @@ export default function FoodResultPage() {
 
     getUserInfo();
   }, []);
-  const handleKakaoShare = () => {
+  const handleKakaoShare = async () => {
     if (!result) return;
 
     if (
@@ -140,14 +140,14 @@ export default function FoodResultPage() {
       ? `✅ 안전해요! 알레르기 성분이 없습니다`
       : `⚠️ 주의! ${allergenText} 알레르기 성분 포함`;
 
-    const shareResult = shareToKakao({
+    const shareResult = await shareToKakao({
       title,
       description,
       imageUrl: ogImageUrl.toString(),
       shareUrl,
     });
 
-    if (shareResult && !shareResult.success) {
+    if (!shareResult.success) {
       toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
     }
   };

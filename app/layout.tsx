@@ -106,6 +106,10 @@ export default function RootLayout({
         />
         <Script
           strategy="afterInteractive"
+          src="https://t1.kakaocdn.net/kakaojs/2.7.4/kakao.min.js"
+        />
+        <Script
+          strategy="afterInteractive"
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
           crossOrigin="anonymous"
         />

@@ -1,14 +1,48 @@
-export function ensureKakaoInit(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!window.Kakao) return false;
-  if (!window.Kakao.isInitialized()) {
-    try {
-      window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
-    } catch {
-      return false;
+let sdkLoadPromise: Promise<void> | null = null;
+
+function loadKakaoSDK(): Promise<void> {
+  if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
+  if (window.Kakao) return Promise.resolve();
+  if (sdkLoadPromise) return sdkLoadPromise;
+
+  sdkLoadPromise = new Promise<void>((resolve, reject) => {
+    // If layout.tsx already injected the script tag, attach to it
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src*="kakaocdn.net/kakaojs"]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Kakao SDK load failed")),
+        { once: true }
+      );
+      return;
     }
+    const script = document.createElement("script");
+    script.src =
+      "https://t1.kakaocdn.net/kakaojs/2.7.4/kakao.min.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Kakao SDK load failed"));
+    document.head.appendChild(script);
+  });
+
+  return sdkLoadPromise;
+}
+
+export async function ensureKakaoReady(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    await loadKakaoSDK();
+    if (!window.Kakao) return false;
+    if (!window.Kakao.isInitialized()) {
+      window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
+    }
+    return window.Kakao.isInitialized();
+  } catch {
+    return false;
   }
-  return window.Kakao.isInitialized();
 }
 
 interface KakaoShareOptions {
@@ -19,7 +53,9 @@ interface KakaoShareOptions {
   buttonText?: string;
 }
 
-export function shareToKakao(options: KakaoShareOptions) {
+export async function shareToKakao(
+  options: KakaoShareOptions
+): Promise<{ success: boolean; fallback?: string }> {
   const {
     title,
     description,
@@ -28,8 +64,7 @@ export function shareToKakao(options: KakaoShareOptions) {
     buttonText = "편하루에서 확인하기",
   } = options;
 
-  if (!ensureKakaoInit()) {
-    // fallback: 링크 복사
+  if (!(await ensureKakaoReady())) {
     navigator.clipboard?.writeText(shareUrl);
     return { success: false, fallback: "clipboard" };
   }

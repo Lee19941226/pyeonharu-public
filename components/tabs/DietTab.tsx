@@ -34,6 +34,7 @@ import {
   Check,
   AlertTriangle,
 } from "lucide-react";
+import { ensureKakaoReady } from "@/lib/utils/kakao-share";
 
 function getTimePeriod(dateStr: string) {
   const h = new Date(dateStr).getHours();
@@ -179,24 +180,6 @@ function BarChart({
   );
 }
 
-// ─── 카카오 SDK 초기화 (공유 시점에 호출) ───
-function ensureKakaoInit(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!window.Kakao) {
-    console.warn("[카카오] SDK가 아직 로드되지 않았습니다");
-    return false;
-  }
-  if (!window.Kakao.isInitialized()) {
-    try {
-      window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
-      console.log("[카카오] SDK 초기화 완료");
-    } catch (e) {
-      console.error("[카카오] SDK 초기화 실패:", e);
-      return false;
-    }
-  }
-  return window.Kakao.isInitialized();
-}
 
 interface DietEntry {
   id: string;
@@ -318,7 +301,6 @@ export default function DietTab() {
   const [selectedMealItems, setSelectedMealItems] = useState<Set<string>>(new Set());
   const [isAddingMeals, setIsAddingMeals] = useState(false);
 
-  // 카카오 SDK는 공유 시점에 ensureKakaoInit()로 초기화
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -825,8 +807,8 @@ export default function DietTab() {
   };
 
   // ─── 카카오 공유: 오늘 먹은 음식 ───
-  const shareToday = () => {
-    if (!ensureKakaoInit()) {
+  const shareToday = async () => {
+    if (!(await ensureKakaoReady())) {
       toast.error("카카오톡 공유를 사용할 수 없습니다");
       return;
     }
@@ -880,8 +862,8 @@ export default function DietTab() {
   };
 
   // ─── 카카오 공유: 식단 리포트 ───
-  const shareReport = () => {
-    if (!ensureKakaoInit()) {
+  const shareReport = async () => {
+    if (!(await ensureKakaoReady())) {
       toast.error("카카오톡 공유를 사용할 수 없습니다");
       return;
     }

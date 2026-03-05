@@ -27,6 +27,7 @@ import {
   openDeliveryApp,
   isMobileDevice,
 } from "@/lib/utils/delivery";
+import { ensureKakaoReady } from "@/lib/utils/kakao-share";
 
 interface Reasoning {
   taste: string;
@@ -66,24 +67,6 @@ interface MealRecommendData {
   };
 }
 
-// ✅ 카카오 SDK 초기화 (공유 시점에 호출)
-function ensureKakaoInit(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!window.Kakao) {
-    console.warn("[카카오] SDK 미로드");
-    return false;
-  }
-  if (!window.Kakao.isInitialized()) {
-    try {
-      window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
-      console.log("[카카오] SDK 초기화 완료");
-    } catch (e) {
-      console.error("[카카오] SDK 초기화 실패:", e);
-      return false;
-    }
-  }
-  return window.Kakao.isInitialized();
-}
 
 export default function MealRecommend() {
   const [data, setData] = useState<MealRecommendData | null>(null);
@@ -136,12 +119,12 @@ export default function MealRecommend() {
   }, []);
 
   // ✅ 카카오 공유: AI 추천 메뉴
-  const shareRecommend = () => {
+  const shareRecommend = async () => {
     if (!data || !data.recommendations.length) {
       toast.error("공유할 추천 결과가 없습니다");
       return;
     }
-    if (!ensureKakaoInit()) {
+    if (!(await ensureKakaoReady())) {
       toast.error("카카오톡 공유를 사용할 수 없습니다");
       return;
     }
