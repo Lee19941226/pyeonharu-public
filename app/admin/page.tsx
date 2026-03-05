@@ -69,6 +69,8 @@ interface Stats {
   overview: {
     totalUsers: number;
     dau: number;
+    dauMembers: number;
+    dauAnon: number;
     wau: number;
     mau: number;
     retentionRate: number;
@@ -634,6 +636,7 @@ export default function AdminDashboard() {
                 icon={Activity}
                 label="DAU (오늘)"
                 value={stats.overview.dau}
+                sub={`회원 ${stats.overview.dauMembers} · 비회원 ${stats.overview.dauAnon}`}
                 color="text-green-600"
               />
               <StatCard

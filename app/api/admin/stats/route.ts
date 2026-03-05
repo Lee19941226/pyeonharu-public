@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
 // 서버사이드 Supabase (service_role로 RLS 우회) — 지연 초기화
 function getAdminClient() {
@@ -36,23 +35,43 @@ function startOfDayKST(): string {
   return new Date(midnightUTC).toISOString();
 }
 
+/**
+ * KST 기준 N일 전 00:00:00의 UTC ISO 문자열
+ * WAU = startOfDayKSTDaysAgo(7), MAU 등에 사용
+ * daysAgo(n)은 "현재 시각 - n일"이라 KST 자정과 불일치 → 이 함수로 통일
+ */
+function startOfDayKSTDaysAgo(n: number): string {
+  const kstNow = new Date(Date.now() + KST_OFFSET);
+  const midnightUTC = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate() - n) - KST_OFFSET;
+  return new Date(midnightUTC).toISOString();
+}
+
+/**
+ * user_id / ip_address로 방문자 식별자 생성
+ * ip_address도 null이면 null 반환 (anon:null 오집계 방지)
+ */
+function makeUserId(userId: string | null, ipAddress: string | null): string | null {
+  if (userId) return userId;
+  if (ipAddress) return `anon:${ipAddress}`;
+  return null;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const period = searchParams.get("period") || "30"; // 기본 30일
   const days = parseInt(period);
-  const supabase = await createServerClient();
-  const adminDb = getAdminClient(); // RLS 우회 (user_action_logs 조회용)
+  const adminDb = getAdminClient(); // service_role: RLS 우회, 전체 데이터 접근
   const auth = await verifyAdmin();
   if (!auth.ok) return auth.response;
   try {
     // ═══ 1. 사용자 통계 ═══
-    // 전체 가입자 수
-    const { count: totalUsers } = await supabase
+    // 전체 가입자 수 (adminDb: RLS 우회로 전체 count 보장)
+    const { count: totalUsers } = await adminDb
       .from("profiles")
       .select("*", { count: "exact", head: true });
 
     // 일별 신규 가입자 (최근 N일)
-    const { data: dailySignups } = await supabase
+    const { data: dailySignups } = await adminDb
       .from("profiles")
       .select("created_at")
       .gte("created_at", daysAgo(days))
@@ -66,43 +85,57 @@ export async function GET(request: Request) {
     });
 
     // ═══ 2. 활성 사용자 (DAU/WAU/MAU) ═══
-    // 각 테이블을 MAU 기준(30일)으로 1회만 조회 후 메모리 필터링 (쿼리 15회 → 5회)
+    // 각 테이블을 MAU 기준(30일)으로 1회만 조회 후 메모리 필터링 (쿼리 15회 → 6회)
     const todayStart = startOfDayKST();
-    const wau7Start = daysAgo(7);
+    // WAU: KST 기준 7일 전 자정 (daysAgo(7)는 현재 시각 기준이라 KST 자정과 불일치)
+    const wau7Start = startOfDayKSTDaysAgo(7);
+    const mau30Start = startOfDayKSTDaysAgo(30);
 
     const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs, mauActionLogs] =
       await Promise.all([
-        supabase.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", daysAgo(30)),
-        supabase.from("community_posts").select("user_id, created_at").gte("created_at", daysAgo(30)),
-        supabase.from("community_comments").select("user_id, created_at").gte("created_at", daysAgo(30)),
-        supabase.from("diet_entries").select("user_id, created_at").gte("created_at", daysAgo(30)),
-        supabase.from("food_search_logs").select("user_id, searched_at").gte("searched_at", daysAgo(30)),
-        adminDb.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", daysAgo(30)),
+        adminDb.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", mau30Start),
+        adminDb.from("community_posts").select("user_id, created_at").gte("created_at", mau30Start),
+        adminDb.from("community_comments").select("user_id, created_at").gte("created_at", mau30Start),
+        adminDb.from("diet_entries").select("user_id, created_at").gte("created_at", mau30Start),
+        // ip_address 포함: anonymous 검색 사용자도 MAU에 집계
+        adminDb.from("food_search_logs").select("user_id, ip_address, searched_at").gte("searched_at", mau30Start),
+        adminDb.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", mau30Start),
       ]);
 
     // 타임스탬프 필드명이 테이블마다 다르므로 ts로 통일
-    // 비로그인 방문자는 ip_address로 고유 식별 (anon: 접두사)
-    const allMauRows: { user_id: string; ts: string }[] = [
-      ...(mauScanLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.scanned_at })),
-      ...(mauPostLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
-      ...(mauCommentLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
-      ...(mauDietLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.created_at })),
-      ...(mauSearchLogs.data || []).map((r) => ({ user_id: r.user_id, ts: r.searched_at })),
+    // makeUserId: user_id → 회원, ip_address → 비회원, 둘 다 없으면 null (anon:null 오집계 방지)
+    const allMauRows: { uid: string; ts: string; isMember: boolean }[] = [
+      ...(mauScanLogs.data || []).map((r) => ({ uid: r.user_id, ts: r.scanned_at, isMember: true })),
+      ...(mauPostLogs.data || []).map((r) => ({ uid: r.user_id, ts: r.created_at, isMember: true })),
+      ...(mauCommentLogs.data || []).map((r) => ({ uid: r.user_id, ts: r.created_at, isMember: true })),
+      ...(mauDietLogs.data || []).map((r) => ({ uid: r.user_id, ts: r.created_at, isMember: true })),
+      ...(mauSearchLogs.data || []).map((r) => ({
+        uid: makeUserId(r.user_id, r.ip_address) ?? "",
+        ts: r.searched_at,
+        isMember: !!r.user_id,
+      })),
       ...(mauActionLogs.data || []).map((r) => ({
-        user_id: r.user_id || `anon:${r.ip_address}`,
+        uid: makeUserId(r.user_id, r.ip_address) ?? "",
         ts: r.created_at,
+        isMember: !!r.user_id,
       })),
     ];
 
     const dauUsers = new Set<string>();
+    const dauMemberUsers = new Set<string>();
+    const dauAnonUsers = new Set<string>();
     const wauUsers = new Set<string>();
     const mauUsers = new Set<string>();
 
-    allMauRows.forEach(({ user_id, ts }) => {
-      if (!user_id || !ts) return;
-      mauUsers.add(user_id);
-      if (ts >= wau7Start) wauUsers.add(user_id);
-      if (ts >= todayStart) dauUsers.add(user_id);
+    allMauRows.forEach(({ uid, ts, isMember }) => {
+      if (!uid || !ts) return;
+      mauUsers.add(uid);
+      if (ts >= wau7Start) wauUsers.add(uid);
+      if (ts >= todayStart) {
+        dauUsers.add(uid);
+        if (isMember) dauMemberUsers.add(uid);
+        else dauAnonUsers.add(uid);
+      }
     });
 
     const dau = dauUsers.size;
@@ -111,37 +144,38 @@ export async function GET(request: Request) {
 
     // ═══ 3. 일별 활성 사용자 추이 (DAU 트렌드) ═══
     const dauTrend: { date: string; dau: number }[] = [];
-    // 최근 N일간 일별 DAU 계산 (food_scan_logs + food_check_history + community 활동 기반)
+    // 최근 N일간 일별 DAU 계산 (전체 활동 소스 기반)
+    const periodStart = startOfDayKSTDaysAgo(days);
     const allActivityLogs = await Promise.all([
-      supabase
+      adminDb
         .from("food_scan_logs")
         .select("user_id, scanned_at")
-        .gte("scanned_at", daysAgo(days)),
-      supabase
+        .gte("scanned_at", periodStart),
+      adminDb
         .from("community_posts")
         .select("user_id, created_at")
-        .gte("created_at", daysAgo(days)),
-      supabase
+        .gte("created_at", periodStart),
+      adminDb
         .from("community_comments")
         .select("user_id, created_at")
-        .gte("created_at", daysAgo(days)),
-      supabase
+        .gte("created_at", periodStart),
+      adminDb
         .from("diet_entries")
         .select("user_id, created_at")
-        .gte("created_at", daysAgo(days)),
+        .gte("created_at", periodStart),
       adminDb
         .from("user_action_logs")
         .select("user_id, ip_address, created_at")
-        .gte("created_at", daysAgo(days)),
+        .gte("created_at", periodStart),
     ]);
 
     const dailyActiveMap: Record<string, Set<string>> = {};
     allActivityLogs.forEach((res) => {
       res.data?.forEach((r: any) => {
-        const ts =
-          r.scanned_at || r.checked_at || r.created_at || r.searched_at;
+        const ts = r.scanned_at || r.checked_at || r.created_at || r.searched_at;
         const date = ts ? toKSTDate(ts) : null;
-        const uid = r.user_id || (r.ip_address ? `anon:${r.ip_address}` : null);
+        // makeUserId: ip_address도 null이면 null 반환으로 anon:null 오집계 방지
+        const uid = makeUserId(r.user_id ?? null, r.ip_address ?? null);
         if (date && uid) {
           if (!dailyActiveMap[date]) dailyActiveMap[date] = new Set();
           dailyActiveMap[date].add(uid);
@@ -158,25 +192,25 @@ export async function GET(request: Request) {
     }
 
     // ═══ 4. 기능별 사용 횟수 ═══
-    const { count: totalScans } = await supabase
+    const { count: totalScans } = await adminDb
       .from("food_scan_logs")
       .select("*", { count: "exact", head: true })
-      .gte("scanned_at", daysAgo(days));
+      .gte("scanned_at", periodStart);
 
-    const { count: totalChecks } = await supabase
+    const { count: totalChecks } = await adminDb
       .from("food_check_history")
       .select("*", { count: "exact", head: true })
-      .gte("checked_at", daysAgo(days));
+      .gte("checked_at", periodStart);
 
-    const { count: totalSearches } = await supabase
+    const { count: totalSearches } = await adminDb
       .from("food_search_logs")
       .select("*", { count: "exact", head: true })
-      .gte("searched_at", daysAgo(days));
+      .gte("searched_at", periodStart);
 
-    const { count: totalDietEntries } = await supabase
+    const { count: totalDietEntries } = await adminDb
       .from("diet_entries")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", daysAgo(days));
+      .gte("created_at", periodStart);
 
     // 일별 기능 사용량 (복합 차트용)
     const featureTrend: Record<
@@ -189,22 +223,22 @@ export async function GET(request: Request) {
     }
 
     const [scanLogs, checkLogs, searchLogs, dietLogs] = await Promise.all([
-      supabase
+      adminDb
         .from("food_scan_logs")
         .select("scanned_at")
-        .gte("scanned_at", daysAgo(days)),
-      supabase
+        .gte("scanned_at", periodStart),
+      adminDb
         .from("food_check_history")
         .select("checked_at")
-        .gte("checked_at", daysAgo(days)),
-      supabase
+        .gte("checked_at", periodStart),
+      adminDb
         .from("food_search_logs")
         .select("searched_at")
-        .gte("searched_at", daysAgo(days)),
-      supabase
+        .gte("searched_at", periodStart),
+      adminDb
         .from("diet_entries")
         .select("created_at")
-        .gte("created_at", daysAgo(days)),
+        .gte("created_at", periodStart),
     ]);
 
     scanLogs.data?.forEach((r) => {
@@ -230,23 +264,23 @@ export async function GET(request: Request) {
     }));
 
     // ═══ 5. 커뮤니티 통계 ═══
-    const { count: totalPosts } = await supabase
+    const { count: totalPosts } = await adminDb
       .from("community_posts")
       .select("*", { count: "exact", head: true });
 
-    const { count: recentPosts } = await supabase
+    const { count: recentPosts } = await adminDb
       .from("community_posts")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", daysAgo(days));
+      .gte("created_at", periodStart);
 
-    const { count: totalComments } = await supabase
+    const { count: totalComments } = await adminDb
       .from("community_comments")
       .select("*", { count: "exact", head: true });
 
-    const { count: recentComments } = await supabase
+    const { count: recentComments } = await adminDb
       .from("community_comments")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", daysAgo(days));
+      .gte("created_at", periodStart);
 
     // 일별 게시글/댓글 추이
     const communityTrend: Record<string, { posts: number; comments: number }> =
@@ -256,14 +290,14 @@ export async function GET(request: Request) {
     }
 
     const [postLogs, commentLogs] = await Promise.all([
-      supabase
+      adminDb
         .from("community_posts")
         .select("created_at")
-        .gte("created_at", daysAgo(days)),
-      supabase
+        .gte("created_at", periodStart),
+      adminDb
         .from("community_comments")
         .select("created_at")
-        .gte("created_at", daysAgo(days)),
+        .gte("created_at", periodStart),
     ]);
 
     postLogs.data?.forEach((r) => {
@@ -283,12 +317,12 @@ export async function GET(request: Request) {
     );
 
     // ═══ 6. 학교 등록 통계 ═══
-    const { count: totalSchools } = await supabase
+    const { count: totalSchools } = await adminDb
       .from("user_schools")
       .select("*", { count: "exact", head: true });
 
     // 학교별 등록 수 TOP 10
-    const { data: schoolRanking } = await supabase
+    const { data: schoolRanking } = await adminDb
       .from("user_schools")
       .select("school_name");
 
@@ -303,24 +337,31 @@ export async function GET(request: Request) {
       .map(([name, count]) => ({ name, count }));
 
     // ═══ 7. 리텐션율 (간이) ═══
-    // 7일 전에 활동한 사용자 중 최근 1일 내 재활동한 비율
-    const weekAgoStart = daysAgo(8);
-    const weekAgoEnd = daysAgo(7);
+    // 7일 전 KST 하루(00:00~23:59)에 활동한 회원 중 오늘 재방문한 비율
+    // base: scan_logs + community_posts + user_action_logs (전체 활동 소스 포함)
+    const weekAgoStart = startOfDayKSTDaysAgo(7); // 7일 전 KST 00:00
+    const weekAgoEnd   = startOfDayKSTDaysAgo(6); // 6일 전 KST 00:00 (= 7일 전 하루 끝)
     const retentionBase = await Promise.all([
-      supabase
+      adminDb
         .from("food_scan_logs")
         .select("user_id")
         .gte("scanned_at", weekAgoStart)
-        .lte("scanned_at", weekAgoEnd),
-      supabase
+        .lt("scanned_at", weekAgoEnd),
+      adminDb
         .from("community_posts")
         .select("user_id")
         .gte("created_at", weekAgoStart)
-        .lte("created_at", weekAgoEnd),
+        .lt("created_at", weekAgoEnd),
+      adminDb
+        .from("user_action_logs")
+        .select("user_id")
+        .gte("created_at", weekAgoStart)
+        .lt("created_at", weekAgoEnd),
     ]);
     const weekAgoUsers = new Set<string>();
+    // 리텐션은 식별 가능한 회원만 대상 (anonymous는 IP가 바뀔 수 있어 제외)
     retentionBase.forEach((res) =>
-      res.data?.forEach((r) => r.user_id && weekAgoUsers.add(r.user_id)),
+      res.data?.forEach((r: any) => r.user_id && weekAgoUsers.add(r.user_id)),
     );
 
     const returnedUsers = new Set<string>();
@@ -341,6 +382,8 @@ export async function GET(request: Request) {
       overview: {
         totalUsers: totalUsers || 0,
         dau,
+        dauMembers: dauMemberUsers.size,  // 오늘 활동한 회원 수
+        dauAnon: dauAnonUsers.size,       // 오늘 활동한 비회원 수 (IP 기반)
         wau,
         mau,
         retentionRate,
@@ -349,10 +392,9 @@ export async function GET(request: Request) {
       signups: {
         total: totalUsers || 0,
         recent: dailySignups?.length || 0,
-        trend: Object.entries(signupsByDate).map(([date, count]) => ({
-          date,
-          count,
-        })),
+        trend: Object.entries(signupsByDate)
+          .sort(([a], [b]) => a.localeCompare(b)) // 날짜 오름차순 정렬 보장
+          .map(([date, count]) => ({ date, count })),
       },
       features: {
         scans: totalScans || 0,
