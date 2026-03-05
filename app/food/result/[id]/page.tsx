@@ -15,6 +15,8 @@ import {
   AlertCircle,
   ChevronLeft,
   Lightbulb,
+  Download,
+  Share2,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -147,6 +149,88 @@ export default function FoodResultPage() {
 
     if (shareResult && !shareResult.success) {
       toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+    }
+  };
+
+  // OG 이미지 URL 생성 헬퍼
+  const buildOgImageUrl = (): string => {
+    if (!result) return "";
+    const allergenText =
+      !result.isSafe && result.detectedAllergens?.length > 0
+        ? result.detectedAllergens.map((a: any) => a.name).join(", ")
+        : "";
+    const url = new URL(`${window.location.origin}/api/og`);
+    url.searchParams.set("name", result.foodName);
+    url.searchParams.set("safe", result.isSafe.toString());
+    url.searchParams.set("allergens", allergenText);
+    url.searchParams.set("manufacturer", result.manufacturer || "");
+    return url.toString();
+  };
+
+  // 📥 사진 저장
+  const handleSaveImage = async () => {
+    if (!result) return;
+    try {
+      const imageUrl = buildOgImageUrl();
+      const res = await fetch(imageUrl);
+      if (!res.ok) throw new Error("fetch failed");
+      const blob = await res.blob();
+      const file = new File([blob], `${result.foodName}_알레르기정보.png`, { type: blob.type });
+
+      // iOS Safari: <a download> 미지원 → navigator.share로 파일 공유 (저장 옵션 포함)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: result.foodName });
+        toast.success("사진이 저장되었습니다");
+      } else {
+        // Android / Desktop: 직접 다운로드
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(objectUrl);
+        toast.success("사진이 저장되었습니다");
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError") return; // 사용자가 직접 취소
+      toast.error("저장에 실패했습니다");
+    }
+  };
+
+  // 📤 공유하기
+  const handleShare = async () => {
+    if (!result) return;
+
+    const shareUrl =
+      result.foodCode?.startsWith("ai-") || result.dataSource === "ai"
+        ? `${window.location.origin}/food`
+        : `${window.location.origin}/food/result/${result.foodCode}`;
+
+    const allergenText =
+      !result.isSafe && result.detectedAllergens?.length > 0
+        ? result.detectedAllergens.map((a: any) => a.name).join(", ")
+        : "";
+
+    const shareText = result.isSafe
+      ? `✅ ${result.foodName} - 알레르기 성분 없음\n편하루에서 확인하세요`
+      : `⚠️ ${result.foodName} - ${allergenText} 포함\n편하루에서 확인하세요`;
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `${result.foodName} 알레르기 정보`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          // 공유 실패 시 카카오 fallback
+          handleKakaoShare();
+        }
+      }
+    } else {
+      // navigator.share 미지원 → 카카오 공유
+      handleKakaoShare();
     }
   };
 
@@ -1443,6 +1527,26 @@ export default function FoodResultPage() {
                 {isFavorite ? "★ 즐겨찾기 제거" : "☆ 즐겨찾기 추가"}
               </Button>
             )}
+
+            {/* 📥 사진 저장 / 📤 공유하기 (모바일 전용) */}
+            <div className="md:hidden grid grid-cols-2 gap-3 mt-3">
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleSaveImage}
+              >
+                <Download className="h-4 w-4" />
+                사진 저장
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleShare}
+              >
+                <Share2 className="h-4 w-4" />
+                공유하기
+              </Button>
+            </div>
           </div>
         </div>
       </main>
