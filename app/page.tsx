@@ -382,7 +382,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
         <div style={{ display: activeTab === "food" ? "block" : "none" }}>
           <div className="container mx-auto px-4 pt-3">

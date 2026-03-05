@@ -82,7 +82,7 @@ export default function FAQPage() {
     <div className="flex min-h-screen flex-col">
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="mb-12 text-center">

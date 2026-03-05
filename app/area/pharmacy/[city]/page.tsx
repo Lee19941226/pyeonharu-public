@@ -69,7 +69,7 @@ export default async function AreaPharmacyPage({ params }: PageProps) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
-        <main className="flex-1 pb-16 md:pb-0">
+        <main className="flex-1 pb-20 md:pb-0">
           <div className="container mx-auto px-4 py-8">
             <div className="mx-auto max-w-2xl text-center">
               <h1 className="mb-4 text-2xl font-bold">
@@ -97,7 +97,7 @@ export default async function AreaPharmacyPage({ params }: PageProps) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <div className="container mx-auto px-4 py-8">
           <div className="mx-auto max-w-3xl">
             {/* 브레드크럼 */}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AdBanner } from "@/components/ad-banner"
+import { toast } from "sonner"
 
 interface Post {
   id: string
@@ -104,7 +105,7 @@ export default function CommunityPage() {
       setWeeklyAverages(data.averages || null)
       setMySchoolStats(data.mySchool || null)
       setTotalSchools(data.totalSchools || 0)
-    } catch { /* ignore */ }
+    } catch { toast.error("게시글을 불러오지 못했습니다") }
   }
 
   useEffect(() => {
@@ -120,7 +121,7 @@ export default function CommunityPage() {
       const primary = schools.find(s => s.is_primary)
       if (primary) setSelectedSchool(primary.school_code)
       else if (schools.length > 0) setSelectedSchool(schools[0].school_code)
-    } catch { /* ignore */ }
+    } catch { toast.error("학교 정보를 불러오지 못했습니다") }
     finally { setSchoolsLoading(false) }
   }
 
@@ -141,7 +142,7 @@ export default function CommunityPage() {
       const data = await res.json()
       setPosts(data.posts || [])
       setTotalPages(data.totalPages || 1)
-    } catch { /* ignore */ }
+    } catch { toast.error("게시글을 불러오지 못했습니다") }
     finally { setIsLoading(false) }
   }
 
