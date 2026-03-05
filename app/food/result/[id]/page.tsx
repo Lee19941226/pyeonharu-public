@@ -55,13 +55,6 @@ export default function FoodResultPage() {
     // 새로운 ID 저장 후 로드
     lastLoadedIdRef.current = id;
     loadFoodResult();
-
-    // Kakao SDK 초기화
-    if (typeof window !== "undefined" && window.Kakao) {
-      if (!window.Kakao.isInitialized()) {
-        window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_KEY);
-      }
-    }
   }, [params.id]);
 
   // ✅ result가 로드된 후에 즐겨찾기 확인

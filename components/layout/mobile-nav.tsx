@@ -31,7 +31,7 @@ import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { createClient } from "@/lib/supabase/client";
 import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
-import { ensureKakaoReady } from "@/lib/utils/kakao-share";
+import { shareToKakao } from "@/lib/utils/kakao-share";
 
 type CameraMode = "allergy" | "diet" | null;
 
@@ -231,7 +231,6 @@ export function MobileNav() {
   // ─── 카카오 공유 ───
   const shareRecommend = async () => {
     if (!recommendData || !recommendData.recommendations.length) return;
-    if (!(await ensureKakaoReady())) { toast.error("카카오톡 공유를 사용할 수 없습니다"); return; }
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
       toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다"); return;
     }
@@ -241,13 +240,14 @@ export function MobileNav() {
     let description = menuList;
     if (recommendData.analysis?.calorieSituation) description += ` | ${recommendData.analysis.calorieSituation}`;
     if (description.length > 150) description = description.slice(0, 147) + "...";
-    try {
-      window.Kakao.Share.sendDefault({
-        objectType: "feed",
-        content: { title: `${mealLabel} AI 맞춤 메뉴 추천`, description, imageUrl: `${window.location.origin}/icons/icon-512.png`, imageWidth: 512, imageHeight: 512, link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
-        buttons: [{ title: "편하루에서 메뉴 추천받기", link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
-      });
-    } catch (err) { console.error("[카카오 공유 실패]", err); toast.error("공유에 실패했습니다"); }
+    const result = await shareToKakao({
+      title: `${mealLabel} AI 맞춤 메뉴 추천`,
+      description,
+      imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
+      shareUrl,
+      buttonText: "편하루에서 메뉴 추천받기",
+    });
+    if (!result.success) { toast.error("공유에 실패했습니다"); }
   };
 
   // ─── 유틸 ───
