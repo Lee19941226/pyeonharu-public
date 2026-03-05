@@ -1301,11 +1301,28 @@ export default function RestaurantTab() {
               </button>
               <button
                 onClick={() => {
-                  const name = encodeURIComponent(navTarget.name);
-                  window.open(
-                    `https://tmap.life/navigate?goalx=${navTarget.lng}&goaly=${navTarget.lat}&goalname=${name}`,
-                    "_blank",
-                  );
+                  const goalName = encodeURIComponent(navTarget.name);
+                  const goalX = navTarget.lng;
+                  const goalY = navTarget.lat;
+
+                  const appUrl = userCoords
+                    ? `tmap://route?startX=${userCoords.lng}&startY=${userCoords.lat}&goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`
+                    : `tmap://route?goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`;
+                  const webUrl = `https://tmap.life/route?goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`;
+
+                  // 앱 미설치 시 1.5초 후 웹으로 fallback
+                  const fallbackTimer = setTimeout(() => {
+                    window.open(webUrl, "_blank");
+                  }, 1500);
+
+                  document.addEventListener("visibilitychange", function onHide() {
+                    if (document.hidden) {
+                      clearTimeout(fallbackTimer);
+                      document.removeEventListener("visibilitychange", onHide);
+                    }
+                  });
+
+                  window.location.href = appUrl;
                   setNavTarget(null);
                 }}
                 className="flex-1 flex flex-col items-center gap-2 rounded-xl border p-4 hover:bg-muted transition-colors"
