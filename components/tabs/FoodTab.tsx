@@ -212,22 +212,12 @@ function SchoolMealCard({
       const now = new Date();
       const year = now.getFullYear();
       const month = now.getMonth() + 1;
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const results: { date: string; meals: MealData[] }[] = [];
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${year}${String(month).padStart(2, "0")}${String(d).padStart(2, "0")}`;
-        try {
-          const res = await fetch(
-            `/api/school/meals?schoolCode=${entry.school.school_code}&officeCode=${entry.school.office_code}&date=${dateStr}`,
-          );
-          const data = await res.json();
-          if (data.meals && data.meals.length > 0)
-            results.push({ date: dateStr, meals: data.meals });
-        } catch {
-          /* skip */
-        }
-      }
-      setMonthlyData(results);
+      const dateStr = `${year}${String(month).padStart(2, "0")}01`;
+      const res = await fetch(
+        `/api/school/meals?schoolCode=${entry.school.school_code}&officeCode=${entry.school.office_code}&date=${dateStr}&mode=month`,
+      );
+      const data = await res.json();
+      setMonthlyData(data.month || []);
     } catch (e) {
       console.error("월간 급식 로드 실패:", e);
     } finally {

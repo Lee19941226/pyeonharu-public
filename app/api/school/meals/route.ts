@@ -160,6 +160,115 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ week: weekResults, baseDate: targetDate, checkedMember })
     }
 
+    // ── 월간 모드 (1회 요청으로 한 달치 일괄 조회) ──────────────────
+    if (mode === "month") {
+      const y = Number(targetDate.slice(0, 4))
+      const m = Number(targetDate.slice(4, 6))
+      const daysInMonth = new Date(y, m, 0).getDate()
+
+      // 1. DB 캐시에서 해당 월 전체 조회 (1회 쿼리)
+      const monthStart = `${targetDate.slice(0, 6)}01`
+      const monthEnd = `${targetDate.slice(0, 6)}${String(daysInMonth).padStart(2, "0")}`
+      const { data: cachedAll } = await supabase
+        .from("school_meals_cache")
+        .select("*")
+        .eq("school_code", schoolCode)
+        .gte("meal_date", monthStart)
+        .lte("meal_date", monthEnd)
+
+      // 캐시된 날짜 Set
+      const cachedDates = new Set<string>()
+      const cacheMap: Record<string, any[]> = {}
+      if (cachedAll) {
+        for (const c of cachedAll) {
+          cachedDates.add(c.meal_date)
+          if (!cacheMap[c.meal_date]) cacheMap[c.meal_date] = []
+          cacheMap[c.meal_date].push({
+            mealType: c.meal_type,
+            mealTypeName: c.meal_type === "1" ? "조식" : c.meal_type === "2" ? "중식" : "석식",
+            menu: c.menu_json,
+            calInfo: c.cal_info,
+            ntrInfo: c.ntr_info,
+            originInfo: c.origin_info,
+          })
+        }
+      }
+
+      // 2. 캐시 미스 날짜만 나이스 API 호출
+      const missingDates: string[] = []
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${targetDate.slice(0, 6)}${String(d).padStart(2, "0")}`
+        if (!cachedDates.has(dateStr)) missingDates.push(dateStr)
+      }
+
+      // 나이스 API는 날짜 범위 조회 지원 → 1회 호출로 미스 전체 커버
+      if (missingDates.length > 0) {
+        const apiKey = process.env.NEIS_API_KEY || ""
+        const url = new URL("https://open.neis.go.kr/hub/mealServiceDietInfo")
+        url.searchParams.append("Type", "json")
+        url.searchParams.append("pIndex", "1")
+        url.searchParams.append("pSize", "100")
+        url.searchParams.append("ATPT_OFCDC_SC_CODE", officeCode)
+        url.searchParams.append("SD_SCHUL_CODE", schoolCode)
+        url.searchParams.append("MLSV_FROM_YMD", monthStart)
+        url.searchParams.append("MLSV_TO_YMD", monthEnd)
+        if (apiKey) url.searchParams.append("KEY", apiKey)
+
+        try {
+          const res = await fetch(url.toString())
+          const data = await res.json()
+          const rows = data?.mealServiceDietInfo?.[1]?.row || []
+
+          for (const r of rows) {
+            const mealDate = r.MLSV_YMD
+            if (cachedDates.has(mealDate)) continue
+
+            const rawDish = r.DDISH_NM || ""
+            const menuItems = rawDish.split(/<br\s*\/?>/gi).filter((s: string) => s.trim())
+            const parsedMenu = menuItems.map(parseMenuItem)
+
+            const meal = {
+              mealType: r.MMEAL_SC_CODE,
+              mealTypeName: r.MMEAL_SC_NM,
+              menu: parsedMenu,
+              calInfo: r.CAL_INFO || "",
+              ntrInfo: r.NTR_INFO || "",
+              originInfo: r.ORPLC_INFO || "",
+            }
+
+            if (!cacheMap[mealDate]) cacheMap[mealDate] = []
+            cacheMap[mealDate].push(meal)
+
+            // 캐시 저장 (비동기)
+            supabase.from("school_meals_cache").upsert({
+              school_code: schoolCode,
+              meal_date: mealDate,
+              meal_type: meal.mealType,
+              menu_json: meal.menu,
+              cal_info: meal.calInfo,
+              ntr_info: meal.ntrInfo,
+              origin_info: meal.originInfo,
+            }, { onConflict: "school_code,meal_date,meal_type" }).then(() => {})
+          }
+        } catch (e) {
+          console.error("[Meals] Month NEIS fetch error:", e)
+        }
+      }
+
+      // 3. 알레르기 매칭 + 결과 조립
+      const monthResults: { date: string; meals: any[] }[] = []
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${targetDate.slice(0, 6)}${String(d).padStart(2, "0")}`
+        const dayMeals = cacheMap[dateStr] || []
+        if (dayMeals.length > 0) {
+          const matched = await matchAllergens(supabase, dayMeals, user, memberId)
+          monthResults.push({ date: dateStr, meals: matched })
+        }
+      }
+
+      return NextResponse.json({ month: monthResults, baseDate: targetDate, checkedMember })
+    }
+
     // ── 단일 날짜 모드 ───────────────────────────────────────────────
     // 1. 캐시 확인
     const { data: cached } = await supabase

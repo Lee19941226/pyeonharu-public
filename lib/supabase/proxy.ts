@@ -149,13 +149,13 @@ export async function updateSession(request: NextRequest) {
     const ipKey = `scan:${clientIp}:${today}`;
     const ipCount = ipScanMap.get(ipKey) || 0;
 
-    if (ipCount >= 10) {
+    if (ipCount >= 1) {
       return NextResponse.json(
         {
           success: false,
           error: "scan_limit_exceeded",
           message:
-            "하루 무료 스캔 횟수를 초과했습니다. 회원가입하면 무제한 스캔이 가능합니다.",
+            "일일 무료 분석 횟수(1회)를 초과했습니다. 로그인하시면 더 많이 사용할 수 있어요.",
           remainingScans: 0,
         },
         { status: 429 },
