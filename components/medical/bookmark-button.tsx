@@ -5,6 +5,10 @@ import { Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+// 모듈 레벨 캐시 (5분 TTL)
+const bookmarkCache: Record<string, { value: boolean; ts: number }> = {}
+const CACHE_TTL = 5 * 60 * 1000
+
 export interface BookmarkButtonProps {
   type: "hospital" | "pharmacy"
   id: string
@@ -34,13 +38,21 @@ export function BookmarkButton({
   const [loading, setLoading] = useState(false)
   const [checked, setChecked] = useState(false)
 
-  // 마운트 시 즐겨찾기 여부 확인
+  // 마운트 시 즐겨찾기 여부 확인 (캐시 우선)
   useEffect(() => {
+    const cacheKey = `${type}:${id}`
+    const cached = bookmarkCache[cacheKey]
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setBookmarked(cached.value)
+      setChecked(true)
+      return
+    }
     const checkBookmark = async () => {
       try {
         const res = await fetch(`/api/bookmarks/check?type=${type}&id=${id}`)
         const data = await res.json()
         setBookmarked(data.bookmarked)
+        bookmarkCache[cacheKey] = { value: data.bookmarked, ts: Date.now() }
       } catch {
         // 비로그인이면 무시
       } finally {
@@ -57,12 +69,16 @@ export function BookmarkButton({
     setLoading(true)
 
     try {
+      const cacheKey = `${type}:${id}`
       if (bookmarked) {
         // 삭제
         const res = await fetch(`/api/bookmarks?type=${type}&id=${id}`, {
           method: "DELETE",
         })
-        if (res.ok) setBookmarked(false)
+        if (res.ok) {
+          setBookmarked(false)
+          bookmarkCache[cacheKey] = { value: false, ts: Date.now() }
+        }
       } else {
         // 추가
         const res = await fetch("/api/bookmarks", {
@@ -72,12 +88,14 @@ export function BookmarkButton({
         })
         if (res.ok) {
           setBookmarked(true)
+          bookmarkCache[cacheKey] = { value: true, ts: Date.now() }
         } else if (res.status === 401) {
           // 비로그인 시 안내
           alert("로그인이 필요합니다.")
         } else if (res.status === 409) {
           // 이미 추가됨
           setBookmarked(true)
+          bookmarkCache[cacheKey] = { value: true, ts: Date.now() }
         }
       }
     } catch {

@@ -88,27 +88,7 @@ async function fetchNearbyHospitals(
   }
 }
 
-// ─── Daily usage limit (localStorage) ───
-const DAILY_LIMIT = 5;
-const STORAGE_KEY = "pyeonharu_symptom_usage";
-
-function getUsageToday(): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    const today = new Date().toISOString().split("T")[0];
-    return d.date === today ? d.count : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function incrementUsage(): number {
-  const today = new Date().toISOString().split("T")[0];
-  const n = getUsageToday() + 1;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: today, count: n }));
-  return n;
-}
+// ─── Daily usage limit (서버 기반) ───
 
 // ═══════════════════════════════════════
 // Main component
@@ -123,6 +103,7 @@ function SymptomContent() {
     useState<NearbyHospital | null>(null);
   const [error, setError] = useState("");
   const [usageCount, setUsageCount] = useState(0);
+  const [dailyLimit, setDailyLimit] = useState(5);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -131,7 +112,14 @@ function SymptomContent() {
   const hasAutoAnalyzed = useRef(false);
 
   useEffect(() => {
-    setUsageCount(getUsageToday());
+    // 서버에서 실제 잔여 횟수 조회
+    fetch("/api/symptom-analyze")
+      .then((r) => r.json())
+      .then((data) => {
+        setUsageCount(data.used || 0);
+        setDailyLimit(data.limit || 5);
+      })
+      .catch(() => {});
     // 사용자 위치
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -148,7 +136,7 @@ function SymptomContent() {
     }
   }, []);
 
-  const remaining = DAILY_LIMIT - usageCount;
+  const remaining = Math.max(dailyLimit - usageCount, 0);
   const limitReached = remaining <= 0;
 
   const runAnalysis = useCallback(
@@ -195,7 +183,7 @@ function SymptomContent() {
         );
         setHospitals(nearbyHospitals);
 
-        setUsageCount(incrementUsage());
+        setUsageCount((prev) => prev + 1);
         setScreen("result");
       } catch {
         timers.forEach(clearTimeout);
@@ -234,6 +222,7 @@ function SymptomContent() {
             symptom={symptom}
             setSymptom={setSymptom}
             remaining={remaining}
+            dailyLimit={dailyLimit}
             limitReached={limitReached}
             error={error}
             setError={setError}
@@ -294,6 +283,7 @@ function InputScreen({
   symptom,
   setSymptom,
   remaining,
+  dailyLimit,
   limitReached,
   error,
   setError,
@@ -302,6 +292,7 @@ function InputScreen({
   symptom: string;
   setSymptom: (v: string) => void;
   remaining: number;
+  dailyLimit: number;
   limitReached: boolean;
   error: string;
   setError: (v: string) => void;
@@ -395,7 +386,7 @@ function InputScreen({
         >
           {limitReached
             ? "오늘 분석 횟수를 모두 사용했습니다"
-            : `오늘 남은 분석 횟수 ${remaining}/${DAILY_LIMIT}`}
+            : `오늘 남은 분석 횟수 ${remaining}/${dailyLimit}`}
         </p>
       </div>
     </div>

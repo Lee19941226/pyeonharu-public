@@ -134,8 +134,12 @@ export async function GET(req: NextRequest) {
     query = query.eq("school_code", schoolCode);
   }
 
-  if (search)
-    query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+  if (search) {
+    // PostgREST .or() 파서에서 특수문자가 구분자로 해석되는 것을 방지
+    const safeSearch = search.replace(/[,.()"'\\]/g, "");
+    if (safeSearch)
+      query = query.or(`title.ilike.%${safeSearch}%,content.ilike.%${safeSearch}%`);
+  }
 
   if (sort === "popular") {
     query = query

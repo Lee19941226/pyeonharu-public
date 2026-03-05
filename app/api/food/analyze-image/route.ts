@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
@@ -15,27 +16,36 @@ export async function POST(req: NextRequest) {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
-  // ─── 인증 체크 추가 ───
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { error: "로그인이 필요합니다." },
-      { status: 401 },
-    );
+
+  // ─── DB 기반 Rate Limit (비회원 1회/일, 로그인 2회/일) ───
+  let identifier: string;
+  let limit: number;
+
+  if (user) {
+    identifier = `analyze:user:${user.id}`;
+    limit = 2;
+  } else {
+    const headersList = await headers();
+    const ip =
+      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      headersList.get("x-real-ip") ||
+      "unknown";
+    identifier = `analyze:ip:${ip}`;
+    limit = 1;
   }
 
-  const identifier = `user:${user.id}`;
-  const limit = 50;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
   const { count } = await supabase
     .from("image_analyze_rate_limits")
     .select("*", { count: "exact", head: true })
-    .eq("identifier", `analyze:${identifier}`)
+    .eq("identifier", identifier)
     .gte("analyzed_at", todayStart.toISOString());
 
   if ((count || 0) >= limit) {
@@ -43,7 +53,7 @@ export async function POST(req: NextRequest) {
       {
         error: user
           ? `오늘 이미지 분석 한도(${limit}회)를 초과했습니다.`
-          : "오늘 무료 분석 한도를 초과했습니다. 로그인하면 더 많이 사용할 수 있어요.",
+          : `일일 무료 분석 횟수(${limit}회)를 초과했습니다. 로그인하시면 더 많이 사용할 수 있어요.`,
       },
       { status: 429 },
     );
@@ -52,7 +62,7 @@ export async function POST(req: NextRequest) {
   supabase
     .from("image_analyze_rate_limits")
     .insert({
-      identifier: `analyze:${identifier}`,
+      identifier,
       analyzed_at: new Date().toISOString(),
     })
     .then(() => {});

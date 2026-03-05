@@ -6,7 +6,7 @@ import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET(req: NextRequest) {
-  // ✅ OpenAI 비용 통제
+  // ✅ 인메모리 Rate Limit (보조)
   const rateCheck = checkOpenAIRateLimit("meal-recommend");
   if (!rateCheck.allowed) {
     return NextResponse.json(
@@ -21,6 +21,30 @@ export async function GET(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user)
       return NextResponse.json({ error: "로그인 필요" }, { status: 401 });
+
+    // ─── DB 기반 Rate Limit (무료 로그인: 1회/일) ───
+    const identifier = `meal:user:${user.id}`;
+    const dailyLimit = 1;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { count: dailyCount } = await supabase
+      .from("image_analyze_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", identifier)
+      .gte("analyzed_at", todayStart.toISOString());
+
+    if ((dailyCount || 0) >= dailyLimit) {
+      return NextResponse.json(
+        { error: `오늘 메뉴 추천 한도(${dailyLimit}회)를 초과했습니다.` },
+        { status: 429 },
+      );
+    }
+
+    supabase
+      .from("image_analyze_rate_limits")
+      .insert({ identifier, analyzed_at: new Date().toISOString() })
+      .then(() => {});
 
     // ─── 1. 사용자 알레르기 ───
     const { data: allergies } = await supabase
