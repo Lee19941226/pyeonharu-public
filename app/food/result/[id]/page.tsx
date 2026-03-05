@@ -898,43 +898,69 @@ export default function FoodResultPage() {
             )}
             {/* 안전 여부 카드 - 안전 */}
             {result.isSafe && (
-              <Card className="mb-6 border-green-600 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+              isLoggedIn && safeUserAllergens.length === 0 ? (
+                <Card className="mb-6 border-amber-500 bg-amber-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                        <Info className="h-6 w-6 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-lg font-bold text-amber-900">
+                          알레르기 정보가 없습니다
+                        </h2>
+                        <p className="text-sm text-amber-700">
+                          등록된 알레르기가 없어 맞춤 분석을 할 수 없어요
+                        </p>
+                        <Link
+                          href="/food/profile"
+                          className="mt-1 inline-block text-sm font-medium text-amber-700 underline hover:text-amber-900"
+                        >
+                          알레르기 등록하고 맞춤 분석 받기 →
+                        </Link>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h2 className="text-lg font-bold text-green-900">
-                        안전합니다!
-                      </h2>
-                      {isLoggedIn ? (
-                        <>
-                          <p className="text-sm text-green-700">
-                            {userName ? `${userName}님의` : ""} 알레르기 성분이
-                            포함되지 않았습니다
-                          </p>
-                          <p className="text-sm text-green-700">
-                            안심하고 드셔도 좋습니다
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-green-700">
-                            확인된 알레르기 성분이 없습니다
-                          </p>
-                          <Link
-                            href="/food/profile"
-                            className="text-sm text-green-600 underline hover:text-green-800"
-                          >
-                            내 알레르기 정보를 등록하고 정확하게 확인하세요 →
-                          </Link>
-                        </>
-                      )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="mb-6 border-green-600 bg-green-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                        <CheckCircle className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-lg font-bold text-green-900">
+                          안전합니다!
+                        </h2>
+                        {isLoggedIn ? (
+                          <>
+                            <p className="text-sm text-green-700">
+                              {userName ? `${userName}님의` : ""} 알레르기 성분이
+                              포함되지 않았습니다
+                            </p>
+                            <p className="text-sm text-green-700">
+                              안심하고 드셔도 좋습니다
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm text-green-700">
+                              확인된 알레르기 성분이 없습니다
+                            </p>
+                            <Link
+                              href="/food/profile"
+                              className="text-sm text-green-600 underline hover:text-green-800"
+                            >
+                              내 알레르기 정보를 등록하고 정확하게 확인하세요 →
+                            </Link>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )
             )}
             {/* 안전 여부 카드 - 위험 */}
             {!result.isSafe && (

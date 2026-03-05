@@ -103,6 +103,15 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
                 .select("allergen_name")
                 .eq("user_id", user.id);
               if (data) userAllergens = data.map((item) => item.allergen_name);
+              if (userAllergens.length === 0) {
+                toast.info("알레르기를 등록하면 맞춤 분석 결과를 알려드려요!", {
+                  action: {
+                    label: "등록하기",
+                    onClick: () => router.push("/food/profile"),
+                  },
+                  duration: 5000,
+                });
+              }
             }
 
             const response = await fetch("/api/food/analyze-image", {
