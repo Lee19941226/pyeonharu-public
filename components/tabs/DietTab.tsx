@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1653,17 +1654,26 @@ export default function DietTab() {
       </div>
 
       {/* ✅ 기록하기 바텀시트 (촬영/앨범/직접입력 선택) */}
-      {showRecordSheet && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50"
-          onClick={() => setShowRecordSheet(false)}
-        >
-          <div
-            className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3"
+      <AnimatePresence>
+        {showRecordSheet && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-end justify-center"
+            onClick={() => setShowRecordSheet(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+          <motion.div
+            className="w-full max-w-md rounded-t-2xl bg-background p-5 space-y-3"
             style={{
               paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
             }}
             onClick={(e) => e.stopPropagation()}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
             <div className="text-center">
@@ -1754,9 +1764,10 @@ export default function DietTab() {
             >
               취소
             </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ═══ 직접 입력 모달 (AI 추정 기능 + 사진 첨부) ═══ */}
       {showManualInput && (
@@ -2009,17 +2020,26 @@ export default function DietTab() {
       )}
 
       {/* ✅ 학교 선택 모달 */}
-      {showSchoolSelect && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50"
-          onClick={() => setShowSchoolSelect(false)}
-        >
-          <div
-            className="w-full max-w-md animate-in slide-in-from-bottom duration-200 rounded-t-2xl bg-background p-5 space-y-3"
+      <AnimatePresence>
+        {showSchoolSelect && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-end justify-center"
+            onClick={() => setShowSchoolSelect(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+          <motion.div
+            className="w-full max-w-md rounded-t-2xl bg-background p-5 space-y-3"
             style={{
               paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
             }}
             onClick={(e) => e.stopPropagation()}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
             <div className="text-center">
@@ -2192,9 +2212,10 @@ export default function DietTab() {
             >
               취소
             </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ✅ 급식 메뉴 선택 모달 */}
       {showMealSelect && (

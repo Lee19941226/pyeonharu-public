@@ -36,6 +36,9 @@ npm install @capacitor/app
 npx cap sync
 pnpm add @capacitor/status-bar
 
+2026-03-05 17:21 이용재
+npm install framer-motion
+
 ---
 
 # 1. 편하루 프로젝트로 이동

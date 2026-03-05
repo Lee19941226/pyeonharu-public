@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useRef, useMemo } from "react";
+import { motion } from "framer-motion";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Input } from "@/components/ui/input";
@@ -1144,14 +1145,26 @@ function FoodSearchPageInner() {
                       </div>
                     )}
                     {/* ✅ 결과 목록 - 여백 줄임 */}
-                    <div className="space-y-2">
+                    <motion.div
+                      className="space-y-2"
+                      initial="hidden"
+                      animate="visible"
+                      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+                    >
                       {currentResults.map((item) => {
                         // ✅ 알레르기 위험 여부
                         const isDangerous = item.hasAllergen;
 
                         return (
-                          <Card
+                          <motion.div
                             key={item.foodCode}
+                            variants={{
+                              hidden: { opacity: 0, y: 20 },
+                              visible: { opacity: 1, y: 0, transition: { duration: 0.15, ease: "easeOut" } },
+                            }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                          <Card
                             className={`cursor-pointer transition-all hover:shadow-md ${
                               isDangerous
                                 ? "border-red-300 bg-red-50 hover:bg-red-100"
@@ -1239,9 +1252,10 @@ function FoodSearchPageInner() {
                               </div>
                             </CardContent>
                           </Card>
+                          </motion.div>
                         );
                       })}
-                    </div>
+                    </motion.div>
 
                     {/* ✅ 페이지네이션 */}
                     {totalPages > 1 && (
