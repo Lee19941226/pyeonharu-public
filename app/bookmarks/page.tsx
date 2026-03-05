@@ -79,25 +79,19 @@ export default function BookmarksPage() {
   const loadBookmarks = async () => {
     setBookmarkLoading(true);
     try {
-      const [hospitalRes, pharmacyRes, foodRes] = await Promise.all([
-        fetch("/api/bookmarks?type=hospital"),
-        fetch("/api/bookmarks?type=pharmacy"),
+      const [bookmarkRes, foodRes] = await Promise.all([
+        fetch("/api/bookmarks"),
         fetch("/api/food/favorites"),
       ]);
 
-      if (hospitalRes.ok) {
-        const hospitalData = await hospitalRes.json();
-        setHospitals(hospitalData.bookmarks || []);
-      }
-
-      if (pharmacyRes.ok) {
-        const pharmacyData = await pharmacyRes.json();
-        setPharmacies(pharmacyData.bookmarks || []);
+      if (bookmarkRes.ok) {
+        const data = await bookmarkRes.json();
+        setHospitals(data.hospitals || []);
+        setPharmacies(data.pharmacies || []);
       }
 
       if (foodRes.ok) {
         const foodData = await foodRes.json();
-        console.log("✅ 음식 즐겨찾기:", foodData.favorites);
         setFoods(foodData.favorites || []);
       }
     } catch (error) {
