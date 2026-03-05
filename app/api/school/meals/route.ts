@@ -25,20 +25,19 @@ const NEIS_ALLERGEN_MAP: Record<string, string> = {
 }
 
 // 교차오염 가능성 매핑
-// key: 사용자 알레르기, value: 교차오염 가능성이 있는 알레르기 성분들
 const CROSS_CONTAMINATION_MAP: Record<string, string[]> = {
-  "계란": ["닭고기"],           // 계란 알레르기 → 닭고기 교차반응
-  "우유": ["쇠고기"],           // 우유 알레르기 → 쇠고기 교차반응
-  "게": ["새우", "조개류"],      // 갑각류 교차반응
-  "새우": ["게", "조개류"],      // 갑각류 교차반응
-  "조개류": ["게", "새우"],      // 갑각류 교차반응
-  "땅콩": ["대두", "호두", "잣"], // 견과류/콩류 교차반응
-  "호두": ["땅콩", "잣"],        // 견과류 교차반응
-  "잣": ["땅콩", "호두"],        // 견과류 교차반응
-  "대두": ["땅콩"],             // 콩류 교차반응
-  "밀": ["메밀"],               // 곡류 교차반응 (글루텐 관련)
-  "고등어": ["오징어"],          // 해산물 교차반응
-  "오징어": ["고등어"],          // 해산물 교차반응
+  "계란": ["닭고기"],
+  "우유": ["쇠고기"],
+  "게": ["새우", "조개류"],
+  "새우": ["게", "조개류"],
+  "조개류": ["게", "새우"],
+  "땅콩": ["대두", "호두", "잣"],
+  "호두": ["땅콩", "잣"],
+  "잣": ["땅콩", "호두"],
+  "대두": ["땅콩"],
+  "밀": ["메밀"],
+  "고등어": ["오징어"],
+  "오징어": ["고등어"],
 }
 
 interface ParsedMenuItem {
@@ -46,6 +45,11 @@ interface ParsedMenuItem {
   allergenNumbers: string[]
   allergenNames: string[]
 }
+
+type CheckedMember =
+  | { type: "unknown" }
+  | { type: "self" }
+  | { type: "member"; memberId: string; name: string; relation: string; avatarEmoji: string }
 
 // "닭살카레볶음*2.5.6.13.15." → { name, allergenNumbers, allergenNames }
 function parseMenuItem(raw: string): ParsedMenuItem {
@@ -80,6 +84,7 @@ export async function GET(req: NextRequest) {
     const officeCode = searchParams.get("officeCode") || ""
     const date = searchParams.get("date") || ""  // YYYYMMDD
     const mode = searchParams.get("mode") || "day" // "day" | "week"
+    const memberId = searchParams.get("memberId") || null
 
     if (!schoolCode || !officeCode) {
       return NextResponse.json({ error: "schoolCode와 officeCode가 필요합니다." }, { status: 400 })
@@ -111,22 +116,51 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    // 이번 주 모드: 월~금 날짜 계산
+    // ── memberId 소유권 검증 및 checkedMember 구성 ──────────────────
+    let checkedMember: CheckedMember = { type: "unknown" }
+
+    if (user) {
+      if (memberId) {
+        const { data: member } = await supabase
+          .from("family_members")
+          .select("id, name, relation, avatar_emoji")
+          .eq("id", memberId)
+          .eq("owner_id", user.id)
+          .maybeSingle()
+
+        if (!member) {
+          return NextResponse.json({ error: "유효하지 않은 가족 구성원입니다." }, { status: 403 })
+        }
+
+        checkedMember = {
+          type: "member",
+          memberId: member.id,
+          name: member.name,
+          relation: member.relation,
+          avatarEmoji: member.avatar_emoji,
+        }
+      } else {
+        checkedMember = { type: "self" }
+      }
+    }
+
+    // ── 이번 주 모드 ─────────────────────────────────────────────────
     if (mode === "week") {
       const weekDates = getWeekDates(targetDate)
       const weekResults: { date: string; meals: any[] }[] = []
 
       for (const d of weekDates) {
         const dayMeals = await fetchMealsForDate(supabase, schoolCode, officeCode, d)
-        const matched = await matchUserAllergens(supabase, dayMeals)
+        const matched = await matchAllergens(supabase, dayMeals, user, memberId)
         weekResults.push({ date: d, meals: matched })
       }
 
-      return NextResponse.json({ week: weekResults, baseDate: targetDate })
+      return NextResponse.json({ week: weekResults, baseDate: targetDate, checkedMember })
     }
 
-    // 단일 날짜 모드 (기존)
+    // ── 단일 날짜 모드 ───────────────────────────────────────────────
     // 1. 캐시 확인
     const { data: cached } = await supabase
       .from("school_meals_cache")
@@ -146,15 +180,20 @@ export async function GET(req: NextRequest) {
         originInfo: c.origin_info,
       }))
 
-      const matchedMeals = await matchUserAllergens(supabase, meals)
-      return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true })
+      const matchedMeals = await matchAllergens(supabase, meals, user, memberId)
+      return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
     }
 
     // 2. 나이스 API 호출
     const meals = await fetchFromNeis(schoolCode, officeCode, targetDate)
 
     if (meals.length === 0) {
-      return NextResponse.json({ meals: [], date: targetDate, message: "해당 날짜의 급식 정보가 없습니다." })
+      return NextResponse.json({
+        meals: [],
+        date: targetDate,
+        message: "해당 날짜의 급식 정보가 없습니다.",
+        checkedMember,
+      })
     }
 
     // 3. 캐시 저장
@@ -170,17 +209,17 @@ export async function GET(req: NextRequest) {
       }, { onConflict: "school_code,meal_date,meal_type" })
     }
 
-    // 4. 사용자 알레르기 매칭
-    const matchedMeals = await matchUserAllergens(supabase, meals)
+    // 4. 알레르기 매칭
+    const matchedMeals = await matchAllergens(supabase, meals, user, memberId)
 
-    return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false })
+    return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })
   } catch (error) {
     console.error("[Meals] Error:", error)
     return NextResponse.json({ error: "급식 정보 조회에 실패했습니다." }, { status: 500 })
   }
 }
 
-// 나이스 API에서 급식 데이터 가져오기
+// ── 나이스 API에서 급식 데이터 가져오기 ──────────────────────────────
 async function fetchFromNeis(schoolCode: string, officeCode: string, targetDate: string) {
   const apiKey = process.env.NEIS_API_KEY || ""
   const url = new URL("https://open.neis.go.kr/hub/mealServiceDietInfo")
@@ -217,9 +256,8 @@ async function fetchFromNeis(schoolCode: string, officeCode: string, targetDate:
   })
 }
 
-// 특정 날짜의 급식 가져오기 (캐시 → 나이스 API)
+// ── 특정 날짜의 급식 가져오기 (캐시 → 나이스 API) ────────────────────
 async function fetchMealsForDate(supabase: any, schoolCode: string, officeCode: string, targetDate: string) {
-  // 캐시 확인
   const { data: cached } = await supabase
     .from("school_meals_cache")
     .select("*")
@@ -237,10 +275,8 @@ async function fetchMealsForDate(supabase: any, schoolCode: string, officeCode: 
     }))
   }
 
-  // 나이스 API
   const meals = await fetchFromNeis(schoolCode, officeCode, targetDate)
 
-  // 캐시 저장
   for (const meal of meals) {
     await supabase.from("school_meals_cache").upsert({
       school_code: schoolCode,
@@ -256,20 +292,19 @@ async function fetchMealsForDate(supabase: any, schoolCode: string, officeCode: 
   return meals
 }
 
-// 이번 주 월~금 날짜 배열 계산
+// ── 이번 주 월~금 날짜 배열 계산 ─────────────────────────────────────
 function getWeekDates(baseDate: string): string[] {
   const y = Number(baseDate.slice(0, 4))
   const m = Number(baseDate.slice(4, 6)) - 1
   const d = Number(baseDate.slice(6, 8))
   const date = new Date(y, m, d)
-  const dayOfWeek = date.getDay() // 0=일, 1=월, ..., 6=토
+  const dayOfWeek = date.getDay()
 
-  // 월요일 찾기
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
   const monday = new Date(y, m, d + mondayOffset)
 
   const dates: string[] = []
-  for (let i = 0; i < 5; i++) { // 월~금
+  for (let i = 0; i < 5; i++) {
     const target = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)
     const ty = target.getFullYear()
     const tm = String(target.getMonth() + 1).padStart(2, "0")
@@ -280,37 +315,57 @@ function getWeekDates(baseDate: string): string[] {
   return dates
 }
 
-// 사용자 알레르기와 급식 메뉴 매칭 (교차오염 포함)
-async function matchUserAllergens(supabase: any, meals: any[]) {
-  const { data: { user } } = await supabase.auth.getUser()
+// ── 알레르기 매칭 핵심 로직 ───────────────────────────────────────────
+// memberId 없음 → user_allergies (본인)
+// memberId 있음 → family_member_allergies (해당 구성원)
+async function matchAllergens(
+  supabase: any,
+  meals: any[],
+  user: any,
+  memberId: string | null,
+) {
+  const unknownResult = meals.map(meal => ({
+    ...meal,
+    menu: meal.menu.map((item: ParsedMenuItem) => ({
+      ...item,
+      status: "unknown" as const,
+      matchedAllergens: [],
+      crossAllergens: [],
+    })),
+  }))
 
-  if (!user) {
-    return meals.map(meal => ({
-      ...meal,
-      menu: meal.menu.map((item: ParsedMenuItem) => ({
-        ...item,
-        status: "unknown" as const,
-        matchedAllergens: [],
-        crossAllergens: [],
-      })),
-    }))
+  if (!user) return unknownResult
+
+  // 알레르기 목록 조회 (본인 or 구성원 분기)
+  let allergenNames: string[] = []
+
+  if (memberId) {
+    const { data: memberAllergens } = await supabase
+      .from("family_member_allergies")
+      .select("allergen_name")
+      .eq("member_id", memberId)
+
+    allergenNames = (memberAllergens || []).map(
+      (a: { allergen_name: string }) => a.allergen_name,
+    )
+  } else {
+    const { data: userAllergens } = await supabase
+      .from("user_allergies")
+      .select("allergen_name")
+      .eq("user_id", user.id)
+
+    allergenNames = (userAllergens || []).map(
+      (a: { allergen_name: string }) => a.allergen_name,
+    )
   }
 
-  const { data: userAllergens } = await supabase
-    .from("user_allergies")
-    .select("allergen_name")
-    .eq("user_id", user.id)
-
-  const userAllergenNames = (userAllergens || []).map((a: { allergen_name: string }) => a.allergen_name)
-
-  // 사용자 알레르기 기반 교차오염 대상 목록 생성
+  // 교차오염 대상 목록 생성
   const crossTargets: Set<string> = new Set()
-  for (const ua of userAllergenNames) {
+  for (const ua of allergenNames) {
     const crossList = CROSS_CONTAMINATION_MAP[ua]
     if (crossList) {
       for (const cross of crossList) {
-        // 이미 직접 알레르기인 것은 제외 (danger로 잡히므로)
-        if (!userAllergenNames.some((n: string) => n.includes(cross) || cross.includes(n))) {
+        if (!allergenNames.some((n: string) => n.includes(cross) || cross.includes(n))) {
           crossTargets.add(cross)
         }
       }
@@ -322,7 +377,7 @@ async function matchUserAllergens(supabase: any, meals: any[]) {
     menu: meal.menu.map((item: ParsedMenuItem) => {
       // 1. 직접 매칭 (danger)
       const matched = item.allergenNames.filter(name =>
-        userAllergenNames.some((ua: string) =>
+        allergenNames.some((ua: string) =>
           name.includes(ua) || ua.includes(name)
         )
       )
