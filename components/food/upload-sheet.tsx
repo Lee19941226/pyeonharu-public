@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
 import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 interface UploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,17 +30,6 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
     reason: "scan_limit" | "scan_warning" | "feature";
     remainingScans?: number;
   }>({ open: false, reason: "scan_warning" });
-
-  const [usageInfo, setUsageInfo] = useState<{ remaining: number; limit: number } | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      fetch("/api/food/analyze-image")
-        .then((r) => r.json())
-        .then((data) => setUsageInfo({ remaining: data.remaining, limit: data.limit }))
-        .catch(() => {});
-    }
-  }, [open]);
 
   // ==========================================
   // 파일 업로드 (AI 분석만)
@@ -224,12 +213,6 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
             </div>
           </button>
         </div>
-
-        {usageInfo && (
-          <div className="rounded-lg bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
-            오늘 남은 AI 분석 횟수 <strong className={usageInfo.remaining === 0 ? "text-destructive" : "text-primary"}>{usageInfo.remaining}</strong>/{usageInfo.limit}회
-          </div>
-        )}
 
         <div className="mt-4 rounded-lg bg-blue-50 p-3">
           <p className="text-xs text-blue-900">
