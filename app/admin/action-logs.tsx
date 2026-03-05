@@ -8,6 +8,7 @@ import {
   Loader2,
   User,
   UserPlus,
+  LogIn,
   Clock,
   Globe,
   Filter,
@@ -49,6 +50,11 @@ const ACTION_CONFIG: Record<
   string,
   { label: string; color: string; icon: typeof Search }
 > = {
+  login: {
+    label: "로그인",
+    color: "bg-sky-100 text-sky-800",
+    icon: LogIn,
+  },
   signup: {
     label: "신규 가입",
     color: "bg-green-100 text-green-800",
