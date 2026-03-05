@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Search,
   Star,
@@ -12,6 +19,7 @@ import {
   ChevronDown,
   ShieldCheck,
   RefreshCw,
+  ArrowUpDown,
 } from "lucide-react";
 
 const QUICK_DEPARTMENTS = [
@@ -40,7 +48,11 @@ interface DoctorSummary {
   avgRating: number;
   reviewCount: number;
   diseases: DiseaseStat[];
+  hospitalLat: number | null;
+  hospitalLng: number | null;
 }
+
+type SortMode = "rating" | "reviews" | "distance";
 
 interface DoctorReviewDetail {
   id: string;
@@ -53,6 +65,17 @@ interface DoctorReviewDetail {
   createdAt: string;
 }
 
+// ── 거리 계산 (Haversine) ──
+function calcDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // ── 모듈 레벨 캐시 (SPA 내비게이션 간 유지, 5분 TTL) ──
 const CACHE_TTL = 5 * 60 * 1000;
 const doctorListCache = new Map<string, { data: DoctorSummary[]; ts: number }>();
@@ -61,12 +84,26 @@ const doctorDetailCache = new Map<string, { data: DoctorReviewDetail[]; ts: numb
 export default function DoctorTab() {
   const [query, setQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
+  const [selectedDisease, setSelectedDisease] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("rating");
   const [doctors, setDoctors] = useState<DoctorSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [detailReviews, setDetailReviews] = useState<DoctorReviewDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // 사용자 위치 (거리 정렬용)
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {},
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 },
+      );
+    }
+  }, []);
 
   const fetchDoctors = useCallback(async (q: string, dept: string, skipCache = false) => {
     setHasSearched(true);
@@ -151,6 +188,44 @@ export default function DoctorTab() {
     fetchDoctors(query, selectedDept, true);
   };
 
+  // 현재 데이터에서 질병 목록 추출
+  const availableDiseases = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of doctors) {
+      for (const ds of d.diseases) set.add(ds.name);
+    }
+    return Array.from(set).sort();
+  }, [doctors]);
+
+  // 질병 필터가 바뀌면 선택값 유효성 체크
+  useEffect(() => {
+    if (selectedDisease && !availableDiseases.includes(selectedDisease)) {
+      setSelectedDisease("");
+    }
+  }, [availableDiseases, selectedDisease]);
+
+  // 필터 + 정렬 적용
+  const displayDoctors = useMemo(() => {
+    let list = doctors;
+
+    // 질병 필터
+    if (selectedDisease) {
+      list = list.filter((d) => d.diseases.some((ds) => ds.name === selectedDisease));
+    }
+
+    // 정렬
+    return [...list].sort((a, b) => {
+      if (sortMode === "rating") return b.avgRating - a.avgRating || b.reviewCount - a.reviewCount;
+      if (sortMode === "reviews") return b.reviewCount - a.reviewCount || b.avgRating - a.avgRating;
+      if (sortMode === "distance" && userLocation) {
+        const distA = a.hospitalLat ? calcDistanceKm(userLocation.lat, userLocation.lng, a.hospitalLat, a.hospitalLng!) : 99999;
+        const distB = b.hospitalLat ? calcDistanceKm(userLocation.lat, userLocation.lng, b.hospitalLat, b.hospitalLng!) : 99999;
+        return distA - distB;
+      }
+      return 0;
+    });
+  }, [doctors, selectedDisease, sortMode, userLocation]);
+
   return (
     <div className="container mx-auto px-4 pt-3">
       <div className="mx-auto max-w-2xl">
@@ -183,7 +258,7 @@ export default function DoctorTab() {
         </div>
 
         {/* 진료과 필터 */}
-        <div className="mb-4 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex flex-wrap gap-1.5">
           {QUICK_DEPARTMENTS.map((dept) => (
             <Badge
               key={dept}
@@ -196,18 +271,48 @@ export default function DoctorTab() {
           ))}
         </div>
 
+        {/* 질병 필터 + 정렬 */}
+        <div className="mb-4 flex items-center gap-2">
+          {availableDiseases.length > 0 && (
+            <Select value={selectedDisease} onValueChange={(v) => setSelectedDisease(v === "all" ? "" : v)}>
+              <SelectTrigger className="h-7 w-auto min-w-[100px] text-xs">
+                <SelectValue placeholder="질병 전체" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">질병 전체</SelectItem>
+                {availableDiseases.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+            <SelectTrigger className="h-7 w-auto min-w-[100px] text-xs">
+              <ArrowUpDown className="mr-1 h-3 w-3" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="rating">별점 순</SelectItem>
+              <SelectItem value="reviews">리뷰 많은 순</SelectItem>
+              <SelectItem value="distance">거리 순</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* 결과 */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : doctors.length === 0 ? (
+        ) : displayDoctors.length === 0 ? (
           <div className="py-16 text-center">
             <UserRound className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">
-              {hasSearched && query
-                ? "검색 결과가 없습니다"
-                : "아직 의사 리뷰가 없습니다"}
+              {selectedDisease
+                ? `"${selectedDisease}" 관련 의사가 없습니다`
+                : hasSearched && query
+                  ? "검색 결과가 없습니다"
+                  : "아직 의사 리뷰가 없습니다"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               병원 상세 페이지에서 진료받은 의사 리뷰를 남겨보세요
@@ -223,7 +328,7 @@ export default function DoctorTab() {
               <span className="w-10 shrink-0 text-center">종합</span>
             </div>
             {/* 테이블 바디 */}
-            {doctors.map((doctor, idx) => {
+            {displayDoctors.map((doctor, idx) => {
               const key = `${doctor.doctorName}::${doctor.hospitalName}`;
               const isExpanded = expandedKey === key;
               return (
@@ -235,7 +340,17 @@ export default function DoctorTab() {
                   >
                     <span className="w-24 shrink-0 text-sm font-semibold truncate">{doctor.doctorName}</span>
                     <Badge variant="secondary" className="w-20 shrink-0 justify-center text-[10px] px-1.5 py-0">{doctor.department}</Badge>
-                    <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{doctor.hospitalName}</span>
+                    <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                      {doctor.hospitalName}
+                      {sortMode === "distance" && userLocation && doctor.hospitalLat && (
+                        <span className="ml-1 text-[10px] text-primary">
+                          {(() => {
+                            const d = calcDistanceKm(userLocation.lat, userLocation.lng, doctor.hospitalLat!, doctor.hospitalLng!);
+                            return d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
+                          })()}
+                        </span>
+                      )}
+                    </span>
                     <div className="w-10 shrink-0 flex items-center justify-center gap-0.5">
                       <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                       <span className="text-xs font-semibold">{doctor.avgRating}</span>

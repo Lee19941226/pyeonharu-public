@@ -230,6 +230,8 @@ function HospitalDetailContent() {
         body: JSON.stringify({
           hospitalName: name.trim(),
           hospitalAddress: address.trim(),
+          hospitalLat: lat || null,
+          hospitalLng: lng || null,
           doctorName: drDoctorName.trim(),
           department: drDepartment,
           diseaseName: drDiseaseName.trim(),

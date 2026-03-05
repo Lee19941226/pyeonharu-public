@@ -126,6 +126,8 @@ export async function GET(req: NextRequest) {
       ratings: number[];
       diseaseRatings: Record<string, number[]>;
       latestDate: string;
+      hospitalLat: number | null;
+      hospitalLng: number | null;
     }
   > = {};
 
@@ -139,9 +141,16 @@ export async function GET(req: NextRequest) {
         ratings: [],
         diseaseRatings: {},
         latestDate: r.created_at,
+        hospitalLat: r.hospital_lat || null,
+        hospitalLng: r.hospital_lng || null,
       };
     }
     grouped[key].ratings.push(r.rating);
+    // 좌표가 없으면 다른 리뷰에서 가져오기
+    if (!grouped[key].hospitalLat && r.hospital_lat) {
+      grouped[key].hospitalLat = r.hospital_lat;
+      grouped[key].hospitalLng = r.hospital_lng;
+    }
     if (r.disease_name) {
       if (!grouped[key].diseaseRatings[r.disease_name]) {
         grouped[key].diseaseRatings[r.disease_name] = [];
@@ -173,6 +182,8 @@ export async function GET(req: NextRequest) {
         reviewCount: g.ratings.length,
         diseases: diseaseStats,
         latestDate: g.latestDate,
+        hospitalLat: g.hospitalLat,
+        hospitalLng: g.hospitalLng,
       };
     })
     // 평균 별점 내림차순, 리뷰 수 내림차순
@@ -205,7 +216,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { hospitalName, hospitalAddress, doctorName, department, diseaseName, rating, content, verificationImageUrl } =
+  const { hospitalName, hospitalAddress, doctorName, department, diseaseName, rating, content, verificationImageUrl, hospitalLat, hospitalLng } =
     body;
 
   if (!hospitalName?.trim()) {
@@ -258,6 +269,8 @@ export async function POST(req: NextRequest) {
         disease_name: stripHtml(diseaseName).slice(0, 100),
         rating: Math.round(rating),
         content: cleanContent || null,
+        hospital_lat: hospitalLat ? Number(hospitalLat) : null,
+        hospital_lng: hospitalLng ? Number(hospitalLng) : null,
         is_verified: !!verificationImageUrl,
         verification_image_url: verificationImageUrl || null,
         review_date: today,
