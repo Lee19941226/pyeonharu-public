@@ -1144,10 +1144,22 @@ export default function RestaurantTab() {
                             )}
                           </div>
 
-                          {/* 주소 */}
-                          <p className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
-                            {restaurant.roadAddress || restaurant.address}
-                          </p>
+                          {/* 주소 + 전화번호 */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {restaurant.roadAddress || restaurant.address}
+                            </p>
+                            {restaurant.phone && (
+                              <a
+                                href={`tel:${restaurant.phone}`}
+                                className="text-[10px] text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Phone className="mr-0.5 inline h-2.5 w-2.5" />
+                                {restaurant.phone}
+                              </a>
+                            )}
+                          </div>
 
                           {/* 알레르기 매칭 태그 */}
                           {restaurant.matchedAllergens.length > 0 && (
