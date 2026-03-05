@@ -39,6 +39,10 @@ import {
   Edit3,
   UserRound,
   Flag,
+  ShieldCheck,
+  Camera,
+  Loader2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NaverMap } from "@/components/medical/naver-map";
@@ -119,6 +123,7 @@ interface Review {
   id: string;
   rating: number;
   memo: string;
+  isVerified: boolean;
   isMine: boolean;
   createdAt: string;
 }
@@ -130,6 +135,7 @@ interface DoctorReview {
   diseaseName: string;
   rating: number;
   content: string;
+  isVerified: boolean;
   isMine: boolean;
   createdAt: string;
 }
@@ -159,6 +165,9 @@ function HospitalDetailContent() {
   const [newRating, setNewRating] = useState(0);
   const [newMemo, setNewMemo] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+  // 병원 리뷰 인증
+  const [reviewVerificationUrl, setReviewVerificationUrl] = useState<string | null>(null);
+  const [reviewVerifying, setReviewVerifying] = useState(false);
 
   // 의사 리뷰 상태
   const [doctorReviews, setDoctorReviews] = useState<DoctorReview[]>([]);
@@ -170,6 +179,9 @@ function HospitalDetailContent() {
   const [drContent, setDrContent] = useState("");
   const [drLoading, setDrLoading] = useState(false);
   const [drManualInput, setDrManualInput] = useState(false);
+  // 의사 리뷰 인증
+  const [drVerificationUrl, setDrVerificationUrl] = useState<string | null>(null);
+  const [drVerifying, setDrVerifying] = useState(false);
 
   // 기존 리뷰에서 의사명 목록 추출
   const existingDoctorNames = useMemo(() => {
@@ -223,6 +235,7 @@ function HospitalDetailContent() {
           diseaseName: drDiseaseName.trim(),
           rating: drRating,
           content: drContent.trim(),
+          verificationImageUrl: drVerificationUrl,
         }),
       });
       if (res.status === 401) { toast.error("로그인이 필요합니다."); return; }
@@ -233,6 +246,7 @@ function HospitalDetailContent() {
       setShowDoctorForm(false);
       setDrDoctorName(""); setDrDepartment(""); setDrDiseaseName("");
       setDrRating(0); setDrContent(""); setDrManualInput(false);
+      setDrVerificationUrl(null);
       fetchDoctorReviews();
     } catch {
       toast.error("저장에 실패했습니다.");
@@ -317,6 +331,7 @@ function HospitalDetailContent() {
           address: address.trim(),
           rating: newRating,
           memo: newMemo.trim(),
+          verificationImageUrl: reviewVerificationUrl,
         }),
       });
       const data = await res.json();
@@ -326,6 +341,7 @@ function HospitalDetailContent() {
       }
       if (data.success) {
         setShowReviewForm(false);
+        setReviewVerificationUrl(null);
         fetchReviews();
       }
     } catch {
@@ -350,6 +366,41 @@ function HospitalDetailContent() {
       }
     } catch {
       alert("삭제에 실패했습니다.");
+    }
+  };
+
+  // 인증 이미지 업로드 (병원/의사 공통)
+  const handleVerificationUpload = async (
+    file: File,
+    verifyType: "hospital" | "doctor",
+    expectedName: string,
+  ) => {
+    const setter = verifyType === "hospital" ? setReviewVerifying : setDrVerifying;
+    const urlSetter = verifyType === "hospital" ? setReviewVerificationUrl : setDrVerificationUrl;
+    setter(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("type", verifyType);
+      formData.append("expectedName", expectedName);
+
+      const res = await fetch("/api/review-verification", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "인증에 실패했습니다.");
+        return;
+      }
+      if (!data.verified) {
+        toast.error(data.reason || "인증에 실패했습니다.");
+        return;
+      }
+      urlSetter(data.imageUrl);
+      toast.success(`${verifyType === "hospital" ? "병원" : "의사"} 방문이 인증되었습니다.`);
+    } catch {
+      toast.error("인증 처리 중 오류가 발생했습니다.");
+    } finally {
+      setter(false);
     }
   };
 
@@ -618,6 +669,56 @@ function HospitalDetailContent() {
                       className="mb-3 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                       rows={3}
                     />
+                    {/* 방문 인증 */}
+                    <div className="mb-3 rounded-md border border-dashed border-muted-foreground/30 p-3">
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
+                        방문 인증 (선택)
+                      </p>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        진료비 영수증을 촬영하면 인증 리뷰로 표시됩니다.
+                      </p>
+                      <p className="mb-2 text-[10px] leading-tight text-destructive/70">
+                        위조·변조된 서류를 제출할 경우 형법 제231조(사문서위조)
+                        및 제234조(위조사문서행사)에 따라 형사 처벌을 받을 수
+                        있습니다.
+                      </p>
+                      {reviewVerificationUrl ? (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs text-green-700 bg-green-100">
+                            <ShieldCheck className="mr-1 h-3 w-3" />
+                            인증 완료
+                          </Badge>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => setReviewVerificationUrl(null)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs hover:bg-accent">
+                          {reviewVerifying ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Camera className="h-3.5 w-3.5" />
+                          )}
+                          {reviewVerifying ? "분석 중..." : "영수증 촬영"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={reviewVerifying}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleVerificationUpload(file, "hospital", name);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
                         {newMemo.length}/100
@@ -637,7 +738,7 @@ function HospitalDetailContent() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setShowReviewForm(false)}
+                          onClick={() => { setShowReviewForm(false); setReviewVerificationUrl(null); }}
                         >
                           취소
                         </Button>
@@ -670,7 +771,7 @@ function HospitalDetailContent() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {reviews.map((review) => (
+                    {[...reviews].sort((a, b) => (b.isVerified ? 1 : 0) - (a.isVerified ? 1 : 0)).map((review) => (
                       <div
                         key={review.id}
                         className={`rounded-lg border p-3 ${review.isMine ? "border-primary/30 bg-primary/5" : "border-border"}`}
@@ -678,6 +779,12 @@ function HospitalDetailContent() {
                         <div className="mb-1 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <StarRating rating={review.rating} />
+                            {review.isVerified && (
+                              <Badge variant="secondary" className="text-xs text-green-700 bg-green-100">
+                                <ShieldCheck className="mr-0.5 h-3 w-3" />
+                                인증
+                              </Badge>
+                            )}
                             {review.isMine && (
                               <Badge variant="secondary" className="text-xs">
                                 내 리뷰
@@ -825,11 +932,61 @@ function HospitalDetailContent() {
                         </span>
                       </div>
                     </div>
+                    {/* 의사 방문 인증 */}
+                    <div className="mt-3 rounded-md border border-dashed border-muted-foreground/30 p-3">
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
+                        진료 인증 (선택)
+                      </p>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        진료 확인서를 촬영하면 인증 리뷰로 표시됩니다.
+                      </p>
+                      <p className="mb-2 text-[10px] leading-tight text-destructive/70">
+                        위조·변조된 서류를 제출할 경우 형법 제231조(사문서위조)
+                        및 제234조(위조사문서행사)에 따라 형사 처벌을 받을 수
+                        있습니다.
+                      </p>
+                      {drVerificationUrl ? (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs text-green-700 bg-green-100">
+                            <ShieldCheck className="mr-1 h-3 w-3" />
+                            인증 완료
+                          </Badge>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => setDrVerificationUrl(null)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs hover:bg-accent">
+                          {drVerifying ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Camera className="h-3.5 w-3.5" />
+                          )}
+                          {drVerifying ? "분석 중..." : "확인서 촬영"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={drVerifying}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleVerificationUpload(file, "doctor", drDoctorName || name);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                     <div className="mt-3 flex justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setShowDoctorForm(false)}
+                        onClick={() => { setShowDoctorForm(false); setDrVerificationUrl(null); }}
                       >
                         취소
                       </Button>
@@ -857,7 +1014,7 @@ function HospitalDetailContent() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {doctorReviews.map((dr) => (
+                    {[...doctorReviews].sort((a, b) => (b.isVerified ? 1 : 0) - (a.isVerified ? 1 : 0)).map((dr) => (
                       <div
                         key={dr.id}
                         className={`rounded-lg border p-3 ${dr.isMine ? "border-primary/30 bg-primary/5" : "border-border"}`}
@@ -873,6 +1030,12 @@ function HospitalDetailContent() {
                             <Badge variant="outline" className="text-xs">
                               {dr.diseaseName}
                             </Badge>
+                            {dr.isVerified && (
+                              <Badge variant="secondary" className="text-xs text-green-700 bg-green-100">
+                                <ShieldCheck className="mr-0.5 h-3 w-3" />
+                                인증
+                              </Badge>
+                            )}
                             {dr.isMine && (
                               <Badge variant="secondary" className="text-xs border-primary/30">
                                 내 리뷰

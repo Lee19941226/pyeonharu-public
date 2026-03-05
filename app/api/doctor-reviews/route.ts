@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         diseaseName: r.disease_name,
         rating: r.rating,
         content: r.content,
+        isVerified: r.is_verified || false,
         isMine: user ? r.user_id === user.id : false,
         createdAt: r.created_at,
       })),
@@ -169,7 +170,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { hospitalName, hospitalAddress, doctorName, department, diseaseName, rating, content } =
+  const { hospitalName, hospitalAddress, doctorName, department, diseaseName, rating, content, verificationImageUrl } =
     body;
 
   if (!hospitalName?.trim()) {
@@ -222,6 +223,8 @@ export async function POST(req: NextRequest) {
         disease_name: stripHtml(diseaseName).slice(0, 100),
         rating: Math.round(rating),
         content: cleanContent || null,
+        is_verified: !!verificationImageUrl,
+        verification_image_url: verificationImageUrl || null,
         review_date: today,
         updated_at: new Date().toISOString(),
       },

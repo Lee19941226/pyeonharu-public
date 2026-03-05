@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
 
   const { data: reviews, error: reviewError } = await supabase
     .from("restaurant_reviews")
-    .select("id, user_id, rating, memo, created_at, updated_at")
+    .select("id, user_id, rating, memo, is_verified, created_at, updated_at")
     .eq("restaurant_key", targetKey)
     .order("created_at", { ascending: false });
 
@@ -140,6 +140,7 @@ export async function GET(req: NextRequest) {
       id: r.id,
       rating: r.rating,
       memo: r.memo,
+      isVerified: r.is_verified || false,
       isMine: user ? r.user_id === user.id : false,
       createdAt: r.created_at,
     })),
@@ -170,7 +171,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, address, rating, memo } = body;
+  const { name, address, rating, memo, verificationImageUrl } = body;
 
   if (!name || !rating || rating < 1 || rating > 5) {
     return NextResponse.json(
@@ -199,6 +200,8 @@ export async function POST(req: NextRequest) {
         restaurant_address: (address || "").trim(),
         rating: Math.round(rating),
         memo: (memo || "").trim().slice(0, 100),
+        is_verified: !!verificationImageUrl,
+        verification_image_url: verificationImageUrl || null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,restaurant_key" },
