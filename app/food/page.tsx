@@ -458,7 +458,7 @@ function FoodMainContent() {
             ]);
             setCurrentPage(1);
             saveSearchHistory(searchQuery);
-            toast.success("AI 분석 완료!");
+            toast.success("AI 분석 완료");
           } else {
             setResults([]);
             toast.error("제품을 찾을 수 없습니다");

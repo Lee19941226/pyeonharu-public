@@ -244,7 +244,7 @@ function HospitalDetailContent() {
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "저장에 실패했습니다."); return; }
 
-      toast.success("의사 리뷰가 등록되었습니다.");
+      toast.success("리뷰 등록 완료");
       setShowDoctorForm(false);
       setDrDoctorName(""); setDrDepartment(""); setDrDiseaseName("");
       setDrRating(0); setDrContent(""); setDrManualInput(false);
@@ -263,7 +263,7 @@ function HospitalDetailContent() {
     try {
       const res = await fetch(`/api/doctor-reviews?id=${reviewId}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("삭제되었습니다.");
+        toast.success("리뷰 삭제 완료");
         fetchDoctorReviews();
       }
     } catch {
@@ -284,7 +284,7 @@ function HospitalDetailContent() {
       if (res.status === 401) toast.error("로그인이 필요합니다.");
       else if (res.status === 409) toast.error("이미 신고한 리뷰입니다.");
       else if (!res.ok) toast.error("신고 처리에 실패했습니다.");
-      else toast.success("신고가 접수되었습니다.");
+      else toast.success("신고 접수 완료");
       setReportDialogOpen(false);
       setReportReason("");
     } catch {
@@ -398,7 +398,7 @@ function HospitalDetailContent() {
         return;
       }
       urlSetter(data.imageUrl);
-      toast.success(`${verifyType === "hospital" ? "병원" : "의사"} 방문이 인증되었습니다.`);
+      toast.success("방문 인증 완료");
     } catch {
       toast.error("인증 처리 중 오류가 발생했습니다.");
     } finally {

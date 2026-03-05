@@ -128,7 +128,7 @@ export default function SchoolPage() {
 
       const data = await res.json()
       if (res.ok) {
-        toast.success(`${school.schoolName} 등록 완료!`)
+        toast.success(`${school.schoolName} 등록 완료`)
         loadMySchools()
       } else {
         toast.error(data.error || "등록 실패")

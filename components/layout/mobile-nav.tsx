@@ -107,7 +107,7 @@ export function MobileNav() {
           const imageFile = new File([u8arr], "scan.jpg", { type: mime });
 
           const barcode = await html5QrCode.scanFile(imageFile, false);
-          toast.success("바코드 인식 성공!");
+          toast.success("바코드 인식 완료");
           router.push(`/food/result/${barcode}`);
         } catch {
           toast.info("AI가 성분표를 분석 중...");
@@ -160,7 +160,7 @@ export function MobileNav() {
                   dataSource: data.dataSource || "ai",
                 }),
               );
-              toast.success("분석 완료!");
+              toast.success("분석 완료");
               router.push(`/food/result/${data.foodCode}`);
             } else {
               toast.error(data.error || "분석에 실패했습니다");
@@ -391,7 +391,7 @@ export function MobileNav() {
           >
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
             <div className="text-center">
-              <h3 className="text-base font-bold">
+              <h3 className="text-base font-semibold">
                 {cameraMode === "allergy" ? "🛡️ 알레르기 안전 확인" : "🍽️ 먹은 음식 기록"}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -464,7 +464,7 @@ export function MobileNav() {
                   <Sparkles className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold">AI 맞춤 메뉴 추천</h3>
+                  <h3 className="text-base font-semibold">AI 맞춤 메뉴 추천</h3>
                   <p className="text-[10px] text-muted-foreground">알레르기·식단·영양 분석</p>
                 </div>
               </div>

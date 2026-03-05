@@ -772,7 +772,7 @@ export default function FoodTab({
           nutritionInfo: data.nutritionInfo || null,
           dataSource: data.dataSource || "ai",
         });
-        toast.success("분석 완료!");
+        toast.success("분석 완료");
         router.push(`/food/result/${data.foodCode}`);
       } else {
         toast.error(data.error || "분석에 실패했습니다");
@@ -809,7 +809,7 @@ export default function FoodTab({
           const html5QrCode = new Html5Qrcode("qr-reader-hidden");
           const barcode = await html5QrCode.scanFile(file, false);
 
-          toast.success("바코드 인식 성공!");
+          toast.success("바코드 인식 완료");
           router.push(`/food/result/${barcode}`);
         } catch (error) {
           toast.error("바코드를 인식할 수 없습니다");
@@ -883,7 +883,7 @@ export default function FoodTab({
         try {
           const barcode = await html5QrCode.scanFile(imageFile, false);
           console.log("✅ 바코드 발견:", barcode);
-          toast.success("바코드 인식 성공!");
+          toast.success("바코드 인식 완료");
           router.push(`/food/result/${barcode}`);
         } catch (barcodeError) {
           console.log("❌ 바코드 없음, AI 분석 시작");
@@ -946,7 +946,7 @@ export default function FoodTab({
                 nutritionInfo: data.nutritionInfo || null,
                 dataSource: data.dataSource || "ai",
               });
-              toast.success("분석 완료!");
+              toast.success("분석 완료");
               router.push(`/food/result/${data.foodCode}`);
             } else {
               toast.error(data.error || "분석에 실패했습니다");

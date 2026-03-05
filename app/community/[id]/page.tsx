@@ -256,7 +256,7 @@ export default function PostDetailPage({
         setPost((prev) =>
           prev ? { ...prev, comment_count: prev.comment_count + 1 } : null,
         );
-        toast.success("댓글이 작성되었습니다");
+        toast.success("댓글 작성 완료");
       }
     } catch {
       toast.error("댓글 작성 실패");
@@ -286,7 +286,7 @@ export default function PostDetailPage({
             ? { ...prev, comment_count: Math.max(0, prev.comment_count - 1) }
             : null,
         );
-        toast.success("댓글이 삭제되었습니다");
+        toast.success("댓글 삭제 완료");
       }
     } catch {
       toast.error("삭제 실패");
@@ -300,7 +300,7 @@ export default function PostDetailPage({
     try {
       const res = await fetch(`/api/community/${id}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("게시글이 삭제되었습니다");
+        toast.success("게시글 삭제 완료");
         router.push("/community");
       }
     } catch {

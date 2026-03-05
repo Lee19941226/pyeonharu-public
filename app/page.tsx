@@ -92,7 +92,7 @@ function SubTabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all relative whitespace-nowrap cursor-pointer ${active ? "text-foreground after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full after:bg-primary" : "text-muted-foreground hover:text-foreground"}`}
+      className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm transition-all relative whitespace-nowrap cursor-pointer ${active ? "font-semibold text-foreground after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full after:bg-primary" : "font-medium text-muted-foreground hover:text-foreground"}`}
     >
       <Icon className="h-4 w-4" />
       {label}

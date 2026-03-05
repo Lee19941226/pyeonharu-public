@@ -399,7 +399,7 @@ export default function AllergyProfilePage() {
       setSavedSelected(new Set(selected));
       setSavedSeverity({ ...severity });
 
-      toast.success(`알레르기 ${selected.size}개 저장 완료!`);
+      toast.success(`알레르기 ${selected.size}개 저장 완료`);
       window.dispatchEvent(new CustomEvent("allergiesUpdated"));
       router.push("/mypage");
       router.refresh();

@@ -483,7 +483,7 @@ export default function DietTab() {
       const data = await res.json();
       if (data.success) {
         toast.success(
-          `${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가!`,
+          `${data.entry.emoji} ${data.entry.food_name} (${data.entry.estimated_cal}kcal) 추가 완료`,
         );
         reloadEntries();
         loadDashboard();
@@ -576,7 +576,7 @@ export default function DietTab() {
     try {
       const imageUrl = await uploadDietImage(file, entryId);
       if (imageUrl) {
-        toast.success("사진이 추가되었습니다");
+        toast.success("사진 추가 완료");
         reloadEntries();
         loadDashboard();
       }
@@ -597,7 +597,7 @@ export default function DietTab() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      toast.success("이미지가 저장되었습니다");
+      toast.success("이미지 저장 완료");
     } catch {
       window.open(imageUrl, "_blank");
     }
@@ -741,7 +741,7 @@ export default function DietTab() {
       }
 
       if (successCount > 0) {
-        toast.success(`🍱 급식 ${successCount}개 메뉴 추가 완료!`);
+        toast.success(`급식 ${successCount}개 메뉴 추가 완료`);
         reloadEntries();
         loadDashboard();
         closeMealSelect();
@@ -822,7 +822,7 @@ export default function DietTab() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("삭제됨");
+        toast.success("삭제 완료");
         reloadEntries();
         loadDashboard();
       }
@@ -860,7 +860,7 @@ export default function DietTab() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`칼로리 ${newCal}kcal로 수정됨`);
+        toast.success(`칼로리 ${newCal}kcal 수정 완료`);
         cancelEditCal();
         reloadEntries();
         loadDashboard();
@@ -915,9 +915,9 @@ export default function DietTab() {
         buttonText: "편하루에서 식단 관리하기",
       });
       if (shareResult.success) {
-        toast.success("카카오톡으로 공유되었습니다");
+        toast.success("카카오톡 공유 완료");
       } else {
-        toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+        toast.success("링크 복사 완료 — 카카오톡에 붙여넣기 하세요");
       }
       setShowShareMenu(false);
     } catch (err) {
@@ -974,9 +974,9 @@ export default function DietTab() {
         buttonText: "편하루에서 식단 관리하기",
       });
       if (shareResult.success) {
-        toast.success("카카오톡으로 공유되었습니다");
+        toast.success("카카오톡 공유 완료");
       } else {
-        toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+        toast.success("링크 복사 완료 — 카카오톡에 붙여넣기 하세요");
       }
       setShowShareMenu(false);
     } catch (err) {

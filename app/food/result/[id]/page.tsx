@@ -141,7 +141,7 @@ export default function FoodResultPage() {
     });
 
     if (!shareResult.success) {
-      toast.success("링크를 복사했어요! 카카오톡에 붙여넣기 해주세요 💬");
+      toast.success("링크 복사 완료 — 카카오톡에 붙여넣기 하세요");
     }
   };
 
@@ -173,7 +173,7 @@ export default function FoodResultPage() {
       // iOS Safari: <a download> 미지원 → navigator.share로 파일 공유 (저장 옵션 포함)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: result.foodName });
-        toast.success("사진이 저장되었습니다");
+        toast.success("사진 저장 완료");
       } else {
         // Android / Desktop: 직접 다운로드
         const objectUrl = URL.createObjectURL(blob);
@@ -182,7 +182,7 @@ export default function FoodResultPage() {
         a.download = file.name;
         a.click();
         URL.revokeObjectURL(objectUrl);
-        toast.success("사진이 저장되었습니다");
+        toast.success("사진 저장 완료");
       }
     } catch (err: any) {
       if (err?.name === "AbortError") return; // 사용자가 직접 취소
@@ -683,7 +683,7 @@ export default function FoodResultPage() {
 
         if (data.success) {
           setIsFavorite(false);
-          toast.success("즐겨찾기에서 제거되었습니다");
+          toast.success("즐겨찾기 해제 완료");
         }
       } else {
         // ✅ 추가
@@ -711,7 +711,7 @@ export default function FoodResultPage() {
 
         if (data.success) {
           setIsFavorite(true);
-          toast.success("즐겨찾기에 추가되었습니다");
+          toast.success("즐겨찾기 추가 완료");
         }
       }
     } catch (error) {

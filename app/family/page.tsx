@@ -163,7 +163,7 @@ export default function FamilyPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(editingId ? "수정 완료!" : "구성원 추가 완료!");
+        toast.success(editingId ? "수정 완료" : "구성원 추가 완료");
         setShowForm(false);
         loadMembers();
       } else {

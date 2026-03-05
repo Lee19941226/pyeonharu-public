@@ -157,7 +157,7 @@ function PharmacyDetailContent() {
         return;
       }
       if (data.success) {
-        toast.success(myReview ? "리뷰가 수정되었습니다." : "리뷰가 등록되었습니다.");
+        toast.success(myReview ? "리뷰 수정 완료" : "리뷰 등록 완료");
         setShowReviewForm(false);
         setReviewVerificationUrl(null);
         fetchReviews();
@@ -174,7 +174,7 @@ function PharmacyDetailContent() {
     try {
       const res = await fetch(`/api/restaurant/reviews?id=${myReview.id}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("삭제되었습니다.");
+        toast.success("리뷰 삭제 완료");
         setMyReview(null);
         setNewRating(0);
         setNewMemo("");
@@ -205,7 +205,7 @@ function PharmacyDetailContent() {
         return;
       }
       setReviewVerificationUrl(data.imageUrl);
-      toast.success("약국 방문이 인증되었습니다.");
+      toast.success("방문 인증 완료");
     } catch {
       toast.error("인증 처리 중 오류가 발생했습니다.");
     } finally {
@@ -220,7 +220,7 @@ function PharmacyDetailContent() {
     } else {
       try {
         await navigator.clipboard.writeText(window.location.href);
-        toast.success("링크가 복사되었습니다!");
+        toast.success("링크 복사 완료");
       } catch {
         toast.error("공유 기능을 사용할 수 없습니다.");
       }

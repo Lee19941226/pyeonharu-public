@@ -770,7 +770,7 @@ export default function RestaurantTab() {
     });
     const data = await res.json();
     if (data.success) {
-      toast.success(myReviews[reviewTarget.key] ? "리뷰가 수정되었어요" : "리뷰가 등록되었어요!");
+      toast.success(myReviews[reviewTarget.key] ? "리뷰 수정 완료" : "리뷰 등록 완료");
       setMyReviews(prev => ({
         ...prev,
         [reviewTarget.key]: { id: data.review.id, rating: data.review.rating, memo: data.review.memo },
@@ -789,7 +789,7 @@ export default function RestaurantTab() {
     });
     const data = await res.json();
     if (data.success) {
-      toast.success("리뷰가 삭제되었어요");
+      toast.success("리뷰 삭제 완료");
       setMyReviews(prev => {
         const next = { ...prev };
         delete next[reviewTarget.key];

@@ -356,7 +356,7 @@ export default function MyPage() {
         setUser((prev) => (prev ? { ...prev, name: editName.trim() } : null));
         // 헤더 등 다른 컴포넌트에 닉네임 변경 알림
         window.dispatchEvent(new CustomEvent("profile-updated", { detail: { nickname: editName.trim() } }));
-        toast.success("프로필이 저장되었습니다");
+        toast.success("프로필 저장 완료");
       } else {
         toast.error(data.error || "저장 실패");
       }

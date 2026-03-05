@@ -80,7 +80,7 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
           const barcode = await html5QrCode.scanFile(imageFile, false);
 
           // ✅ 바코드 발견!
-          toast.success("바코드 인식 성공!");
+          toast.success("바코드 인식 완료");
           router.push(`/food/result/${barcode}`);
         } catch (error) {
           // ❌ 바코드 없음 → AI 분석
@@ -158,7 +158,7 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
                 nutritionInfo: data.nutritionInfo || null,
                 dataSource: data.dataSource || "ai",
               });
-              toast.success("분석 완료!");
+              toast.success("분석 완료");
               router.push(`/food/result/${data.foodCode}`);
             } else {
               toast.error(data.error || "분석에 실패했습니다");
