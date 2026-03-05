@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Button } from "@/components/ui/button";
@@ -146,10 +147,22 @@ export default function FoodFavoritesPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <motion.div
+                className="space-y-3"
+                initial="hidden"
+                animate="visible"
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+              >
                 {favorites.map((item) => (
-                  <Card
+                  <motion.div
                     key={item.id}
+                    variants={{
+                      hidden: { opacity: 0, y: 20 },
+                      visible: { opacity: 1, y: 0, transition: { duration: 0.15, ease: "easeOut" } },
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                  <Card
                     className="cursor-pointer transition-all hover:shadow-md"
                     onClick={() => router.push(`/food/result/${item.foodCode}`)}
                   >
@@ -211,8 +224,9 @@ export default function FoodFavoritesPage() {
                       </div>
                     </CardContent>
                   </Card>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
         </div>

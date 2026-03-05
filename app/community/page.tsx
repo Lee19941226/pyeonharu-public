@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { MobileNav } from "@/components/layout/mobile-nav"
@@ -256,13 +257,23 @@ export default function CommunityPage() {
                   </div>
 
                   {/* 게시글 행 */}
+                  <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+                  >
                   {posts.map((post, i) => {
                     const hasImage = post.image_urls && post.image_urls.length > 0
                     const thumbUrl = hasImage ? post.image_urls[0] : null
 
                     return (
-                      <div
+                      <motion.div
                         key={post.id}
+                        variants={{
+                          hidden: { opacity: 0, y: 20 },
+                          visible: { opacity: 1, y: 0, transition: { duration: 0.15, ease: "easeOut" } },
+                        }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => router.push(`/community/${post.id}`)}
                         className={`cursor-pointer transition-colors hover:bg-muted/30 active:bg-muted/50 ${i > 0 ? "border-t" : "sm:border-t-0"}`}
                       >
@@ -319,9 +330,10 @@ export default function CommunityPage() {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     )
                   })}
+                  </motion.div>
                 </div>
 
                 {/* 페이징 */}
