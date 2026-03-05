@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-function stripHtml(str: string): string {
-  return str.replace(/<[^>]*>/g, "").trim();
-}
+import { stripHtml, maskProfanity } from "@/lib/utils/profanity-filter";
 
 // GET /api/community/[id] — 게시글 상세 조회
 export async function GET(
@@ -211,8 +208,8 @@ export async function PUT(
   const { data, error } = await supabase
     .from("community_posts")
     .update({
-      title: stripHtml(title),
-      content: stripHtml(content),
+      title: maskProfanity(stripHtml(title)),
+      content: maskProfanity(stripHtml(content)),
       image_urls: imageUrls,
       updated_at: new Date().toISOString(),
     })
