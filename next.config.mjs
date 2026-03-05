@@ -112,6 +112,9 @@ const nextConfig = {
                 "https://epi.adtrafficquality.google",
               ].join(" "),
 
+              // 클릭재킹 방지: 이 사이트가 iframe에 포함되는 것을 차단
+              "frame-ancestors 'none'",
+
               // iframe: 카카오 로그인 + Google 애드센스 + 네이버 지도 임베드
               "frame-src 'self' https://accounts.kakao.com https://kauth.kakao.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://map.naver.com https://*.map.naver.com",
 

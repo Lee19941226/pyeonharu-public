@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { logAction } from "@/lib/utils/action-log";
+import { createSessionToken } from "@/lib/utils/session-manager";
 
 // ─── 허용된 리다이렉트 경로 검증 ───
 function getSafeRedirectPath(redirectParam: string | null): string {
@@ -83,8 +84,21 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ✅ 안전한 리다이렉트 경로만 허용 (Open Redirect 방지)
+  // 세션 토큰 생성 + 쿠키 설정
   const redirectParam = requestUrl.searchParams.get("redirect");
   const safePath = getSafeRedirectPath(redirectParam);
-  return NextResponse.redirect(`${origin}${safePath}`);
+  const response = NextResponse.redirect(`${origin}${safePath}`);
+
+  if (user) {
+    const sessionToken = await createSessionToken(user.id);
+    response.cookies.set("session_token", sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30일
+    });
+  }
+
+  return response;
 }

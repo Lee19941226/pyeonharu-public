@@ -12,6 +12,24 @@ setInterval(
 );
 
 export async function updateSession(request: NextRequest) {
+  // ==========================================
+  // CSRF 방어: mutation 요청의 Origin 헤더 검증
+  // ==========================================
+  const method = request.method.toUpperCase();
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("host");
+    if (origin && host) {
+      const originHost = new URL(origin).host;
+      if (originHost !== host) {
+        return NextResponse.json(
+          { error: "CSRF 검증 실패: 허용되지 않은 출처입니다." },
+          { status: 403 },
+        );
+      }
+    }
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -42,6 +60,58 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // ==========================================
+  // 중복 로그인 검증 (세션 토큰 비교)
+  // ==========================================
+  const pathname = request.nextUrl.pathname;
+  const skipSessionCheck =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/api/auth/");
+
+  if (user && !skipSessionCheck) {
+    const sessionTokenCookie = request.cookies.get("session_token")?.value;
+
+    if (sessionTokenCookie) {
+      try {
+        const { data, error } = await supabase
+          .from("active_sessions")
+          .select("session_token")
+          .eq("user_id", user.id)
+          .single();
+
+        // 레코드 없음 or 쿼리 실패 → 안전 허용
+        const isValid = error || !data ? true : data.session_token === sessionTokenCookie;
+
+        if (!isValid) {
+          const isApiRequest =
+            pathname.startsWith("/api/") ||
+            request.headers.get("accept")?.includes("application/json");
+
+          if (isApiRequest) {
+            const apiResponse = NextResponse.json(
+              { error: "duplicate_login" },
+              { status: 401 },
+            );
+            apiResponse.cookies.delete("session_token");
+            return apiResponse;
+          }
+
+          // 페이지 요청 → 로그인 페이지로 리다이렉트
+          const url = request.nextUrl.clone();
+          url.pathname = "/login";
+          url.searchParams.set("reason", "duplicate_login");
+          const redirectResponse = NextResponse.redirect(url);
+          redirectResponse.cookies.delete("session_token");
+          return redirectResponse;
+        }
+      } catch {
+        // DB 쿼리 실패 → fail-open (접근 허용)
+      }
+    }
+  }
 
   // ==========================================
   // 보호 경로 체크

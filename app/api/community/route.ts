@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { logAction } from "@/lib/utils/action-log";
-
-// ✅ 서버사이드 HTML 태그 제거 (XSS 방어)
-function stripHtml(str: string): string {
-  return str.replace(/<[^>]*>/g, "").trim();
-}
+import { stripHtml, maskProfanity } from "@/lib/utils/profanity-filter";
 
 // 프로필 + 학교명 조회 헬퍼
 async function enrichPosts(supabase: any, data: any[], userId?: string) {
@@ -283,8 +279,8 @@ export async function POST(req: NextRequest) {
     .insert({
       user_id: user.id,
       school_code: schoolCode,
-      title: stripHtml(title),
-      content: stripHtml(content),
+      title: maskProfanity(stripHtml(title)),
+      content: maskProfanity(stripHtml(content)),
       image_urls: imageUrls || [],
     })
     .select()
@@ -301,7 +297,7 @@ export async function POST(req: NextRequest) {
   logAction({
     userId: user.id,
     actionType: "community_post_create",
-    metadata: { post_id: data.id, title: stripHtml(title) },
+    metadata: { post_id: data.id, title: maskProfanity(stripHtml(title)) },
   });
 
   return NextResponse.json({ success: true, post: data });

@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { logAction } from "@/lib/utils/action-log";
-
-// ✅ 서버사이드 HTML 태그 제거 (XSS 방어)
-function stripHtml(str: string): string {
-  return str.replace(/<[^>]*>/g, "").trim();
-}
+import { stripHtml, maskProfanity } from "@/lib/utils/profanity-filter";
 
 // POST /api/community/[id]/comments — 댓글/대댓글 작성
 export async function POST(
@@ -72,7 +68,7 @@ export async function POST(
       post_id: postId,
       user_id: user.id,
       parent_id: parentId || null,
-      content: stripHtml(content),
+      content: maskProfanity(stripHtml(content)),
     })
     .select("*")
     .single();

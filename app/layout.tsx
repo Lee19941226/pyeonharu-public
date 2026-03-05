@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
@@ -10,6 +10,7 @@ import { BackButtonHandler } from "@/components/back-button-handler";
 import { StatusBarInit } from "@/components/status-bar-init";
 import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
 import { PageTrackerProvider } from "@/components/providers/page-tracker-provider";
+import { AdSidebar } from "@/components/ad-sidebar";
 
 export const metadata: Metadata = {
   title: {
@@ -113,19 +114,19 @@ export default function RootLayout({
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4884937144207124"
           crossOrigin="anonymous"
         />
+        {/* AdSense 스크립트는 광고 컴포넌트(AdBanner)에서 직접 로드합니다 */}
         <AuthProvider>
           <BackButtonHandler />
           <StatusBarInit />
           <HapticProvider>
             <HeartbeatProvider>
-              <PageTrackerProvider>
-                {children}
-              </PageTrackerProvider>
+              <PageTrackerProvider>{children}</PageTrackerProvider>
             </HeartbeatProvider>
             <Toaster />
           </HapticProvider>
         </AuthProvider>
         <Analytics />
+        <AdSidebar />
         <Script
           id="sw-register"
           strategy="afterInteractive"

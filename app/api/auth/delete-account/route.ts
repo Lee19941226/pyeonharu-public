@@ -41,8 +41,20 @@ export async function POST(req: NextRequest) {
       { success: true, message: "회원 탈퇴가 완료되었습니다." },
       { status: 200 },
     );
-    response.cookies.set("sb-access-token", "", { maxAge: 0, path: "/" });
-    response.cookies.set("sb-refresh-token", "", { maxAge: 0, path: "/" });
+    response.cookies.set("sb-access-token", "", {
+      maxAge: 0,
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+    });
+    response.cookies.set("sb-refresh-token", "", {
+      maxAge: 0,
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+    });
     console.log("[DeleteAccount] Deletion completed successfully");
     return response;
   } catch (error) {
