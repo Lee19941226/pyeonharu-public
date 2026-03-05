@@ -76,7 +76,7 @@ export async function GET() {
       return NextResponse.json({ error: "학교 목록 조회에 실패했습니다." }, { status: 500 })
     }
 
-    const rows = (data || []) as SchoolRow[]
+    const rows = (data || []) as unknown as SchoolRow[]
 
     // ── 본인 학교 (family_member_id IS NULL) ──────────────────────────
     const ownSchools: School[] = rows
