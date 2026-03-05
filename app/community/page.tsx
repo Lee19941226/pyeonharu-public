@@ -283,7 +283,7 @@ export default function CommunityPage() {
                           <div className="flex items-center gap-2 min-w-0">
                             {thumbUrl && (
                               <div className="shrink-0 h-8 w-8 rounded overflow-hidden bg-muted border">
-                                <img src={thumbUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                                <img src={thumbUrl} alt={`${post.title} 첨부 이미지`} className="h-full w-full object-cover" loading="lazy" />
                               </div>
                             )}
                             {hasImage && !thumbUrl && (
@@ -307,7 +307,7 @@ export default function CommunityPage() {
                         <div className="flex items-start gap-3 px-3 py-3 sm:hidden">
                           {thumbUrl && (
                             <div className="shrink-0 h-14 w-14 rounded-lg overflow-hidden bg-muted border">
-                              <img src={thumbUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                              <img src={thumbUrl} alt={`${post.title} 첨부 이미지`} className="h-full w-full object-cover" loading="lazy" />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
@@ -321,8 +321,8 @@ export default function CommunityPage() {
                               )}
                             </div>
                             <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span className="rounded bg-muted px-1 py-0.5 text-[10px] font-medium">{post.schoolName}</span>
-                              <span>{post.author}</span>
+                              <span className="max-w-[80px] truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium">{post.schoolName}</span>
+                              <span className="max-w-[60px] truncate">{post.author}</span>
                               <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" />{post.view_count}</span>
                               <span className={`flex items-center gap-0.5 ${post.like_count > 0 ? "text-red-500" : ""}`}>
                                 <Heart className={`h-3 w-3 ${post.like_count > 0 ? "fill-red-500" : ""}`} />{post.like_count}

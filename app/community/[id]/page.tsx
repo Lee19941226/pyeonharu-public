@@ -418,6 +418,7 @@ export default function PostDetailPage({
                         onClick={() =>
                           router.push(`/community/write?edit=${id}`)
                         }
+                        aria-label="게시글 수정"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -426,6 +427,7 @@ export default function PostDetailPage({
                         size="sm"
                         onClick={handleDeletePost}
                         className="text-destructive"
+                        aria-label="게시글 삭제"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -621,7 +623,8 @@ function CommentItem({
         {comment.isOwner && (
           <button
             onClick={onDelete}
-            className="text-muted-foreground hover:text-destructive"
+            className="p-1.5 rounded text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+            aria-label="댓글 삭제"
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -633,7 +636,9 @@ function CommentItem({
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <button
           onClick={onLike}
-          className={`flex items-center gap-0.5 hover:text-red-500 ${comment.isLiked ? "text-red-500" : ""}`}
+          className={`flex items-center gap-0.5 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 rounded ${comment.isLiked ? "text-red-500" : ""}`}
+          aria-label={comment.isLiked ? "좋아요 취소" : "좋아요 추가"}
+          aria-pressed={comment.isLiked}
         >
           <Heart
             className={`h-3 w-3 ${comment.isLiked ? "fill-red-500" : ""}`}

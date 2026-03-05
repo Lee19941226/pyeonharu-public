@@ -138,10 +138,14 @@ export default function MedicineTab() {
                   searchResults.map((medicine) => (
                     <Card
                       key={medicine.id}
-                      className="cursor-pointer transition-all hover:shadow-md"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${medicine.name} 상세 정보 보기`}
+                      className="cursor-pointer transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       onClick={() => setSelectedMedicine(medicine)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedMedicine(medicine); } }}
                     >
-                      <CardContent className="p-4">
+                      <CardContent className="min-h-[44px] p-4">
                         <div className="flex items-start gap-4">
                           {medicine.image ? (
                             <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">

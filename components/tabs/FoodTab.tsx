@@ -1028,12 +1028,16 @@ export default function FoodTab({
 
             {/* 드래그 앤 드롭 영역 */}
             <Card
+              role="button"
+              tabIndex={0}
+              aria-label="식품 이미지를 드래그하거나 클릭하여 알레르기 성분 확인"
               className={`group transition-all cursor-pointer ${
                 isDragging
                   ? "border-4 border-primary bg-primary/10 scale-[1.02]"
-                  : "border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/5"
+                  : "border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               }`}
               onClick={() => !isDragging && setShowUploadSheet(true)}
+              onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isDragging) { e.preventDefault(); setShowUploadSheet(true); } }}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -1062,7 +1066,12 @@ export default function FoodTab({
                     </p>
                   </div>
                   {!isDragging && (
-                    <Button onClick={(e) => { e.stopPropagation(); setShowUploadSheet(true); }} size="sm" className="cursor-pointer">
+                    <Button
+                      onClick={(e) => { e.stopPropagation(); setShowUploadSheet(true); }}
+                      size="sm"
+                      className="cursor-pointer"
+                      aria-label="식품 이미지 업로드하여 알레르기 확인"
+                    >
                       <Camera className="mr-2 h-4 w-4" />
                       업로드
                     </Button>
