@@ -79,35 +79,30 @@ export async function updateSession(request: NextRequest) {
   if (user && !skipSessionCheck && isApiRequest) {
     const sessionTokenCookie = request.cookies.get("session_token")?.value;
 
-    // 쿠키 없음 = 세션 토큰 미발급 상태 → 재로그인 유도
-    if (!sessionTokenCookie) {
-      return NextResponse.json(
-        { error: "duplicate_login", message: "세션이 만료되었습니다. 다시 로그인해주세요." },
-        { status: 401 },
-      );
-    }
+    // 쿠키 있을 때만 검증 (없으면 스킵 — 로그인 직후/WebView 쿠키 이슈 대응)
+    if (sessionTokenCookie) {
+      try {
+        const { data, error } = await supabase
+          .from("active_sessions")
+          .select("session_token")
+          .eq("user_id", user.id)
+          .single();
 
-    try {
-      const { data, error } = await supabase
-        .from("active_sessions")
-        .select("session_token")
-        .eq("user_id", user.id)
-        .single();
+        // DB에 레코드 없음 → 허용 (아직 세션 등록 전)
+        // 쿼리 실패 → fail-open
+        const isValid = error || !data ? true : data.session_token === sessionTokenCookie;
 
-      // DB에 레코드 없음 → 허용 (아직 세션 등록 전)
-      // 쿼리 실패 → fail-open
-      const isValid = error || !data ? true : data.session_token === sessionTokenCookie;
-
-      if (!isValid) {
-        const apiResponse = NextResponse.json(
-          { error: "duplicate_login", message: "다른 기기에서 로그인되어 로그아웃되었습니다." },
-          { status: 401 },
-        );
-        apiResponse.cookies.delete("session_token");
-        return apiResponse;
+        if (!isValid) {
+          const apiResponse = NextResponse.json(
+            { error: "duplicate_login", message: "다른 기기에서 로그인되어 로그아웃되었습니다." },
+            { status: 401 },
+          );
+          apiResponse.cookies.delete("session_token");
+          return apiResponse;
+        }
+      } catch {
+        // DB 쿼리 실패 → fail-open (접근 허용)
       }
-    } catch {
-      // DB 쿼리 실패 → fail-open (접근 허용)
     }
   }
 
