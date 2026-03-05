@@ -5,6 +5,49 @@ import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const headersList = await headers();
+
+    let identifier: string;
+    let dailyLimit: number;
+
+    if (user) {
+      identifier = `analyze:user:${user.id}`;
+      dailyLimit = 2;
+    } else {
+      const ip =
+        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        headersList.get("x-real-ip") ||
+        "unknown";
+      identifier = `analyze:ip:${ip}`;
+      dailyLimit = 1;
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { count } = await supabase
+      .from("image_analyze_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", identifier)
+      .gte("analyzed_at", todayStart.toISOString());
+
+    const used = count || 0;
+    return NextResponse.json({
+      used,
+      limit: dailyLimit,
+      remaining: Math.max(0, dailyLimit - used),
+    });
+  } catch {
+    return NextResponse.json({ used: 0, limit: 2, remaining: 2 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
