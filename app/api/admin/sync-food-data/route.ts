@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getChosung } from "@/lib/utils/chosung";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     // ✅ Cron Secret 또는 관리자 인증 체크 추가
     const authHeader = req.headers.get("authorization");
