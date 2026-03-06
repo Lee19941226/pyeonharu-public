@@ -11,6 +11,9 @@ function sanitizeFilterValue(value: string): string {
   return value.replace(/[,.()"\\]/g, "");
 }
 
+const ALLOWED_STATUSES = ["pending", "in_progress", "resolved", "closed"] as const;
+type SupportStatus = (typeof ALLOWED_STATUSES)[number];
+
 // 문의 목록 조회 (관리자)
 export async function GET(req: NextRequest) {
   try {
@@ -30,6 +33,12 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (status) {
+      if (!ALLOWED_STATUSES.includes(status as SupportStatus)) {
+        return NextResponse.json(
+          { error: "유효하지 않은 상태값입니다." },
+          { status: 400 },
+        );
+      }
       query = query.eq("status", status);
     }
 
@@ -90,6 +99,13 @@ export async function PATCH(req: NextRequest) {
     if (!inquiryId) {
       return NextResponse.json(
         { error: "문의 ID가 필요합니다" },
+        { status: 400 },
+      );
+    }
+
+    if (status && !ALLOWED_STATUSES.includes(status as SupportStatus)) {
+      return NextResponse.json(
+        { error: "유효하지 않은 상태값입니다." },
         { status: 400 },
       );
     }
