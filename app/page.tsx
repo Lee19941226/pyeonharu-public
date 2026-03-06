@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   UtensilsCrossed,
@@ -118,7 +118,12 @@ function TabLoading() {
 
 export default function HomePage() {
   const router = useRouter();
+
+  // ── Supabase 클라이언트: 컴포넌트 내에서 1회만 생성 ──
+  const supabase = useMemo(() => createClient(), []);
+
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   useBackHandler(loginModalOpen, () => setLoginModalOpen(false));
 
@@ -238,15 +243,17 @@ export default function HomePage() {
   const [tourActive, setTourActive] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setIsLoading(false);
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     setLoadProgress(10);
@@ -273,7 +280,6 @@ export default function HomePage() {
     setTourActive(false);
     if (user) {
       try {
-        const supabase = createClient();
         await supabase.auth.updateUser({
           data: { onboarding_completed: true },
         });
@@ -400,6 +406,19 @@ export default function HomePage() {
       </div>
 
       <main className="flex-1 pb-20 md:pb-0">
+        {/* ═══ auth 확인 전 Skeleton UI ═══ */}
+        {isLoading ? (
+          <div className="container mx-auto px-4 pt-6 space-y-4 max-w-2xl">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+            </div>
+            <div className="rounded-xl bg-gray-100 animate-pulse h-10" />
+            <div className="rounded-xl bg-gray-100 animate-pulse h-64" />
+          </div>
+        ) : (
+          <>
         {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
         {activeTab === "food" && (
           <div className="container mx-auto px-4 pt-3">
@@ -421,6 +440,8 @@ export default function HomePage() {
         {activeTab === "symptom" && <SymptomTab />}
         {activeTab === "hospital" && <HospitalTab />}
         {activeTab === "doctor" && <DoctorTab />}
+          </>
+        )}
       </main>
 
       {/* ═══ 첫 화면 설정 고정 버튼 (로딩 완료 후 표시) ═══ */}
