@@ -19,7 +19,9 @@
       "Bash(npm run:*)",
       "Bash(node:*)",
       "Bash(do sed:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
