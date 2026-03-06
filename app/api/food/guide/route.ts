@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -76,6 +77,25 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Rate limit 체크 (OpenAI 호출 직전)
+    const supabaseAuth = await createClient();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
+
+    const rateResult = await checkApiRateLimit({
+      prefix: "guide",
+      userId: user?.id || null,
+      dailyLimitLogin: 10,
+      dailyLimitAnon: 5,
+    });
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: "일일 가이드 생성 한도를 초과했습니다. 내일 다시 시도해주세요." },
+        { status: 429 },
+      );
+    }
+
     console.log("🤖 OpenAI로 가이드 생성 시작...");
 
     // ==========================================
@@ -106,9 +126,10 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
 `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // ✅ 더 빠르고 저렴한 모델
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
+      max_tokens: 1500,
     });
 
     const content = response.choices[0].message.content || "{}";

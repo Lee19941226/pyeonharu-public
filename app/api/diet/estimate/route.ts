@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -26,6 +27,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "음식 이름을 입력해주세요." },
         { status: 400 },
+      );
+    }
+
+    // Rate limit 체크 (OpenAI 호출 직전)
+    const rateResult = await checkApiRateLimit({
+      prefix: "estimate",
+      userId: user.id,
+      dailyLimitLogin: 20,
+      dailyLimitAnon: 0,
+    });
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: "일일 칼로리 추정 한도(20회)를 초과했습니다. 내일 다시 시도해주세요." },
+        { status: 429 },
       );
     }
 
