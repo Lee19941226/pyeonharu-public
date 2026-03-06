@@ -491,6 +491,7 @@ export default function FoodTab({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [imageAnalysisUsage, setImageAnalysisUsage] = useState<{ remaining: number; limit: number } | null>(null);
 
   const [loginPrompt, setLoginPrompt] = useState<{
     open: boolean;
@@ -501,6 +502,10 @@ export default function FoodTab({
   // ─── 마운트 시 진행률 알림 ───
   useEffect(() => {
     onProgress?.(35, "화면 구성 중...");
+    fetch("/api/food/analyze-image")
+      .then((r) => r.json())
+      .then((data) => setImageAnalysisUsage({ remaining: data.remaining, limit: data.limit }))
+      .catch(() => {});
   }, []);
 
   // ─── Effects ───
@@ -1052,7 +1057,9 @@ export default function FoodTab({
                     <p className="text-xs text-muted-foreground">
                       {isDragging
                         ? "바코드 또는 성분표 이미지"
-                        : "이미지를 드래그하거나 버튼을 눌러 업로드"}
+                        : imageAnalysisUsage
+                          ? `오늘 남은 AI 분석 ${imageAnalysisUsage.remaining}/${imageAnalysisUsage.limit}회`
+                          : "이미지를 드래그하거나 버튼을 눌러 업로드"}
                     </p>
                   </div>
                   {!isDragging && (

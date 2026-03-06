@@ -75,7 +75,8 @@ export async function GET(request: Request) {
       .from("profiles")
       .select("created_at")
       .gte("created_at", daysAgo(days))
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(10000);
 
     // 일별 집계
     const signupsByDate: Record<string, number> = {};
@@ -91,15 +92,16 @@ export async function GET(request: Request) {
     const wau7Start = startOfDayKSTDaysAgo(7);
     const mau30Start = startOfDayKSTDaysAgo(30);
 
-    const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs, mauActionLogs] =
+    const [mauScanLogs, mauPostLogs, mauCommentLogs, mauDietLogs, mauSearchLogs, mauActionLogs, mauCheckLogs] =
       await Promise.all([
-        adminDb.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", mau30Start),
-        adminDb.from("community_posts").select("user_id, created_at").gte("created_at", mau30Start),
-        adminDb.from("community_comments").select("user_id, created_at").gte("created_at", mau30Start),
-        adminDb.from("diet_entries").select("user_id, created_at").gte("created_at", mau30Start),
+        adminDb.from("food_scan_logs").select("user_id, scanned_at").gte("scanned_at", mau30Start).limit(10000),
+        adminDb.from("community_posts").select("user_id, created_at").gte("created_at", mau30Start).limit(10000),
+        adminDb.from("community_comments").select("user_id, created_at").gte("created_at", mau30Start).limit(10000),
+        adminDb.from("diet_entries").select("user_id, created_at").gte("created_at", mau30Start).limit(10000),
         // ip_address 포함: anonymous 검색 사용자도 MAU에 집계
-        adminDb.from("food_search_logs").select("user_id, ip_address, searched_at").gte("searched_at", mau30Start),
-        adminDb.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", mau30Start),
+        adminDb.from("food_search_logs").select("user_id, ip_address, searched_at").gte("searched_at", mau30Start).limit(10000),
+        adminDb.from("user_action_logs").select("user_id, ip_address, created_at").gte("created_at", mau30Start).limit(10000),
+        adminDb.from("food_check_history").select("user_id, checked_at").gte("checked_at", mau30Start).limit(10000),
       ]);
 
     // 타임스탬프 필드명이 테이블마다 다르므로 ts로 통일
@@ -119,6 +121,7 @@ export async function GET(request: Request) {
         ts: r.created_at,
         isMember: !!r.user_id,
       })),
+      ...(mauCheckLogs.data || []).map((r) => ({ uid: r.user_id, ts: r.checked_at, isMember: true })),
     ];
 
     const dauUsers = new Set<string>();
@@ -150,29 +153,44 @@ export async function GET(request: Request) {
       adminDb
         .from("food_scan_logs")
         .select("user_id, scanned_at")
-        .gte("scanned_at", periodStart),
+        .gte("scanned_at", periodStart)
+        .limit(10000),
       adminDb
         .from("community_posts")
         .select("user_id, created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
       adminDb
         .from("community_comments")
         .select("user_id, created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
       adminDb
         .from("diet_entries")
         .select("user_id, created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
       adminDb
         .from("user_action_logs")
         .select("user_id, ip_address, created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
+      adminDb
+        .from("food_search_logs")
+        .select("user_id, ip_address, searched_at")
+        .gte("searched_at", periodStart)
+        .limit(10000),
+      adminDb
+        .from("food_check_history")
+        .select("user_id, checked_at")
+        .gte("checked_at", periodStart)
+        .limit(10000),
     ]);
 
     const dailyActiveMap: Record<string, Set<string>> = {};
     allActivityLogs.forEach((res) => {
       res.data?.forEach((r: any) => {
-        const ts = r.scanned_at || r.checked_at || r.created_at || r.searched_at;
+        const ts = r.scanned_at || r.searched_at || r.checked_at || r.created_at;
         const date = ts ? toKSTDate(ts) : null;
         // makeUserId: ip_address도 null이면 null 반환으로 anon:null 오집계 방지
         const uid = makeUserId(r.user_id ?? null, r.ip_address ?? null);
@@ -226,19 +244,23 @@ export async function GET(request: Request) {
       adminDb
         .from("food_scan_logs")
         .select("scanned_at")
-        .gte("scanned_at", periodStart),
+        .gte("scanned_at", periodStart)
+        .limit(10000),
       adminDb
         .from("food_check_history")
         .select("checked_at")
-        .gte("checked_at", periodStart),
+        .gte("checked_at", periodStart)
+        .limit(10000),
       adminDb
         .from("food_search_logs")
         .select("searched_at")
-        .gte("searched_at", periodStart),
+        .gte("searched_at", periodStart)
+        .limit(10000),
       adminDb
         .from("diet_entries")
         .select("created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
     ]);
 
     scanLogs.data?.forEach((r) => {
@@ -293,11 +315,13 @@ export async function GET(request: Request) {
       adminDb
         .from("community_posts")
         .select("created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
       adminDb
         .from("community_comments")
         .select("created_at")
-        .gte("created_at", periodStart),
+        .gte("created_at", periodStart)
+        .limit(10000),
     ]);
 
     postLogs.data?.forEach((r) => {
@@ -324,7 +348,8 @@ export async function GET(request: Request) {
     // 학교별 등록 수 TOP 10
     const { data: schoolRanking } = await adminDb
       .from("user_schools")
-      .select("school_name");
+      .select("school_name")
+      .limit(10000);
 
     const schoolCounts: Record<string, number> = {};
     schoolRanking?.forEach((r) => {
@@ -346,17 +371,26 @@ export async function GET(request: Request) {
         .from("food_scan_logs")
         .select("user_id")
         .gte("scanned_at", weekAgoStart)
-        .lt("scanned_at", weekAgoEnd),
+        .lt("scanned_at", weekAgoEnd)
+        .limit(10000),
       adminDb
         .from("community_posts")
         .select("user_id")
         .gte("created_at", weekAgoStart)
-        .lt("created_at", weekAgoEnd),
+        .lt("created_at", weekAgoEnd)
+        .limit(10000),
       adminDb
         .from("user_action_logs")
         .select("user_id")
         .gte("created_at", weekAgoStart)
-        .lt("created_at", weekAgoEnd),
+        .lt("created_at", weekAgoEnd)
+        .limit(10000),
+      adminDb
+        .from("food_check_history")
+        .select("user_id")
+        .gte("checked_at", weekAgoStart)
+        .lt("checked_at", weekAgoEnd)
+        .limit(10000),
     ]);
     const weekAgoUsers = new Set<string>();
     // 리텐션은 식별 가능한 회원만 대상 (anonymous는 IP가 바뀔 수 있어 제외)

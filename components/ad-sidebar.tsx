@@ -13,6 +13,12 @@ const NO_AD_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/offline",
+  "/terms",
+  "/privacy",
+  "/auth",
+  "/error",
+  "/not-found",
+  "/verify",
 ];
 
 export function AdSidebar() {

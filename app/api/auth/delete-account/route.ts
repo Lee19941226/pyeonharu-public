@@ -1,6 +1,7 @@
 ﻿import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { logAction } from "@/lib/utils/action-log";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,13 @@ export async function POST(req: NextRequest) {
       );
     }
     console.log(`[DeleteAccount] Starting deletion for user: ${user.id}`);
+
+    // 삭제 전에 로그 기록 (삭제 후에는 user_id FK가 사라짐)
+    logAction({
+      userId: user.id,
+      actionType: "account_delete",
+      metadata: { email: user.email },
+    });
 
     // Admin 클라이언트로 유저 완전 삭제 (CASCADE로 관련 데이터도 자동 삭제)
     const supabaseAdmin = createAdminClient(

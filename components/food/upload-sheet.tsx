@@ -126,7 +126,12 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
             }
             // ── 스캔 제한 ──
             if (response.status === 429) {
-              setLoginPrompt({ open: true, reason: "scan_limit" });
+              if (user) {
+                const errData = await response.json().catch(() => ({}));
+                toast.error(errData.error || "오늘 이미지 분석 한도를 초과했습니다.");
+              } else {
+                setLoginPrompt({ open: true, reason: "scan_limit" });
+              }
               return;
             }
 
