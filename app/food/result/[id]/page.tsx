@@ -29,7 +29,8 @@ import { AllergenDisclaimer } from "@/components/food/allergen-disclaimer";
 import { getAiResult } from "@/lib/utils/ai-result-storage";
 import { classifyApiError, getToastDuration } from "@/lib/utils/api-error";
 import { DataSourceBadge } from "@/components/food/data-source-badge";
-import { shareToKakao } from "@/lib/utils/kakao-share";
+import { ShareBottomSheet } from "@/components/share-bottom-sheet";
+
 export default function FoodResultPage() {
   const params = useParams();
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function FoodResultPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<string>("me");
   const [alternatives, setAlternatives] = useState<any[]>([]);
   const [altLoading, setAltLoading] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -100,49 +102,9 @@ export default function FoodResultPage() {
 
     getUserInfo();
   }, []);
-  const handleKakaoShare = async () => {
+  const handleKakaoShare = () => {
     if (!result) return;
-
-    if (
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    ) {
-      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다");
-      return;
-    }
-
-    const shareUrl =
-      result.foodCode?.startsWith("ai-") || result.dataSource === "ai"
-        ? `${window.location.origin}/food`
-        : `${window.location.origin}/food/result/${result.foodCode}`;
-
-    const isSafe = result.isSafe;
-    const allergenText =
-      !isSafe && result.detectedAllergens?.length > 0
-        ? result.detectedAllergens.map((a: any) => a.name).join(", ")
-        : "";
-
-    const ogImageUrl = new URL(`${window.location.origin}/api/og`);
-    ogImageUrl.searchParams.set("name", result.foodName);
-    ogImageUrl.searchParams.set("safe", isSafe.toString());
-    ogImageUrl.searchParams.set("allergens", allergenText);
-    ogImageUrl.searchParams.set("manufacturer", result.manufacturer || "");
-
-    const title = `${result.foodName} 알레르기 정보`;
-    const description = isSafe
-      ? `✅ 안전해요! 알레르기 성분이 없습니다`
-      : `⚠️ 주의! ${allergenText} 알레르기 성분 포함`;
-
-    const shareResult = await shareToKakao({
-      title,
-      description,
-      imageUrl: ogImageUrl.toString(),
-      shareUrl,
-    });
-
-    if (!shareResult.success) {
-      toast.success("링크 복사 완료 — 카카오톡에 붙여넣기 하세요");
-    }
+    setShowShareSheet(true);
   };
 
   // OG 이미지 URL 생성 헬퍼
@@ -190,41 +152,10 @@ export default function FoodResultPage() {
     }
   };
 
-  // 📤 공유하기
-  const handleShare = async () => {
+  // 📤 공유하기 → 바텀시트 오픈
+  const handleShare = () => {
     if (!result) return;
-
-    const shareUrl =
-      result.foodCode?.startsWith("ai-") || result.dataSource === "ai"
-        ? `${window.location.origin}/food`
-        : `${window.location.origin}/food/result/${result.foodCode}`;
-
-    const allergenText =
-      !result.isSafe && result.detectedAllergens?.length > 0
-        ? result.detectedAllergens.map((a: any) => a.name).join(", ")
-        : "";
-
-    const shareText = result.isSafe
-      ? `✅ ${result.foodName} - 알레르기 성분 없음\n편하루에서 확인하세요`
-      : `⚠️ ${result.foodName} - ${allergenText} 포함\n편하루에서 확인하세요`;
-
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({
-          title: `${result.foodName} 알레르기 정보`,
-          text: shareText,
-          url: shareUrl,
-        });
-      } catch (err: any) {
-        if (err?.name !== "AbortError") {
-          // 공유 실패 시 카카오 fallback
-          handleKakaoShare();
-        }
-      }
-    } else {
-      // navigator.share 미지원 → 카카오 공유
-      handleKakaoShare();
-    }
+    setShowShareSheet(true);
   };
 
   const loadFoodResult = async () => {
@@ -1571,6 +1502,36 @@ export default function FoodResultPage() {
       </main>
 
       <MobileNav />
+
+      {result && showShareSheet && (() => {
+        const shareUrl =
+          result.foodCode?.startsWith("ai-") || result.dataSource === "ai"
+            ? `${window.location.origin}/food`
+            : `${window.location.origin}/food/result/${result.foodCode}`;
+        const allergenText =
+          !result.isSafe && result.detectedAllergens?.length > 0
+            ? result.detectedAllergens.map((a: any) => a.name).join(", ")
+            : "";
+        const ogImageUrl = new URL(`${window.location.origin}/api/og`);
+        ogImageUrl.searchParams.set("name", result.foodName);
+        ogImageUrl.searchParams.set("safe", result.isSafe.toString());
+        ogImageUrl.searchParams.set("allergens", allergenText);
+        ogImageUrl.searchParams.set("manufacturer", result.manufacturer || "");
+        return (
+          <ShareBottomSheet
+            open={showShareSheet}
+            onClose={() => setShowShareSheet(false)}
+            data={{
+              title: `${result.foodName} 알레르기 정보`,
+              description: result.isSafe
+                ? `✅ 안전해요! 알레르기 성분이 없습니다`
+                : `⚠️ 주의! ${allergenText} 알레르기 성분 포함`,
+              imageUrl: ogImageUrl.toString(),
+              shareUrl,
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

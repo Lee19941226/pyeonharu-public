@@ -31,7 +31,7 @@ import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { createClient } from "@/lib/supabase/client";
 import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
-import { shareToKakao } from "@/lib/utils/kakao-share";
+import { ShareBottomSheet, type ShareBottomSheetData } from "@/components/share-bottom-sheet";
 
 type CameraMode = "allergy" | "diet" | null;
 
@@ -64,6 +64,7 @@ export function MobileNav() {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [todayCal, setTodayCal] = useState(0);
   const [bmr, setBmr] = useState(0);
+  const [shareSheetData, setShareSheetData] = useState<ShareBottomSheetData | null>(null);
 
   const openSheet = (mode: CameraMode) => {
     setCameraMode(mode);
@@ -228,26 +229,30 @@ export function MobileNav() {
     }
   }, []);
 
-  // ─── 카카오 공유 ───
-  const shareRecommend = async () => {
+  // ─── 공유 데이터 빌드 + 바텀시트 열기 ───
+  const shareRecommend = () => {
     if (!recommendData || !recommendData.recommendations.length) return;
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다"); return;
-    }
     const shareUrl = `${window.location.origin}/food`;
-    const mealLabel = recommendData.mealType === "아침" ? "🌅 아침" : recommendData.mealType === "점심" ? "☀️ 점심" : recommendData.mealType === "간식" ? "🍪 간식" : "🌇 저녁";
-    const menuList = recommendData.recommendations.slice(0, 5).map(r => `${r.emoji} ${r.name} (${r.estimatedCal}kcal)`).join(", ");
+    const mealLabel =
+      recommendData.mealType === "아침" ? "🌅 아침"
+      : recommendData.mealType === "점심" ? "☀️ 점심"
+      : recommendData.mealType === "간식" ? "🍪 간식"
+      : "🌇 저녁";
+    const menuList = recommendData.recommendations
+      .slice(0, 5)
+      .map((r) => `${r.emoji} ${r.name} (${r.estimatedCal}kcal)`)
+      .join(", ");
     let description = menuList;
-    if (recommendData.analysis?.calorieSituation) description += ` | ${recommendData.analysis.calorieSituation}`;
+    if (recommendData.analysis?.calorieSituation)
+      description += ` | ${recommendData.analysis.calorieSituation}`;
     if (description.length > 150) description = description.slice(0, 147) + "...";
-    const result = await shareToKakao({
+    setShareSheetData({
       title: `${mealLabel} AI 맞춤 메뉴 추천`,
       description,
       imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
       shareUrl,
       buttonText: "편하루에서 메뉴 추천받기",
     });
-    if (!result.success) { toast.error("공유에 실패했습니다"); }
   };
 
   // ─── 유틸 ───
@@ -436,6 +441,15 @@ export function MobileNav() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ═══ 공유 바텀시트 ═══ */}
+      {shareSheetData && (
+        <ShareBottomSheet
+          open={!!shareSheetData}
+          onClose={() => setShareSheetData(null)}
+          data={shareSheetData}
+        />
+      )}
 
       {/* ═══ AI 메뉴 추천 모달 (풀 리포트) ═══ */}
       <AnimatePresence>

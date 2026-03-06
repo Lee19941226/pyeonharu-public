@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
-import { shareToKakao } from "@/lib/utils/kakao-share";
-import { toast } from "sonner";
+import { ShareBottomSheet } from "@/components/share-bottom-sheet";
 
 declare global {
   interface Window {
@@ -101,39 +100,42 @@ export function AdBanner({
   );
 }
 
-function FallbackBanner({ className }: { className?: string }) {
-  const handleShare = async () => {
-    const result = await shareToKakao({
-      title: "편하루 - 식사를 편하게",
-      description:
-        "메뉴 선정부터 병원 찾기까지, 편하루가 도와드려요. 친구에게 공유하고 동창들과 커뮤니티도 이용해보세요!",
-      imageUrl: "https://www.pyeonharu.com/icons/icon-512.png",
-      shareUrl: "https://www.pyeonharu.com",
-    });
+const FALLBACK_SHARE_DATA = {
+  title: "편하루 - 식사를 편하게",
+  description:
+    "메뉴 선정부터 병원 찾기까지, 편하루가 도와드려요. 친구에게 공유하고 동창들과 커뮤니티도 이용해보세요!",
+  imageUrl: "https://www.pyeonharu.com/icons/icon-512.png",
+  shareUrl: "https://www.pyeonharu.com",
+};
 
-    if (result && !result.success && result.fallback === "clipboard") {
-      toast.success("링크가 복사되었습니다");
-    }
-  };
+function FallbackBanner({ className }: { className?: string }) {
+  const [showShareSheet, setShowShareSheet] = useState(false);
 
   return (
-    <button
-      onClick={handleShare}
-      className={`w-full rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 px-4 py-3 text-left transition-colors hover:border-primary/40 ${className}`}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-bold text-primary">
-            메뉴 선정부터 병원 찾기까지, 편하루가 도와드려요
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            친구에게 공유하고 동창들과 커뮤니티도 이용해보세요!
-          </p>
+    <>
+      <button
+        onClick={() => setShowShareSheet(true)}
+        className={`w-full rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 px-4 py-3 text-left transition-colors hover:border-primary/40 ${className}`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-primary">
+              메뉴 선정부터 병원 찾기까지, 편하루가 도와드려요
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              친구에게 공유하고 동창들과 커뮤니티도 이용해보세요!
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+            공유하기
+          </span>
         </div>
-        <span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-          공유하기
-        </span>
-      </div>
-    </button>
+      </button>
+      <ShareBottomSheet
+        open={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        data={FALLBACK_SHARE_DATA}
+      />
+    </>
   );
 }

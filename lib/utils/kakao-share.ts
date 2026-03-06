@@ -1,3 +1,8 @@
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod|Android/.test(navigator.userAgent);
+}
+
 let sdkLoadPromise: Promise<void> | null = null;
 
 function loadKakaoSDK(): Promise<void> {
@@ -45,7 +50,7 @@ export async function ensureKakaoReady(): Promise<boolean> {
   }
 }
 
-interface KakaoShareOptions {
+export interface KakaoShareOptions {
   title: string;
   description: string;
   imageUrl: string;
@@ -80,6 +85,7 @@ export async function shareToKakao(
   try {
     window.Kakao.Share.sendDefault({
       objectType: "feed",
+      installTalk: isMobileDevice(),
       content: {
         title,
         description,

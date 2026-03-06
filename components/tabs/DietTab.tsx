@@ -35,7 +35,7 @@ import {
   Check,
   AlertTriangle,
 } from "lucide-react";
-import { shareToKakao } from "@/lib/utils/kakao-share";
+import { ShareBottomSheet, type ShareBottomSheetData } from "@/components/share-bottom-sheet";
 
 function getTimePeriod(dateStr: string) {
   const h = new Date(dateStr).getHours();
@@ -323,8 +323,7 @@ export default function DietTab() {
   // ✅ 새로 추가
   const [showRecordSheet, setShowRecordSheet] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
-  const [isSharingToday, setIsSharingToday] = useState(false);
-  const [isSharingReport, setIsSharingReport] = useState(false);
+  const [shareSheetData, setShareSheetData] = useState<ShareBottomSheetData | null>(null);
 
   // ✅ 학교 급식 자동 입력 상태
   const [showSchoolSelect, setShowSchoolSelect] = useState(false);
@@ -879,112 +878,66 @@ export default function DietTab() {
     setWarningShownToday(false);
   };
 
-  // ─── 카카오 공유: 오늘 먹은 음식 ───
-  const shareToday = async () => {
-    setIsSharingToday(true);
-    try {
-      if (
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1"
-      ) {
-        toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", {
-          description: "배포 후 테스트해주세요",
-          duration: 5000,
-        });
-        return;
-      }
-      const shareUrl = `${window.location.origin}/diet`;
-      const foodList =
-        entries.length > 0
-          ? entries
-              .map((e) => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`)
-              .slice(0, 5)
-              .join(", ")
-          : "아직 기록이 없어요";
-      const moreText = entries.length > 5 ? ` 외 ${entries.length - 5}개 더` : "";
-      const statusText = isOver
-        ? `⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과!`
-        : bmr > 0
-          ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`
-          : `총 ${totalCal.toLocaleString()}kcal 섭취`;
-      const shareResult = await shareToKakao({
-        title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`,
-        description: `${foodList}${moreText} | ${statusText}`,
-        imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
-        shareUrl,
-        buttonText: "편하루에서 식단 관리하기",
-      });
-      if (shareResult.success) {
-        toast.success("카카오톡 공유 완료");
-      } else {
-        toast.success("링크 복사 완료 — 카카오톡에 붙여넣기 하세요");
-      }
-      setShowShareMenu(false);
-    } catch (err) {
-      console.error("[카카오 공유 실패]", err);
-      toast.error("공유에 실패했습니다. 다시 시도해주세요");
-    } finally {
-      setIsSharingToday(false);
-    }
+  // ─── 공유 바텀시트: 오늘 먹은 음식 ───
+  const shareToday = () => {
+    const shareUrl = `${window.location.origin}/diet`;
+    const foodList =
+      entries.length > 0
+        ? entries
+            .map((e) => `${e.emoji} ${e.food_name} (${e.estimated_cal}kcal)`)
+            .slice(0, 5)
+            .join(", ")
+        : "아직 기록이 없어요";
+    const moreText = entries.length > 5 ? ` 외 ${entries.length - 5}개 더` : "";
+    const statusText = isOver
+      ? `⚠️ 기초대사량 대비 ${overAmount.toLocaleString()}kcal 초과!`
+      : bmr > 0
+        ? `✅ 기초대사량 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`
+        : `총 ${totalCal.toLocaleString()}kcal 섭취`;
+    setShareSheetData({
+      title: `🍽️ ${isToday ? "오늘" : new Date(date + "T12:00:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 먹은 것들`,
+      description: `${foodList}${moreText} | ${statusText}`,
+      imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
+      shareUrl,
+      buttonText: "편하루에서 식단 관리하기",
+    });
+    setShowShareMenu(false);
   };
 
-  // ─── 카카오 공유: 식단 리포트 ───
-  const shareReport = async () => {
-    setIsSharingReport(true);
-    try {
-      if (
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1"
-      ) {
-        toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", {
-          description: "배포 후 테스트해주세요",
-          duration: 5000,
-        });
-        return;
-      }
-      const shareUrl = `${window.location.origin}/diet`;
-      const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("ko-KR", {
-        month: "long",
-        day: "numeric",
-      });
-      let title = `📊 ${dateLabel} 식단 리포트`;
-      let description = `총 ${totalCal.toLocaleString()}kcal 섭취 · ${entries.length}끼`;
-      if (bmr > 0) {
-        description += isOver
-          ? ` | ⚠️ BMR 대비 ${overAmount.toLocaleString()}kcal 초과`
-          : ` | ✅ BMR 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`;
-      }
-      if (dashData?.summary) {
-        const rangeLabel = getRangeLabel();
-        title = `📊 식단 리포트 (${rangeLabel})`;
-        description = `일 평균 ${dashData.summary.avgCal.toLocaleString()}kcal · ${dashData.summary.daysWithData}일 기록 / ${dashData.summary.totalDays}일`;
-        if (bmr > 0 && dashData.summary.overDays > 0)
-          description += ` · ⚠️ ${dashData.summary.overDays}일 초과`;
-        if (dashData.summary.topFoods.length > 0)
-          description += ` · 🍴 ${dashData.summary.topFoods
-            .slice(0, 3)
-            .map((f) => f.name)
-            .join(", ")}`;
-      }
-      const shareResult = await shareToKakao({
-        title,
-        description,
-        imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
-        shareUrl,
-        buttonText: "편하루에서 식단 관리하기",
-      });
-      if (shareResult.success) {
-        toast.success("카카오톡 공유 완료");
-      } else {
-        toast.success("링크 복사 완료 — 카카오톡에 붙여넣기 하세요");
-      }
-      setShowShareMenu(false);
-    } catch (err) {
-      console.error("[카카오 공유 실패]", err);
-      toast.error("공유에 실패했습니다. 다시 시도해주세요");
-    } finally {
-      setIsSharingReport(false);
+  // ─── 공유 바텀시트: 식단 리포트 ───
+  const shareReport = () => {
+    const shareUrl = `${window.location.origin}/diet`;
+    const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("ko-KR", {
+      month: "long",
+      day: "numeric",
+    });
+    let title = `📊 ${dateLabel} 식단 리포트`;
+    let description = `총 ${totalCal.toLocaleString()}kcal 섭취 · ${entries.length}끼`;
+    if (bmr > 0) {
+      description += isOver
+        ? ` | ⚠️ BMR 대비 ${overAmount.toLocaleString()}kcal 초과`
+        : ` | ✅ BMR 대비 ${(bmr - totalCal).toLocaleString()}kcal 남음`;
     }
+    if (dashData?.summary) {
+      const rangeLabel = getRangeLabel();
+      title = `📊 식단 리포트 (${rangeLabel})`;
+      description = `일 평균 ${dashData.summary.avgCal.toLocaleString()}kcal · ${dashData.summary.daysWithData}일 기록 / ${dashData.summary.totalDays}일`;
+      if (bmr > 0 && dashData.summary.overDays > 0)
+        description += ` · ⚠️ ${dashData.summary.overDays}일 초과`;
+      if (dashData.summary.topFoods.length > 0)
+        description += ` · 🍴 ${dashData.summary.topFoods
+          .slice(0, 3)
+          .map((f) => f.name)
+          .join(", ")}`;
+    }
+    setShareSheetData({
+      title,
+      description,
+      imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
+      shareUrl,
+      buttonText: "편하루에서 식단 관리하기",
+    });
+    setShowShareMenu(false);
   };
 
   const isToday = date === new Date().toLocaleDateString("en-CA");
@@ -1147,31 +1100,21 @@ export default function DietTab() {
                       <div className="absolute right-0 top-10 z-50 w-52 rounded-xl border bg-background shadow-lg p-2 flex flex-col gap-2">
                         <button
                           onClick={shareToday}
-                          disabled={isSharingToday || isSharingReport}
-                          className="w-full flex items-center gap-3 rounded-lg px-4 min-h-[48px] text-left transition-opacity disabled:opacity-60 active:opacity-80"
+                          className="w-full flex items-center gap-3 rounded-lg px-4 min-h-[48px] text-left transition-opacity active:opacity-80"
                           style={{ backgroundColor: "#FEE500", color: "#000000" }}
                         >
-                          {isSharingToday ? (
-                            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                          ) : (
-                            <span className="text-lg shrink-0">🍽️</span>
-                          )}
+                          <span className="text-lg shrink-0">🍽️</span>
                           <div>
                             <p className="font-semibold text-[13px]">먹은 음식 공유</p>
-                            <p className="text-[10px] opacity-60">카카오톡으로 공유</p>
+                            <p className="text-[10px] opacity-60">공유 방법 선택</p>
                           </div>
                         </button>
                         <button
                           onClick={shareReport}
-                          disabled={isSharingToday || isSharingReport}
-                          className="w-full flex items-center gap-3 rounded-lg px-4 min-h-[48px] text-left transition-opacity disabled:opacity-60 active:opacity-80"
+                          className="w-full flex items-center gap-3 rounded-lg px-4 min-h-[48px] text-left transition-opacity active:opacity-80"
                           style={{ backgroundColor: "#FEE500", color: "#000000" }}
                         >
-                          {isSharingReport ? (
-                            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                          ) : (
-                            <span className="text-lg shrink-0">📊</span>
-                          )}
+                          <span className="text-lg shrink-0">📊</span>
                           <div>
                             <p className="font-semibold text-[13px]">식단 리포트 공유</p>
                             <p className="text-[10px] opacity-60">칼로리 요약 · 통계</p>
@@ -2404,6 +2347,14 @@ export default function DietTab() {
             />
           </div>
         </div>
+      )}
+
+      {shareSheetData && (
+        <ShareBottomSheet
+          open={!!shareSheetData}
+          onClose={() => setShareSheetData(null)}
+          data={shareSheetData}
+        />
       )}
     </div>
   );

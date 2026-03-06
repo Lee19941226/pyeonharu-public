@@ -28,7 +28,7 @@ import {
   openDeliveryApp,
   isMobileDevice,
 } from "@/lib/utils/delivery";
-import { shareToKakao } from "@/lib/utils/kakao-share";
+import { ShareBottomSheet, type ShareBottomSheetData } from "@/components/share-bottom-sheet";
 
 interface Reasoning {
   taste: string;
@@ -75,6 +75,7 @@ export default function MealRecommend() {
   const [error, setError] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [showShareSheet, setShowShareSheet] = useState(false);
 
   const [todayCal, setTodayCal] = useState(0);
   const [bmr, setBmr] = useState(0);
@@ -119,22 +120,9 @@ export default function MealRecommend() {
     }
   }, []);
 
-  // ✅ 카카오 공유: AI 추천 메뉴
-  const shareRecommend = async () => {
-    if (!data || !data.recommendations.length) {
-      toast.error("공유할 추천 결과가 없습니다");
-      return;
-    }
-    if (
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    ) {
-      toast.error("카카오톡 공유는 실제 도메인에서만 작동합니다", {
-        description: "배포 후 테스트해주세요",
-        duration: 5000,
-      });
-      return;
-    }
+  // 공유 데이터 계산
+  const buildShareData = (): ShareBottomSheetData | null => {
+    if (!data || !data.recommendations.length) return null;
     const shareUrl = `${window.location.origin}/food`;
     const mealLabel =
       data.mealType === "아침"
@@ -152,18 +140,22 @@ export default function MealRecommend() {
     let description = menuList;
     if (data.analysis?.calorieSituation)
       description += ` | ${data.analysis.calorieSituation}`;
-    if (description.length > 150)
-      description = description.slice(0, 147) + "...";
-    const result = await shareToKakao({
+    if (description.length > 150) description = description.slice(0, 147) + "...";
+    return {
       title,
       description,
       imageUrl: `${window.location.origin}/api/og?name=편하루 식단관리&safe=true`,
       shareUrl,
       buttonText: "편하루에서 메뉴 추천받기",
-    });
-    if (!result.success) {
-      toast.error("공유에 실패했습니다");
+    };
+  };
+
+  const shareRecommend = () => {
+    if (!data || !data.recommendations.length) {
+      toast.error("공유할 추천 결과가 없습니다");
+      return;
     }
+    setShowShareSheet(true);
   };
 
   if (isLoggedIn === false || isLoggedIn === null) return null;
@@ -464,6 +456,19 @@ export default function MealRecommend() {
             확인하세요.
           </p>
         </div>
+      )}
+
+      {showShareSheet && (
+        <ShareBottomSheet
+          open={showShareSheet}
+          onClose={() => setShowShareSheet(false)}
+          data={buildShareData() ?? {
+            title: "AI 맞춤 메뉴 추천",
+            description: "편하루에서 AI 맞춤 메뉴를 추천받으세요",
+            imageUrl: `${typeof window !== "undefined" ? window.location.origin : ""}/icons/icon-512.png`,
+            shareUrl: `${typeof window !== "undefined" ? window.location.origin : ""}/food`,
+          }}
+        />
       )}
     </div>
   );
