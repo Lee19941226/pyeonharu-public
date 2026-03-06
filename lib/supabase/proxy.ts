@@ -29,29 +29,35 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
   }
 
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // Edge Runtime 호환: raw fetch로 Supabase REST API 직접 호출
+    if (!supabaseUrl || !anonKey) {
+      console.error("[maintenance] 환경변수 없음:", { supabaseUrl: !!supabaseUrl, anonKey: !!anonKey });
+      return null;
+    }
+
+    // Edge Runtime 호환: raw fetch로 Supabase REST API 직접 호출 (전체 조회 — 2행뿐)
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/site_settings?select=key,value&key=in.(%22maintenance_mode%22,%22whitelist_user_ids%22)`,
+      `${supabaseUrl}/rest/v1/site_settings?select=key,value`,
       {
         headers: {
           apikey: anonKey,
           Authorization: `Bearer ${anonKey}`,
-          Accept: "application/json",
         },
         cache: "no-store",
       },
     );
 
     if (!res.ok) {
-      console.error("[maintenance] REST API 응답 실패:", res.status, await res.text());
+      const body = await res.text();
+      console.error("[maintenance] REST API 실패:", res.status, body);
       if (maintenanceCache) return maintenanceCache;
       return null;
     }
 
     const rows: { key: string; value: any }[] = await res.json();
+    console.log("[maintenance] DB 조회 결과:", JSON.stringify(rows));
 
     const modeRow = rows.find((r) => r.key === "maintenance_mode");
     const wlRow = rows.find((r) => r.key === "whitelist_user_ids");
@@ -172,6 +178,7 @@ export async function updateSession(request: NextRequest) {
 
   if (!isBypassPath) {
     const maint = await getMaintenanceSettings();
+    console.log("[maintenance] 체크:", { path: pathname, enabled: maint?.enabled, userId: user?.id?.slice(0, 8) });
     if (maint?.enabled) {
       // 관리자 또는 화이트리스트 사용자는 통과
       let isWhitelisted = false;
@@ -179,6 +186,7 @@ export async function updateSession(request: NextRequest) {
         // 화이트리스트 체크
         if (maint.whitelistIds.includes(user.id)) {
           isWhitelisted = true;
+          console.log("[maintenance] 화이트리스트 통과:", user.id.slice(0, 8));
         }
         // 관리자 체크 (요청 컨텍스트의 supabase 클라이언트 사용 — Edge 호환)
         if (!isWhitelisted) {
@@ -188,12 +196,14 @@ export async function updateSession(request: NextRequest) {
             .eq("id", user.id)
             .single();
           const role = profile?.role;
+          console.log("[maintenance] 역할 체크:", { role, isAdmin: role === "admin" || role === "super_admin" });
           if (role === "admin" || role === "super_admin") {
             isWhitelisted = true;
           }
         }
       }
       if (!isWhitelisted) {
+        console.log("[maintenance] → /maintenance 리다이렉트");
         const url = request.nextUrl.clone();
         url.pathname = "/maintenance";
         return NextResponse.redirect(url);
