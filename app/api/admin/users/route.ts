@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     let query = supabaseAdmin
       .from("profiles")
       .select(
-        "id, nickname, avatar_url, created_at, role, height, weight, age, gender",
+        "id, nickname, avatar_url, created_at, role, height, weight, age, gender, is_banned, ban_reason, ban_until, banned_at",
         { count: "exact" },
       );
 

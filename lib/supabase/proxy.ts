@@ -174,6 +174,53 @@ export async function updateSession(request: NextRequest) {
   }
 
   // ==========================================
+  // 밴 상태 체크 (로그인 사용자만)
+  // ==========================================
+  const banBypass = ["/banned", "/login", "/auth/", "/api/auth/", "/api/admin/"];
+  const isBanBypassPath = banBypass.some((p) => pathname.startsWith(p));
+
+  if (user && !isBanBypassPath) {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (supabaseUrl && anonKey) {
+        const banRes = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?select=is_banned,ban_until&id=eq.${user.id}`,
+          {
+            headers: {
+              apikey: anonKey,
+              Authorization: `Bearer ${anonKey}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (banRes.ok) {
+          const rows: { is_banned: boolean; ban_until: string | null }[] = await banRes.json();
+          const profile = rows[0];
+
+          if (profile?.is_banned) {
+            // ban_until이 지났으면 자동 해제
+            if (profile.ban_until && new Date(profile.ban_until) < new Date()) {
+              // 자동 해제: service role 없이 anon key로는 update 불가하므로
+              // /api/admin/users/unban 호출 대신, 그냥 통과시키고
+              // 클라이언트에서 자동 해제 처리
+              // Edge에서 service_role 사용 불가 → 통과 허용
+            } else {
+              const url = request.nextUrl.clone();
+              url.pathname = "/banned";
+              return NextResponse.redirect(url);
+            }
+          }
+        }
+      }
+    } catch {
+      // fail-open: DB 쿼리 실패 시 접근 허용
+    }
+  }
+
+  // ==========================================
   // 점검 모드 체크
   // ==========================================
   const maintenanceBypass = ["/maintenance", "/admin", "/api/admin/", "/login", "/auth/", "/api/auth/"];

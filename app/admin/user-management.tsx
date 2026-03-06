@@ -19,6 +19,8 @@ import {
   X,
   Loader2,
   Filter,
+  Ban,
+  ShieldOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -37,6 +39,10 @@ interface UserData {
   schools: string[];
   scanCount: number;
   postCount: number;
+  is_banned?: boolean;
+  ban_reason?: string;
+  ban_until?: string | null;
+  banned_at?: string | null;
 }
 
 interface UsersResponse {
@@ -106,6 +112,18 @@ export default function UserManagement() {
     newRole: string;
   } | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [banDialog, setBanDialog] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
+  const [banReason, setBanReason] = useState("");
+  const [banDuration, setBanDuration] = useState<"1d" | "7d" | "30d" | "permanent">("7d");
+  const [banLoading, setBanLoading] = useState(false);
+  const [unbanDialog, setUnbanDialog] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
+  const [unbanLoading, setUnbanLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -165,6 +183,60 @@ export default function UserManagement() {
       setConfirmDialog(null);
     }
   };
+
+  const handleBan = async () => {
+    if (!banDialog || !banReason.trim()) return;
+    setBanLoading(true);
+    try {
+      const res = await fetch("/api/admin/users/ban", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: banDialog.userId,
+          reason: banReason.trim(),
+          duration: banDuration,
+        }),
+      });
+      if (res.ok) {
+        await fetchUsers();
+        setBanDialog(null);
+        setBanReason("");
+        setBanDuration("7d");
+      } else {
+        const err = await res.json();
+        alert(err.error || "밴 처리 실패");
+      }
+    } catch {
+      alert("밴 처리 중 오류 발생");
+    } finally {
+      setBanLoading(false);
+    }
+  };
+
+  const handleUnban = async () => {
+    if (!unbanDialog) return;
+    setUnbanLoading(true);
+    try {
+      const res = await fetch("/api/admin/users/unban", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: unbanDialog.userId }),
+      });
+      if (res.ok) {
+        await fetchUsers();
+        setUnbanDialog(null);
+      } else {
+        const err = await res.json();
+        alert(err.error || "밴 해제 실패");
+      }
+    } catch {
+      alert("밴 해제 중 오류 발생");
+    } finally {
+      setUnbanLoading(false);
+    }
+  };
+
+  const isAdminRole = (role: string) => role === "admin" || role === "super_admin";
 
   return (
     <div className="space-y-4">
@@ -283,7 +355,15 @@ export default function UserManagement() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <RoleBadge role={user.role || "user"} />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <RoleBadge role={user.role || "user"} />
+                          {user.is_banned && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                              <Ban className="h-2.5 w-2.5" />
+                              정지
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center hidden lg:table-cell">
                         <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
@@ -392,6 +472,66 @@ export default function UserManagement() {
                                 )}
                               </span>
                             </div>
+
+                            {/* 밴 상태 정보 */}
+                            {user.is_banned && (
+                              <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-3 space-y-1">
+                                <p className="text-xs font-semibold text-red-700 dark:text-red-400 flex items-center gap-1">
+                                  <Ban className="h-3 w-3" /> 정지 상태
+                                </p>
+                                {user.ban_reason && (
+                                  <p className="text-xs text-red-600 dark:text-red-300">
+                                    사유: {user.ban_reason}
+                                  </p>
+                                )}
+                                <p className="text-xs text-red-600 dark:text-red-300">
+                                  해제 예정:{" "}
+                                  {user.ban_until
+                                    ? new Date(user.ban_until).toLocaleString("ko-KR")
+                                    : "영구 정지"}
+                                </p>
+                                {user.banned_at && (
+                                  <p className="text-[10px] text-red-500 dark:text-red-400">
+                                    정지일: {new Date(user.banned_at).toLocaleString("ko-KR")}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* 밴/언밴 버튼 */}
+                            <div className="flex gap-2 pt-1">
+                              {user.is_banned ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setUnbanDialog({
+                                      userId: user.id,
+                                      userName: user.nickname || user.email,
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
+                                >
+                                  <ShieldOff className="h-3 w-3" />
+                                  정지 해제
+                                </button>
+                              ) : (
+                                !isAdminRole(user.role || "user") && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setBanDialog({
+                                        userId: user.id,
+                                        userName: user.nickname || user.email,
+                                      });
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
+                                  >
+                                    <Ban className="h-3 w-3" />
+                                    정지 처리
+                                  </button>
+                                )
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -498,6 +638,151 @@ export default function UserManagement() {
                   <Check className="h-4 w-4" />
                 )}
                 변경
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 밴 처리 다이얼로그 */}
+      {banDialog && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          onClick={() => {
+            setBanDialog(null);
+            setBanReason("");
+            setBanDuration("7d");
+          }}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl bg-card p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-950/40">
+                <Ban className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold">사용자 정지</h3>
+            </div>
+            <div className="mb-5 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">{banDialog.userName}</strong>
+                님을 정지 처리합니다.
+              </p>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  정지 사유 *
+                </label>
+                <textarea
+                  value={banReason}
+                  onChange={(e) => setBanReason(e.target.value)}
+                  placeholder="정지 사유를 입력하세요..."
+                  rows={3}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  정지 기간
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(
+                    [
+                      { value: "1d", label: "1일" },
+                      { value: "7d", label: "7일" },
+                      { value: "30d", label: "30일" },
+                      { value: "permanent", label: "영구" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setBanDuration(opt.value)}
+                      className={`rounded-lg border py-2 text-xs font-semibold transition-colors ${
+                        banDuration === opt.value
+                          ? opt.value === "permanent"
+                            ? "bg-red-600 text-white border-red-600"
+                            : "bg-primary text-primary-foreground border-primary"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {banDuration === "permanent" && (
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <p>영구 정지는 관리자가 직접 해제하기 전까지 유지됩니다.</p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setBanDialog(null);
+                  setBanReason("");
+                  setBanDuration("7d");
+                }}
+                className="flex-1 rounded-lg border py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleBan}
+                disabled={banLoading || !banReason.trim()}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-red-600 hover:bg-red-700 py-2.5 text-sm font-medium text-white disabled:opacity-50 transition-colors"
+              >
+                {banLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Ban className="h-4 w-4" />
+                )}
+                정지 처리
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 밴 해제 확인 다이얼로그 */}
+      {unbanDialog && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          onClick={() => setUnbanDialog(null)}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl bg-card p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/40">
+                <ShieldOff className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="text-lg font-semibold">정지 해제</h3>
+            </div>
+            <p className="mb-6 text-sm text-muted-foreground">
+              <strong className="text-foreground">{unbanDialog.userName}</strong>
+              님의 정지를 해제합니다. 해제 후 즉시 서비스 이용이 가능합니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setUnbanDialog(null)}
+                className="flex-1 rounded-lg border py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleUnban}
+                disabled={unbanLoading}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 py-2.5 text-sm font-medium text-white disabled:opacity-50 transition-colors"
+              >
+                {unbanLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                해제
               </button>
             </div>
           </div>
