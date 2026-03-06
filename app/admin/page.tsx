@@ -3,31 +3,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Users,
-  UserPlus,
   Activity,
-  BarChart3,
-  MessageSquare,
-  School,
-  TrendingUp,
-  TrendingDown,
   RefreshCw,
-  Calendar,
-  Eye,
   Search,
-  ScanLine,
-  UtensilsCrossed,
-  Percent,
-  Zap,
   ArrowUpRight,
   ArrowDownRight,
   Headphones,
   Key,
-  Radio,
   UserCheck,
   UserX,
   Wifi,
   WifiOff,
+  ShieldCheck,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import {
   LineChart,
@@ -108,33 +97,37 @@ interface Stats {
   dauTrend: { date: string; dau: number }[];
 }
 
-// ─── Stat Card ───
+// ─── Stat Card (디자인 개선) ───
 function StatCard({
-  icon: Icon,
+  emoji,
   label,
   value,
   sub,
-  color = "text-primary",
+  bgColor = "bg-blue-50 dark:bg-blue-950/30",
   trend,
 }: {
-  icon: React.ElementType;
+  emoji: string;
   label: string;
   value: string | number;
   sub?: string;
-  color?: string;
+  bgColor?: string;
   trend?: { value: number; label: string };
 }) {
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-3">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${color.replace("text-", "bg-")}/10`}
+          className={`flex h-10 w-10 items-center justify-center rounded-xl ${bgColor} text-lg`}
         >
-          <Icon className={`h-5 w-5 ${color}`} />
+          {emoji}
         </div>
         {trend && (
           <div
-            className={`flex items-center gap-0.5 text-xs font-medium ${trend.value >= 0 ? "text-green-600" : "text-red-500"}`}
+            className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+              trend.value >= 0
+                ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40"
+                : "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/40"
+            }`}
           >
             {trend.value >= 0 ? (
               <ArrowUpRight className="h-3 w-3" />
@@ -145,18 +138,22 @@ function StatCard({
           </div>
         )}
       </div>
-      <p className="text-2xl font-bold tabular-nums">
+      <p className="text-2xl font-extrabold tracking-tight tabular-nums text-gray-900 dark:text-gray-50">
         {typeof value === "number" ? value.toLocaleString() : value}
       </p>
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1.5">
+        {label}
+      </p>
       {sub && (
-        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</p>
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+          {sub}
+        </p>
       )}
     </div>
   );
 }
 
-// ─── Chart Card ───
+// ─── Chart Card (디자인 개선) ───
 function ChartCard({
   title,
   children,
@@ -167,8 +164,12 @@ function ChartCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border bg-card p-5 shadow-sm ${className}`}>
-      <h3 className="text-sm font-semibold mb-4">{title}</h3>
+    <div
+      className={`rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-6 shadow-sm ${className}`}
+    >
+      <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 mb-5">
+        {title}
+      </h3>
       {children}
     </div>
   );
@@ -191,135 +192,141 @@ function OnlineUsersCard({
   const [showDetail, setShowDetail] = useState(false);
 
   return (
-    <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-            <Radio className="h-5 w-5 text-green-500 animate-pulse" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-lg">
+            📡
           </div>
           <div>
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              현재 접속자 (실시간)
+            <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+              실시간 접속자
               {connected ? (
-                <span className="inline-flex items-center gap-1 text-[10px] font-normal text-green-600 bg-green-100 dark:bg-green-950/40 dark:text-green-400 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full">
                   <Wifi className="h-2.5 w-2.5" />
-                  SSE 연결됨
+                  연결됨
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[10px] font-normal text-red-600 bg-red-100 dark:bg-red-950/40 dark:text-red-400 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full">
                   <WifiOff className="h-2.5 w-2.5" />
-                  연결 끊김
+                  끊김
                 </span>
               )}
             </h3>
-            <p className="text-[11px] text-muted-foreground">
-              SSE 기반 · 5초 간격 갱신 · AWS 이관 호환
+            <p className="text-[11px] text-gray-400 dark:text-gray-500">
+              SSE 기반 · 5초 간격 갱신
             </p>
           </div>
         </div>
         <button
           onClick={() => setShowDetail(!showDetail)}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg border hover:bg-muted"
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
         >
-          {showDetail ? "접기" : "상세 보기"}
+          {showDetail ? "접기" : "상세"}
         </button>
       </div>
 
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-3 mt-3">
-        <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/20 p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1.5">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-xs font-medium text-green-700 dark:text-green-400">
-              전체 접속
+            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+              전체
             </span>
           </div>
-          <p className="text-2xl font-bold text-green-700 dark:text-green-300 tabular-nums">
+          <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 tabular-nums">
             {totalOnline}
           </p>
         </div>
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
+        <div className="rounded-xl bg-blue-50 dark:bg-blue-950/20 p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1.5">
             <UserCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-            <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+            <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400">
               회원
             </span>
           </div>
-          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums">
+          <p className="text-2xl font-extrabold text-blue-700 dark:text-blue-300 tabular-nums">
             {authenticatedCount}
           </p>
         </div>
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-800/30 p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/30 p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1.5">
             <UserX className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+            <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-400">
               비회원
             </span>
           </div>
-          <p className="text-2xl font-bold text-gray-600 dark:text-gray-300 tabular-nums">
+          <p className="text-2xl font-extrabold text-gray-600 dark:text-gray-300 tabular-nums">
             {anonymousCount}
           </p>
         </div>
       </div>
 
-      {/* 상세 목록 */}
       {showDetail && users.length > 0 && (
-        <div className="mt-4 border rounded-lg overflow-hidden">
+        <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
           <div className="max-h-60 overflow-auto">
             <table className="w-full text-xs min-w-[600px]">
-              <thead className="bg-muted/50 sticky top-0">
+              <thead className="bg-gray-50 dark:bg-gray-800/50 sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">상태</th>
-                  <th className="text-left px-3 py-2 font-medium">사용자</th>
-                  <th className="text-left px-3 py-2 font-medium">유형</th>
-                  <th className="text-left px-3 py-2 font-medium">IP</th>
-                  <th className="text-left px-3 py-2 font-medium">접속 시간</th>
-                  <th className="text-left px-3 py-2 font-medium">
-                    마지막 활동
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-500 dark:text-gray-400">
+                    상태
+                  </th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-500 dark:text-gray-400">
+                    사용자
+                  </th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-500 dark:text-gray-400">
+                    유형
+                  </th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-500 dark:text-gray-400">
+                    IP
+                  </th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-500 dark:text-gray-400">
+                    접속
+                  </th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-500 dark:text-gray-400">
+                    활동
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {users.map((user, idx) => (
                   <tr
                     key={`${user.userId}-${idx}`}
-                    className="hover:bg-muted/30"
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800/30"
                   >
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2.5">
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-medium">
+                    <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-200">
                       {user.nickname ||
                         (user.isAuthenticated
                           ? user.userId.slice(0, 8) + "..."
                           : "비회원")}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2.5">
                       {user.isAuthenticated ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-medium">
-                          <UserCheck className="h-2.5 w-2.5" />
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-semibold">
                           회원
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] font-medium">
-                          <UserX className="h-2.5 w-2.5" />
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[10px] font-semibold">
                           비회원
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground font-mono text-[11px]">
+                    <td className="px-3 py-2.5 text-gray-400 font-mono text-[11px]">
                       {user.ipAddress || "unknown"}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-3 py-2.5 text-gray-400">
                       {new Date(user.connectedAt).toLocaleTimeString("ko-KR")}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-3 py-2.5 text-gray-400">
                       {formatTimeAgo(user.lastHeartbeat)}
                     </td>
                   </tr>
@@ -331,10 +338,270 @@ function OnlineUsersCard({
       )}
 
       {showDetail && users.length === 0 && (
-        <div className="mt-4 text-center py-6 text-sm text-muted-foreground border rounded-lg">
+        <div className="mt-4 text-center py-6 text-sm text-gray-400 border border-gray-200 dark:border-gray-700 rounded-xl">
           현재 접속 중인 사용자가 없습니다
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Rate Limit 관리 섹션 ───
+function RateLimitManager() {
+  const [resetAllLoading, setResetAllLoading] = useState(false);
+  const [resetUserLoading, setResetUserLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<
+    { id: string; nickname: string; email: string }[]
+  >([]);
+  const [selectedUser, setSelectedUser] = useState<{
+    id: string;
+    nickname: string;
+    email: string;
+  } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // 사용자 검색 (debounce)
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 1) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/admin/rate-limit?q=${encodeURIComponent(searchQuery.trim())}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.users || []);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleResetAll = async () => {
+    setResetAllLoading(true);
+    try {
+      const res = await fetch("/api/admin/rate-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "all" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("전체 rate limit 초기화 완료", "success");
+      } else {
+        showToast("일부 테이블 초기화 실패", "error");
+      }
+    } catch {
+      showToast("초기화 중 오류 발생", "error");
+    } finally {
+      setResetAllLoading(false);
+      setConfirmAll(false);
+    }
+  };
+
+  const handleResetUser = async () => {
+    if (!selectedUser) return;
+    setResetUserLoading(true);
+    try {
+      const res = await fetch("/api/admin/rate-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "user", userId: selectedUser.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(
+          `${selectedUser.nickname} 님의 rate limit 초기화 완료`,
+          "success",
+        );
+        setSelectedUser(null);
+        setSearchQuery("");
+        setSearchResults([]);
+      } else {
+        showToast("초기화 실패", "error");
+      }
+    } catch {
+      showToast("초기화 중 오류 발생", "error");
+    } finally {
+      setResetUserLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/30 text-lg">
+          🔄
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">
+            Rate Limit 관리
+          </h3>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            API 사용량 제한 초기화 (5개 테이블)
+          </p>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`mb-4 px-4 py-2.5 rounded-xl text-sm font-medium ${
+            toast.type === "success"
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+              : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* 전체 초기화 */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+          <h4 className="text-xs font-bold text-gray-600 dark:text-gray-300 mb-2 flex items-center gap-1.5">
+            <Trash2 className="h-3.5 w-3.5" />
+            전체 초기화
+          </h4>
+          <p className="text-[11px] text-gray-400 mb-3">
+            오늘자 rate limit 데이터를 모든 테이블에서 삭제합니다.
+          </p>
+          {!confirmAll ? (
+            <button
+              onClick={() => setConfirmAll(true)}
+              className="w-full rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-semibold py-2.5 transition-colors"
+            >
+              전체 초기화
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={handleResetAll}
+                disabled={resetAllLoading}
+                className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2.5 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {resetAllLoading ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                )}
+                확인
+              </button>
+              <button
+                onClick={() => setConfirmAll(false)}
+                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 text-xs font-semibold py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 특정 사용자 초기화 */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+          <h4 className="text-xs font-bold text-gray-600 dark:text-gray-300 mb-2 flex items-center gap-1.5">
+            <RotateCcw className="h-3.5 w-3.5" />
+            사용자별 초기화
+          </h4>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedUser(null);
+              }}
+              placeholder="닉네임 또는 UUID 입력"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            />
+            {searching && (
+              <RefreshCw className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin text-gray-400" />
+            )}
+          </div>
+
+          {/* 검색 결과 드롭다운 */}
+          {searchResults.length > 0 && !selectedUser && (
+            <div className="mb-3 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden max-h-36 overflow-auto">
+              {searchResults.map((user) => (
+                <button
+                  key={user.id}
+                  onClick={() => {
+                    setSelectedUser(user);
+                    setSearchQuery(user.nickname);
+                    setSearchResults([]);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between"
+                >
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    {user.nickname}
+                  </span>
+                  <span className="text-gray-400 text-[10px]">
+                    {user.email}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 선택된 사용자 */}
+          {selectedUser && (
+            <div className="mb-3 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">
+                  {selectedUser.nickname}
+                </span>
+                <span className="text-[10px] text-blue-500 dark:text-blue-500 ml-2">
+                  {selectedUser.email}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedUser(null);
+                  setSearchQuery("");
+                }}
+                className="text-blue-400 hover:text-blue-600 text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleResetUser}
+            disabled={!selectedUser || resetUserLoading}
+            className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-gray-800 text-white disabled:text-gray-400 text-xs font-semibold py-2.5 transition-colors flex items-center justify-center gap-1.5"
+          >
+            {resetUserLoading ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
+            선택한 사용자 초기화
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -432,7 +699,7 @@ export default function AdminDashboard() {
   if (isAdmin === null) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+        <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
       </div>
     );
   }
@@ -450,35 +717,35 @@ export default function AdminDashboard() {
     : [];
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-gray-50/80 dark:bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+      <div className="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-background/95 backdrop-blur">
         <div className="container mx-auto px-4">
           {/* Title + Controls */}
-          <div className="flex h-12 items-center justify-between gap-3">
+          <div className="flex h-14 items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-base sm:text-lg font-bold shrink-0">
-                📊 편하루 관리자
+              <h1 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-gray-50 shrink-0">
+                편하루 관리자
               </h1>
               {activeTab === "dashboard" && (
                 <div
-                  className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                  className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                     sseConnected
-                      ? "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400"
-                      : "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"
+                      : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400"
                   }`}
                 >
                   <span className="relative flex h-2 w-2">
                     {sseConnected ? (
                       <>
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </>
                     ) : (
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                     )}
                   </span>
-                  {sseConnected ? `${totalOnline}명 접속 중` : "연결 끊김"}
+                  {sseConnected ? `${totalOnline}명 접속` : "연결 끊김"}
                 </div>
               )}
             </div>
@@ -486,15 +753,15 @@ export default function AdminDashboard() {
               {activeTab === "dashboard" && (
                 <>
                   <AdminReportButton stats={stats} period={period} />
-                  <div className="hidden sm:flex items-center gap-1 rounded-lg border bg-card p-0.5">
+                  <div className="hidden sm:flex items-center gap-0.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-0.5">
                     {[7, 14, 30, 90].map((d) => (
                       <button
                         key={d}
                         onClick={() => setPeriod(d)}
-                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                           period === d
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground"
+                            ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-50 shadow-sm"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                         }`}
                       >
                         {d}일
@@ -504,84 +771,61 @@ export default function AdminDashboard() {
                   <button
                     onClick={fetchStats}
                     disabled={loading}
-                    className="rounded-lg border bg-card p-2 hover:bg-muted transition-colors"
+                    className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <RefreshCw
-                      className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                      className={`h-4 w-4 text-gray-500 ${loading ? "animate-spin" : ""}`}
                     />
                   </button>
                 </>
               )}
             </div>
           </div>
-          {/* Tab navigation (scrollable on mobile) */}
+          {/* Tab navigation */}
           <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-2">
-            <div className="flex items-center gap-0.5 rounded-lg border bg-card p-0.5 w-fit">
-              <button
-                onClick={() => setActiveTab("dashboard")}
-                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === "dashboard"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                대시보드
-              </button>
-              <button
-                onClick={() => setActiveTab("users")}
-                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === "users"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                사용자 관리
-              </button>
-              <button
-                onClick={() => setActiveTab("support")}
-                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === "support"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1">
-                  <Headphones className="h-3 w-3" />
-                  고객센터
-                </span>
-              </button>
-              <button
-                onClick={() => setActiveTab("actionLogs")}
-                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === "actionLogs"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1">
-                  <Activity className="h-3 w-3" />
-                  활동 로그
-                </span>
-              </button>
-              <button
-                onClick={() => setActiveTab("portfolioTokens")}
-                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === "portfolioTokens"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1">
-                  <Key className="h-3 w-3" />
-                  포트폴리오
-                </span>
-              </button>
+            <div className="flex items-center gap-0.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-0.5 w-fit">
+              {(
+                [
+                  { key: "dashboard", label: "대시보드", icon: null },
+                  { key: "users", label: "사용자 관리", icon: null },
+                  {
+                    key: "support",
+                    label: "고객센터",
+                    icon: Headphones,
+                  },
+                  {
+                    key: "actionLogs",
+                    label: "활동 로그",
+                    icon: Activity,
+                  },
+                  {
+                    key: "portfolioTokens",
+                    label: "포트폴리오",
+                    icon: Key,
+                  },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    activeTab === tab.key
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-50 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <span className="flex items-center gap-1">
+                    {tab.icon && <tab.icon className="h-3 w-3" />}
+                    {tab.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-4 py-6 space-y-5">
         {activeTab === "users" ? (
           <UserManagement />
         ) : activeTab === "support" ? (
@@ -592,21 +836,21 @@ export default function AdminDashboard() {
           <PortfolioTokens />
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
-            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+            <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : stats ? (
           <>
             {/* ═══ 모바일 기간 선택 ═══ */}
             <div className="flex sm:hidden items-center justify-between">
-              <div className="flex items-center gap-1 rounded-lg border bg-card p-0.5">
+              <div className="flex items-center gap-0.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-0.5">
                 {[7, 14, 30, 90].map((d) => (
                   <button
                     key={d}
                     onClick={() => setPeriod(d)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                       period === d
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-50 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
                     {d}일
@@ -615,7 +859,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ═══ 🟢 현재 접속자 (SSE 실시간) ═══ */}
+            {/* ═══ 실시간 접속자 ═══ */}
             <OnlineUsersCard
               totalOnline={totalOnline}
               authenticatedCount={authenticatedCount}
@@ -625,139 +869,161 @@ export default function AdminDashboard() {
             />
 
             {/* ═══ 핵심 지표 카드 ═══ */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard
-                icon={Users}
+                emoji="👥"
                 label="전체 가입자"
                 value={stats.overview.totalUsers}
-                color="text-blue-600"
+                bgColor="bg-blue-50 dark:bg-blue-950/30"
               />
               <StatCard
-                icon={Activity}
+                emoji="📊"
                 label="DAU (오늘)"
                 value={stats.overview.dau}
-                sub={`회원 ${stats.overview.dauMembers} · 비회원 ${stats.overview.dauAnon}`}
-                color="text-green-600"
+                sub={`회원 ${stats.overview.dauMembers.toLocaleString()} · 비회원 ${stats.overview.dauAnon.toLocaleString()}`}
+                bgColor="bg-emerald-50 dark:bg-emerald-950/30"
               />
               <StatCard
-                icon={Activity}
+                emoji="📆"
                 label="WAU (7일)"
                 value={stats.overview.wau}
-                color="text-emerald-600"
+                bgColor="bg-teal-50 dark:bg-teal-950/30"
               />
               <StatCard
-                icon={Activity}
+                emoji="📅"
                 label="MAU (30일)"
                 value={stats.overview.mau}
-                color="text-teal-600"
+                bgColor="bg-cyan-50 dark:bg-cyan-950/30"
               />
               <StatCard
-                icon={Percent}
+                emoji="🔁"
                 label="리텐션율"
                 value={`${stats.overview.retentionRate}%`}
                 sub="7일 전 사용자 재방문"
-                color="text-violet-600"
+                bgColor="bg-violet-50 dark:bg-violet-950/30"
               />
               <StatCard
-                icon={Zap}
+                emoji="⚡"
                 label="스티키니스"
                 value={`${stats.overview.stickiness}%`}
                 sub="DAU/MAU 비율"
-                color="text-amber-600"
+                bgColor="bg-amber-50 dark:bg-amber-950/30"
               />
             </div>
 
             {/* ═══ 기능 사용 요약 ═══ */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
-                icon={ScanLine}
+                emoji="📷"
                 label={`바코드 스캔 (${period}일)`}
                 value={stats.features.scans}
-                color="text-orange-600"
+                bgColor="bg-orange-50 dark:bg-orange-950/30"
               />
               <StatCard
-                icon={Eye}
+                emoji="🛡️"
                 label={`안전 확인 (${period}일)`}
                 value={stats.features.checks}
-                color="text-pink-600"
+                bgColor="bg-pink-50 dark:bg-pink-950/30"
               />
               <StatCard
-                icon={Search}
+                emoji="🔍"
                 label={`음식 검색 (${period}일)`}
                 value={stats.features.searches}
-                color="text-cyan-600"
+                bgColor="bg-sky-50 dark:bg-sky-950/30"
               />
               <StatCard
-                icon={UtensilsCrossed}
+                emoji="🍽️"
                 label={`식단 기록 (${period}일)`}
                 value={stats.features.dietEntries}
-                color="text-lime-600"
+                bgColor="bg-lime-50 dark:bg-lime-950/30"
               />
             </div>
 
-            {/* ═══ 커뮤니티 + 학교 요약 ═══ */}
+            {/* ═══ 커뮤니티 + 학교 + 가입 ═══ */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
-                icon={MessageSquare}
+                emoji="💬"
                 label="전체 게시글"
                 value={stats.community.totalPosts}
-                sub={`최근 ${period}일: ${stats.community.recentPosts}개`}
-                color="text-indigo-600"
+                sub={`최근 ${period}일: ${stats.community.recentPosts.toLocaleString()}개`}
+                bgColor="bg-indigo-50 dark:bg-indigo-950/30"
               />
               <StatCard
-                icon={MessageSquare}
+                emoji="🗨️"
                 label="전체 댓글"
                 value={stats.community.totalComments}
-                sub={`최근 ${period}일: ${stats.community.recentComments}개`}
-                color="text-purple-600"
+                sub={`최근 ${period}일: ${stats.community.recentComments.toLocaleString()}개`}
+                bgColor="bg-purple-50 dark:bg-purple-950/30"
               />
               <StatCard
-                icon={School}
+                emoji="🏫"
                 label="학교 등록 수"
                 value={stats.schools.total}
-                color="text-sky-600"
+                bgColor="bg-sky-50 dark:bg-sky-950/30"
               />
               <StatCard
-                icon={UserPlus}
+                emoji="🆕"
                 label={`신규 가입 (${period}일)`}
                 value={stats.signups.recent}
-                color="text-rose-600"
+                bgColor="bg-rose-50 dark:bg-rose-950/30"
               />
             </div>
 
             {/* ═══ 차트 영역 ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* DAU 추이 (Area Chart) */}
               <ChartCard title="📈 일별 활성 사용자 (DAU) 추이">
                 <ResponsiveContainer width="100%" height={280}>
                   <AreaChart data={stats.dauTrend}>
                     <defs>
-                      <linearGradient id="dauGrad" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient
+                        id="dauGrad"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
                         <stop
                           offset="5%"
-                          stopColor="#22c55e"
-                          stopOpacity={0.3}
+                          stopColor="#10b981"
+                          stopOpacity={0.25}
                         />
                         <stop
                           offset="95%"
-                          stopColor="#22c55e"
+                          stopColor="#10b981"
                           stopOpacity={0}
                         />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatDate}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip labelFormatter={(v) => `날짜: ${v}`} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      labelFormatter={(v) => `${v}`}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        fontSize: 12,
+                      }}
+                    />
                     <Area
                       type="monotone"
                       dataKey="dau"
-                      stroke="#22c55e"
-                      strokeWidth={2}
+                      stroke="#10b981"
+                      strokeWidth={2.5}
                       fill="url(#dauGrad)"
                       name="DAU"
                     />
@@ -765,55 +1031,87 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* 신규 가입자 추이 (Bar Chart) */}
               <ChartCard title="👤 신규 가입자 추이">
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={stats.signups.trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatDate}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip labelFormatter={(v) => `날짜: ${v}`} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      labelFormatter={(v) => `${v}`}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        fontSize: 12,
+                      }}
+                    />
                     <Bar
                       dataKey="count"
-                      fill="#3b82f6"
-                      radius={[4, 4, 0, 0]}
+                      fill="#6366f1"
+                      radius={[6, 6, 0, 0]}
                       name="가입자 수"
                     />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* 기능별 사용량 (Composed Chart) */}
               <ChartCard
-                title="🔧 기능별 일일 사용량 (복합 차트)"
+                title="🔧 기능별 일일 사용량"
                 className="lg:col-span-2"
               >
                 <ResponsiveContainer width="100%" height={320}>
                   <ComposedChart data={stats.features.trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatDate}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip labelFormatter={(v) => `날짜: ${v}`} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      labelFormatter={(v) => `${v}`}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        fontSize: 12,
+                      }}
+                    />
                     <Legend />
                     <Bar
                       dataKey="scans"
                       fill="#f59e0b"
-                      radius={[2, 2, 0, 0]}
+                      radius={[3, 3, 0, 0]}
                       name="바코드 스캔"
                       stackId="a"
                     />
                     <Bar
                       dataKey="checks"
                       fill="#ec4899"
-                      radius={[2, 2, 0, 0]}
+                      radius={[3, 3, 0, 0]}
                       name="안전 확인"
                       stackId="a"
                     />
@@ -821,7 +1119,7 @@ export default function AdminDashboard() {
                       type="monotone"
                       dataKey="searches"
                       stroke="#06b6d4"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       dot={false}
                       name="음식 검색"
                     />
@@ -829,7 +1127,7 @@ export default function AdminDashboard() {
                       type="monotone"
                       dataKey="diet"
                       stroke="#22c55e"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       dot={false}
                       name="식단 기록"
                     />
@@ -837,40 +1135,55 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* 커뮤니티 활동 */}
               <ChartCard title="💬 커뮤니티 활동 추이">
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={stats.community.trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatDate}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip labelFormatter={(v) => `날짜: ${v}`} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      labelFormatter={(v) => `${v}`}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        fontSize: 12,
+                      }}
+                    />
                     <Legend />
                     <Line
                       type="monotone"
                       dataKey="posts"
                       stroke="#6366f1"
-                      strokeWidth={2}
-                      dot={{ r: 2 }}
+                      strokeWidth={2.5}
+                      dot={{ r: 2.5 }}
                       name="게시글"
                     />
                     <Line
                       type="monotone"
                       dataKey="comments"
                       stroke="#a855f7"
-                      strokeWidth={2}
-                      dot={{ r: 2 }}
+                      strokeWidth={2.5}
+                      dot={{ r: 2.5 }}
                       name="댓글"
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* 기능 사용 비율 (파이 차트) */}
               <ChartCard title="🎯 기능 사용 비율">
                 {featurePieData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={280}>
@@ -879,8 +1192,8 @@ export default function AdminDashboard() {
                         data={featurePieData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
+                        innerRadius={65}
+                        outerRadius={105}
                         paddingAngle={4}
                         dataKey="value"
                         label={({ name, percent }) =>
@@ -891,17 +1204,22 @@ export default function AdminDashboard() {
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e5e7eb",
+                          fontSize: 12,
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex items-center justify-center h-[280px] text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center h-[280px] text-sm text-gray-400">
                     데이터 없음
                   </div>
                 )}
               </ChartCard>
 
-              {/* 학교 등록 랭킹 */}
               <ChartCard title="🏫 학교 등록 TOP 10" className="lg:col-span-2">
                 {stats.schools.topSchools.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
@@ -912,44 +1230,58 @@ export default function AdminDashboard() {
                     >
                       <CartesianGrid
                         strokeDasharray="3 3"
-                        stroke="#e5e7eb"
+                        stroke="#f3f4f6"
                         horizontal={false}
                       />
-                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 11, fill: "#9ca3af" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
                       <YAxis
                         type="category"
                         dataKey="name"
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: 11, fill: "#6b7280" }}
                         width={120}
+                        axisLine={false}
+                        tickLine={false}
                       />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e5e7eb",
+                          fontSize: 12,
+                        }}
+                      />
                       <Bar
                         dataKey="count"
                         fill="#0ea5e9"
-                        radius={[0, 4, 4, 0]}
+                        radius={[0, 6, 6, 0]}
                         name="등록 수"
                       />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center h-[300px] text-sm text-gray-400">
                     등록된 학교가 없습니다
                   </div>
                 )}
               </ChartCard>
             </div>
 
+            {/* ═══ Rate Limit 관리 ═══ */}
+            <RateLimitManager />
+
             {/* 마지막 업데이트 */}
-            <p className="text-center text-xs text-muted-foreground pb-4">
+            <p className="text-center text-[11px] text-gray-400 pb-4">
               마지막 업데이트: {new Date().toLocaleString("ko-KR")} · 기간: 최근{" "}
               {period}일
             </p>
           </>
         ) : (
           <div className="flex items-center justify-center py-20">
-            <p className="text-muted-foreground">
-              데이터를 불러올 수 없습니다.
-            </p>
+            <p className="text-gray-400">데이터를 불러올 수 없습니다.</p>
           </div>
         )}
       </div>

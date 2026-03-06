@@ -18,7 +18,8 @@
       "mcp__supabase__apply_migration",
       "Bash(npm run:*)",
       "Bash(node:*)",
-      "Bash(do sed:*)"
+      "Bash(do sed:*)",
+      "Bash(npx tsc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
