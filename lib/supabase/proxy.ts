@@ -19,14 +19,11 @@ export async function updateSession(request: NextRequest) {
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     const origin = request.headers.get("origin");
     const host = request.headers.get("host");
-    if (origin && host) {
-      const originHost = new URL(origin).host;
-      if (originHost !== host) {
-        return NextResponse.json(
-          { error: "CSRF 검증 실패: 허용되지 않은 출처입니다." },
-          { status: 403 },
-        );
-      }
+    if (!origin || !host || new URL(origin).host !== host) {
+      return NextResponse.json(
+        { error: "CSRF 검증 실패: 허용되지 않은 출처입니다." },
+        { status: 403 },
+      );
     }
   }
 
