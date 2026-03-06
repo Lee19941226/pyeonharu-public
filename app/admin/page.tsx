@@ -46,7 +46,9 @@ import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
 type AdminTab =
-  | "dashboard"
+  | "marketing"
+  | "operations"
+  | "tools"
   | "users"
   | "support"
   | "actionLogs"
@@ -642,7 +644,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(30);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AdminTab>("marketing");
 
   // ✅ SSE 실시간 접속자 구독
   const {
@@ -727,7 +729,7 @@ export default function AdminDashboard() {
               <h1 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-gray-50 shrink-0">
                 편하루 관리자
               </h1>
-              {activeTab === "dashboard" && (
+              {activeTab === "operations" && (
                 <div
                   className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                     sseConnected
@@ -750,7 +752,7 @@ export default function AdminDashboard() {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {activeTab === "dashboard" && (
+              {(activeTab === "marketing" || activeTab === "operations") && (
                 <>
                   <AdminReportButton stats={stats} period={period} />
                   <div className="hidden sm:flex items-center gap-0.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-0.5">
@@ -786,7 +788,9 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-0.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-0.5 w-fit">
               {(
                 [
-                  { key: "dashboard", label: "대시보드", icon: null },
+                  { key: "marketing", label: "마케팅", icon: null },
+                  { key: "operations", label: "운영", icon: null },
+                  { key: "tools", label: "도구", icon: null },
                   { key: "users", label: "사용자 관리", icon: null },
                   {
                     key: "support",
@@ -834,6 +838,10 @@ export default function AdminDashboard() {
           <ActionLogs />
         ) : activeTab === "portfolioTokens" ? (
           <PortfolioTokens />
+        ) : activeTab === "tools" ? (
+          <div className="space-y-5">
+            <RateLimitManager />
+          </div>
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
             <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
@@ -859,419 +867,429 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ═══ 실시간 접속자 ═══ */}
-            <OnlineUsersCard
-              totalOnline={totalOnline}
-              authenticatedCount={authenticatedCount}
-              anonymousCount={anonymousCount}
-              users={onlineUsers}
-              connected={sseConnected}
-            />
+            {/* ═══ 마케팅 탭 ═══ */}
+            {activeTab === "marketing" && (
+              <div className="space-y-5">
+                {/* 핵심 지표 카드 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <StatCard
+                    emoji="👥"
+                    label="전체 가입자"
+                    value={stats.overview.totalUsers}
+                    bgColor="bg-blue-50 dark:bg-blue-950/30"
+                  />
+                  <StatCard
+                    emoji="📊"
+                    label="DAU (오늘)"
+                    value={stats.overview.dau}
+                    sub={`회원 ${stats.overview.dauMembers.toLocaleString()} · 비회원 ${stats.overview.dauAnon.toLocaleString()}`}
+                    bgColor="bg-emerald-50 dark:bg-emerald-950/30"
+                  />
+                  <StatCard
+                    emoji="📆"
+                    label="WAU (7일)"
+                    value={stats.overview.wau}
+                    bgColor="bg-teal-50 dark:bg-teal-950/30"
+                  />
+                  <StatCard
+                    emoji="📅"
+                    label="MAU (30일)"
+                    value={stats.overview.mau}
+                    bgColor="bg-cyan-50 dark:bg-cyan-950/30"
+                  />
+                  <StatCard
+                    emoji="🔁"
+                    label="리텐션율"
+                    value={`${stats.overview.retentionRate}%`}
+                    sub="7일 전 사용자 재방문"
+                    bgColor="bg-violet-50 dark:bg-violet-950/30"
+                  />
+                  <StatCard
+                    emoji="⚡"
+                    label="스티키니스"
+                    value={`${stats.overview.stickiness}%`}
+                    sub="DAU/MAU 비율"
+                    bgColor="bg-amber-50 dark:bg-amber-950/30"
+                  />
+                </div>
 
-            {/* ═══ 핵심 지표 카드 ═══ */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard
-                emoji="👥"
-                label="전체 가입자"
-                value={stats.overview.totalUsers}
-                bgColor="bg-blue-50 dark:bg-blue-950/30"
-              />
-              <StatCard
-                emoji="📊"
-                label="DAU (오늘)"
-                value={stats.overview.dau}
-                sub={`회원 ${stats.overview.dauMembers.toLocaleString()} · 비회원 ${stats.overview.dauAnon.toLocaleString()}`}
-                bgColor="bg-emerald-50 dark:bg-emerald-950/30"
-              />
-              <StatCard
-                emoji="📆"
-                label="WAU (7일)"
-                value={stats.overview.wau}
-                bgColor="bg-teal-50 dark:bg-teal-950/30"
-              />
-              <StatCard
-                emoji="📅"
-                label="MAU (30일)"
-                value={stats.overview.mau}
-                bgColor="bg-cyan-50 dark:bg-cyan-950/30"
-              />
-              <StatCard
-                emoji="🔁"
-                label="리텐션율"
-                value={`${stats.overview.retentionRate}%`}
-                sub="7일 전 사용자 재방문"
-                bgColor="bg-violet-50 dark:bg-violet-950/30"
-              />
-              <StatCard
-                emoji="⚡"
-                label="스티키니스"
-                value={`${stats.overview.stickiness}%`}
-                sub="DAU/MAU 비율"
-                bgColor="bg-amber-50 dark:bg-amber-950/30"
-              />
-            </div>
+                {/* 커뮤니티 + 학교 + 가입 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <StatCard
+                    emoji="💬"
+                    label="전체 게시글"
+                    value={stats.community.totalPosts}
+                    sub={`최근 ${period}일: ${stats.community.recentPosts.toLocaleString()}개`}
+                    bgColor="bg-indigo-50 dark:bg-indigo-950/30"
+                  />
+                  <StatCard
+                    emoji="🗨️"
+                    label="전체 댓글"
+                    value={stats.community.totalComments}
+                    sub={`최근 ${period}일: ${stats.community.recentComments.toLocaleString()}개`}
+                    bgColor="bg-purple-50 dark:bg-purple-950/30"
+                  />
+                  <StatCard
+                    emoji="🏫"
+                    label="학교 등록 수"
+                    value={stats.schools.total}
+                    bgColor="bg-sky-50 dark:bg-sky-950/30"
+                  />
+                  <StatCard
+                    emoji="🆕"
+                    label={`신규 가입 (${period}일)`}
+                    value={stats.signups.recent}
+                    bgColor="bg-rose-50 dark:bg-rose-950/30"
+                  />
+                </div>
 
-            {/* ═══ 기능 사용 요약 ═══ */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard
-                emoji="📷"
-                label={`바코드 스캔 (${period}일)`}
-                value={stats.features.scans}
-                bgColor="bg-orange-50 dark:bg-orange-950/30"
-              />
-              <StatCard
-                emoji="🛡️"
-                label={`안전 확인 (${period}일)`}
-                value={stats.features.checks}
-                bgColor="bg-pink-50 dark:bg-pink-950/30"
-              />
-              <StatCard
-                emoji="🔍"
-                label={`음식 검색 (${period}일)`}
-                value={stats.features.searches}
-                bgColor="bg-sky-50 dark:bg-sky-950/30"
-              />
-              <StatCard
-                emoji="🍽️"
-                label={`식단 기록 (${period}일)`}
-                value={stats.features.dietEntries}
-                bgColor="bg-lime-50 dark:bg-lime-950/30"
-              />
-            </div>
-
-            {/* ═══ 커뮤니티 + 학교 + 가입 ═══ */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard
-                emoji="💬"
-                label="전체 게시글"
-                value={stats.community.totalPosts}
-                sub={`최근 ${period}일: ${stats.community.recentPosts.toLocaleString()}개`}
-                bgColor="bg-indigo-50 dark:bg-indigo-950/30"
-              />
-              <StatCard
-                emoji="🗨️"
-                label="전체 댓글"
-                value={stats.community.totalComments}
-                sub={`최근 ${period}일: ${stats.community.recentComments.toLocaleString()}개`}
-                bgColor="bg-purple-50 dark:bg-purple-950/30"
-              />
-              <StatCard
-                emoji="🏫"
-                label="학교 등록 수"
-                value={stats.schools.total}
-                bgColor="bg-sky-50 dark:bg-sky-950/30"
-              />
-              <StatCard
-                emoji="🆕"
-                label={`신규 가입 (${period}일)`}
-                value={stats.signups.recent}
-                bgColor="bg-rose-50 dark:bg-rose-950/30"
-              />
-            </div>
-
-            {/* ═══ 차트 영역 ═══ */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="📈 일별 활성 사용자 (DAU) 추이">
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={stats.dauTrend}>
-                    <defs>
-                      <linearGradient
-                        id="dauGrad"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#10b981"
-                          stopOpacity={0.25}
+                {/* 차트 영역 */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <ChartCard title="📈 일별 활성 사용자 (DAU) 추이">
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart data={stats.dauTrend}>
+                        <defs>
+                          <linearGradient
+                            id="dauGrad"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#10b981"
+                              stopOpacity={0.25}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#10b981"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#f3f4f6"
+                          vertical={false}
                         />
-                        <stop
-                          offset="95%"
-                          stopColor="#10b981"
-                          stopOpacity={0}
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={formatDate}
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
                         />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#f3f4f6"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDate}
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      labelFormatter={(v) => `${v}`}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #e5e7eb",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="dau"
-                      stroke="#10b981"
-                      strokeWidth={2.5}
-                      fill="url(#dauGrad)"
-                      name="DAU"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
+                        <YAxis
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          labelFormatter={(v) => `${v}`}
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid #e5e7eb",
+                            fontSize: 12,
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="dau"
+                          stroke="#10b981"
+                          strokeWidth={2.5}
+                          fill="url(#dauGrad)"
+                          name="DAU"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
 
-              <ChartCard title="👤 신규 가입자 추이">
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={stats.signups.trend}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#f3f4f6"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDate}
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      labelFormatter={(v) => `${v}`}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #e5e7eb",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="#6366f1"
-                      radius={[6, 6, 0, 0]}
-                      name="가입자 수"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
+                  <ChartCard title="👤 신규 가입자 추이">
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={stats.signups.trend}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#f3f4f6"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={formatDate}
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          labelFormatter={(v) => `${v}`}
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid #e5e7eb",
+                            fontSize: 12,
+                          }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          fill="#6366f1"
+                          radius={[6, 6, 0, 0]}
+                          name="가입자 수"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
 
-              <ChartCard
-                title="🔧 기능별 일일 사용량"
-                className="lg:col-span-2"
-              >
-                <ResponsiveContainer width="100%" height={320}>
-                  <ComposedChart data={stats.features.trend}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#f3f4f6"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDate}
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      labelFormatter={(v) => `${v}`}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #e5e7eb",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="scans"
-                      fill="#f59e0b"
-                      radius={[3, 3, 0, 0]}
-                      name="바코드 스캔"
-                      stackId="a"
-                    />
-                    <Bar
-                      dataKey="checks"
-                      fill="#ec4899"
-                      radius={[3, 3, 0, 0]}
-                      name="안전 확인"
-                      stackId="a"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="searches"
-                      stroke="#06b6d4"
-                      strokeWidth={2.5}
-                      dot={false}
-                      name="음식 검색"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="diet"
-                      stroke="#22c55e"
-                      strokeWidth={2.5}
-                      dot={false}
-                      name="식단 기록"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </ChartCard>
+                  <ChartCard title="💬 커뮤니티 활동 추이">
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={stats.community.trend}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#f3f4f6"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={formatDate}
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          labelFormatter={(v) => `${v}`}
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid #e5e7eb",
+                            fontSize: 12,
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="posts"
+                          stroke="#6366f1"
+                          strokeWidth={2.5}
+                          dot={{ r: 2.5 }}
+                          name="게시글"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="comments"
+                          stroke="#a855f7"
+                          strokeWidth={2.5}
+                          dot={{ r: 2.5 }}
+                          name="댓글"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
 
-              <ChartCard title="💬 커뮤니티 활동 추이">
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={stats.community.trend}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#f3f4f6"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDate}
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#9ca3af" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      labelFormatter={(v) => `${v}`}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #e5e7eb",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="posts"
-                      stroke="#6366f1"
-                      strokeWidth={2.5}
-                      dot={{ r: 2.5 }}
-                      name="게시글"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="comments"
-                      stroke="#a855f7"
-                      strokeWidth={2.5}
-                      dot={{ r: 2.5 }}
-                      name="댓글"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartCard>
+                  <ChartCard title="🏫 학교 등록 TOP 10" className="lg:col-span-2">
+                    {stats.schools.topSchools.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart
+                          data={stats.schools.topSchools}
+                          layout="vertical"
+                          margin={{ left: 20 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#f3f4f6"
+                            horizontal={false}
+                          />
+                          <XAxis
+                            type="number"
+                            tick={{ fontSize: 11, fill: "#9ca3af" }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            tick={{ fontSize: 11, fill: "#6b7280" }}
+                            width={120}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 12,
+                              border: "1px solid #e5e7eb",
+                              fontSize: 12,
+                            }}
+                          />
+                          <Bar
+                            dataKey="count"
+                            fill="#0ea5e9"
+                            radius={[0, 6, 6, 0]}
+                            name="등록 수"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-[300px] text-sm text-gray-400">
+                        등록된 학교가 없습니다
+                      </div>
+                    )}
+                  </ChartCard>
+                </div>
+              </div>
+            )}
 
-              <ChartCard title="🎯 기능 사용 비율">
-                {featurePieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={featurePieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={65}
-                        outerRadius={105}
-                        paddingAngle={4}
-                        dataKey="value"
-                        label={({ name, percent }) =>
-                          `${name} ${(percent * 100).toFixed(0)}%`
-                        }
-                      >
-                        {featurePieData.map((_, i) => (
-                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid #e5e7eb",
-                          fontSize: 12,
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[280px] text-sm text-gray-400">
-                    데이터 없음
-                  </div>
-                )}
-              </ChartCard>
+            {/* ═══ 운영 탭 ═══ */}
+            {activeTab === "operations" && (
+              <div className="space-y-5">
+                {/* 실시간 접속자 */}
+                <OnlineUsersCard
+                  totalOnline={totalOnline}
+                  authenticatedCount={authenticatedCount}
+                  anonymousCount={anonymousCount}
+                  users={onlineUsers}
+                  connected={sseConnected}
+                />
 
-              <ChartCard title="🏫 학교 등록 TOP 10" className="lg:col-span-2">
-                {stats.schools.topSchools.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart
-                      data={stats.schools.topSchools}
-                      layout="vertical"
-                      margin={{ left: 20 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#f3f4f6"
-                        horizontal={false}
-                      />
-                      <XAxis
-                        type="number"
-                        tick={{ fontSize: 11, fill: "#9ca3af" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: "#6b7280" }}
-                        width={120}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid #e5e7eb",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Bar
-                        dataKey="count"
-                        fill="#0ea5e9"
-                        radius={[0, 6, 6, 0]}
-                        name="등록 수"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[300px] text-sm text-gray-400">
-                    등록된 학교가 없습니다
-                  </div>
-                )}
-              </ChartCard>
-            </div>
+                {/* 기능 사용 요약 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <StatCard
+                    emoji="📷"
+                    label={`바코드 스캔 (${period}일)`}
+                    value={stats.features.scans}
+                    bgColor="bg-orange-50 dark:bg-orange-950/30"
+                  />
+                  <StatCard
+                    emoji="🛡️"
+                    label={`안전 확인 (${period}일)`}
+                    value={stats.features.checks}
+                    bgColor="bg-pink-50 dark:bg-pink-950/30"
+                  />
+                  <StatCard
+                    emoji="🔍"
+                    label={`음식 검색 (${period}일)`}
+                    value={stats.features.searches}
+                    bgColor="bg-sky-50 dark:bg-sky-950/30"
+                  />
+                  <StatCard
+                    emoji="🍽️"
+                    label={`식단 기록 (${period}일)`}
+                    value={stats.features.dietEntries}
+                    bgColor="bg-lime-50 dark:bg-lime-950/30"
+                  />
+                </div>
 
-            {/* ═══ Rate Limit 관리 ═══ */}
-            <RateLimitManager />
+                {/* 차트 영역 */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <ChartCard
+                    title="🔧 기능별 일일 사용량"
+                    className="lg:col-span-2"
+                  >
+                    <ResponsiveContainer width="100%" height={320}>
+                      <ComposedChart data={stats.features.trend}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#f3f4f6"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={formatDate}
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: "#9ca3af" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          labelFormatter={(v) => `${v}`}
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid #e5e7eb",
+                            fontSize: 12,
+                          }}
+                        />
+                        <Legend />
+                        <Bar
+                          dataKey="scans"
+                          fill="#f59e0b"
+                          radius={[3, 3, 0, 0]}
+                          name="바코드 스캔"
+                          stackId="a"
+                        />
+                        <Bar
+                          dataKey="checks"
+                          fill="#ec4899"
+                          radius={[3, 3, 0, 0]}
+                          name="안전 확인"
+                          stackId="a"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="searches"
+                          stroke="#06b6d4"
+                          strokeWidth={2.5}
+                          dot={false}
+                          name="음식 검색"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="diet"
+                          stroke="#22c55e"
+                          strokeWidth={2.5}
+                          dot={false}
+                          name="식단 기록"
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  <ChartCard title="🎯 기능 사용 비율">
+                    {featurePieData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={featurePieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={105}
+                            paddingAngle={4}
+                            dataKey="value"
+                            label={({ name, percent }) =>
+                              `${name} ${(percent * 100).toFixed(0)}%`
+                            }
+                          >
+                            {featurePieData.map((_, i) => (
+                              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 12,
+                              border: "1px solid #e5e7eb",
+                              fontSize: 12,
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-[280px] text-sm text-gray-400">
+                        데이터 없음
+                      </div>
+                    )}
+                  </ChartCard>
+                </div>
+              </div>
+            )}
 
             {/* 마지막 업데이트 */}
             <p className="text-center text-[11px] text-gray-400 pb-4">
