@@ -351,9 +351,26 @@ async function fetchFromNeis(schoolCode: string, officeCode: string, targetDate:
 
   console.log("[Meals] Fetching from NEIS:", schoolCode, targetDate)
 
-  const res = await fetch(url.toString())
-  const data = await res.json()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10_000)
 
+  let res: Response
+  try {
+    res = await fetch(url.toString(), { signal: controller.signal })
+  } catch (err: any) {
+    const isTimeout = err?.name === "AbortError"
+    console.error("[Meals] NEIS fetch 실패:", isTimeout ? "타임아웃(10s)" : err?.message)
+    throw new Error("급식 정보를 불러오지 못했습니다.")
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!res.ok) {
+    console.error("[Meals] NEIS HTTP 오류:", res.status, res.statusText)
+    throw new Error("급식 정보를 불러오지 못했습니다.")
+  }
+
+  const data = await res.json()
   const rows = data?.mealServiceDietInfo?.[1]?.row || []
 
   return rows.map((r: Record<string, string>) => {
