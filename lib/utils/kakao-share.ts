@@ -73,13 +73,26 @@ export async function shareToKakao(
     buttonText = "편하루에서 확인하기",
   } = options;
 
+  // shareUrl 정규화: localhost/내부IP/상대경로 → pyeonharu.com 기반 절대 URL
+  const normalizeShareUrl = (url: string): string => {
+    const isLocal = /localhost|127\.0\.0\.1|192\.168/.test(url);
+    if (isLocal) {
+      const path = url.replace(/^https?:\/\/[^/]+/, "");
+      return "https://pyeonharu.com" + path;
+    }
+    if (url.startsWith("/")) return "https://pyeonharu.com" + url;
+    return url;
+  };
+
+  const safeShareUrl = normalizeShareUrl(shareUrl);
+
   // 페이로드 정규화: 카카오 API 권장 길이 + 10KB 제한 대응
   const safeTitle = title.slice(0, 50);
   const safeDesc = description.slice(0, 100);
   const safeButtonText = buttonText.slice(0, 28); // 카카오 버튼 텍스트 최대 28자
 
   if (!(await ensureKakaoReady())) {
-    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(shareUrl);
+    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(safeShareUrl);
     return { success: false, fallback: "clipboard" };
   }
 
@@ -87,7 +100,7 @@ export async function shareToKakao(
     !window.Kakao.Share ||
     typeof window.Kakao.Share.sendDefault !== "function"
   ) {
-    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(shareUrl);
+    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(safeShareUrl);
     return { success: false, fallback: "clipboard" };
   }
 
@@ -100,16 +113,16 @@ export async function shareToKakao(
         description: safeDesc,
         imageUrl: KAKAO_OG_IMAGE, // 고정 OG 이미지 사용
         link: {
-          mobileWebUrl: shareUrl,
-          webUrl: shareUrl,
+          mobileWebUrl: safeShareUrl,
+          webUrl: safeShareUrl,
         },
       },
       buttons: [
         {
           title: safeButtonText,
           link: {
-            mobileWebUrl: shareUrl,
-            webUrl: shareUrl,
+            mobileWebUrl: safeShareUrl,
+            webUrl: safeShareUrl,
           },
         },
       ],
