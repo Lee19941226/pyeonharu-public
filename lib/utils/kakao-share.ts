@@ -45,8 +45,8 @@ export async function ensureKakaoReady(): Promise<boolean> {
   }
 }
 
-// 카카오 공유 OG 이미지: 동적 URL 대신 고정 URL 사용 (페이로드 크기 최소화)
-const KAKAO_OG_IMAGE = "https://pyeonharu.com/og-image.png";
+// 카카오 공유 OG 이미지: app/opengraph-image.tsx를 Next.js가 자동으로 이 URL로 제공
+const KAKAO_OG_IMAGE = "https://pyeonharu.com/opengraph-image";
 
 export interface KakaoShareOptions {
   title: string;
