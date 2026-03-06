@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
+import { randomBytes } from "crypto";
 
 function getSupabase() {
   return createClient(
@@ -9,16 +10,8 @@ function getSupabase() {
   );
 }
 
-// 모호한 문자 제외한 문자셋
-const CHARSET = "abcdefghjkmnpqrstuvwxyz23456789";
-
 function generateToken(): string {
-  const prefix = "pyeon";
-  let suffix = "";
-  for (let i = 0; i < 4; i++) {
-    suffix += CHARSET[Math.floor(Math.random() * CHARSET.length)];
-  }
-  return `${prefix}-${suffix}`;
+  return randomBytes(32).toString("hex");
 }
 
 const TOKEN_FORMAT = /^[a-zA-Z0-9-]{4,32}$/;

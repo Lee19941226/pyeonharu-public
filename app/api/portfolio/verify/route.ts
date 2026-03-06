@@ -10,6 +10,37 @@ function getSupabase() {
 
 export async function POST(req: NextRequest) {
   try {
+    // IP 기반 rate limit: 10회/분
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0] ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+
+    const rateLimitKey = `portfolio:verify:ip:${ip}`;
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - 60 * 1000);
+
+    const supabase = getSupabase();
+    const { count: recentCount } = await supabase
+      .from("restaurant_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", rateLimitKey)
+      .gte("searched_at", windowStart.toISOString());
+
+    if ((recentCount || 0) >= 10) {
+      return NextResponse.json(
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+
+    supabase
+      .from("restaurant_rate_limits")
+      .insert({ identifier: rateLimitKey, searched_at: now.toISOString() })
+      .then(({ error }) => {
+        if (error) console.error("rate limit 기록 실패:", error);
+      });
+
     const { token } = await req.json();
 
     if (!token || typeof token !== "string") {
@@ -20,7 +51,6 @@ export async function POST(req: NextRequest) {
     }
 
     const normalized = token.trim().toLowerCase();
-    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("portfolio_access_tokens")
@@ -56,7 +86,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = new Date();
     const validFrom = new Date(data.valid_from);
     const validUntil = new Date(data.valid_until);
 
