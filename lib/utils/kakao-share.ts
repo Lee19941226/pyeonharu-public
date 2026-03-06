@@ -105,13 +105,13 @@ export async function shareToKakao(
   }
 
   try {
-    window.Kakao.Share.sendDefault({
+    const payload = {
       objectType: "feed",
       installTalk: isMobileDevice(),
       content: {
         title: safeTitle,
         description: safeDesc,
-        imageUrl: KAKAO_OG_IMAGE, // 고정 OG 이미지 사용
+        imageUrl: KAKAO_OG_IMAGE,
         link: {
           mobileWebUrl: safeShareUrl,
           webUrl: safeShareUrl,
@@ -126,7 +126,14 @@ export async function shareToKakao(
           },
         },
       ],
-    });
+    };
+
+    const payloadSize = new Blob([JSON.stringify(payload)]).size;
+    console.log("카카오 공유 페이로드 크기:", payloadSize, "bytes");
+    console.log("카카오 공유 페이로드:", JSON.stringify(payload));
+    if (payloadSize > 10240) console.warn("⚠️ 페이로드 10KB 초과:", payloadSize);
+
+    window.Kakao.Share.sendDefault(payload);
     return { success: true };
   } catch {
     return { success: false, fallback: "error" };
