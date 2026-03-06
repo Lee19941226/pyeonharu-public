@@ -321,6 +321,7 @@ export default function UserManagement() {
                   가입일
                 </th>
                 <th className="px-4 py-3 text-center font-medium">등급 변경</th>
+                <th className="px-4 py-3 text-center font-medium">차단</th>
               </tr>
             </thead>
             <tbody>
@@ -409,11 +410,44 @@ export default function UserManagement() {
                           ))}
                         </select>
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        {user.is_banned ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUnbanDialog({
+                                userId: user.id,
+                                userName: user.nickname || user.email,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                          >
+                            <ShieldOff className="h-3 w-3" />
+                            해제
+                          </button>
+                        ) : isAdminRole(user.role || "user") ? (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setBanDialog({
+                                userId: user.id,
+                                userName: user.nickname || user.email,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                          >
+                            <Ban className="h-3 w-3" />
+                            정지
+                          </button>
+                        )}
+                      </td>
                     </tr>
                     {/* 확장 상세 */}
                     {isExpanded && (
                       <tr key={`${user.id}-detail`} className="border-b">
-                        <td colSpan={6} className="bg-muted/20 px-4 py-3">
+                        <td colSpan={7} className="bg-muted/20 px-4 py-3">
                           <div className="space-y-2 text-xs">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <div>
@@ -498,40 +532,6 @@ export default function UserManagement() {
                               </div>
                             )}
 
-                            {/* 밴/언밴 버튼 */}
-                            <div className="flex gap-2 pt-1">
-                              {user.is_banned ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setUnbanDialog({
-                                      userId: user.id,
-                                      userName: user.nickname || user.email,
-                                    });
-                                  }}
-                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
-                                >
-                                  <ShieldOff className="h-3 w-3" />
-                                  정지 해제
-                                </button>
-                              ) : (
-                                !isAdminRole(user.role || "user") && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setBanDialog({
-                                        userId: user.id,
-                                        userName: user.nickname || user.email,
-                                      });
-                                    }}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
-                                  >
-                                    <Ban className="h-3 w-3" />
-                                    정지 처리
-                                  </button>
-                                )
-                              )}
-                            </div>
                           </div>
                         </td>
                       </tr>

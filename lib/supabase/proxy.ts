@@ -244,7 +244,7 @@ export async function updateSession(request: NextRequest) {
       const isUserWhitelisted = user ? maint.whitelistIds.includes(user.id) : false;
       const isIpWhitelisted = clientIp ? maint.whitelistIps.includes(clientIp) : false;
       const isWhitelisted = isUserWhitelisted || isIpWhitelisted;
-      debugMaintenanceStatus += `,wl:${isWhitelisted}`;
+      debugMaintenanceStatus += `,wl:${isWhitelisted},ip:${clientIp},wlIps:${JSON.stringify(maint.whitelistIps)}`;
       if (!isWhitelisted) {
         const url = request.nextUrl.clone();
         url.pathname = "/maintenance";
