@@ -17,6 +17,7 @@ let maintenanceCache: {
   message: string;
   endTime: string | null;
   whitelistIds: string[];
+  whitelistIps: string[];
   fetchedAt: number;
 } | null = null;
 
@@ -61,12 +62,14 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
 
     const modeRow = rows.find((r) => r.key === "maintenance_mode");
     const wlRow = rows.find((r) => r.key === "whitelist_user_ids");
+    const ipRow = rows.find((r) => r.key === "whitelist_ips");
 
     maintenanceCache = {
       enabled: modeRow?.value?.enabled ?? false,
       message: modeRow?.value?.message ?? "",
       endTime: modeRow?.value?.endTime ?? null,
       whitelistIds: Array.isArray(wlRow?.value) ? wlRow.value : [],
+      whitelistIps: Array.isArray(ipRow?.value) ? ipRow.value : [],
       fetchedAt: now,
     };
 
@@ -186,8 +189,14 @@ export async function updateSession(request: NextRequest) {
       : "fetch:null";
 
     if (maint?.enabled) {
-      // 화이트리스트 사용자만 통과 (관리자 포함 전원 차단)
-      const isWhitelisted = user ? maint.whitelistIds.includes(user.id) : false;
+      // 화이트리스트 사용자 또는 IP만 통과 (관리자 포함 전원 차단)
+      const clientIp =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        request.headers.get("x-real-ip") ||
+        "";
+      const isUserWhitelisted = user ? maint.whitelistIds.includes(user.id) : false;
+      const isIpWhitelisted = clientIp ? maint.whitelistIps.includes(clientIp) : false;
+      const isWhitelisted = isUserWhitelisted || isIpWhitelisted;
       debugMaintenanceStatus += `,wl:${isWhitelisted}`;
       if (!isWhitelisted) {
         const url = request.nextUrl.clone();
