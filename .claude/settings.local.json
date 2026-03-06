@@ -16,16 +16,14 @@
       "Bash(git:*)",
       "Bash(npm run:*)",
       "mcp__supabase__apply_migration",
-      "Bash(npm run:*)",
       "Bash(node:*)",
       "Bash(do sed:*)",
       "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
       "Bash(npx next:*)",
       "Bash(wc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "supabase"
-  ]
+  "enabledMcpjsonServers": ["supabase"]
 }

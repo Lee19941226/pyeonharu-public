@@ -151,9 +151,12 @@ export async function GET(req: NextRequest) {
       const weekDates = getWeekDates(targetDate)
       const weekResults: { date: string; meals: any[] }[] = []
 
+      // 알레르기 1회만 조회 후 날짜 루프에서 재사용
+      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+
       for (const d of weekDates) {
         const dayMeals = await fetchMealsForDate(supabase, schoolCode, officeCode, d)
-        const matched = await matchAllergens(supabase, dayMeals, user, memberId)
+        const matched = matchAllergens(dayMeals, allergenNames)
         weekResults.push({ date: d, meals: matched })
       }
 
@@ -256,12 +259,14 @@ export async function GET(req: NextRequest) {
       }
 
       // 3. 알레르기 매칭 + 결과 조립
+      // 알레르기 1회만 조회 후 날짜 루프에서 재사용
+      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
       const monthResults: { date: string; meals: any[] }[] = []
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${targetDate.slice(0, 6)}${String(d).padStart(2, "0")}`
         const dayMeals = cacheMap[dateStr] || []
         if (dayMeals.length > 0) {
-          const matched = await matchAllergens(supabase, dayMeals, user, memberId)
+          const matched = matchAllergens(dayMeals, allergenNames)
           monthResults.push({ date: dateStr, meals: matched })
         }
       }
@@ -289,7 +294,8 @@ export async function GET(req: NextRequest) {
         originInfo: c.origin_info,
       }))
 
-      const matchedMeals = await matchAllergens(supabase, meals, user, memberId)
+      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+      const matchedMeals = matchAllergens(meals, allergenNames)
       return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
     }
 
@@ -319,7 +325,8 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. 알레르기 매칭
-    const matchedMeals = await matchAllergens(supabase, meals, user, memberId)
+    const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+    const matchedMeals = matchAllergens(meals, allergenNames)
 
     return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })
   } catch (error) {
@@ -344,9 +351,26 @@ async function fetchFromNeis(schoolCode: string, officeCode: string, targetDate:
 
   console.log("[Meals] Fetching from NEIS:", schoolCode, targetDate)
 
-  const res = await fetch(url.toString())
-  const data = await res.json()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10_000)
 
+  let res: Response
+  try {
+    res = await fetch(url.toString(), { signal: controller.signal })
+  } catch (err: any) {
+    const isTimeout = err?.name === "AbortError"
+    console.error("[Meals] NEIS fetch 실패:", isTimeout ? "타임아웃(10s)" : err?.message)
+    throw new Error("급식 정보를 불러오지 못했습니다.")
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!res.ok) {
+    console.error("[Meals] NEIS HTTP 오류:", res.status, res.statusText)
+    throw new Error("급식 정보를 불러오지 못했습니다.")
+  }
+
+  const data = await res.json()
   const rows = data?.mealServiceDietInfo?.[1]?.row || []
 
   return rows.map((r: Record<string, string>) => {
@@ -424,48 +448,45 @@ function getWeekDates(baseDate: string): string[] {
   return dates
 }
 
-// ── 알레르기 매칭 핵심 로직 ───────────────────────────────────────────
+// ── 알레르기 목록 조회 (1회만 호출, 루프 밖에서 재사용) ──────────────
 // memberId 없음 → user_allergies (본인)
 // memberId 있음 → family_member_allergies (해당 구성원)
-async function matchAllergens(
+async function fetchAllergenNames(
   supabase: any,
-  meals: any[],
   user: any,
   memberId: string | null,
-) {
-  const unknownResult = meals.map(meal => ({
-    ...meal,
-    menu: meal.menu.map((item: ParsedMenuItem) => ({
-      ...item,
-      status: "unknown" as const,
-      matchedAllergens: [],
-      crossAllergens: [],
-    })),
-  }))
-
-  if (!user) return unknownResult
-
-  // 알레르기 목록 조회 (본인 or 구성원 분기)
-  let allergenNames: string[] = []
+): Promise<string[]> {
+  if (!user) return []
 
   if (memberId) {
-    const { data: memberAllergens } = await supabase
+    const { data } = await supabase
       .from("family_member_allergies")
       .select("allergen_name")
       .eq("member_id", memberId)
 
-    allergenNames = (memberAllergens || []).map(
-      (a: { allergen_name: string }) => a.allergen_name,
-    )
+    return (data || []).map((a: { allergen_name: string }) => a.allergen_name)
   } else {
-    const { data: userAllergens } = await supabase
+    const { data } = await supabase
       .from("user_allergies")
       .select("allergen_name")
       .eq("user_id", user.id)
 
-    allergenNames = (userAllergens || []).map(
-      (a: { allergen_name: string }) => a.allergen_name,
-    )
+    return (data || []).map((a: { allergen_name: string }) => a.allergen_name)
+  }
+}
+
+// ── 알레르기 매칭 핵심 로직 (동기, allergenNames를 직접 받아 재사용) ──
+function matchAllergens(meals: any[], allergenNames: string[]) {
+  if (allergenNames.length === 0) {
+    return meals.map(meal => ({
+      ...meal,
+      menu: meal.menu.map((item: ParsedMenuItem) => ({
+        ...item,
+        status: "unknown" as const,
+        matchedAllergens: [],
+        crossAllergens: [],
+      })),
+    }))
   }
 
   // 교차오염 대상 목록 생성

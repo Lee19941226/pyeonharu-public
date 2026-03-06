@@ -1,6 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
-import portfolioData from "@/data/portfolio-data.json";
+
+// portfolio-data.json은 빌드 스크립트(generate-portfolio-data.mjs)가 생성하는 파일이므로
+// 파일이 없는 환경(CI, 첫 클론 등)에서도 타입 오류 없이 안전하게 로드한다.
+const PORTFOLIO_FALLBACK = { categories: [], totalFiles: 0, totalLines: 0, generatedAt: "" };
+
+let portfolioData: typeof PORTFOLIO_FALLBACK | Record<string, unknown> = PORTFOLIO_FALLBACK;
+try {
+  const raw = readFileSync(join(process.cwd(), "data/portfolio-data.json"), "utf-8");
+  portfolioData = JSON.parse(raw);
+} catch {
+  console.warn("[Portfolio] data/portfolio-data.json not found — fallback 사용. 'npm run build'를 실행하면 파일이 생성됩니다.");
+}
 
 function getSupabase() {
   return createClient(
