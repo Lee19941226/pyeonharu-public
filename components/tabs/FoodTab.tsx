@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -505,13 +505,23 @@ export default function FoodTab({
   }>({ open: false, reason: "scan_warning" });
   const [hasAllergies, setHasAllergies] = useState<boolean | null>(null);
   // ─── 마운트 시 진행률 알림 ───
-  useEffect(() => {
-    onProgress?.(35, "화면 구성 중...");
+  const fetchAnalysisUsage = useCallback(() => {
     fetch("/api/food/analyze-image")
       .then((r) => r.json())
-      .then((data) => setImageAnalysisUsage({ remaining: data.remaining, limit: data.limit }))
-      .catch(() => {});
+      .then((data) => {
+        if (typeof data.remaining === "number" && typeof data.limit === "number") {
+          setImageAnalysisUsage({ remaining: data.remaining, limit: data.limit });
+        } else {
+          setImageAnalysisUsage(null);
+        }
+      })
+      .catch(() => setImageAnalysisUsage(null));
   }, []);
+
+  useEffect(() => {
+    onProgress?.(35, "화면 구성 중...");
+    fetchAnalysisUsage();
+  }, [user]);
 
   // ─── Effects ───
   useEffect(() => {
