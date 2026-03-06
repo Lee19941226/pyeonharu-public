@@ -20,7 +20,8 @@
       "Bash(node:*)",
       "Bash(do sed:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(wc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 // ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
@@ -10,6 +11,60 @@ setInterval(
   },
   60 * 60 * 1000,
 );
+
+// ✅ 점검 모드 캐시 (60초 TTL, 매 요청 DB 조회 방지)
+let maintenanceCache: {
+  enabled: boolean;
+  message: string;
+  endTime: string | null;
+  whitelistIds: string[];
+  fetchedAt: number;
+} | null = null;
+
+const MAINTENANCE_CACHE_TTL = 60_000; // 60초
+
+async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
+  const now = Date.now();
+  if (maintenanceCache && now - maintenanceCache.fetchedAt < MAINTENANCE_CACHE_TTL) {
+    return maintenanceCache;
+  }
+
+  try {
+    const supabase = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+
+    const [modeRes, wlRes] = await Promise.all([
+      supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "maintenance_mode")
+        .single(),
+      supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "whitelist_user_ids")
+        .single(),
+    ]);
+
+    const mode = modeRes.data?.value as { enabled: boolean; message: string; endTime: string | null } | null;
+    const wl = wlRes.data?.value as string[] | null;
+
+    maintenanceCache = {
+      enabled: mode?.enabled ?? false,
+      message: mode?.message ?? "",
+      endTime: mode?.endTime ?? null,
+      whitelistIds: Array.isArray(wl) ? wl : [],
+      fetchedAt: now,
+    };
+
+    return maintenanceCache;
+  } catch {
+    // DB 조회 실패 시 fail-open (점검 모드 비활성 처리)
+    return null;
+  }
+}
 
 export async function updateSession(request: NextRequest) {
   // ==========================================
@@ -99,6 +154,45 @@ export async function updateSession(request: NextRequest) {
         }
       } catch {
         // DB 쿼리 실패 → fail-open (접근 허용)
+      }
+    }
+  }
+
+  // ==========================================
+  // 점검 모드 체크
+  // ==========================================
+  const maintenanceBypass = ["/maintenance", "/api/admin/", "/login", "/auth/", "/api/auth/"];
+  const isBypassPath = maintenanceBypass.some((p) => pathname.startsWith(p));
+
+  if (!isBypassPath) {
+    const maint = await getMaintenanceSettings();
+    if (maint?.enabled) {
+      // 관리자 또는 화이트리스트 사용자는 통과
+      let isWhitelisted = false;
+      if (user) {
+        // 관리자 체크 (간단히 profile role 조회)
+        const adminClient = createAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        );
+        const { data: profile } = await adminClient
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        const role = profile?.role;
+        if (role === "admin" || role === "super_admin") {
+          isWhitelisted = true;
+        }
+        // 화이트리스트 체크
+        if (!isWhitelisted && maint.whitelistIds.includes(user.id)) {
+          isWhitelisted = true;
+        }
+      }
+      if (!isWhitelisted) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/maintenance";
+        return NextResponse.redirect(url);
       }
     }
   }
