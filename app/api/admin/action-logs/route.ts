@@ -26,7 +26,32 @@ export async function GET(req: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - period);
 
-    // 로그 조회 쿼리
+    const nicknameMap: Record<string, string> = {};
+
+    // search 필터: 닉네임/UUID 기준으로 매칭되는 user_id 목록을 먼저 조회
+    let searchUserIds: string[] | null = null;
+    if (search) {
+      const safeSearch = search.replace(/[%_\\]/g, "");
+      const { data: matchedProfiles } = await supabaseAdmin
+        .from("profiles")
+        .select("id, nickname")
+        .ilike("nickname", `%${safeSearch}%`);
+
+      matchedProfiles?.forEach((p) => {
+        nicknameMap[p.id] = p.nickname || "Unknown";
+      });
+
+      // 닉네임 매칭 + UUID 직접 매칭
+      const fromNickname = matchedProfiles?.map((p) => p.id) || [];
+      const fromUuid = search.match(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      )
+        ? [search]
+        : [];
+      searchUserIds = [...new Set([...fromNickname, ...fromUuid])];
+    }
+
+    // 모든 필터를 DB 쿼리에 적용 후 페이지네이션
     let query = supabaseAdmin
       .from("user_action_logs")
       .select("*", { count: "exact" })
@@ -39,15 +64,21 @@ export async function GET(req: NextRequest) {
       const safeIp = ip.replace(/[%_\\]/g, "");
       if (safeIp) query = query.ilike("ip_address", `%${safeIp}%`);
     }
+    if (searchUserIds !== null) {
+      if (searchUserIds.length === 0) {
+        // 매칭 결과 없음 → 빈 결과 반환
+        return NextResponse.json({ logs: [], total: 0, page, limit, totalPages: 0, actionCounts: {} });
+      }
+      query = query.in("user_id", searchUserIds);
+    }
 
     const { data: logs, count, error } = await query.range(offset, offset + limit - 1);
     if (error) throw error;
 
-    // 사용자 닉네임 조회
+    // 조회된 로그의 닉네임 보완 조회
     const userIds = [
       ...new Set((logs || []).map((l) => l.user_id).filter(Boolean)),
-    ];
-    const nicknameMap: Record<string, string> = {};
+    ].filter((id) => !nicknameMap[id]);
 
     if (userIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
@@ -60,32 +91,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 닉네임으로 검색 시 user_id 찾기
-    let filteredLogs = logs || [];
-    if (search) {
-      // 닉네임 검색
-      const safeSearch = search.replace(/[%_\\]/g, "");
-      const { data: matchedProfiles } = await supabaseAdmin
-        .from("profiles")
-        .select("id, nickname")
-        .ilike("nickname", `%${safeSearch}%`);
-
-      const matchedIds = new Set(matchedProfiles?.map((p) => p.id) || []);
-
-      // UUID 직접 검색도 지원
-      filteredLogs = filteredLogs.filter(
-        (log) =>
-          matchedIds.has(log.user_id) ||
-          log.user_id?.includes(search),
-      );
-
-      // 검색된 프로필도 닉네임 맵에 추가
-      matchedProfiles?.forEach((p) => {
-        nicknameMap[p.id] = p.nickname || "Unknown";
-      });
-    }
-
-    const enrichedLogs = filteredLogs.map((log) => ({
+    const enrichedLogs = (logs || []).map((log) => ({
       ...log,
       nickname: log.user_id
         ? nicknameMap[log.user_id] || "Unknown"
@@ -105,10 +111,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       logs: enrichedLogs,
-      total: search ? enrichedLogs.length : count || 0,
+      total: count || 0,
       page,
       limit,
-      totalPages: Math.ceil((search ? enrichedLogs.length : count || 0) / limit),
+      totalPages: Math.ceil((count || 0) / limit),
       actionCounts,
     });
   } catch (error) {
