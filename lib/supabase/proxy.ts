@@ -60,8 +60,10 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
     };
 
     return maintenanceCache;
-  } catch {
-    // DB 조회 실패 시 fail-open (점검 모드 비활성 처리)
+  } catch (err) {
+    console.error("[maintenance] DB 조회 실패:", err);
+    // 이전 캐시가 있으면 만료되더라도 재사용 (fail-safe)
+    if (maintenanceCache) return maintenanceCache;
     return null;
   }
 }
@@ -170,23 +172,21 @@ export async function updateSession(request: NextRequest) {
       // 관리자 또는 화이트리스트 사용자는 통과
       let isWhitelisted = false;
       if (user) {
-        // 관리자 체크 (간단히 profile role 조회)
-        const adminClient = createAdminClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        );
-        const { data: profile } = await adminClient
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        const role = profile?.role;
-        if (role === "admin" || role === "super_admin") {
+        // 화이트리스트 체크
+        if (maint.whitelistIds.includes(user.id)) {
           isWhitelisted = true;
         }
-        // 화이트리스트 체크
-        if (!isWhitelisted && maint.whitelistIds.includes(user.id)) {
-          isWhitelisted = true;
+        // 관리자 체크 (요청 컨텍스트의 supabase 클라이언트 사용 — Edge 호환)
+        if (!isWhitelisted) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
+          const role = profile?.role;
+          if (role === "admin" || role === "super_admin") {
+            isWhitelisted = true;
+          }
         }
       }
       if (!isWhitelisted) {
