@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -19,11 +19,7 @@ export default function FoodFavoritesPage() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [favorites, setFavorites] = useState<FoodFavorite[]>([]);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     const supabase = createClient();
     const {
       data: { user },
@@ -36,7 +32,11 @@ export default function FoodFavoritesPage() {
       setIsLoggedIn(false);
     }
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const loadFavorites = async () => {
     try {
