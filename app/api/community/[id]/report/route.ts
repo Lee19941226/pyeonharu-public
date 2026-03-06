@@ -38,12 +38,22 @@ export async function POST(
 
   // 본인 게시글/댓글 신고 방지
   if (commentId) {
+    // commentId가 해당 postId 소속인지 검증
     const { data: comment } = await supabase
       .from("community_comments")
       .select("user_id")
       .eq("id", commentId)
-      .single();
-    if (comment?.user_id === user.id) {
+      .eq("post_id", postId)
+      .maybeSingle();
+
+    if (!comment) {
+      return NextResponse.json(
+        { error: "존재하지 않는 댓글입니다." },
+        { status: 403 },
+      );
+    }
+
+    if (comment.user_id === user.id) {
       return NextResponse.json(
         { error: "본인 댓글은 신고할 수 없습니다." },
         { status: 400 },

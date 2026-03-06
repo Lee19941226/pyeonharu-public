@@ -24,6 +24,21 @@ export async function POST(
   const commentId = body.commentId || null;
 
   if (commentId) {
+    // commentId가 해당 postId 소속인지 검증
+    const { data: commentOwner } = await supabase
+      .from("community_comments")
+      .select("id")
+      .eq("id", commentId)
+      .eq("post_id", postId)
+      .maybeSingle();
+
+    if (!commentOwner) {
+      return NextResponse.json(
+        { error: "존재하지 않는 댓글입니다." },
+        { status: 403 },
+      );
+    }
+
     // 댓글 좋아요 토글
     const { data: existing } = await supabase
       .from("community_likes")
