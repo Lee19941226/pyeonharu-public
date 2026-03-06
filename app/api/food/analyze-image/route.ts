@@ -538,7 +538,7 @@ export async function POST(req: NextRequest) {
     if (dbProductData && dbProductData.allergens.length > 0) {
       finalAllergens = dbProductData.allergens;
       finalProductName = dbProductData.productName;
-      dataSource = "database";
+      dataSource = "db";
 
       if (dbProductData.rawMaterials) {
         const rawMaterialsList = dbProductData.rawMaterials
