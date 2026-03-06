@@ -85,7 +85,6 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: dark)", color: "#4A7C59" },
   ],
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -110,7 +109,7 @@ export default function RootLayout({
           strategy="afterInteractive"
           src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
         />
-<AuthProvider>
+        <AuthProvider>
           <BackButtonHandler />
           <StatusBarInit />
           <OAuthDeepLinkHandler />

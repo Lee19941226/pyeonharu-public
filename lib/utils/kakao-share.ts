@@ -1,6 +1,6 @@
 function isMobileDevice(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod|Android/.test(navigator.userAgent);
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 let sdkLoadPromise: Promise<void> | null = null;
@@ -50,10 +50,13 @@ export async function ensureKakaoReady(): Promise<boolean> {
   }
 }
 
+// 카카오 공유 OG 이미지: 동적 URL 대신 고정 URL 사용 (페이로드 크기 최소화)
+const KAKAO_OG_IMAGE = "https://pyeonharu.com/og-image.png";
+
 export interface KakaoShareOptions {
   title: string;
   description: string;
-  imageUrl: string;
+  imageUrl?: string; // 무시됨 — 항상 KAKAO_OG_IMAGE 사용
   shareUrl: string;
   buttonText?: string;
 }
@@ -61,16 +64,22 @@ export interface KakaoShareOptions {
 export async function shareToKakao(
   options: KakaoShareOptions
 ): Promise<{ success: boolean; fallback?: string }> {
+  if (typeof window === "undefined") return { success: false };
+
   const {
     title,
     description,
-    imageUrl,
     shareUrl,
     buttonText = "편하루에서 확인하기",
   } = options;
 
+  // 페이로드 정규화: 카카오 API 권장 길이 + 10KB 제한 대응
+  const safeTitle = title.slice(0, 50);
+  const safeDesc = description.slice(0, 100);
+  const safeButtonText = buttonText.slice(0, 28); // 카카오 버튼 텍스트 최대 28자
+
   if (!(await ensureKakaoReady())) {
-    navigator.clipboard?.writeText(shareUrl);
+    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(shareUrl);
     return { success: false, fallback: "clipboard" };
   }
 
@@ -78,7 +87,7 @@ export async function shareToKakao(
     !window.Kakao.Share ||
     typeof window.Kakao.Share.sendDefault !== "function"
   ) {
-    navigator.clipboard?.writeText(shareUrl);
+    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(shareUrl);
     return { success: false, fallback: "clipboard" };
   }
 
@@ -87,11 +96,9 @@ export async function shareToKakao(
       objectType: "feed",
       installTalk: isMobileDevice(),
       content: {
-        title,
-        description,
-        imageUrl,
-        imageWidth: 1200,
-        imageHeight: 630,
+        title: safeTitle,
+        description: safeDesc,
+        imageUrl: KAKAO_OG_IMAGE, // 고정 OG 이미지 사용
         link: {
           mobileWebUrl: shareUrl,
           webUrl: shareUrl,
@@ -99,7 +106,7 @@ export async function shareToKakao(
       },
       buttons: [
         {
-          title: buttonText,
+          title: safeButtonText,
           link: {
             mobileWebUrl: shareUrl,
             webUrl: shareUrl,
