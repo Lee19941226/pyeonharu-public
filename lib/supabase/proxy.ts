@@ -173,35 +173,16 @@ export async function updateSession(request: NextRequest) {
   // ==========================================
   // 점검 모드 체크
   // ==========================================
-  const maintenanceBypass = ["/maintenance", "/api/admin/", "/login", "/auth/", "/api/auth/"];
+  const maintenanceBypass = ["/maintenance", "/admin", "/api/admin/", "/login", "/auth/", "/api/auth/"];
   const isBypassPath = maintenanceBypass.some((p) => pathname.startsWith(p));
 
   if (!isBypassPath) {
     const maint = await getMaintenanceSettings();
     console.log("[maintenance] 체크:", { path: pathname, enabled: maint?.enabled, userId: user?.id?.slice(0, 8) });
     if (maint?.enabled) {
-      // 관리자 또는 화이트리스트 사용자는 통과
-      let isWhitelisted = false;
-      if (user) {
-        // 화이트리스트 체크
-        if (maint.whitelistIds.includes(user.id)) {
-          isWhitelisted = true;
-          console.log("[maintenance] 화이트리스트 통과:", user.id.slice(0, 8));
-        }
-        // 관리자 체크 (요청 컨텍스트의 supabase 클라이언트 사용 — Edge 호환)
-        if (!isWhitelisted) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .single();
-          const role = profile?.role;
-          console.log("[maintenance] 역할 체크:", { role, isAdmin: role === "admin" || role === "super_admin" });
-          if (role === "admin" || role === "super_admin") {
-            isWhitelisted = true;
-          }
-        }
-      }
+      // 화이트리스트 사용자만 통과 (관리자 포함 전원 차단)
+      const isWhitelisted = user ? maint.whitelistIds.includes(user.id) : false;
+      console.log("[maintenance] 체크 결과:", { isWhitelisted, userId: user?.id?.slice(0, 8) });
       if (!isWhitelisted) {
         console.log("[maintenance] → /maintenance 리다이렉트");
         const url = request.nextUrl.clone();
