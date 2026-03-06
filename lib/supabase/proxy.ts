@@ -176,21 +176,30 @@ export async function updateSession(request: NextRequest) {
   const maintenanceBypass = ["/maintenance", "/admin", "/api/admin/", "/login", "/auth/", "/api/auth/"];
   const isBypassPath = maintenanceBypass.some((p) => pathname.startsWith(p));
 
+  // 디버그: 모든 응답에 점검 모드 상태 헤더 추가
+  let debugMaintenanceStatus = "skip:bypass";
+
   if (!isBypassPath) {
     const maint = await getMaintenanceSettings();
-    console.log("[maintenance] 체크:", { path: pathname, enabled: maint?.enabled, userId: user?.id?.slice(0, 8) });
+    debugMaintenanceStatus = maint
+      ? `enabled:${maint.enabled}`
+      : "fetch:null";
+
     if (maint?.enabled) {
       // 화이트리스트 사용자만 통과 (관리자 포함 전원 차단)
       const isWhitelisted = user ? maint.whitelistIds.includes(user.id) : false;
-      console.log("[maintenance] 체크 결과:", { isWhitelisted, userId: user?.id?.slice(0, 8) });
+      debugMaintenanceStatus += `,wl:${isWhitelisted}`;
       if (!isWhitelisted) {
-        console.log("[maintenance] → /maintenance 리다이렉트");
         const url = request.nextUrl.clone();
         url.pathname = "/maintenance";
-        return NextResponse.redirect(url);
+        const redirectRes = NextResponse.redirect(url);
+        redirectRes.headers.set("x-maintenance-debug", debugMaintenanceStatus);
+        return redirectRes;
       }
     }
   }
+
+  supabaseResponse.headers.set("x-maintenance-debug", debugMaintenanceStatus);
 
   // ==========================================
   // 보호 경로 체크
