@@ -1083,7 +1083,7 @@ export default function AdminDashboard() {
                         <Line
                           type="monotone"
                           dataKey="posts"
-                          stroke="#6366f1"
+                          stroke="#3b82f6"
                           strokeWidth={2.5}
                           dot={{ r: 2.5 }}
                           name="게시글"
@@ -1091,9 +1091,10 @@ export default function AdminDashboard() {
                         <Line
                           type="monotone"
                           dataKey="comments"
-                          stroke="#a855f7"
+                          stroke="#f97316"
                           strokeWidth={2.5}
                           dot={{ r: 2.5 }}
+                          strokeDasharray="6 3"
                           name="댓글"
                         />
                       </LineChart>
