@@ -8,24 +8,15 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Pill, Search, AlertTriangle, Clock, Ban, Info, Loader2, ArrowLeft, Package } from "lucide-react"
 import Image from "next/image"
-
-interface Medicine {
-  id: string
-  name: string
-  company: string
-  efficacy: string
-  usage: string
-  warningPrecaution: string
-  precaution: string
-  interaction: string
-  sideEffect: string
-  storage: string
-  image: string
-}
+import { useTabStateStore, type Medicine } from "@/store/tab-state"
 
 export default function MedicineTab() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<Medicine[]>([])
+  // ── Zustand store: 탭 전환 후 재마운트 시 상태 복원 ──
+  const { medicine, setMedicineTab } = useTabStateStore()
+  const searchQuery = medicine.searchQuery
+  const searchResults = medicine.searchResults
+  const setSearchQuery = (v: string) => setMedicineTab({ searchQuery: v })
+  const setSearchResults = (v: Medicine[]) => setMedicineTab({ searchResults: v })
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)

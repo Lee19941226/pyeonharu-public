@@ -36,6 +36,7 @@ import { UploadSheet } from "@/components/food/upload-sheet";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
 import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
+import { useTabStateStore } from "@/store/tab-state";
 // ─── 드롭다운 전용 미니맵 ───
 function MiniNaverMap({
   lat,
@@ -463,13 +464,17 @@ export default function FoodTab({
   onProgress?: (progress: number, label: string) => void;
 }) {
   const router = useRouter();
-  const [foodInput, setFoodInput] = useState("");
+
+  // ── Zustand store: 탭 전환 후 재마운트 시 상태 복원 ──
+  const { food, setFoodTab } = useTabStateStore();
+  const foodInput = food.searchQuery;
+  const recentChecks = food.recentSearches;
+  const setFoodInput = (v: string) => setFoodTab({ searchQuery: v });
+  const setRecentChecks = (v: { foodName: string; isSafe: boolean; checkedAt: string }[]) =>
+    setFoodTab({ recentSearches: v });
+
   const [user, setUser] = useState<SupabaseUser | null | undefined>(undefined);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-
-  const [recentChecks, setRecentChecks] = useState<
-    { foodName: string; isSafe: boolean; checkedAt: string }[]
-  >([]);
 
   const [mySchools, setMySchools] = useState<MySchool[]>([]);
   const [allSchoolMeals, setAllSchoolMeals] = useState<

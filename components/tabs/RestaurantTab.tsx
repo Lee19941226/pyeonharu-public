@@ -30,23 +30,7 @@ import {
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
-
-interface Restaurant {
-  name: string;
-  category: string;
-  categoryFull: string;
-  address: string;
-  roadAddress: string;
-  lat: number;
-  lng: number;
-  phone: string;
-  link: string;
-  riskLevel: "safe" | "caution" | "danger";
-  matchedAllergens: string[];
-  categoryAllergens: string[];
-  distance?: string;
-  distanceKm?: number;
-}
+import { useTabStateStore, type Restaurant } from "@/store/tab-state";
 
 interface AIAnalysis {
   riskLevel: string;
@@ -489,10 +473,21 @@ function AIAnalysisModal({
 export default function RestaurantTab() {
   const router = useRouter();
 
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  // ── Zustand store: 탭 전환 후 재마운트 시 상태 복원 ──
+  const { restaurant, setRestaurantTab } = useTabStateStore();
+  const restaurants = restaurant.searchResults;
+  const searchQuery = restaurant.searchQuery;
+  const setRestaurants = (v: Restaurant[] | ((prev: Restaurant[]) => Restaurant[])) => {
+    if (typeof v === "function") {
+      setRestaurantTab((s) => ({ searchResults: v(s.searchResults) }));
+    } else {
+      setRestaurantTab({ searchResults: v });
+    }
+  };
+  const setSearchQuery = (v: string) => setRestaurantTab({ searchQuery: v });
+
   const [userAllergens, setUserAllergens] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [locationName, setLocationName] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [user, setUser] = useState<any>(null);
