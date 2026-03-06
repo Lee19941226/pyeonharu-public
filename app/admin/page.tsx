@@ -111,6 +111,7 @@ function StatCard({
   sub,
   bgColor = "bg-blue-50 dark:bg-blue-950/30",
   trend,
+  tooltip,
 }: {
   emoji: string;
   label: string;
@@ -118,9 +119,10 @@ function StatCard({
   sub?: string;
   bgColor?: string;
   trend?: { value: number; label: string };
+  tooltip?: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
+    <div className="rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow relative group">
       <div className="flex items-center justify-between mb-3">
         <div
           className={`flex h-10 w-10 items-center justify-center rounded-xl ${bgColor} text-lg`}
@@ -154,6 +156,12 @@ function StatCard({
         <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
           {sub}
         </p>
+      )}
+      {tooltip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[11px] leading-relaxed w-56 text-center shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50">
+          {tooltip}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-100" />
+        </div>
       )}
     </div>
   );
@@ -885,6 +893,7 @@ export default function AdminDashboard() {
                     label="전체 가입자"
                     value={stats.overview.totalUsers}
                     bgColor="bg-blue-50 dark:bg-blue-950/30"
+                    tooltip="서비스에 가입한 전체 사용자 수입니다."
                   />
                   <StatCard
                     emoji="📊"
@@ -892,18 +901,21 @@ export default function AdminDashboard() {
                     value={stats.overview.dau}
                     sub={`회원 ${stats.overview.dauMembers.toLocaleString()} · 비회원 ${stats.overview.dauAnon.toLocaleString()}`}
                     bgColor="bg-emerald-50 dark:bg-emerald-950/30"
+                    tooltip="Daily Active Users. 오늘 하루 동안 서비스를 이용한 순 사용자 수입니다. 높을수록 일일 활성도가 좋습니다."
                   />
                   <StatCard
                     emoji="📆"
                     label="WAU (7일)"
                     value={stats.overview.wau}
                     bgColor="bg-teal-50 dark:bg-teal-950/30"
+                    tooltip="Weekly Active Users. 최근 7일간 서비스를 이용한 순 사용자 수입니다."
                   />
                   <StatCard
                     emoji="📅"
                     label="MAU (30일)"
                     value={stats.overview.mau}
                     bgColor="bg-cyan-50 dark:bg-cyan-950/30"
+                    tooltip="Monthly Active Users. 최근 30일간 서비스를 이용한 순 사용자 수입니다. 서비스의 전체 규모를 나타냅니다."
                   />
                   <StatCard
                     emoji="🔁"
@@ -911,6 +923,7 @@ export default function AdminDashboard() {
                     value={`${stats.overview.retentionRate}%`}
                     sub="7일 전 사용자 재방문"
                     bgColor="bg-violet-50 dark:bg-violet-950/30"
+                    tooltip="7일 전에 방문했던 사용자 중 오늘 다시 방문한 비율입니다. 높을수록 사용자가 서비스에 다시 돌아오는 것을 의미합니다."
                   />
                   <StatCard
                     emoji="⚡"
@@ -918,6 +931,7 @@ export default function AdminDashboard() {
                     value={`${stats.overview.stickiness}%`}
                     sub="DAU/MAU 비율"
                     bgColor="bg-amber-50 dark:bg-amber-950/30"
+                    tooltip="DAU를 MAU로 나눈 비율입니다. 높을수록 월간 사용자들이 매일 꾸준히 접속하는 것을 의미합니다. 업계 평균은 10~20%입니다."
                   />
                 </div>
 
@@ -929,6 +943,7 @@ export default function AdminDashboard() {
                     value={stats.community.totalPosts}
                     sub={`최근 ${period}일: ${stats.community.recentPosts.toLocaleString()}개`}
                     bgColor="bg-indigo-50 dark:bg-indigo-950/30"
+                    tooltip="커뮤니티에 작성된 전체 게시글 수입니다."
                   />
                   <StatCard
                     emoji="🗨️"
@@ -936,18 +951,21 @@ export default function AdminDashboard() {
                     value={stats.community.totalComments}
                     sub={`최근 ${period}일: ${stats.community.recentComments.toLocaleString()}개`}
                     bgColor="bg-purple-50 dark:bg-purple-950/30"
+                    tooltip="커뮤니티 게시글에 달린 전체 댓글 수입니다. 게시글 대비 댓글 비율이 높으면 참여도가 좋습니다."
                   />
                   <StatCard
                     emoji="🏫"
                     label="학교 등록 수"
                     value={stats.schools.total}
                     bgColor="bg-sky-50 dark:bg-sky-950/30"
+                    tooltip="급식 알림을 위해 학교를 등록한 사용자 수입니다."
                   />
                   <StatCard
                     emoji="🆕"
                     label={`신규 가입 (${period}일)`}
                     value={stats.signups.recent}
                     bgColor="bg-rose-50 dark:bg-rose-950/30"
+                    tooltip={`최근 ${period}일 동안 새로 가입한 사용자 수입니다.`}
                   />
                 </div>
 
@@ -1172,24 +1190,28 @@ export default function AdminDashboard() {
                     label={`바코드 스캔 (${period}일)`}
                     value={stats.features.scans}
                     bgColor="bg-orange-50 dark:bg-orange-950/30"
+                    tooltip="식품 바코드를 카메라로 스캔하여 성분 정보를 확인한 횟수입니다."
                   />
                   <StatCard
                     emoji="🛡️"
                     label={`안전 확인 (${period}일)`}
                     value={stats.features.checks}
                     bgColor="bg-pink-50 dark:bg-pink-950/30"
+                    tooltip="사용자의 알레르기 프로필 기반으로 식품 안전 여부를 확인한 횟수입니다."
                   />
                   <StatCard
                     emoji="🔍"
                     label={`음식 검색 (${period}일)`}
                     value={stats.features.searches}
                     bgColor="bg-sky-50 dark:bg-sky-950/30"
+                    tooltip="식품명으로 검색하여 영양 정보나 알레르기 정보를 조회한 횟수입니다."
                   />
                   <StatCard
                     emoji="🍽️"
                     label={`식단 기록 (${period}일)`}
                     value={stats.features.dietEntries}
                     bgColor="bg-lime-50 dark:bg-lime-950/30"
+                    tooltip="사용자가 자신의 식단을 기록한 횟수입니다."
                   />
                 </div>
 
