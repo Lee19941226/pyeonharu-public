@@ -39,6 +39,9 @@ pnpm add @capacitor/status-bar
 2026-03-05 17:21 이용재
 npm install framer-motion
 
+2026-03-07 02:39 이용재
+npm install zustand
+
 ---
 
 # 1. 편하루 프로젝트로 이동

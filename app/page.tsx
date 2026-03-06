@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   UtensilsCrossed,
@@ -24,17 +24,25 @@ import { WelcomeModal } from "@/components/onboarding/welcome-modal";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import FoodTab from "@/components/tabs/FoodTab";
-import RestaurantTab from "@/components/tabs/RestaurantTab";
-import DietTab from "@/components/tabs/DietTab";
-import SymptomTab from "@/components/tabs/SymptomTab";
-import HospitalTab from "@/components/tabs/HospitalTab";
-import MedicineTab from "@/components/tabs/MedicineTab";
-import DoctorTab from "@/components/tabs/DoctorTab";
+import dynamic from "next/dynamic";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 import MealRecommend from "@/components/meal-recommend";
 import { toast } from "sonner";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
+
+const TabSpinner = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+  </div>
+);
+
+const FoodTab = dynamic(() => import("@/components/tabs/FoodTab"), { loading: TabSpinner, ssr: false });
+const RestaurantTab = dynamic(() => import("@/components/tabs/RestaurantTab"), { loading: TabSpinner, ssr: false });
+const DietTab = dynamic(() => import("@/components/tabs/DietTab"), { loading: TabSpinner, ssr: false });
+const SymptomTab = dynamic(() => import("@/components/tabs/SymptomTab"), { loading: TabSpinner, ssr: false });
+const HospitalTab = dynamic(() => import("@/components/tabs/HospitalTab"), { loading: TabSpinner, ssr: false });
+const MedicineTab = dynamic(() => import("@/components/tabs/MedicineTab"), { loading: TabSpinner, ssr: false });
+const DoctorTab = dynamic(() => import("@/components/tabs/DoctorTab"), { loading: TabSpinner, ssr: false });
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
@@ -110,7 +118,12 @@ function TabLoading() {
 
 export default function HomePage() {
   const router = useRouter();
+
+  // ── Supabase 클라이언트: 컴포넌트 내에서 1회만 생성 ──
+  const supabase = useMemo(() => createClient(), []);
+
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   useBackHandler(loginModalOpen, () => setLoginModalOpen(false));
 
@@ -230,15 +243,17 @@ export default function HomePage() {
   const [tourActive, setTourActive] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setIsLoading(false);
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     setLoadProgress(10);
@@ -265,7 +280,6 @@ export default function HomePage() {
     setTourActive(false);
     if (user) {
       try {
-        const supabase = createClient();
         await supabase.auth.updateUser({
           data: { onboarding_completed: true },
         });
@@ -392,8 +406,21 @@ export default function HomePage() {
       </div>
 
       <main className="flex-1 pb-20 md:pb-0">
+        {/* ═══ auth 확인 전 Skeleton UI ═══ */}
+        {isLoading ? (
+          <div className="container mx-auto px-4 pt-6 space-y-4 max-w-2xl">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+            </div>
+            <div className="rounded-xl bg-gray-100 animate-pulse h-10" />
+            <div className="rounded-xl bg-gray-100 animate-pulse h-64" />
+          </div>
+        ) : (
+          <>
         {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
-        <div style={{ display: activeTab === "food" ? "block" : "none" }}>
+        {activeTab === "food" && (
           <div className="container mx-auto px-4 pt-3">
             <div className="flex gap-4 justify-center">
               <div className="w-full max-w-2xl">
@@ -406,20 +433,15 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        </div>
-
-        <div style={{ display: activeTab === "restaurant" ? "block" : "none" }}>
-          <RestaurantTab />
-        </div>
-        <div style={{ display: activeTab === "diet" ? "block" : "none" }}>
-          <DietTab />
-        </div>
-        <div style={{ display: activeTab === "medicine" ? "block" : "none" }}>
-          <MedicineTab />
-        </div>
+        )}
+        {activeTab === "restaurant" && <RestaurantTab />}
+        {activeTab === "diet" && <DietTab />}
+        {activeTab === "medicine" && <MedicineTab />}
         {activeTab === "symptom" && <SymptomTab />}
         {activeTab === "hospital" && <HospitalTab />}
         {activeTab === "doctor" && <DoctorTab />}
+          </>
+        )}
       </main>
 
       {/* ═══ 첫 화면 설정 고정 버튼 (로딩 완료 후 표시) ═══ */}

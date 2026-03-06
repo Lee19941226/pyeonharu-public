@@ -741,8 +741,10 @@ function FoodSearchPageInner() {
     setHasSearched(true);
     setCurrentPage(1);
 
+    let aiProgressTimer: ReturnType<typeof setTimeout> | null = null;
+
     try {
-      setSearchProgress({ step: "DB 캐시 검색 중...", progress: 25 });
+      setSearchProgress({ step: "DB 캐시 검색 중...", progress: 20 });
 
       const phase1Res = await fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}&phase=1`,
@@ -754,14 +756,23 @@ function FoodSearchPageInner() {
         setAllResults(phase1Data.items);
       }
 
-      setSearchProgress({ step: "식약처 API 조회 중...", progress: 50 });
+      setSearchProgress({ step: "식약처 API 조회 중...", progress: 40 });
 
-      const phase2Res = await fetch(
+      const phase2Promise = fetch(
         `/api/food/search?q=${encodeURIComponent(searchQuery.trim())}`,
         { signal },
       );
 
-      setSearchProgress({ step: "검색 결과 정리 중...", progress: 75 });
+      // 4초 후에도 응답이 없으면 AI 분석 단계로 진행
+      aiProgressTimer = setTimeout(() => {
+        setSearchProgress({ step: "AI로 분석 중... (10-20초 소요)", progress: 60 });
+      }, 4000);
+
+      const phase2Res = await phase2Promise;
+      clearTimeout(aiProgressTimer);
+      aiProgressTimer = null;
+
+      setSearchProgress({ step: "검색 결과 정리 중...", progress: 80 });
 
       const phase2Data = await phase2Res.json();
       if (phase2Res.status === 429) {
@@ -834,6 +845,10 @@ function FoodSearchPageInner() {
       }
       setSearchProgress({ step: "검색 실패", progress: 0 });
     } finally {
+      if (aiProgressTimer) {
+        clearTimeout(aiProgressTimer);
+        aiProgressTimer = null;
+      }
       setTimeout(() => {
         setIsLoading(false);
         setSearchProgress({ step: "", progress: 0 });
@@ -997,6 +1012,11 @@ function FoodSearchPageInner() {
                           <p className="text-sm text-muted-foreground">
                             {searchProgress.step || "식품 정보를 찾고 있습니다"}
                           </p>
+                          {searchProgress.progress === 60 && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              최대 20초 소요될 수 있어요
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -1017,34 +1037,44 @@ function FoodSearchPageInner() {
                       </div>
 
                       {/* 검색 단계 표시 */}
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-5 gap-2">
                         <div
-                          className={`text-center ${searchProgress.progress >= 25 ? "text-primary" : "text-muted-foreground"}`}
+                          className={`text-center ${searchProgress.progress >= 20 ? "text-primary" : "text-muted-foreground"}`}
                         >
                           <div
-                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 25 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 20 ? "border-primary bg-primary/10" : "border-gray-300"}`}
                           >
-                            {searchProgress.progress >= 25 ? "✓" : "1"}
+                            {searchProgress.progress >= 20 ? "✓" : "1"}
                           </div>
                           <p className="text-xs">DB 검색</p>
                         </div>
                         <div
-                          className={`text-center ${searchProgress.progress >= 50 ? "text-primary" : "text-muted-foreground"}`}
+                          className={`text-center ${searchProgress.progress >= 40 ? "text-primary" : "text-muted-foreground"}`}
                         >
                           <div
-                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 50 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 40 ? "border-primary bg-primary/10" : "border-gray-300"}`}
                           >
-                            {searchProgress.progress >= 50 ? "✓" : "2"}
+                            {searchProgress.progress >= 40 ? "✓" : "2"}
                           </div>
                           <p className="text-xs">API 조회</p>
                         </div>
                         <div
-                          className={`text-center ${searchProgress.progress >= 75 ? "text-primary" : "text-muted-foreground"}`}
+                          className={`text-center ${searchProgress.progress >= 60 ? "text-primary" : "text-muted-foreground"}`}
                         >
                           <div
-                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 75 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 60 ? "border-primary bg-primary/10" : "border-gray-300"}`}
                           >
-                            {searchProgress.progress >= 75 ? "✓" : "3"}
+                            {searchProgress.progress >= 60 ? "✓" : "3"}
+                          </div>
+                          <p className="text-xs">AI 분석</p>
+                        </div>
+                        <div
+                          className={`text-center ${searchProgress.progress >= 80 ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          <div
+                            className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 80 ? "border-primary bg-primary/10" : "border-gray-300"}`}
+                          >
+                            {searchProgress.progress >= 80 ? "✓" : "4"}
                           </div>
                           <p className="text-xs">데이터 정리</p>
                         </div>
@@ -1054,7 +1084,7 @@ function FoodSearchPageInner() {
                           <div
                             className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full border-2 ${searchProgress.progress >= 100 ? "border-primary bg-primary/10" : "border-gray-300"}`}
                           >
-                            {searchProgress.progress >= 100 ? "✓" : "4"}
+                            {searchProgress.progress >= 100 ? "✓" : "5"}
                           </div>
                           <p className="text-xs">완료</p>
                         </div>

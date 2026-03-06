@@ -9,10 +9,14 @@
 그건 정상 동작이고 배포 환경에서만 실제 효과가 납니다.
 */
 const nextConfig = {
+  poweredByHeader: false,
+  compress: true,
+
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
     },
+    optimizePackageImports: ["lucide-react", "@supabase/supabase-js", "framer-motion"],
   },
 
   typescript: {
@@ -20,6 +24,8 @@ const nextConfig = {
   },
   images: {
     // ✅ 실서비스: unoptimized 제거 → Next.js 이미지 최적화 활성화
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60,
     remotePatterns: [
       {
         protocol: "https",
