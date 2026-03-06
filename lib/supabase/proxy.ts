@@ -1,5 +1,4 @@
 import { createServerClient } from "@supabase/ssr";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 // ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
@@ -30,39 +29,50 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
   }
 
   try {
-    const supabase = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !anonKey) {
+      console.error("[maintenance] 환경변수 없음:", { supabaseUrl: !!supabaseUrl, anonKey: !!anonKey });
+      return null;
+    }
+
+    // Edge Runtime 호환: raw fetch로 Supabase REST API 직접 호출 (전체 조회 — 2행뿐)
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/site_settings?select=key,value`,
+      {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        cache: "no-store",
+      },
     );
 
-    const [modeRes, wlRes] = await Promise.all([
-      supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "maintenance_mode")
-        .single(),
-      supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "whitelist_user_ids")
-        .single(),
-    ]);
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("[maintenance] REST API 실패:", res.status, body);
+      if (maintenanceCache) return maintenanceCache;
+      return null;
+    }
 
-    const mode = modeRes.data?.value as { enabled: boolean; message: string; endTime: string | null } | null;
-    const wl = wlRes.data?.value as string[] | null;
+    const rows: { key: string; value: any }[] = await res.json();
+    console.log("[maintenance] DB 조회 결과:", JSON.stringify(rows));
+
+    const modeRow = rows.find((r) => r.key === "maintenance_mode");
+    const wlRow = rows.find((r) => r.key === "whitelist_user_ids");
 
     maintenanceCache = {
-      enabled: mode?.enabled ?? false,
-      message: mode?.message ?? "",
-      endTime: mode?.endTime ?? null,
-      whitelistIds: Array.isArray(wl) ? wl : [],
+      enabled: modeRow?.value?.enabled ?? false,
+      message: modeRow?.value?.message ?? "",
+      endTime: modeRow?.value?.endTime ?? null,
+      whitelistIds: Array.isArray(wlRow?.value) ? wlRow.value : [],
       fetchedAt: now,
     };
 
     return maintenanceCache;
   } catch (err) {
     console.error("[maintenance] DB 조회 실패:", err);
-    // 이전 캐시가 있으면 만료되더라도 재사용 (fail-safe)
     if (maintenanceCache) return maintenanceCache;
     return null;
   }
@@ -163,39 +173,33 @@ export async function updateSession(request: NextRequest) {
   // ==========================================
   // 점검 모드 체크
   // ==========================================
-  const maintenanceBypass = ["/maintenance", "/api/admin/", "/login", "/auth/", "/api/auth/"];
+  const maintenanceBypass = ["/maintenance", "/admin", "/api/admin/", "/login", "/auth/", "/api/auth/"];
   const isBypassPath = maintenanceBypass.some((p) => pathname.startsWith(p));
+
+  // 디버그: 모든 응답에 점검 모드 상태 헤더 추가
+  let debugMaintenanceStatus = "skip:bypass";
 
   if (!isBypassPath) {
     const maint = await getMaintenanceSettings();
+    debugMaintenanceStatus = maint
+      ? `enabled:${maint.enabled}`
+      : "fetch:null";
+
     if (maint?.enabled) {
-      // 관리자 또는 화이트리스트 사용자는 통과
-      let isWhitelisted = false;
-      if (user) {
-        // 화이트리스트 체크
-        if (maint.whitelistIds.includes(user.id)) {
-          isWhitelisted = true;
-        }
-        // 관리자 체크 (요청 컨텍스트의 supabase 클라이언트 사용 — Edge 호환)
-        if (!isWhitelisted) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .single();
-          const role = profile?.role;
-          if (role === "admin" || role === "super_admin") {
-            isWhitelisted = true;
-          }
-        }
-      }
+      // 화이트리스트 사용자만 통과 (관리자 포함 전원 차단)
+      const isWhitelisted = user ? maint.whitelistIds.includes(user.id) : false;
+      debugMaintenanceStatus += `,wl:${isWhitelisted}`;
       if (!isWhitelisted) {
         const url = request.nextUrl.clone();
         url.pathname = "/maintenance";
-        return NextResponse.redirect(url);
+        const redirectRes = NextResponse.redirect(url);
+        redirectRes.headers.set("x-maintenance-debug", debugMaintenanceStatus);
+        return redirectRes;
       }
     }
   }
+
+  supabaseResponse.headers.set("x-maintenance-debug", debugMaintenanceStatus);
 
   // ==========================================
   // 보호 경로 체크
