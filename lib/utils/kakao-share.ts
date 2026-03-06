@@ -1,8 +1,3 @@
-function isMobileDevice(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
 let sdkLoadPromise: Promise<void> | null = null;
 
 function loadKakaoSDK(): Promise<void> {
@@ -107,7 +102,6 @@ export async function shareToKakao(
   try {
     const payload = {
       objectType: "feed",
-      installTalk: isMobileDevice(),
       content: {
         title: safeTitle,
         description: safeDesc,
@@ -129,7 +123,8 @@ export async function shareToKakao(
     };
 
     const payloadSize = new Blob([JSON.stringify(payload)]).size;
-    console.log("카카오 공유 페이로드 크기:", payloadSize, "bytes");
+    console.log("[Kakao Share] safeShareUrl:", safeShareUrl);
+    console.log("[Kakao Share] payload size:", payloadSize, "bytes");
     console.log("카카오 공유 페이로드:", JSON.stringify(payload));
     if (payloadSize > 10240) console.warn("⚠️ 페이로드 10KB 초과:", payloadSize);
 
