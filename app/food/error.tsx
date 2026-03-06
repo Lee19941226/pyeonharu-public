@@ -8,7 +8,6 @@ import {
   Home,
   RefreshCw,
   ChevronDown,
-  Package,
 } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/header";
@@ -36,8 +35,8 @@ export default function FoodError({
           <CardContent className="p-6">
             {/* 아이콘 */}
             <div className="mb-4 flex justify-center">
-              <div className="rounded-full bg-orange-100 p-3">
-                <Package className="h-8 w-8 text-orange-600" />
+              <div className="rounded-full bg-destructive/10 p-3">
+                <AlertCircle className="h-8 w-8 text-destructive" />
               </div>
             </div>
 
@@ -99,8 +98,8 @@ export default function FoodError({
             </div>
 
             {/* 대안 제시 */}
-            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <p className="text-xs text-blue-900">
+            <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <p className="text-xs text-primary">
                 💡 <strong>다른 방법:</strong> 바코드를 다시 스캔하거나
                 제품명으로 검색해보세요
               </p>

@@ -918,7 +918,7 @@ function FoodMainContent() {
                           </div>
 
                           {/* 프로그레스 바 */}
-                          <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
                               style={{ width: `${safetyStats.percentage}%` }}

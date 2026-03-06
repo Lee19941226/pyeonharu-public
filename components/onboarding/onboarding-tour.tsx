@@ -339,7 +339,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
                     ? "w-5 bg-primary"
                     : i < step
                       ? "w-1.5 bg-primary/40"
-                      : "w-1.5 bg-gray-200",
+                      : "w-1.5 bg-muted",
                 )}
               />
             ))}
@@ -350,7 +350,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
             {!isFirst && !isLast && (
               <button
                 onClick={goPrev}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>

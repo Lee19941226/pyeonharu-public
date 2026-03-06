@@ -50,7 +50,7 @@ export default function ScanSummaryPage() {
                     {safePercentage}%
                   </span>
                 </div>
-                <div className="relative h-4 w-full overflow-hidden rounded-full bg-gray-200">
+                <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all"
                     style={{ width: `${safePercentage}%` }}

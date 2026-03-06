@@ -1002,7 +1002,7 @@ function FoodSearchPageInner() {
 
                       {/* 진행률 바 */}
                       <div className="space-y-2">
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                           <div
                             className="h-full bg-primary transition-all duration-500 ease-out"
                             style={{ width: `${searchProgress.progress}%` }}
@@ -1069,10 +1069,10 @@ function FoodSearchPageInner() {
                     <Card key={i} className="animate-pulse">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-gray-200" />
+                          <div className="h-10 w-10 rounded-full bg-muted" />
                           <div className="flex-1 space-y-2">
-                            <div className="h-4 w-3/4 rounded bg-gray-200" />
-                            <div className="h-3 w-1/2 rounded bg-gray-200" />
+                            <div className="h-4 w-3/4 rounded bg-muted" />
+                            <div className="h-3 w-1/2 rounded bg-muted" />
                           </div>
                         </div>
                       </CardContent>
@@ -1103,8 +1103,8 @@ function FoodSearchPageInner() {
                           onClick={() => setFilterSafeOnly((v) => !v)}
                           className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                             filterSafeOnly
-                              ? "border-green-400 bg-green-50 text-green-700"
-                              : "border-gray-200 bg-white text-gray-600 hover:border-green-300 hover:bg-green-50"
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5"
                           }`}
                         >
                           <span>{filterSafeOnly ? "✅" : "🔍"}</span>내 알레르기
@@ -1128,7 +1128,7 @@ function FoodSearchPageInner() {
                               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                                 filterSource === src
                                   ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-gray-200 bg-white text-gray-600 hover:border-primary/50"
+                                  : "border-border bg-background text-muted-foreground hover:border-primary/50"
                               }`}
                             >
                               {labels[src]}
@@ -1139,7 +1139,7 @@ function FoodSearchPageInner() {
                         <select
                           value={sortBy}
                           onChange={(e) => setSortBy(e.target.value)}
-                          className="ml-auto rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary"
+                          className="ml-auto rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                         >
                           <option value="default">관련도순</option>
                           <option value="safe_first">안전 먼저</option>

@@ -1433,7 +1433,7 @@ export default function FoodResultPage() {
                       {[1, 2, 3].map((i) => (
                         <div
                           key={i}
-                          className="min-w-[180px] animate-pulse rounded-lg border-2 border-gray-200 bg-gray-100 p-3 h-28"
+                          className="min-w-[180px] animate-pulse rounded-lg border-2 border-border bg-muted p-3 h-28"
                         />
                       ))}
                     </div>

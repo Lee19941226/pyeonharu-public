@@ -47,7 +47,7 @@ export function WelcomeModal({ active, onFinish }: WelcomeModalProps) {
           {/* 닫기 버튼 */}
           <button
             onClick={onFinish}
-            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

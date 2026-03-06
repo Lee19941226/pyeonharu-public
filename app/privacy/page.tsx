@@ -7,23 +7,23 @@ export default function PrivacyPage() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* 헤더 */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <button
           onClick={() => router.back()}
-          className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+          className="rounded-lg p-1 text-muted-foreground hover:bg-muted transition-colors"
           aria-label="뒤로가기"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-700" />
+          <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-lg font-bold text-gray-900">개인정보처리방침</h1>
+        <h1 className="text-lg font-bold">개인정보처리방침</h1>
       </div>
 
       {/* 본문 */}
       <div className="max-w-3xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-6 text-gray-700 text-sm leading-relaxed">
-          <p className="text-xs text-gray-400">시행일: 2026년 2월 25일</p>
+        <div className="bg-card rounded-2xl shadow-sm p-6 space-y-6 text-foreground text-sm leading-relaxed">
+          <p className="text-xs text-muted-foreground">시행일: 2026년 2월 25일</p>
 
           <p>
             편하루(이하 &quot;서비스&quot;)는 이용자의 개인정보를 중요시하며,
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
           </p>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               1. 수집하는 개인정보 항목
             </h2>
             <div className="overflow-x-auto">
@@ -86,7 +86,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               2. 개인정보의 이용 목적
             </h2>
             <ul className="list-disc list-inside space-y-1">
@@ -98,7 +98,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               3. 개인정보의 보유 및 이용 기간
             </h2>
             <p>
@@ -113,7 +113,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               4. 개인정보의 제3자 제공
             </h2>
             <p>
@@ -127,7 +127,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               5. 개인정보 처리 위탁
             </h2>
             <p>서비스는 원활한 서비스 제공을 위해 다음과 같이 개인정보 처리를 위탁하고 있습니다.</p>
@@ -162,7 +162,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               6. 개인정보의 파기 절차 및 방법
             </h2>
             <ul className="list-disc list-inside space-y-1">
@@ -172,7 +172,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               7. 이용자의 권리와 행사 방법
             </h2>
             <p>이용자는 언제든지 다음의 권리를 행사할 수 있습니다.</p>
@@ -185,7 +185,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               8. 개인정보 보호를 위한 안전조치
             </h2>
             <p>서비스는 이용자의 개인정보 보호를 위해 다음과 같은 조치를 취하고 있습니다.</p>
@@ -199,7 +199,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               9. 쿠키(Cookie) 사용
             </h2>
             <p>
@@ -210,7 +210,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               10. 개인정보 보호책임자
             </h2>
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -226,7 +226,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               11. 개인정보 침해 구제
             </h2>
             <p>개인정보 침해에 대한 신고나 상담이 필요하신 경우 아래 기관에 문의하실 수 있습니다.</p>
@@ -239,7 +239,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-bold text-gray-900 mb-2">
+            <h2 className="text-base font-bold mb-2">
               12. 방침 변경에 관한 사항
             </h2>
             <p>

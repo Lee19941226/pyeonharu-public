@@ -76,14 +76,14 @@ export function LoginPromptSheet({
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
-        <div className="mx-auto max-w-lg rounded-t-2xl bg-white px-6 pb-8 pt-5 shadow-2xl">
+        <div className="mx-auto max-w-lg rounded-t-2xl bg-card px-6 pb-8 pt-5 shadow-2xl">
           {/* 핸들 */}
-          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
+          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted" />
 
           {/* 닫기 버튼 */}
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 hover:bg-gray-100"
+            className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted"
           >
             <X className="h-4 w-4" />
           </button>

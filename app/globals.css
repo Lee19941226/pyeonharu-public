@@ -137,3 +137,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  /* 에러 상태 카드 - 공통 패턴 */
+  .error-card {
+    @apply rounded-xl border border-destructive/30 bg-destructive/5 p-4;
+  }
+
+  /* 정보 안내 카드 - 공통 패턴 */
+  .info-card {
+    @apply rounded-xl border border-primary/20 bg-primary/5 p-4;
+  }
+
+  /* 프로그레스 바 트랙 - 공통 패턴 */
+  .progress-track {
+    @apply h-2 w-full overflow-hidden rounded-full bg-muted;
+  }
+}

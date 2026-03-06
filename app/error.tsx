@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Home, RefreshCw, ChevronDown } from "lucide-react";
+import { AlertCircle, Home, RefreshCw, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -32,8 +32,8 @@ export default function GlobalError({
             <CardContent className="p-6">
               {/* 아이콘 */}
               <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-red-100 p-3">
-                  <AlertTriangle className="h-8 w-8 text-red-600" />
+                <div className="rounded-full bg-destructive/10 p-3">
+                  <AlertCircle className="h-8 w-8 text-destructive" />
                 </div>
               </div>
 
