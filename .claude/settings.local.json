@@ -21,9 +21,12 @@
       "Bash(npx tsc:*)",
       "Bash(npm install:*)",
       "Bash(npx next:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(pnpm install:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
