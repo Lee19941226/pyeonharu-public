@@ -1,9 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getChosung } from "@/lib/utils/chosung";
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+
+const supabaseService = createServiceClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 export async function GET() {
   try {
@@ -605,7 +611,7 @@ export async function POST(req: NextRequest) {
       analysisData.nutritionInfo ||
       null;
     try {
-      const { error: saveError } = await supabase
+      const { error: saveError } = await supabaseService
         .from("food_search_cache")
         .upsert(
           {

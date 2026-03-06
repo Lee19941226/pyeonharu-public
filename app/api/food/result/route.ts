@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
+
+const supabaseService = createServiceClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 // ✅ 초성 추출 함수 추가
 function getChosung(str: string): string {
@@ -245,7 +251,7 @@ JSON 형식으로만 응답:
 
             // ✅ 업데이트 실행
             if (Object.keys(updateData).length > 0) {
-              await supabase
+              await supabaseService
                 .from("food_search_cache")
                 .update(updateData)
                 .eq("food_code", cachedData.food_code);
@@ -457,7 +463,7 @@ JSON 형식으로만 응답:
 
           // DB 업데이트
           if (Object.keys(updateData).length > 0) {
-            await supabase
+            await supabaseService
               .from("food_search_cache")
               .update(updateData)
               .eq("food_code", code);
@@ -849,7 +855,7 @@ JSON 형식으로만 응답:
       console.log("💾 Open API 데이터를 DB에 저장 시작...");
 
       try {
-        const { error: saveError } = await supabase
+        const { error: saveError } = await supabaseService
           .from("food_search_cache")
           .upsert(
             {

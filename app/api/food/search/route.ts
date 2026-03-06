@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { getChosung, normalizeChosungQuery } from "@/lib/utils/chosung";
 import { headers } from "next/headers";
 import { logAction } from "@/lib/utils/action-log";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { correctFoodTypo, jamoSimilarity } from "@/lib/utils/korean-typo";
+
+const supabaseService = createServiceClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 interface ProductScore {
   foodCode: string;
@@ -833,7 +839,7 @@ JSON 배열 형식으로만 반환:
     if (toCache.length > 0) {
       console.log(`💾 검색 결과 ${toCache.length}개 DB 캐시 저장 시작...`);
 
-      supabase
+      supabaseService
         .from("food_search_cache")
         .upsert(
           toCache.map((item) => {
