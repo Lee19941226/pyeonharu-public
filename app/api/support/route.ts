@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// IP 기반 문의 rate limit (5회/시간)
+const supportRateLimit = new Map<string, number>();
+setInterval(() => {
+  supportRateLimit.clear();
+}, 60 * 60 * 1000);
+
 // 문의 목록 조회 (본인 것만)
 export async function GET() {
   try {
@@ -30,6 +36,20 @@ export async function GET() {
 // 문의 등록
 export async function POST(req: NextRequest) {
   try {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+
+    const ipCount = supportRateLimit.get(ip) || 0;
+    if (ipCount >= 5) {
+      return NextResponse.json(
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429, headers: { "Retry-After": "3600" } },
+      );
+    }
+    supportRateLimit.set(ip, ipCount + 1);
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -41,6 +61,20 @@ export async function POST(req: NextRequest) {
     if (!name?.trim() || !email?.trim() || !title?.trim() || !content?.trim()) {
       return NextResponse.json(
         { error: "필수 항목을 모두 입력해주세요" },
+        { status: 400 },
+      );
+    }
+
+    if (title.trim().length > 100) {
+      return NextResponse.json(
+        { error: "제목은 100자 이내로 입력해주세요." },
+        { status: 400 },
+      );
+    }
+
+    if (content.trim().length > 2000) {
+      return NextResponse.json(
+        { error: "내용은 2000자 이내로 입력해주세요." },
         { status: 400 },
       );
     }
