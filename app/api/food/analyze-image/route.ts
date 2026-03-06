@@ -102,13 +102,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  supabase
-    .from("image_analyze_rate_limits")
-    .insert({
-      identifier,
-      analyzed_at: new Date().toISOString(),
-    })
-    .then(() => {});
   try {
     // ✅ OpenAI 비용 통제: 호출 제한
     const rateCheck = checkOpenAIRateLimit("analyze-image");
@@ -355,6 +348,15 @@ export async function POST(req: NextRequest) {
         confidence: safeAnalysisData.confidence,
         category: safeAnalysisData.category,
       });
+
+      // OpenAI 호출 성공 후 rate limit 카운트 차감
+      supabase
+        .from("image_analyze_rate_limits")
+        .insert({
+          identifier,
+          analyzed_at: new Date().toISOString(),
+        })
+        .then(() => {});
     } catch (aiError) {
       console.error("❌ AI 분석 실패:", aiError);
       return NextResponse.json(
@@ -397,7 +399,6 @@ export async function POST(req: NextRequest) {
     // ==========================================
     // Step 2.5: DB 캐시에서 제품명 검색
     // ==========================================
-    const supabase = await createClient();
     let dbProductData = null;
 
     if (analysisData.productName) {
