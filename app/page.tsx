@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   UtensilsCrossed,
@@ -24,17 +24,25 @@ import { WelcomeModal } from "@/components/onboarding/welcome-modal";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import FoodTab from "@/components/tabs/FoodTab";
-import RestaurantTab from "@/components/tabs/RestaurantTab";
-import DietTab from "@/components/tabs/DietTab";
-import SymptomTab from "@/components/tabs/SymptomTab";
-import HospitalTab from "@/components/tabs/HospitalTab";
-import MedicineTab from "@/components/tabs/MedicineTab";
-import DoctorTab from "@/components/tabs/DoctorTab";
+import dynamic from "next/dynamic";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 import MealRecommend from "@/components/meal-recommend";
 import { toast } from "sonner";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
+
+const TabSpinner = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+  </div>
+);
+
+const FoodTab = dynamic(() => import("@/components/tabs/FoodTab"), { loading: TabSpinner, ssr: false });
+const RestaurantTab = dynamic(() => import("@/components/tabs/RestaurantTab"), { loading: TabSpinner, ssr: false });
+const DietTab = dynamic(() => import("@/components/tabs/DietTab"), { loading: TabSpinner, ssr: false });
+const SymptomTab = dynamic(() => import("@/components/tabs/SymptomTab"), { loading: TabSpinner, ssr: false });
+const HospitalTab = dynamic(() => import("@/components/tabs/HospitalTab"), { loading: TabSpinner, ssr: false });
+const MedicineTab = dynamic(() => import("@/components/tabs/MedicineTab"), { loading: TabSpinner, ssr: false });
+const DoctorTab = dynamic(() => import("@/components/tabs/DoctorTab"), { loading: TabSpinner, ssr: false });
 
 type MainTab = "meal" | "sick";
 type MealSubTab = "restaurant" | "food" | "diet";
@@ -393,7 +401,7 @@ export default function HomePage() {
 
       <main className="flex-1 pb-20 md:pb-0">
         {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
-        <div style={{ display: activeTab === "food" ? "block" : "none" }}>
+        {activeTab === "food" && (
           <div className="container mx-auto px-4 pt-3">
             <div className="flex gap-4 justify-center">
               <div className="w-full max-w-2xl">
@@ -406,17 +414,10 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        </div>
-
-        <div style={{ display: activeTab === "restaurant" ? "block" : "none" }}>
-          <RestaurantTab />
-        </div>
-        <div style={{ display: activeTab === "diet" ? "block" : "none" }}>
-          <DietTab />
-        </div>
-        <div style={{ display: activeTab === "medicine" ? "block" : "none" }}>
-          <MedicineTab />
-        </div>
+        )}
+        {activeTab === "restaurant" && <RestaurantTab />}
+        {activeTab === "diet" && <DietTab />}
+        {activeTab === "medicine" && <MedicineTab />}
         {activeTab === "symptom" && <SymptomTab />}
         {activeTab === "hospital" && <HospitalTab />}
         {activeTab === "doctor" && <DoctorTab />}
