@@ -27,16 +27,17 @@ export async function GET(
 
   // 조회수 중복 방어 (쿠키 기반 24시간)
   const viewedCookie = req.cookies.get(`viewed_${id}`)?.value;
-  let newViewCount = post.view_count || 0;
 
+  let newViewCount: number | null = null;
   if (!viewedCookie) {
-    newViewCount += 1;
-    const { error: viewCountError } = await supabase
-      .from("community_posts")
-      .update({ view_count: newViewCount })
-      .eq("id", id);
+    const { data: viewCountData, error: viewCountError } = await supabase.rpc(
+      "increment_view_count",
+      { post_id: id },
+    );
     if (viewCountError) {
       console.error("[Community] 조회수 업데이트 실패:", viewCountError.message);
+    } else {
+      newViewCount = viewCountData as number;
     }
   }
 
@@ -148,7 +149,7 @@ export async function GET(
       avatarUrl: authorProfile?.avatar_url || null,
       isLiked: isPostLiked,
       isOwner: user?.id === post.user_id,
-      view_count: newViewCount,
+      view_count: newViewCount !== null ? newViewCount : (post.view_count || 0),
     },
     comments: topComments,
   });
