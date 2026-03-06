@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/utils/action-log";
 
 // PUT /api/profile — 프로필 닉네임 업데이트 (auth + profiles 동기화)
 export async function PUT(req: NextRequest) {
@@ -62,6 +63,12 @@ export async function PUT(req: NextRequest) {
       { status: 500 },
     );
   }
+
+  logAction({
+    userId: user.id,
+    actionType: "profile_update",
+    metadata: { nickname: trimmedName },
+  });
 
   return NextResponse.json({ success: true, name: trimmedName });
 }

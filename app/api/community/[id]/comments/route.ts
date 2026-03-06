@@ -152,5 +152,11 @@ export async function DELETE(
     );
   }
 
+  logAction({
+    userId: user.id,
+    actionType: "community_comment_delete",
+    metadata: { comment_id: commentId, post_id: postId },
+  });
+
   return NextResponse.json({ success: true });
 }

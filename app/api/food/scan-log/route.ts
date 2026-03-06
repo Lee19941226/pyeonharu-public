@@ -58,5 +58,11 @@ export async function POST(req: NextRequest) {
     metadata: { food_code: foodCode, food_name: foodName, is_safe: isSafe ?? true },
   });
 
+  logAction({
+    userId: user.id,
+    actionType: "food_check",
+    metadata: { food_code: foodCode, food_name: foodName, is_safe: isSafe ?? true },
+  });
+
   return NextResponse.json({ success: true });
 }

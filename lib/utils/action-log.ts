@@ -21,7 +21,6 @@ export type ActionType =
   | "diet_entry_delete"
   | "profile_update"
   | "account_delete"
-  | "doctor_register"
   | "doctor_review_create"
   | "doctor_review_delete"
   | "doctor_review_report";
