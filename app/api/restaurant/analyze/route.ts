@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
 import { createClient } from "@/lib/supabase/server"
+import { checkApiRateLimit } from "@/lib/utils/api-rate-limit"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -23,6 +24,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "음식점 이름과 알레르기 정보가 필요합니다." },
         { status: 400 }
+      )
+    }
+
+    // Rate limit 체크 (OpenAI 호출 직전)
+    const rateResult = await checkApiRateLimit({
+      prefix: "rest",
+      userId: user.id,
+      dailyLimitLogin: 10,
+      dailyLimitAnon: 0,
+    })
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: "일일 음식점 분석 한도(10회)를 초과했습니다. 내일 다시 시도해주세요." },
+        { status: 429 }
       )
     }
 

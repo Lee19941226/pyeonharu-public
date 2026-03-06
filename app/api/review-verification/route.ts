@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 
 // POST /api/review-verification
 // 진료비 영수증 또는 진료 확인서 이미지를 AI로 분석하여
@@ -56,6 +57,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "유효하지 않은 이미지 파일입니다." },
       { status: 400 },
+    );
+  }
+
+  // Rate limit 체크 (OpenAI 호출 직전)
+  const rateResult = await checkApiRateLimit({
+    prefix: "review",
+    userId: user.id,
+    dailyLimitLogin: 5,
+    dailyLimitAnon: 0,
+  });
+  if (!rateResult.allowed) {
+    return NextResponse.json(
+      { error: "일일 인증 한도(5회)를 초과했습니다. 내일 다시 시도해주세요." },
+      { status: 429 },
     );
   }
 

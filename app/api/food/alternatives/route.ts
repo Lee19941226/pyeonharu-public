@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 
 export async function GET(req: NextRequest) {
   console.log("test");
@@ -95,6 +96,24 @@ export async function GET(req: NextRequest) {
     // ==========================================
     // 2단계: AI로 나머지 채우기
     // ==========================================
+    // Rate limit 체크 (OpenAI 호출 직전)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const rateResult = await checkApiRateLimit({
+      prefix: "alt",
+      userId: user?.id || null,
+      dailyLimitLogin: 20,
+      dailyLimitAnon: 10,
+    });
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: "일일 대체품 추천 한도를 초과했습니다. 내일 다시 시도해주세요." },
+        { status: 429 },
+      );
+    }
+
     const needed = 3 - dbAlternatives.length;
     const excludeNames = dbAlternatives.map((a) => a.productName);
 

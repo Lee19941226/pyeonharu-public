@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 
 // ✅ 초성 추출 함수 추가
 function getChosung(str: string): string {
@@ -160,6 +161,20 @@ export async function GET(req: NextRequest) {
         cachedData.nutrition_details.length === 0;
 
       if (needsEnrichment && cachedData.data_source === "ai") {
+        // Rate limit 체크 (OpenAI 호출 직전)
+        const rateResult = await checkApiRateLimit({
+          prefix: "result",
+          userId: user?.id || null,
+          dailyLimitLogin: 20,
+          dailyLimitAnon: 10,
+        });
+        if (!rateResult.allowed) {
+          return NextResponse.json(
+            { error: "일일 AI 분석 한도를 초과했습니다. 내일 다시 시도해주세요." },
+            { status: 429 },
+          );
+        }
+
         console.log("🔄 DB 데이터 불완전, AI로 보완 시작...");
         console.log(
           `  - 원재료: ${cachedData.raw_materials ? "있음" : "없음"}`,
