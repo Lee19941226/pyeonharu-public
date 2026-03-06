@@ -1,5 +1,4 @@
 import { createServerClient } from "@supabase/ssr";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 // ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
@@ -30,39 +29,44 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
   }
 
   try {
-    const supabase = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    // Edge Runtime 호환: raw fetch로 Supabase REST API 직접 호출
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/site_settings?select=key,value&key=in.(%22maintenance_mode%22,%22whitelist_user_ids%22)`,
+      {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      },
     );
 
-    const [modeRes, wlRes] = await Promise.all([
-      supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "maintenance_mode")
-        .single(),
-      supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "whitelist_user_ids")
-        .single(),
-    ]);
+    if (!res.ok) {
+      console.error("[maintenance] REST API 응답 실패:", res.status, await res.text());
+      if (maintenanceCache) return maintenanceCache;
+      return null;
+    }
 
-    const mode = modeRes.data?.value as { enabled: boolean; message: string; endTime: string | null } | null;
-    const wl = wlRes.data?.value as string[] | null;
+    const rows: { key: string; value: any }[] = await res.json();
+
+    const modeRow = rows.find((r) => r.key === "maintenance_mode");
+    const wlRow = rows.find((r) => r.key === "whitelist_user_ids");
 
     maintenanceCache = {
-      enabled: mode?.enabled ?? false,
-      message: mode?.message ?? "",
-      endTime: mode?.endTime ?? null,
-      whitelistIds: Array.isArray(wl) ? wl : [],
+      enabled: modeRow?.value?.enabled ?? false,
+      message: modeRow?.value?.message ?? "",
+      endTime: modeRow?.value?.endTime ?? null,
+      whitelistIds: Array.isArray(wlRow?.value) ? wlRow.value : [],
       fetchedAt: now,
     };
 
     return maintenanceCache;
   } catch (err) {
     console.error("[maintenance] DB 조회 실패:", err);
-    // 이전 캐시가 있으면 만료되더라도 재사용 (fail-safe)
     if (maintenanceCache) return maintenanceCache;
     return null;
   }
