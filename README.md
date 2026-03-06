@@ -64,5 +64,3 @@ npx cap add android
 # 5. out 폴더 + 더미 index.html 생성
 
 mkdir out
-
-..
