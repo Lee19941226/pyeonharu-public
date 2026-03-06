@@ -6,7 +6,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const VALID_ROLES = ["user", "moderator", "admin", "super_admin"];
+const VALID_ROLES = ["user", "tester", "moderator", "admin", "super_admin"];
 
 /** PostgREST .or() 필터 인젝션 방지: 특수문자 제거 */
 function sanitizeFilterValue(value: string): string {

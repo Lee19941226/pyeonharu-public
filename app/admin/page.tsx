@@ -42,6 +42,10 @@ import SupportManagement from "./support-management";
 import ActionLogs from "./action-logs";
 import PortfolioTokens from "./portfolio-tokens";
 import AdminReportButton from "./admin-report-button";
+import MaintenanceManager from "./maintenance-manager";
+import WhitelistManager from "./whitelist-manager";
+import CacheManager from "./cache-manager";
+import TesterManager from "./tester-manager";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
@@ -841,6 +845,10 @@ export default function AdminDashboard() {
         ) : activeTab === "tools" ? (
           <div className="space-y-5">
             <RateLimitManager />
+            <MaintenanceManager />
+            <WhitelistManager />
+            <CacheManager />
+            <TesterManager />
           </div>
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
