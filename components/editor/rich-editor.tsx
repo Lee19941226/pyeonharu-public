@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-// ─── Slash Command 메뉴 아이템 ───
+// ??? Slash Command 硫붾돱 ?꾩씠?????
 const SLASH_COMMANDS = [
   { label: "제목 1", description: "큰 제목", icon: Heading1, command: (editor: Editor) => editor.chain().focus().toggleHeading({ level: 2 }).run() },
   { label: "제목 2", description: "작은 제목", icon: Heading2, command: (editor: Editor) => editor.chain().focus().toggleHeading({ level: 3 }).run() },
@@ -26,10 +26,10 @@ const SLASH_COMMANDS = [
   { label: "인용", description: "인용문 블록", icon: Quote, command: (editor: Editor) => editor.chain().focus().toggleBlockquote().run() },
   { label: "코드", description: "코드 블록", icon: Code, command: (editor: Editor) => editor.chain().focus().toggleCodeBlock().run() },
   { label: "구분선", description: "수평 구분선", icon: Minus, command: (editor: Editor) => editor.chain().focus().setHorizontalRule().run() },
-  { label: "이미지", description: "이미지 업로드", icon: ImageIcon, command: () => {} }, // 특수 처리
+  { label: "이미지", description: "이미지 업로드", icon: ImageIcon, command: () => {} },
 ]
 
-// ─── Slash Command Menu 컴포넌트 ───
+// ??? Slash Command Menu 而댄룷?뚰듃 ???
 function SlashCommandMenu({
   editor,
   query,
@@ -74,11 +74,11 @@ function SlashCommandMenu({
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [filtered, selectedIndex, onClose])
 
-  const selectItem = (index: number) => {
+  function selectItem(index: number) {
     const item = filtered[index]
     if (!item) return
 
-    // "/" 텍스트 삭제
+    // "/" ?띿뒪????젣
     const { state } = editor
     const { from } = state.selection
     const textBefore = state.doc.textBetween(Math.max(0, from - query.length - 1), from)
@@ -124,7 +124,7 @@ function SlashCommandMenu({
   )
 }
 
-// ─── 링크 입력 팝업 ───
+// ??? 留곹겕 ?낅젰 ?앹뾽 ???
 function LinkInput({
   editor,
   onClose,
@@ -157,11 +157,11 @@ function LinkInput({
         value={url}
         onChange={e => setUrl(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter") handleSubmit(); if (e.key === "Escape") onClose() }}
-        placeholder="URL 입력..."
+        placeholder="URL ?낅젰..."
         className="h-7 w-48 rounded px-2 text-xs outline-none"
       />
       <button onClick={handleSubmit} className="rounded px-2 py-1 text-xs font-medium text-primary hover:bg-muted">
-        확인
+        ?뺤씤
       </button>
       <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted">
         <X className="h-3 w-3" />
@@ -170,7 +170,7 @@ function LinkInput({
   )
 }
 
-// ─── 메인 에디터 컴포넌트 ───
+// ??? 硫붿씤 ?먮뵒??而댄룷?뚰듃 ???
 export interface RichEditorRef {
   getHTML: () => string
   getJSON: () => any
@@ -186,7 +186,7 @@ interface RichEditorProps {
 }
 
 const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
-  ({ initialContent, placeholder = "'/' 를 입력하여 명령어를 사용하세요...", onImageUpload, onChange }, ref) => {
+  ({ initialContent, placeholder = "'/' 瑜??낅젰?섏뿬 紐낅졊?대? ?ъ슜?섏꽭??..", onImageUpload, onChange }, ref) => {
 
   const [slashMenu, setSlashMenu] = useState<{ query: string; position: { top: number; left: number } } | null>(null)
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -217,7 +217,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         class: "prose prose-sm max-w-none min-h-[240px] px-4 py-3 outline-none focus:outline-none",
       },
       handleKeyDown: (view, event) => {
-        // "/" 입력 감지
+        // "/" ?낅젰 媛먯?
         if (event.key === "/" && !slashMenu) {
           setTimeout(() => {
             const { from } = view.state.selection
@@ -255,7 +255,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
       },
     },
     onUpdate: ({ editor: e }) => {
-      // Slash command 쿼리 업데이트
+      // Slash command 荑쇰━ ?낅뜲?댄듃
       if (slashMenu) {
         const { from } = e.state.selection
         const text = e.state.doc.textBetween(Math.max(0, from - 20), from)
@@ -272,11 +272,11 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 
   const handleImageFile = useCallback(async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("이미지 크기는 5MB 이하만 가능합니다")
+      toast.error("?대?吏 ?ш린??5MB ?댄븯留?媛?ν빀?덈떎")
       return
     }
     if (!file.type.startsWith("image/")) {
-      toast.error("이미지 파일만 업로드 가능합니다")
+      toast.error("?대?吏 ?뚯씪留??낅줈??媛?ν빀?덈떎")
       return
     }
 
@@ -287,7 +287,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         editor.chain().focus().setImage({ src: url }).run()
       }
     } catch {
-      toast.error("이미지 업로드 실패")
+      toast.error("?대?吏 ?낅줈???ㅽ뙣")
     } finally {
       setUploading(false)
     }
@@ -299,7 +299,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
-  // ref로 외부 접근
+  // ref濡??몃? ?묎렐
   useImperativeHandle(ref, () => ({
     getHTML: () => editor?.getHTML() || "",
     getJSON: () => editor?.getJSON() || null,
@@ -315,7 +315,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
     isEmpty: () => {
       if (!editor) return true
       const html = editor.getHTML()
-      // <p></p>만 있거나 완전히 비었을 때만 empty
+      // <p></p>留??덇굅???꾩쟾??鍮꾩뿀???뚮쭔 empty
       return !html || html === "<p></p>" || html.trim() === ""
     },
   }))
@@ -324,12 +324,12 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 
   return (
     <div className="rounded-lg border">
-      {/* 툴바 */}
+      {/* ?대컮 */}
       <div className="flex flex-wrap items-center gap-0.5 border-b px-2 py-1.5">
         <ToolbarButton
           active={editor.isActive("bold")}
           onClick={() => editor.chain().focus().toggleBold().run()}
-          title="굵게"
+          title="援듦쾶"
         >
           <Bold className="h-4 w-4" />
         </ToolbarButton>
@@ -343,7 +343,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         <ToolbarButton
           active={editor.isActive("underline")}
           onClick={() => editor.chain().focus().toggleUnderline().run()}
-          title="밑줄"
+          title="諛묒쨪"
         >
           <UnderlineIcon className="h-4 w-4" />
         </ToolbarButton>
@@ -353,14 +353,14 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         <ToolbarButton
           active={editor.isActive("heading", { level: 2 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          title="제목 1"
+          title="?쒕ぉ 1"
         >
           <Heading1 className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("heading", { level: 3 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          title="제목 2"
+          title="?쒕ぉ 2"
         >
           <Heading2 className="h-4 w-4" />
         </ToolbarButton>
@@ -370,14 +370,14 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         <ToolbarButton
           active={editor.isActive("bulletList")}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          title="글머리 기호"
+          title="湲癒몃━ 湲고샇"
         >
           <List className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("orderedList")}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          title="번호 목록"
+          title="踰덊샇 紐⑸줉"
         >
           <ListOrdered className="h-4 w-4" />
         </ToolbarButton>
@@ -387,7 +387,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         <ToolbarButton
           active={editor.isActive("link")}
           onClick={() => setShowLinkInput(!showLinkInput)}
-          title="링크"
+          title="留곹겕"
         >
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
@@ -402,20 +402,20 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         <ToolbarButton
           active={editor.isActive("blockquote")}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          title="인용"
+          title="?몄슜"
         >
           <Quote className="h-4 w-4" />
         </ToolbarButton>
       </div>
 
-      {/* 링크 입력 */}
+      {/* 留곹겕 ?낅젰 */}
       {showLinkInput && (
         <div className="border-b px-2 py-1.5">
           <LinkInput editor={editor} onClose={() => setShowLinkInput(false)} />
         </div>
       )}
 
-      {/* 에디터 본문 */}
+      {/* ?먮뵒??蹂몃Ц */}
       <div className="relative">
         <EditorContent editor={editor} />
 
@@ -423,15 +423,15 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
           <div className="absolute inset-0 flex items-center justify-center bg-background/60">
             <div className="flex items-center gap-2 rounded-lg bg-background px-4 py-2 shadow-lg border">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-sm">이미지 업로드 중...</span>
+              <span className="text-sm">?대?吏 ?낅줈??以?..</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* 하단 힌트 */}
+      {/* ?섎떒 ?뚰듃 */}
       <div className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">
-        <span className="font-medium">/</span> 명령어 · 이미지를 드래그하거나 붙여넣기 가능
+        <span className="font-medium">/</span> 紐낅졊??쨌 ?대?吏瑜??쒕옒洹명븯嫄곕굹 遺숈뿬?ｊ린 媛??
       </div>
 
       {/* Slash Command Menu */}
@@ -445,7 +445,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
         />
       )}
 
-      {/* 숨겨진 file input */}
+      {/* ?④꺼吏?file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -459,7 +459,7 @@ const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 
 RichEditor.displayName = "RichEditor"
 
-// ─── 툴바 버튼 ───
+// ??? ?대컮 踰꾪듉 ???
 function ToolbarButton({
   children, active, onClick, title, disabled,
 }: {

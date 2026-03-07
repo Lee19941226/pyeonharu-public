@@ -5,100 +5,90 @@ import { createPortal } from "react-dom"
 import { X, ChevronRight, ChevronLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// ─── 투어 스텝 정의 ───
-// selector: 하이라이트할 요소의 CSS 선택자
-// 없으면 전체 화면 소개 (딤드만)
+// ??? ?ъ뼱 ?ㅽ뀦 ?뺤쓽 ???
+// selector: ?섏씠?쇱씠?명븷 ?붿냼??CSS ?좏깮??
+// ?놁쑝硫??꾩껜 ?붾㈃ ?뚭컻 (?ㅻ뱶留?
 export interface TourStep {
-  /** 하이라이트할 DOM 요소 CSS 선택자 (없으면 전체화면 인트로) */
+  /** ?섏씠?쇱씠?명븷 DOM ?붿냼 CSS ?좏깮??(?놁쑝硫??꾩껜?붾㈃ ?명듃濡? */
   selector?: string
-  /** 설명 제목 */
+  /** ?ㅻ챸 ?쒕ぉ */
   title: string
-  /** 설명 본문 */
+  /** ?ㅻ챸 蹂몃Ц */
   description: string
-  /** 말풍선 위치 */
+  /** 留먰뭾???꾩튂 */
   position?: "top" | "bottom" | "left" | "right" | "center"
-  /** 이모지 아이콘 */
+  /** ?대え吏 ?꾩씠肄?*/
   emoji?: string
 }
 
 const TOUR_STEPS: TourStep[] = [
-  // ── 0. 전체 인트로 ──
   {
-    title: "음식을 드시기 전 알레르기가 불안하신가요?",
-    description: "바코드만 찍으면 먹어도 되는지 5초 안에 알려드려요.\n편하루가 안전한 식사를 도와드릴게요.",
+    title: "편하루 시작 가이드",
+    description: "알레르기 식품 확인, 증상 체크, 병원/약국 찾기 기능을 순서대로 안내해 드립니다.",
     position: "center",
-    emoji: "🛡️",
+    emoji: "👋",
   },
-  // ── 1. 4탭 통합 검색 카드 ──
   {
     selector: "[data-tour='search-tabs']",
-    title: "여기서 모든 걸 할 수 있어요",
-    description: "식품 안전 확인, 증상 분석, 병원 찾기, 약 검색까지\n4가지 핵심 기능이 이 카드에 모여 있어요.",
+    title: "통합 검색 탭",
+    description: "식품 안전 확인, 증상 분석, 병원/약국 찾기, 약 정보 조회를 한 곳에서 사용할 수 있습니다.",
     position: "bottom",
-    emoji: "🔍",
+    emoji: "🧭",
   },
-  // ── 2. 이거 먹어도 돼? 탭 ──
   {
     selector: "[data-tour='tab-food']",
-    title: "이거 먹어도 돼?",
-    description: "음식 이름이나 바코드 사진으로 검색하면\n내 알레르기 기준으로 안전 여부를 알려줘요.",
+    title: "식품 안전 확인",
+    description: "식품명이나 바코드를 입력하면 알레르기 기준으로 안전 여부를 빠르게 확인할 수 있습니다.",
     position: "bottom",
-    emoji: "🍽️",
+    emoji: "🥗",
   },
-  // ── 3. 사진 업로드 버튼 ──
   {
     selector: "[data-tour='btn-camera']",
     title: "바코드 스캔",
-    description: "과자나 식품 뒷면의 바코드를 찍으면\n식약처 데이터로 알레르기 성분을 바로 확인해요.",
+    description: "카메라로 바코드를 촬영하면 제품 정보를 자동으로 인식해 결과를 보여줍니다.",
     position: "bottom",
-    emoji: "📸",
+    emoji: "📷",
   },
-  // ── 4. 몸이 아파요 탭 ──
   {
     selector: "[data-tour='tab-symptom']",
-    title: "몸이 아파요",
-    description: "증상을 입력하면 AI가 어떤 진료과를 가야 하는지\n추천해드려요. 응급 상황 판단에도 도움이 돼요.",
+    title: "증상 체크",
+    description: "현재 증상을 입력하면 필요한 진료과목과 주의사항을 확인할 수 있습니다.",
     position: "bottom",
     emoji: "🩺",
   },
-  // ── 5. 병원/약국 조회 탭 ──
   {
     selector: "[data-tour='tab-search']",
-    title: "병원/약국 조회",
-    description: "현재 위치를 기반으로 가까운 병원과 약국을\n찾아주고, 전화·길찾기까지 바로 할 수 있어요.",
+    title: "병원/약국 찾기",
+    description: "현재 위치 기반으로 주변 병원과 약국을 지도에서 확인하고 길찾기로 이동할 수 있습니다.",
     position: "bottom",
     emoji: "🏥",
   },
-  // ── 6. 약 정보 검색 탭 ──
   {
     selector: "[data-tour='tab-medicine']",
     title: "약 정보 검색",
-    description: "약 이름을 검색하면 복용법, 주의사항,\n부작용 정보를 한눈에 확인할 수 있어요.",
+    description: "약 이름으로 복용법, 주의사항, 부작용 정보를 조회할 수 있습니다.",
     position: "bottom",
     emoji: "💊",
   },
-  // ── 7. 급식 영역 ──
   {
     selector: "[data-tour='meal-section']",
-    title: "학교 급식 알레르기 체크",
-    description: "학교를 등록하면 매일 급식 메뉴에서\n위험한 알레르기 식품을 자동으로 표시해줘요.",
+    title: "급식 알레르기 체크",
+    description: "학교 급식 메뉴에서 알레르기 유발 식품을 확인할 수 있습니다.",
     position: "top",
     emoji: "🍱",
   },
-  // ── 8. 하단 네비게이션 ──
   {
     selector: "[data-tour='bottom-nav']",
-    title: "빠른 이동",
-    description: "홈, 안전식품, 바코드 스캔, 알림, 마이페이지로\n한 번에 이동할 수 있어요.",
+    title: "하단 네비게이션",
+    description: "홈, 식품 확인, 스캔, 알림, 마이페이지로 빠르게 이동할 수 있습니다.",
     position: "top",
-    emoji: "📱",
+    emoji: "🧩",
   },
-  // ── 9. 마무리 ──
   {
-    title: "준비 완료!",
-    description: "이제 편하루를 자유롭게 사용해보세요.\n알레르기 정보를 등록하면 더 정확한 결과를 받을 수 있어요.",
+    title: "이제 시작해볼까요?",
+    description: "필요한 기능부터 하나씩 사용해 보세요. 언제든 다시 둘러보기를 열 수 있습니다.",
     position: "center",
-    emoji: "🎉",
+    emoji: "✅",
   },
 ]
 
@@ -119,7 +109,37 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
     setMounted(true)
   }, [])
 
-  // 현재 스텝의 타겟 요소 위치 계산
+  // ?꾩옱 ?ㅽ뀦???寃??붿냼 ?꾩튂 怨꾩궛
+  const calculateTooltipPosition = useCallback((rect: DOMRect, position: string) => {
+    const pad = 16
+    const tooltipW = Math.min(320, window.innerWidth - 32)
+
+    let top = 0
+    let left = 0
+
+    switch (position) {
+      case "bottom":
+        top = rect.bottom + pad
+        left = Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - pad))
+        break
+      case "top":
+        top = rect.top - pad - 160
+        left = Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - pad))
+        if (top < pad) top = rect.bottom + pad
+        break
+      case "left":
+        top = rect.top + rect.height / 2 - 80
+        left = Math.max(pad, rect.left - tooltipW - pad)
+        break
+      case "right":
+        top = rect.top + rect.height / 2 - 80
+        left = Math.min(rect.right + pad, window.innerWidth - tooltipW - pad)
+        break
+    }
+
+    setTooltipStyle({ position: "fixed", top, left, width: tooltipW })
+  }, [])
+
   const updatePosition = useCallback(() => {
     const currentStep = TOUR_STEPS[step]
     if (!currentStep?.selector) {
@@ -138,11 +158,11 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
     const rect = el.getBoundingClientRect()
     setTargetRect(rect)
 
-    // 요소가 뷰포트에 보이도록 스크롤
+    // ?붿냼媛 酉고룷?몄뿉 蹂댁씠?꾨줉 ?ㅽ겕濡?
     const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight
     if (!isVisible) {
       el.scrollIntoView({ behavior: "smooth", block: "center" })
-      // 스크롤 후 위치 재계산
+      // ?ㅽ겕濡????꾩튂 ?ш퀎??
       setTimeout(() => {
         const newRect = el.getBoundingClientRect()
         setTargetRect(newRect)
@@ -154,36 +174,6 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
     calculateTooltipPosition(rect, currentStep.position || "bottom")
   }, [step])
 
-  const calculateTooltipPosition = (rect: DOMRect, position: string) => {
-    const pad = 16
-    const tooltipW = Math.min(320, window.innerWidth - 32)
-
-    let top = 0
-    let left = 0
-
-    switch (position) {
-      case "bottom":
-        top = rect.bottom + pad
-        left = Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - pad))
-        break
-      case "top":
-        top = rect.top - pad - 160 // 대략적인 툴팁 높이
-        left = Math.max(pad, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - pad))
-        if (top < pad) top = rect.bottom + pad // 위에 공간 없으면 아래로
-        break
-      case "left":
-        top = rect.top + rect.height / 2 - 80
-        left = Math.max(pad, rect.left - tooltipW - pad)
-        break
-      case "right":
-        top = rect.top + rect.height / 2 - 80
-        left = Math.min(rect.right + pad, window.innerWidth - tooltipW - pad)
-        break
-    }
-
-    setTooltipStyle({ position: "fixed", top, left, width: tooltipW })
-  }
-
   useEffect(() => {
     if (!active) return
     setIsAnimating(true)
@@ -194,7 +184,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
     return () => clearTimeout(timer)
   }, [active, step, updatePosition])
 
-  // 리사이즈/스크롤 시 재계산
+  // 由ъ궗?댁쫰/?ㅽ겕濡????ш퀎??
   useEffect(() => {
     if (!active) return
     const handler = () => updatePosition()
@@ -229,9 +219,9 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
   const isLast = step === TOUR_STEPS.length - 1
   const isFirst = step === 0
 
-  // SVG 마스크로 하이라이트 영역만 투명하게 구멍 뚫기
+  // SVG 留덉뒪?щ줈 ?섏씠?쇱씠???곸뿭留??щ챸?섍쾶 援щ찉 ?リ린
   const renderOverlay = () => {
-    const p = 8 // 하이라이트 영역 패딩
+    const p = 8 // ?섏씠?쇱씠???곸뿭 ?⑤뵫
     const r = 12 // border-radius
 
     return (
@@ -241,9 +231,9 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
       >
         <defs>
           <mask id="tour-mask">
-            {/* 전체 흰색(불투명) */}
+            {/* ?꾩껜 ?곗깋(遺덊닾紐? */}
             <rect width="100%" height="100%" fill="white" />
-            {/* 하이라이트 영역만 검정(투명) */}
+            {/* ?섏씠?쇱씠???곸뿭留?寃???щ챸) */}
             {targetRect && !isCenter && (
               <rect
                 x={targetRect.left - p}
@@ -257,7 +247,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
             )}
           </mask>
         </defs>
-        {/* 딤드 배경 */}
+        {/* ?ㅻ뱶 諛곌꼍 */}
         <rect
           width="100%"
           height="100%"
@@ -268,7 +258,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
     )
   }
 
-  // 점선 하이라이트 보더
+  // ?먯꽑 ?섏씠?쇱씠??蹂대뜑
   const renderHighlight = () => {
     if (!targetRect || isCenter) return null
     const p = 8
@@ -287,7 +277,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
     )
   }
 
-  // 설명 툴팁
+  // ?ㅻ챸 ?댄똻
   const renderTooltip = () => {
     const content = (
       <div
@@ -309,7 +299,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
             : tooltipStyle
         }
       >
-        {/* 이모지 + 제목 */}
+        {/* ?대え吏 + ?쒕ぉ */}
         <div className="mb-2 flex items-start gap-3">
           {currentStep.emoji && (
             <span className="shrink-0 text-2xl">{currentStep.emoji}</span>
@@ -321,14 +311,14 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
           </div>
         </div>
 
-        {/* 설명 */}
+        {/* ?ㅻ챸 */}
         <p className="mb-4 text-sm leading-relaxed text-gray-600 whitespace-pre-line">
           {currentStep.description}
         </p>
 
-        {/* 하단: 프로그레스 + 버튼 */}
+        {/* ?섎떒: ?꾨줈洹몃젅??+ 踰꾪듉 */}
         <div className="flex items-center justify-between">
-          {/* 프로그레스 도트 */}
+          {/* ?꾨줈洹몃젅???꾪듃 */}
           <div className="flex items-center gap-1">
             {TOUR_STEPS.map((_, i) => (
               <div
@@ -345,7 +335,7 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
             ))}
           </div>
 
-          {/* 버튼 */}
+          {/* 踰꾪듉 */}
           <div className="flex items-center gap-2">
             {!isFirst && !isLast && (
               <button
@@ -361,14 +351,14 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
                 onClick={onFinish}
                 className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
               >
-                시작하기
+                ?쒖옉?섍린
               </button>
             ) : (
               <button
                 onClick={goNext}
                 className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
               >
-                다음
+                ?ㅼ쓬
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             )}
@@ -382,28 +372,28 @@ export function OnboardingTour({ active, onFinish }: OnboardingTourProps) {
 
   return createPortal(
     <>
-      {/* 클릭으로 다음 진행 (딤드 영역 클릭) */}
+      {/* ?대┃?쇰줈 ?ㅼ쓬 吏꾪뻾 (?ㅻ뱶 ?곸뿭 ?대┃) */}
       <div
         className="fixed inset-0 z-[9997] cursor-pointer"
         onClick={goNext}
       />
 
-      {/* SVG 오버레이 (딤드 + 하이라이트 구멍) */}
+      {/* SVG ?ㅻ쾭?덉씠 (?ㅻ뱶 + ?섏씠?쇱씠??援щ찉) */}
       {renderOverlay()}
 
-      {/* 점선 하이라이트 보더 */}
+      {/* ?먯꽑 ?섏씠?쇱씠??蹂대뜑 */}
       {renderHighlight()}
 
-      {/* 건너뛰기 버튼 (좌상단) */}
+      {/* 嫄대꼫?곌린 踰꾪듉 (醫뚯긽?? */}
       <button
         onClick={handleSkip}
         className="fixed right-4 top-4 z-[10001] flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-500 shadow-lg backdrop-blur transition-colors hover:bg-white hover:text-gray-700"
       >
-        건너뛰기
+        嫄대꼫?곌린
         <X className="h-3 w-3" />
       </button>
 
-      {/* 설명 툴팁 */}
+      {/* ?ㅻ챸 ?댄똻 */}
       {renderTooltip()}
     </>,
     document.body,
