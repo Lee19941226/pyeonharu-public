@@ -65,6 +65,18 @@ export function MobileNav() {
   const [todayCal, setTodayCal] = useState(0);
   const [bmr, setBmr] = useState(0);
   const [shareSheetData, setShareSheetData] = useState<ShareBottomSheetData | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const open = () => setIsMenuOpen(true);
+    const close = () => setIsMenuOpen(false);
+    window.addEventListener("mobile-menu-open", open);
+    window.addEventListener("mobile-menu-close", close);
+    return () => {
+      window.removeEventListener("mobile-menu-open", open);
+      window.removeEventListener("mobile-menu-close", close);
+    };
+  }, []);
 
   const openSheet = (mode: CameraMode) => {
     setCameraMode(mode);
@@ -272,7 +284,7 @@ export function MobileNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden"
+        className={`fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden transition-transform ${isMenuOpen ? "hidden" : ""}`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         data-tour="bottom-nav"
       >
