@@ -223,7 +223,7 @@ export default function HomePage() {
         setLoadProgress(100);
         setLoadLabel("완료!");
       }
-    }, 8000);
+    }, 3000);
     return () => clearTimeout(fallback);
   }, [isInitialLoading]);
 
@@ -246,6 +246,12 @@ export default function HomePage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       setIsLoading(false);
+      setLoadProgress((prev) => Math.max(prev, 90));
+      setLoadLabel("마무리 중...");
+      setTimeout(() => {
+        setLoadProgress(100);
+        setLoadLabel("완료!");
+      }, 500);
     });
     const {
       data: { subscription },
@@ -258,6 +264,23 @@ export default function HomePage() {
   useEffect(() => {
     setLoadProgress(10);
     setLoadLabel("페이지 준비 중...");
+    const t1 = setTimeout(() => {
+      setLoadProgress((prev) => Math.max(prev, 30));
+      setLoadLabel("앱 초기화 중...");
+    }, 500);
+    const t2 = setTimeout(() => {
+      setLoadProgress((prev) => Math.max(prev, 50));
+      setLoadLabel("데이터 불러오는 중...");
+    }, 1000);
+    const t3 = setTimeout(() => {
+      setLoadProgress((prev) => Math.max(prev, 70));
+      setLoadLabel("거의 다 됐어요...");
+    }, 1500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, []);
 
   useEffect(() => {
