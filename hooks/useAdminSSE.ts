@@ -20,8 +20,8 @@ interface AdminSSEData {
 }
 
 /**
- * SSE濡?愿由ъ옄 ??쒕낫?쒖뿉 ?ㅼ떆媛??묒냽???뺣낫瑜??ㅽ듃由щ컢?⑸땲??
- * ?곌껐 ?딄? ???먮룞 ?ъ뿰寃?(理쒕? 5?? 諛깆삤???곸슜)
+ * SSE로 관리자 대시보드에 실시간 접속자 정보를 스트리밍합니다.
+ * 연결 끊김 시 자동 재연결 (최대 5회, 백오프 적용)
  */
 export function useAdminSSE(): AdminSSEData {
   const [data, setData] = useState<AdminSSEData>({
@@ -36,8 +36,8 @@ export function useAdminSSE(): AdminSSEData {
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const connect = useCallback(function connectSSE() {
-    // 湲곗〈 ?곌껐 ?뺣━
+  const connect = useCallback(() => {
+    // 기존 연결 정리
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -46,7 +46,7 @@ export function useAdminSSE(): AdminSSEData {
     const es = new EventSource("/api/admin/online");
 
     es.onopen = () => {
-      retryCountRef.current = 0; // ?곌껐 ?깃났 ???ъ떆??移댁슫??由ъ뀑
+      retryCountRef.current = 0; // 연결 성공 시 재시도 카운트 리셋
       setData((prev) => ({ ...prev, connected: true }));
     };
 
@@ -70,11 +70,11 @@ export function useAdminSSE(): AdminSSEData {
       eventSourceRef.current = null;
       setData((prev) => ({ ...prev, connected: false }));
 
-      // ?먮룞 ?ъ뿰寃?(理쒕? 5?? 吏??諛깆삤??
+      // 자동 재연결 (최대 5회, 지수 백오프)
       if (retryCountRef.current < 5) {
         const delay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
         retryCountRef.current += 1;
-        retryTimerRef.current = setTimeout(connectSSE, delay);
+        retryTimerRef.current = setTimeout(connect, delay);
       }
     };
 
