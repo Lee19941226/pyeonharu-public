@@ -23,7 +23,8 @@ export type ActionType =
   | "account_delete"
   | "doctor_review_create"
   | "doctor_review_delete"
-  | "doctor_review_report";
+  | "doctor_review_report"
+  | "food_select";
 
 interface LogActionParams {
   userId: string | null;

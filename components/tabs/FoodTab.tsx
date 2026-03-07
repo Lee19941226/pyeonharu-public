@@ -1018,111 +1018,121 @@ export default function FoodTab({
 
       <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
         {/* ═══ 1. 식품 안전 확인 ═══ */}
-        {hasAllergies === false ? (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100">
-                  <Info className="h-6 w-6 text-blue-600" />
+        {/* 알레르기 미등록 안내 카드 (비로그인 또는 로그인+미등록) */}
+        {(hasAllergies === false || !user) && (
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
                     알레르기를 등록하시면 자동으로 위험 성분을 확인해드립니다
                   </p>
-                  <Link href="/food/profile">
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 text-blue-600"
+                  {user ? (
+                    <Link href="/food/profile">
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-blue-600 dark:text-blue-400"
+                      >
+                        알레르기 등록하러 가기 →
+                      </Button>
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => setLoginModalOpen(true)}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                      알레르기 등록하러 가기 →
-                    </Button>
-                  </Link>
+                      로그인하고 등록하기 →
+                    </button>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              음식 사진이나 이름으로 알레르기를 확인하세요
-            </p>
+        )}
 
-            {/* 드래그 앤 드롭 영역 */}
-            <Card
-              role="button"
-              tabIndex={0}
-              aria-label="식품 이미지를 드래그하거나 클릭하여 알레르기 성분 확인"
-              className={`group transition-all cursor-pointer ${
-                isDragging
-                  ? "border-4 border-primary bg-primary/10 scale-[1.02]"
-                  : "border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              }`}
-              onClick={() => !isDragging && setShowUploadSheet(true)}
-              onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isDragging) { e.preventDefault(); setShowUploadSheet(true); } }}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                      isDragging ? "bg-primary/30 scale-110" : "bg-primary/10"
-                    } transition-all`}
-                  >
-                    {isDragging ? (
-                      <Upload className="h-6 w-6 text-primary animate-bounce" />
-                    ) : (
-                      <Camera className="h-6 w-6 text-primary" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm">
-                      {isDragging ? "이미지를 놓으세요!" : "사진으로 빠르게 확인"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {isDragging
-                        ? "바코드 또는 성분표 이미지"
-                        : imageAnalysisUsage
-                          ? `오늘 남은 AI 분석 ${imageAnalysisUsage.remaining}/${imageAnalysisUsage.limit}회`
-                          : "이미지를 드래그하거나 버튼을 눌러 업로드"}
-                    </p>
-                  </div>
-                  {!isDragging && (
-                    <Button
-                      onClick={(e) => { e.stopPropagation(); setShowUploadSheet(true); }}
-                      size="sm"
-                      className="cursor-pointer"
-                      aria-label="식품 이미지 업로드하여 알레르기 확인"
-                    >
-                      <Camera className="mr-2 h-4 w-4" />
-                      업로드
-                    </Button>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            음식 사진이나 이름으로 알레르기를 확인하세요
+          </p>
+
+          {/* 드래그 앤 드롭 영역 */}
+          <Card
+            role="button"
+            tabIndex={0}
+            aria-label="식품 이미지를 드래그하거나 클릭하여 알레르기 성분 확인"
+            className={`group transition-all cursor-pointer ${
+              isDragging
+                ? "border-4 border-primary bg-primary/10 scale-[1.02]"
+                : "border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            }`}
+            onClick={() => !isDragging && setShowUploadSheet(true)}
+            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isDragging) { e.preventDefault(); setShowUploadSheet(true); } }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                    isDragging ? "bg-primary/30 scale-110" : "bg-primary/10"
+                  } transition-all`}
+                >
+                  {isDragging ? (
+                    <Upload className="h-6 w-6 text-primary animate-bounce" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-primary" />
                   )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* 검색창 */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="음식 이름 (예: 새우튀김, 땅콩버터)"
-                  value={foodInput}
-                  onChange={(e) => setFoodInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleFoodSearch()}
-                  className="h-10 pl-10"
-                />
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">
+                    {isDragging ? "이미지를 놓으세요!" : "사진으로 빠르게 확인"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isDragging
+                      ? "바코드 또는 성분표 이미지"
+                      : imageAnalysisUsage
+                        ? `오늘 남은 AI 분석 ${imageAnalysisUsage.remaining}/${imageAnalysisUsage.limit}회`
+                        : "이미지를 드래그하거나 버튼을 눌러 업로드"}
+                  </p>
+                </div>
+                {!isDragging && (
+                  <Button
+                    onClick={(e) => { e.stopPropagation(); setShowUploadSheet(true); }}
+                    size="sm"
+                    className="cursor-pointer"
+                    aria-label="식품 이미지 업로드하여 알레르기 확인"
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    업로드
+                  </Button>
+                )}
               </div>
-              <Button onClick={handleFoodSearch}>검색</Button>
-            </div>
+            </CardContent>
+          </Card>
 
-            <p className="text-xs text-muted-foreground">
-              내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요
-            </p>
+          {/* 검색창 */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="음식 이름 (예: 새우튀김, 땅콩버터)"
+                value={foodInput}
+                onChange={(e) => setFoodInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleFoodSearch()}
+                className="h-10 pl-10"
+              />
+            </div>
+            <Button onClick={handleFoodSearch}>검색</Button>
           </div>
-        )}
+
+          <p className="text-xs text-muted-foreground">
+            내 알레르기 정보를 기반으로 안전 여부를 AI가 분석해드려요
+          </p>
+        </div>
 
         {/* ═══ 2. 급식 알레르기 ═══ */}
         <div data-tour="meal-section">
