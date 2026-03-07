@@ -37,6 +37,11 @@ interface NaverMapProps {
   height?: string;
   onZoomChange?: (zoom: number) => void;
   onCenterChange?: (center: { lat: number; lng: number }) => void;
+  onViewportChange?: (viewport: {
+    center: { lat: number; lng: number };
+    zoom: number;
+    radiusMeters: number;
+  }) => void;
 }
 
 export function NaverMap({
@@ -52,6 +57,7 @@ export function NaverMap({
   height = "100%",
   onZoomChange,
   onCenterChange,
+  onViewportChange,
 }: NaverMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -62,8 +68,10 @@ export function NaverMap({
   const [isLoading, setIsLoading] = useState(true);
   const onZoomChangeRef = useRef(onZoomChange);
   const onCenterChangeRef = useRef(onCenterChange);
+  const onViewportChangeRef = useRef(onViewportChange);
   useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
   useEffect(() => { onCenterChangeRef.current = onCenterChange; }, [onCenterChange]);
+  useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
 
   useEffect(() => {
     const NAVER_CLIENT_ID =
@@ -92,8 +100,26 @@ export function NaverMap({
   const centerLat = center?.lat ?? userLocation?.lat ?? 37.5665;
   const centerLng = center?.lng ?? userLocation?.lng ?? 126.978;
 
+  const getDistanceMeters = useCallback(
+    (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const R = 6371000;
+      const toRad = (v: number) => (v * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+          Math.cos(toRad(lat2)) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (!isMapLoaded || !mapRef.current || !window.naver) return;
+    if (!isMapLoaded || !mapRef.current || !window.naver || mapInstanceRef.current) return;
 
     const mapCenter = new window.naver.maps.LatLng(centerLat, centerLng);
 
@@ -113,34 +139,70 @@ export function NaverMap({
       mapOptions,
     );
 
-    const zoomListener = window.naver.maps.Event.addListener(
+    const idleListener = window.naver.maps.Event.addListener(
       mapInstanceRef.current,
-      "zoom_changed",
+      "idle",
       () => {
-        const currentZoom = mapInstanceRef.current?.getZoom();
-        if (currentZoom !== undefined) onZoomChangeRef.current?.(currentZoom);
-      },
-    );
+        const map = mapInstanceRef.current;
+        const currentCenter = map?.getCenter();
+        const currentZoom = map?.getZoom();
+        const bounds = map?.getBounds?.();
 
-    const dragEndListener = window.naver.maps.Event.addListener(
-      mapInstanceRef.current,
-      "dragend",
-      () => {
-        const currentCenter = mapInstanceRef.current?.getCenter();
         if (currentCenter) {
-          onCenterChangeRef.current?.({
+          const centerPos = {
             lat: currentCenter.lat(),
             lng: currentCenter.lng(),
-          });
+          };
+          onCenterChangeRef.current?.(centerPos);
+
+          if (currentZoom !== undefined) {
+            onZoomChangeRef.current?.(currentZoom);
+          }
+
+          if (bounds && currentZoom !== undefined) {
+            const ne = bounds.getNE();
+            const radiusMeters = Math.round(
+              getDistanceMeters(centerPos.lat, centerPos.lng, ne.lat(), ne.lng()),
+            );
+            onViewportChangeRef.current?.({
+              center: centerPos,
+              zoom: currentZoom,
+              radiusMeters,
+            });
+          }
         }
       },
     );
 
     return () => {
-      window.naver.maps.Event.removeListener(zoomListener);
-      window.naver.maps.Event.removeListener(dragEndListener);
+      window.naver.maps.Event.removeListener(idleListener);
     };
-  }, [isMapLoaded, centerLat, centerLng, zoom]);
+  }, [isMapLoaded, centerLat, centerLng, zoom, getDistanceMeters]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.naver) return;
+    const map = mapInstanceRef.current;
+    const currentCenter = map.getCenter?.();
+    const next = new window.naver.maps.LatLng(centerLat, centerLng);
+    if (!currentCenter) {
+      map.setCenter(next);
+      return;
+    }
+    const latDiff = Math.abs(currentCenter.lat() - centerLat);
+    const lngDiff = Math.abs(currentCenter.lng() - centerLng);
+    if (latDiff > 0.00005 || lngDiff > 0.00005) {
+      map.panTo(next);
+    }
+  }, [centerLat, centerLng]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    const currentZoom = map.getZoom?.();
+    if (currentZoom !== zoom) {
+      map.setZoom(zoom, true);
+    }
+  }, [zoom]);
 
   useEffect(() => {
     if (
