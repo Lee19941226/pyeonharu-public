@@ -2,7 +2,9 @@ let sdkLoadPromise: Promise<void> | null = null;
 
 function loadKakaoSDK(): Promise<void> {
   if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
-  if (window.Kakao) return Promise.resolve();
+  if (window.Kakao && window.Kakao.Share && window.Kakao.isInitialized()) {
+    return Promise.resolve();
+  }
   if (sdkLoadPromise) return sdkLoadPromise;
 
   sdkLoadPromise = new Promise<void>((resolve, reject) => {
@@ -11,6 +13,10 @@ function loadKakaoSDK(): Promise<void> {
       'script[src*="kakao_js_sdk"]'
     );
     if (existing) {
+      if (window.Kakao) {
+        resolve();
+        return;
+      }
       existing.addEventListener("load", () => resolve(), { once: true });
       existing.addEventListener(
         "error",
@@ -46,7 +52,7 @@ export async function ensureKakaoReady(): Promise<boolean> {
 }
 
 // 카카오 공유 OG 이미지: app/opengraph-image.tsx를 Next.js가 자동으로 이 URL로 제공
-const KAKAO_OG_IMAGE = "https://pyeonharu.com/opengraph-image";
+const KAKAO_OG_IMAGE = "https://pyeonharu.com/opengraph-image.png";
 
 export interface KakaoShareOptions {
   title: string;
