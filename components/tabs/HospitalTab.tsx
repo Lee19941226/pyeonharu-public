@@ -51,9 +51,9 @@ export default function HospitalTab() {
   } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [mapZoom, setMapZoom] = useState(14);
+  const [mapRadius, setMapRadius] = useState<number>(zoomToRadius(14));
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [addressInput, setAddressInput] = useState("");
@@ -61,6 +61,7 @@ export default function HospitalTab() {
   const [locationName, setLocationName] = useState("");
   const [listPage, setListPage] = useState(1);
   const hasLoadedOnce = useRef(false);
+  const viewportFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 현재 위치 가져오기
   useEffect(() => {
@@ -107,13 +108,14 @@ export default function HospitalTab() {
     return day !== 0 && hour >= 9 && hour < 18;
   }, []);
 
-  const handleZoomChange = useCallback((zoom: number) => {
-    setMapZoom(zoom);
-  }, []);
-
-  const handleCenterChange = useCallback((center: { lat: number; lng: number }) => {
-    setMapCenter(center);
-  }, []);
+  const handleViewportChange = useCallback(
+    (viewport: { center: { lat: number; lng: number }; zoom: number; radiusMeters: number }) => {
+      setMapCenter(viewport.center);
+      setMapZoom(viewport.zoom);
+      setMapRadius(Math.max(300, Math.round(viewport.radiusMeters)));
+    },
+    [],
+  );
 
   const searchByAddress = async () => {
     if (!addressInput.trim()) return;
@@ -142,7 +144,7 @@ export default function HospitalTab() {
     const searchCenter = mapCenter ?? userLocation;
     if (!searchCenter) return;
 
-    const searchRadius = zoomToRadius(mapZoom);
+    const searchRadius = Math.max(300, mapRadius || zoomToRadius(mapZoom));
     const cacheKey = `${searchCenter.lat.toFixed(4)}::${searchCenter.lng.toFixed(4)}::${searchRadius}::${placeType}`;
 
     if (!skipCacheRef.current) {
@@ -160,8 +162,6 @@ export default function HospitalTab() {
 
     if (!hasLoadedOnce.current) {
       setIsLoading(true);
-    } else {
-      setIsRefetching(true);
     }
     setError(null);
 
@@ -336,15 +336,32 @@ export default function HospitalTab() {
       setError("데이터를 불러오는데 실패했습니다.");
     } finally {
       setIsLoading(false);
-      setIsRefetching(false);
+
     }
-  }, [userLocation, mapCenter, mapZoom, placeType, calculateDistance, checkIsOpen]);
+  }, [userLocation, mapCenter, mapZoom, mapRadius, placeType, calculateDistance, checkIsOpen]);
 
   useEffect(() => {
-    if (userLocation) {
+    if (!userLocation) return;
+
+    if (!hasLoadedOnce.current) {
       fetchPlaces();
+      return;
     }
-  }, [userLocation, placeType, fetchPlaces]);
+
+    if (viewportFetchTimeoutRef.current) {
+      clearTimeout(viewportFetchTimeoutRef.current);
+    }
+
+    viewportFetchTimeoutRef.current = setTimeout(() => {
+      fetchPlaces();
+    }, 300);
+
+    return () => {
+      if (viewportFetchTimeoutRef.current) {
+        clearTimeout(viewportFetchTimeoutRef.current);
+      }
+    };
+  }, [userLocation, mapCenter, mapZoom, mapRadius, placeType, fetchPlaces]);
 
   // 새로고침: GPS 재요청 + 캐시 무시
   const handleRefresh = useCallback(() => {
@@ -530,17 +547,8 @@ export default function HospitalTab() {
                 selectedPlace={selectedPlace}
                 onSelectPlace={(place: any) => setSelectedPlace(place)}
                 userLocation={userLocation}
-                onZoomChange={handleZoomChange}
-                onCenterChange={handleCenterChange}
+                onViewportChange={handleViewportChange}
               />
-              {isRefetching && (
-                <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-20 pointer-events-none rounded-lg">
-                  <div className="bg-white rounded-lg px-4 py-2 flex items-center gap-2 shadow-lg">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-sm font-medium">재검색 중...</span>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* List */}
