@@ -258,7 +258,7 @@ export default function CommunityPage() {
               <>
                 <div className="border rounded-lg overflow-hidden">
                   {/* 데스크톱 테이블 헤더 */}
-                  <div className="hidden sm:grid sm:grid-cols-[1fr_80px_50px_50px_65px] border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+                  <div className="hidden sm:grid sm:grid-cols-[1fr_140px_50px_50px_65px] border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
                     <span>제목</span>
                     <span className="text-center">작성자</span>
                     <span className="text-center">조회</span>
@@ -288,7 +288,7 @@ export default function CommunityPage() {
                         className={`cursor-pointer transition-colors hover:bg-muted/30 active:bg-muted/50 ${i > 0 ? "border-t" : "sm:border-t-0"}`}
                       >
                         {/* 데스크톱 행 */}
-                        <div className="hidden sm:grid sm:grid-cols-[1fr_80px_50px_50px_65px] items-center px-3 py-2">
+                        <div className="hidden sm:grid sm:grid-cols-[1fr_140px_50px_50px_65px] items-center px-3 py-2">
                           <div className="flex items-center gap-2 min-w-0">
                             {thumbUrl && (
                               <div className="shrink-0 h-8 w-8 rounded overflow-hidden bg-muted border">
@@ -306,11 +306,13 @@ export default function CommunityPage() {
                               {post.schoolName}
                             </span>
                           </div>
-                          <span className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                            <button onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }} className="truncate hover:underline">
+                          <span className="flex items-center justify-center gap-1 text-xs text-muted-foreground overflow-hidden">
+                            <button onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }} className="truncate shrink-0 max-w-[60px] hover:underline">
                               {post.author}
                             </button>
-                            <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
+                            <span className="shrink-0">
+                              <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
+                            </span>
                           </span>
                           <span className="text-center text-xs text-muted-foreground">{post.view_count}</span>
                           <span className={`text-center text-xs ${post.like_count > 0 ? "font-semibold text-red-500" : "text-muted-foreground"}`}>{post.like_count}</span>
@@ -334,12 +336,14 @@ export default function CommunityPage() {
                                 <ImageIcon className="h-3 w-3 shrink-0 text-blue-400" />
                               )}
                             </div>
-                            <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span className="max-w-[80px] truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium">{post.schoolName}</span>
-                              <button onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }} className="max-w-[60px] truncate hover:underline">
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground overflow-hidden">
+                              <span className="max-w-[70px] truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium shrink-0">{post.schoolName}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }} className="max-w-[50px] truncate shrink-0 hover:underline">
                                 {post.author}
                               </button>
-                              <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
+                              <span className="shrink-0">
+                                <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
+                              </span>
                               <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" />{post.view_count}</span>
                               <span className={`flex items-center gap-0.5 ${post.like_count > 0 ? "text-red-500" : ""}`}>
                                 <Heart className={`h-3 w-3 ${post.like_count > 0 ? "fill-red-500" : ""}`} />{post.like_count}

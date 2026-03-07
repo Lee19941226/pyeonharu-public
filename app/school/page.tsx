@@ -63,6 +63,7 @@ export default function SchoolPage() {
     enrollmentYear: string
   }>({ enrollmentStatus: null, graduationYear: "", enrollmentYear: "" })
   const [savingStatus, setSavingStatus] = useState(false)
+  const [enrollmentPrompt, setEnrollmentPrompt] = useState<string | null>(null)
 
   useEffect(() => {
     checkAuth()
@@ -139,7 +140,8 @@ export default function SchoolPage() {
       const data = await res.json()
       if (res.ok) {
         toast.success(`${school.schoolName} 등록 완료`)
-        loadMySchools()
+        await loadMySchools()
+        setEnrollmentPrompt(school.schoolCode)
       } else {
         toast.error(data.error || "등록 실패")
       }
@@ -253,10 +255,13 @@ export default function SchoolPage() {
             {/* 내 학교 목록 */}
             {isLoggedIn && (
               <div className="mb-6">
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold">
                   <GraduationCap className="h-4 w-4" />
                   내 학교 ({mySchools.length}/5)
                 </h2>
+                <p className="mb-3 text-[11px] text-muted-foreground">
+                  🎓 버튼을 눌러 재학/졸업 상태를 설정하면 커뮤니티에서 선후배·동창을 확인할 수 있어요
+                </p>
 
                 {isLoadingMy ? (
                   <div className="space-y-2">
@@ -491,6 +496,42 @@ export default function SchoolPage() {
         </div>
       </main>
       <MobileNav />
+
+      {/* 재학/졸업 설정 유도 팝업 */}
+      {enrollmentPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-card">
+            <div className="mb-4 flex justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                <GraduationCap className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+            <h2 className="mb-2 text-center text-base font-bold">재학/졸업 상태를 설정할까요?</h2>
+            <p className="mb-5 text-center text-xs text-muted-foreground leading-relaxed">
+              재학/졸업 여부를 등록하면 커뮤니티에서<br />
+              선후배, 동창 관계를 알 수 있어요!
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEnrollmentPrompt(null)}
+                className="flex-1 rounded-xl border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+              >
+                나중에
+              </button>
+              <button
+                onClick={() => {
+                  const school = mySchools.find(s => s.school_code === enrollmentPrompt)
+                  if (school) openStatusEdit(school)
+                  setEnrollmentPrompt(null)
+                }}
+                className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                설정하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

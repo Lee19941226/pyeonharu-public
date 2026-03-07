@@ -36,6 +36,7 @@ import { UploadSheet } from "@/components/food/upload-sheet";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
 import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
+import { AuthorTag } from "@/components/community/author-tag";
 import { useTabStateStore } from "@/store/tab-state";
 // ─── 드롭다운 전용 미니맵 ───
 function MiniNaverMap({
@@ -489,6 +490,7 @@ export default function FoodTab({
   const [popularLikes, setPopularLikes] = useState<any[]>([]);
   const [popularViews, setPopularViews] = useState<any[]>([]);
   const [communityLoading, setCommunityLoading] = useState(true);
+  const [communityMyEnrollment, setCommunityMyEnrollment] = useState<{ enrollment_status: string | null; graduation_year: number | null } | null>(null);
 
   // 파일 업로드 관련
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -601,12 +603,20 @@ export default function FoodTab({
         const schoolData = await schoolRes.json();
         const schools = schoolData.schools || [];
         if (schools.length > 0) {
+          const primary = schools.find((s: any) => s.is_primary) || schools[0];
           const codes = schools.map((s: any) => s.school_code).join(",");
           const res = await fetch(
             `/api/community?schoolCodes=${codes}&sort=latest&limit=10`,
           );
           const data = await res.json();
           setCommunityPosts(data.posts || []);
+
+          // primary 학교 기준 myEnrollment 조회
+          if (primary) {
+            const enrollRes = await fetch(`/api/community?schoolCode=${primary.school_code}&limit=0`);
+            const enrollData = await enrollRes.json();
+            if (enrollData.myEnrollment) setCommunityMyEnrollment(enrollData.myEnrollment);
+          }
         }
       }
 
@@ -1261,14 +1271,12 @@ export default function FoodTab({
               <p className="text-sm font-medium text-muted-foreground">
                 💬 내 학교 최신글
               </p>
-              {user && (
-                <button
-                  onClick={() => router.push("/community/write")}
-                  className="text-xs text-muted-foreground hover:text-primary"
-                >
-                  글쓰기 →
-                </button>
-              )}
+              <button
+                onClick={() => router.push("/community")}
+                className="text-xs text-muted-foreground hover:text-primary"
+              >
+                글 목록 →
+              </button>
             </div>
             {communityLoading ? (
               <div className="space-y-2">
@@ -1338,7 +1346,9 @@ export default function FoodTab({
                         </span>
                         <p className="text-sm truncate">{post.title}</p>
                       </div>
-                      <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground shrink-0 ml-3">
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground shrink-0 ml-3">
+                        <span className="truncate max-w-[50px]">{post.author}</span>
+                        <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={communityMyEnrollment} isOwner={post.isOwner} />
                         <span className="flex items-center gap-0.5">
                           <Heart className="h-3 w-3" />
                           {post.like_count}
