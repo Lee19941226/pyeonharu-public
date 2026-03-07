@@ -78,12 +78,16 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-semibold transition-colors relative ${active ? color : "text-muted-foreground hover:text-foreground"}`}
+      className={`group relative m-1 flex flex-1 items-center justify-center gap-1.5 rounded-2xl py-2.5 text-sm font-semibold transition-all ${
+        active
+          ? `${color} bg-card/90 shadow-sm`
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+      }`}
     >
       <Icon className="h-4 w-4" />
       {label}
       {active && (
-        <span className="absolute bottom-0 left-4 right-4 h-[2.5px] rounded-full bg-current" />
+        <span className="absolute bottom-0.5 left-5 right-5 h-[2.5px] rounded-full bg-current" />
       )}
     </button>
   );
@@ -103,13 +107,15 @@ function SubTabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-1.5 px-4 py-2 text-[13px] transition-colors relative whitespace-nowrap cursor-pointer ${active ? "font-semibold text-foreground" : "font-medium text-muted-foreground hover:text-foreground"}`}
+      className={`flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-[13px] transition-colors relative whitespace-nowrap cursor-pointer ${
+        active
+          ? "bg-muted/70 font-semibold text-foreground"
+          : "font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      }`}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
-      {active && (
-        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
-      )}
+      
     </button>
   );
 }
@@ -359,8 +365,8 @@ export default function HomePage() {
       <Header mainTab={mainTab} onMainTabChange={setMainTab} />
 
       {/* 모바일 메인 탭 */}
-      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-40 border-b border-border/60 bg-background md:hidden">
-        <div className="flex">
+      <div className="glass-surface sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-40 border-b border-border/60 md:hidden">
+        <div className="mx-auto flex w-full max-w-md px-2 py-1">
           <TabButton
             active={mainTab === "meal"}
             onClick={() => setMainTab("meal")}
@@ -378,10 +384,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="sticky top-[calc(6rem+env(safe-area-inset-top))] md:top-14 z-30 bg-background border-b border-border/40">
+      <div className="glass-surface sticky top-[calc(6rem+env(safe-area-inset-top))] md:top-14 z-30 border-b border-border/50">
         <div className="container mx-auto px-4">
           <div
-            className="flex items-center justify-center overflow-x-auto scrollbar-hide"
+            className="mx-auto flex max-w-4xl items-center justify-center gap-1 overflow-x-auto py-1.5 scrollbar-hide"
             data-tour="search-tabs"
           >
             {mainTab === "meal" ? (
@@ -437,24 +443,24 @@ export default function HomePage() {
         </div>
       </div>
 
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="relative z-10 flex-1 pb-20 md:pb-0">
         {/* ═══ auth 확인 전 Skeleton UI ═══ */}
         {isLoading ? (
-          <div className="container mx-auto px-4 pt-6 space-y-4 max-w-2xl">
+          <div className="container mx-auto max-w-2xl space-y-4 px-4 pt-6">
             <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
-              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
-              <div className="rounded-2xl bg-gray-100 animate-pulse h-24" />
+              <div className="h-24 animate-pulse rounded-2xl bg-muted/70" />
+              <div className="h-24 animate-pulse rounded-2xl bg-muted/70" />
+              <div className="h-24 animate-pulse rounded-2xl bg-muted/70" />
             </div>
-            <div className="rounded-xl bg-gray-100 animate-pulse h-10" />
-            <div className="rounded-xl bg-gray-100 animate-pulse h-64" />
+            <div className="h-10 animate-pulse rounded-xl bg-muted/70" />
+            <div className="h-64 animate-pulse rounded-xl bg-muted/70" />
           </div>
         ) : (
           <>
         {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
         {activeTab === "food" && (
-          <div className="container mx-auto px-4 pt-3">
-            <div className="flex gap-4 justify-center">
+          <div className="container mx-auto px-4 pt-4">
+            <div className="mx-auto flex max-w-6xl justify-center gap-4">
               <div className="w-full max-w-2xl">
                 <FoodTab onProgress={handleFoodTabProgress} />
               </div>
@@ -482,10 +488,10 @@ export default function HomePage() {
           <button
             onClick={setAsHome}
             disabled={isCurrentHome}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-lg transition-all active:scale-95 ${
+            className={`glass-surface flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium shadow-sm transition-all active:scale-95 ${
               isCurrentHome
-                ? "bg-primary/10 text-primary border border-primary/30"
-                : "bg-background text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
+                ? "text-primary border-primary/30"
+                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
             }`}
           >
             {isCurrentHome ? (
