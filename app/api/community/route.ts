@@ -88,7 +88,6 @@ export async function GET(req: NextRequest) {
   const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, limitRaw)) : 10;
   const sort = searchParams.get("sort") || "latest";
   const search = searchParams.get("search") || "";
-  const debugRequested = searchParams.get("_debug") === "1";
 
   const {
     data: { user },
@@ -168,28 +167,10 @@ export async function GET(req: NextRequest) {
   const { data, error, count } = await query;
 
   if (error) {
-    const debugInfo = {
-      message: error.message,
-      code: (error as any).code,
-      details: (error as any).details,
-      hint: (error as any).hint,
-      params: {
-        mode,
-        schoolCode,
-        hasSchoolCodes: !!schoolCodesParam,
-        page,
-        limit,
-        offset,
-        sort,
-        hasSearch: !!search,
-      },
-      userId: user?.id || null,
-    };
-    console.error("community_posts 조회 에러:", debugInfo);
+    console.error("community_posts 조회 에러:", error);
+    console.error("[community]", error.message);
     return NextResponse.json(
-      debugRequested
-        ? { error: "서버 오류가 발생했습니다.", debug: debugInfo }
-        : { error: "서버 오류가 발생했습니다." },
+      { error: "서버 오류가 발생했습니다." },
       { status: 500 },
     );
   }
