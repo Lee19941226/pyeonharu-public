@@ -651,18 +651,19 @@ export default function FoodTab({
       }
       onProgress?.(55, "급식 메뉴 분석 중...");
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const results: { school: MySchool; meals: MealData[] }[] = [];
-      for (const school of schools) {
-        try {
-          const mealRes = await fetch(
-            `/api/school/meals?schoolCode=${school.school_code}&officeCode=${school.office_code}&date=${today}`,
-          );
-          const mealData = await mealRes.json();
-          results.push({ school, meals: mealData.meals || [] });
-        } catch {
-          results.push({ school, meals: [] });
-        }
-      }
+      const results = await Promise.all(
+        schools.map(async (school) => {
+          try {
+            const mealRes = await fetch(
+              `/api/school/meals?schoolCode=${school.school_code}&officeCode=${school.office_code}&date=${today}`,
+            );
+            const mealData = await mealRes.json();
+            return { school, meals: mealData.meals || [] };
+          } catch {
+            return { school, meals: [] };
+          }
+        })
+      );
       setAllSchoolMeals(results);
       setMealStatus("loaded");
       onProgress?.(65, "급식 정보 완료");

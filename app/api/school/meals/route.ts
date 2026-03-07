@@ -149,16 +149,17 @@ export async function GET(req: NextRequest) {
     // ── 이번 주 모드 ─────────────────────────────────────────────────
     if (mode === "week") {
       const weekDates = getWeekDates(targetDate)
-      const weekResults: { date: string; meals: any[] }[] = []
-
       // 알레르기 1회만 조회 후 날짜 루프에서 재사용
       const allergenNames = await fetchAllergenNames(supabase, user, memberId)
 
-      for (const d of weekDates) {
-        const dayMeals = await fetchMealsForDate(supabase, schoolCode, officeCode, d)
-        const matched = matchAllergens(dayMeals, allergenNames)
-        weekResults.push({ date: d, meals: matched })
-      }
+      const weekMeals = await Promise.all(
+        weekDates.map(d => fetchMealsForDate(supabase, schoolCode, officeCode, d))
+      )
+
+      const weekResults = weekDates.map((d, i) => ({
+        date: d,
+        meals: matchAllergens(weekMeals[i], allergenNames),
+      }))
 
       return NextResponse.json({ week: weekResults, baseDate: targetDate, checkedMember })
     }
@@ -311,18 +312,20 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 3. 캐시 저장
-    for (const meal of meals) {
-      await supabase.from("school_meals_cache").upsert({
-        school_code: schoolCode,
-        meal_date: targetDate,
-        meal_type: meal.mealType,
-        menu_json: meal.menu,
-        cal_info: meal.calInfo,
-        ntr_info: meal.ntrInfo,
-        origin_info: meal.originInfo,
-      }, { onConflict: "school_code,meal_date,meal_type" })
-    }
+    // 3. 캐시 저장 (병렬)
+    await Promise.all(
+      meals.map(meal =>
+        supabase.from("school_meals_cache").upsert({
+          school_code: schoolCode,
+          meal_date: targetDate,
+          meal_type: meal.mealType,
+          menu_json: meal.menu,
+          cal_info: meal.calInfo,
+          ntr_info: meal.ntrInfo,
+          origin_info: meal.originInfo,
+        }, { onConflict: "school_code,meal_date,meal_type" })
+      )
+    );
 
     // 4. 알레르기 매칭
     const allergenNames = await fetchAllergenNames(supabase, user, memberId)
