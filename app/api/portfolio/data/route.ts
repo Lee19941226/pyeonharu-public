@@ -1,18 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
 
-// portfolio-data.json은 빌드 스크립트(generate-portfolio-data.mjs)가 생성하는 파일이므로
-// 파일이 없는 환경(CI, 첫 클론 등)에서도 타입 오류 없이 안전하게 로드한다.
-const PORTFOLIO_FALLBACK = { categories: [], totalFiles: 0, totalLines: 0, generatedAt: "" };
+const PORTFOLIO_FALLBACK = {
+  categories: [],
+  totalFiles: 0,
+  totalLines: 0,
+  generatedAt: "",
+};
 
 let portfolioData: typeof PORTFOLIO_FALLBACK | Record<string, unknown> = PORTFOLIO_FALLBACK;
+
 try {
   const raw = readFileSync(join(process.cwd(), "data/portfolio-data.json"), "utf-8");
   portfolioData = JSON.parse(raw);
 } catch {
-  console.warn("[Portfolio] data/portfolio-data.json not found — fallback 사용. 'npm run build'를 실행하면 파일이 생성됩니다.");
+  console.warn("[Portfolio] data/portfolio-data.json not found. fallback 사용");
 }
 
 function getSupabase() {
@@ -22,9 +26,16 @@ function getSupabase() {
   );
 }
 
+function normalizePortfolioToken(value: string) {
+  return value
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // IP 기반 rate limit: 10회/분
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0] ||
       req.headers.get("x-real-ip") ||
@@ -43,17 +54,14 @@ export async function POST(req: NextRequest) {
 
     if ((recentCount || 0) >= 10) {
       return NextResponse.json(
-        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
         { status: 429, headers: { "Retry-After": "60" } },
       );
     }
 
-    supabase
+    void supabase
       .from("restaurant_rate_limits")
-      .insert({ identifier: rateLimitKey, searched_at: now.toISOString() })
-      .then(({ error }) => {
-        if (error) console.error("rate limit 기록 실패:", error);
-      });
+      .insert({ identifier: rateLimitKey, searched_at: now.toISOString() });
 
     const { token } = await req.json();
 
@@ -64,13 +72,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const normalized = token.trim().toLowerCase();
+    const normalized = normalizePortfolioToken(token);
+
+    if (!normalized) {
+      return NextResponse.json(
+        { error: "토큰이 필요합니다." },
+        { status: 400 },
+      );
+    }
 
     const { data, error } = await supabase
       .from("portfolio_access_tokens")
       .select("id, token, is_revoked, valid_from, valid_until, use_count")
-      .eq("token", normalized)
-      .single();
+      .ilike("token", normalized)
+      .maybeSingle();
 
     if (error || !data) {
       return NextResponse.json(
@@ -92,6 +107,7 @@ export async function POST(req: NextRequest) {
         { status: 401 },
       );
     }
+
     if (now > new Date(data.valid_until)) {
       return NextResponse.json(
         { error: "만료된 토큰입니다." },

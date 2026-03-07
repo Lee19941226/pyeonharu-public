@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 function getSupabase() {
@@ -8,9 +8,16 @@ function getSupabase() {
   );
 }
 
+function normalizePortfolioToken(value: string) {
+  return value
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // IP 기반 rate limit: 10회/분
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0] ||
       req.headers.get("x-real-ip") ||
@@ -29,43 +36,41 @@ export async function POST(req: NextRequest) {
 
     if ((recentCount || 0) >= 10) {
       return NextResponse.json(
-        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+        { error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
         { status: 429, headers: { "Retry-After": "60" } },
       );
     }
 
-    supabase
+    void supabase
       .from("restaurant_rate_limits")
-      .insert({ identifier: rateLimitKey, searched_at: now.toISOString() })
-      .then(({ error }) => {
-        if (error) console.error("rate limit 기록 실패:", error);
-      });
+      .insert({ identifier: rateLimitKey, searched_at: now.toISOString() });
 
     const { token } = await req.json();
 
     if (!token || typeof token !== "string") {
       return NextResponse.json(
-        { error: "토큰을 입력해주세요." },
+        { error: "토큰을 입력해 주세요." },
         { status: 400 },
       );
     }
 
-    const normalized = token.trim().toLowerCase();
+    const normalized = normalizePortfolioToken(token);
+
+    if (!normalized) {
+      return NextResponse.json(
+        { error: "토큰을 입력해 주세요." },
+        { status: 400 },
+      );
+    }
 
     const { data, error } = await supabase
       .from("portfolio_access_tokens")
       .select("*")
-      .eq("token", normalized)
-      .single();
+      .ilike("token", normalized)
+      .maybeSingle();
 
     if (error) {
       console.error("Portfolio token verify error:", error.message);
-      if (error.code === "PGRST116") {
-        return NextResponse.json(
-          { error: "유효하지 않은 토큰입니다." },
-          { status: 401 },
-        );
-      }
       return NextResponse.json(
         { error: "서버 오류가 발생했습니다." },
         { status: 500 },
@@ -89,15 +94,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // fire-and-forget: 사용 횟수 증가 및 마지막 사용 시간 업데이트
-    supabase
+    void supabase
       .from("portfolio_access_tokens")
       .update({
         use_count: (data.use_count || 0) + 1,
         last_used_at: new Date().toISOString(),
       })
-      .eq("id", data.id)
-      .then(() => {});
+      .eq("id", data.id);
 
     return NextResponse.json({ success: true });
   } catch {

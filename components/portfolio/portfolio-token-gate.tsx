@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Lock, KeyRound, Loader2, ArrowRight } from "lucide-react";
@@ -13,15 +13,13 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
   const [error, setError] = useState("");
   const [verifying, setVerifying] = useState(false);
 
-  // 마운트 시 sessionStorage 확인
   useEffect(() => {
     const saved = sessionStorage.getItem(STORAGE_KEY);
     if (saved) {
-      verifyToken(saved, true);
+      void verifyToken(saved, true);
     } else {
       setState("input");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function verifyToken(value: string, silent = false) {
@@ -42,12 +40,16 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
         setState("verified");
       } else {
         sessionStorage.removeItem(STORAGE_KEY);
-        setError(data.error || "인증에 실패했습니다.");
+        const message =
+          typeof data?.error === "string"
+            ? data.error
+            : `인증 실패 (${res.status})`;
+        setError(message);
         setState("input");
       }
     } catch {
       sessionStorage.removeItem(STORAGE_KEY);
-      setError("서버에 연결할 수 없습니다.");
+      setError("서버와 연결할 수 없습니다.");
       setState("input");
     } finally {
       setVerifying(false);
@@ -58,10 +60,10 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
     e.preventDefault();
     const trimmed = token.trim();
     if (!trimmed) {
-      setError("토큰을 입력해주세요.");
+      setError("토큰을 입력해 주세요.");
       return;
     }
-    verifyToken(trimmed);
+    void verifyToken(trimmed);
   }
 
   if (state === "loading") {
@@ -76,11 +78,10 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
     return <>{children}</>;
   }
 
-  // state === "input"
   return (
-    <div className="flex items-center justify-center py-20 px-4">
+    <div className="flex items-center justify-center px-4 py-20">
       <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-3">
+        <div className="space-y-3 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Lock className="h-6 w-6 text-muted-foreground" />
           </div>
@@ -88,7 +89,7 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
           <p className="text-sm text-muted-foreground">
             이 페이지는 접근 토큰이 필요합니다.
             <br />
-            이력서에 기재된 토큰을 입력해주세요.
+            이력서에 기재된 토큰을 입력해 주세요.
           </p>
         </div>
 
@@ -108,14 +109,12 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
             />
           </div>
 
-          {error && (
-            <p className="text-xs text-destructive text-center">{error}</p>
-          )}
+          {error && <p className="text-center text-xs text-destructive">{error}</p>}
 
           <button
             type="submit"
             disabled={verifying}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {verifying ? (
               <Loader2 className="h-4 w-4 animate-spin" />
