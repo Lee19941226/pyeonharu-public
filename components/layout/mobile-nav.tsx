@@ -284,8 +284,8 @@ export function MobileNav() {
   return (
     <>
       <nav
-        className={`fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden transition-transform ${isMenuOpen ? "hidden" : ""}`}
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)", display: isMenuOpen ? "none" : undefined }}
         data-tour="bottom-nav"
       >
         <motion.div
