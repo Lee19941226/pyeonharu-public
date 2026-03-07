@@ -284,7 +284,7 @@ export function MobileNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-background/85 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)", display: isMenuOpen ? "none" : undefined }}
         data-tour="bottom-nav"
       >
@@ -308,7 +308,7 @@ export function MobileNav() {
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex flex-1 flex-col items-center gap-1 rounded-xl bg-white p-2.5 shadow-md"
+            className="relative flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border/70 bg-card/90 p-2.5 shadow-sm"
           >
             <div className="relative flex items-center justify-center rounded-lg bg-green-50 p-1.5">
               {isProcessing && cameraMode === "allergy" ? (
@@ -320,7 +320,7 @@ export function MobileNav() {
                 <Camera className="h-2 w-2 text-white" />
               </div>
             </div>
-            <span className="text-xs font-medium text-gray-700">
+            <span className="text-xs font-semibold text-foreground/80">
               {isProcessing && cameraMode === "allergy" ? "분석중..." : "안전확인"}
             </span>
           </motion.button>
@@ -336,7 +336,7 @@ export function MobileNav() {
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex flex-1 flex-col items-center gap-1 rounded-xl bg-white p-2.5 shadow-md"
+            className="relative flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border/70 bg-card/90 p-2.5 shadow-sm"
           >
             <div className="relative flex items-center justify-center rounded-lg bg-purple-50 p-1.5">
               {recommendLoading ? (
@@ -348,7 +348,7 @@ export function MobileNav() {
                 <Sparkles className="h-2 w-2 text-white" />
               </div>
             </div>
-            <span className="text-xs font-medium text-gray-700">
+            <span className="text-xs font-semibold text-foreground/80">
               {recommendLoading ? "추천중..." : "메뉴추천"}
             </span>
           </motion.button>
@@ -364,7 +364,7 @@ export function MobileNav() {
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex flex-1 flex-col items-center gap-1 rounded-xl bg-white p-2.5 shadow-md"
+            className="relative flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border/70 bg-card/90 p-2.5 shadow-sm"
           >
             <div className="relative flex items-center justify-center rounded-lg bg-orange-50 p-1.5">
               {isProcessing && cameraMode === "diet" ? (
@@ -376,7 +376,7 @@ export function MobileNav() {
                 <Camera className="h-2 w-2 text-white" />
               </div>
             </div>
-            <span className="text-xs font-medium text-gray-700">
+            <span className="text-xs font-semibold text-foreground/80">
               {isProcessing && cameraMode === "diet" ? "분석중..." : "식단관리"}
             </span>
           </motion.button>

@@ -3,16 +3,11 @@
 // 전략: Network First + 오프라인 폴백
 // ============================================
 
-const CACHE_NAME = "pyeonharu-v2-20260225";
+const CACHE_NAME = "pyeonharu-v3-20260307";
 const OFFLINE_URL = "/offline";
 
 // ── 캐시할 정적 자원 (앱 셸) ──
 const STATIC_ASSETS = [
-  "/",
-  "/food",
-  "/food/search",
-  "/hospital",
-  "/mypage",
   "/offline",
   "/manifest.json",
   "/icons/icon-192.png",
@@ -23,7 +18,7 @@ const STATIC_ASSETS = [
 const NO_CACHE_PATTERNS = [
   /\/api\//, // API 호출은 항상 네트워크
   /\/auth\//, // 인증 관련
-  /\/_next\/static/, // Next.js 정적 파일은 브라우저 캐시가 처리
+  /\/_next\//, // Next.js 정적 파일은 브라우저 캐시가 처리
   /supabase\.co/, // Supabase 직접 호출
 ];
 
@@ -78,6 +73,14 @@ self.addEventListener("fetch", (event) => {
 
   // ── GET 요청만 처리 ──
   if (request.method !== "GET") return;
+
+  // HTML navigation requests are not cached to avoid stale SSR/CSR mismatch
+  if (
+    request.mode === "navigate" ||
+    request.headers.get("Accept")?.includes("text/html")
+  ) {
+    return;
+  }
 
   // ── 캐시 제외 패턴 체크 ──
   const shouldSkip = NO_CACHE_PATTERNS.some(

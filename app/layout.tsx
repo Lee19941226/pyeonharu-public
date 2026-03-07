@@ -129,13 +129,46 @@ export default function RootLayout({
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
+                  var host = window.location.hostname;
+                  var isDevHost = host === 'localhost' || /^(\\d{1,3}\\.){3}\\d{1,3}$/.test(host);
+
+                  // Prevent stale SW/asset cache during local development.
+                  if (isDevHost) {
+                    navigator.serviceWorker.getRegistrations()
+                      .then(function(regs) {
+                        return Promise.all(regs.map(function(r) { return r.unregister(); }));
+                      })
+                      .then(function() {
+                        if ('caches' in window) {
+                          return caches.keys().then(function(keys) {
+                            return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+                          });
+                        }
+                      })
+                      .then(function() {
+                        console.log('[SW] 개발 환경 SW/캐시 정리 완료');
+                      })
+                      .catch(function(err) {
+                        console.warn('[SW] 개발 환경 SW/캐시 정리 실패:', err);
+                      });
+                    return;
+                  }
+
+                  navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
                     .then(function(reg) {
                       console.log('[SW] 등록 성공:', reg.scope);
+                      reg.update();
                     })
                     .catch(function(err) {
                       console.warn('[SW] 등록 실패:', err);
                     });
+
+                  var refreshing = false;
+                  navigator.serviceWorker.addEventListener('controllerchange', function() {
+                    if (refreshing) return;
+                    refreshing = true;
+                    window.location.reload();
+                  });
                 });
               }
             `,

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "API 키가 설정되지 않았습니다." }, { status: 500 })
     }
 
-    let url = `http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList?serviceKey=${serviceKey}&pageNo=${pageNo}&numOfRows=${numOfRows}&sidoCd=${sidoCd}`
+    let url = `https://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList?serviceKey=${serviceKey}&pageNo=${pageNo}&numOfRows=${numOfRows}&sidoCd=${sidoCd}`
 
     // 키워드가 있으면 yadmNm 파라미터로 서버 검색
     if (keyword && keyword.trim()) {

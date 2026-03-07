@@ -82,8 +82,10 @@ export async function GET(req: NextRequest) {
   const mode = searchParams.get("mode") || ""; // "popular" = 인기글(전체 학교)
   const schoolCode = searchParams.get("schoolCode") || "";
   const schoolCodesParam = searchParams.get("schoolCodes") || ""; // 쉼표 구분 복수 학교
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "10");
+  const pageRaw = parseInt(searchParams.get("page") || "1", 10);
+  const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+  const limitRaw = parseInt(searchParams.get("limit") || "10", 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, limitRaw)) : 10;
   const sort = searchParams.get("sort") || "latest";
   const search = searchParams.get("search") || "";
 

@@ -444,11 +444,11 @@ export default function MyPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-20 md:pb-0">
-        <div className="container mx-auto px-4 py-6">
-          <div className="mx-auto max-w-lg space-y-4">
+      <main className="relative z-10 flex-1 pb-20 md:pb-0">
+        <div className="container mx-auto px-4 py-5">
+          <div className="mx-auto max-w-3xl space-y-4">
             {/* Profile Header */}
-            <Card>
+            <Card className="glass-surface shadow-none">
               <CardContent className="flex items-center gap-4 p-6">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <User className="h-7 w-7 text-primary" />
@@ -461,7 +461,7 @@ export default function MyPage() {
             </Card>
 
             {/* ★ 신체정보 / 기초대사량 (NEW) */}
-            <Card>
+            <Card className="glass-surface shadow-none">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Activity className="h-5 w-5 text-primary" />
@@ -484,7 +484,7 @@ export default function MyPage() {
             </Card>
 
             {/* Activity Links */}
-            <Card>
+            <Card className="glass-surface shadow-none">
               <CardHeader className="pb-0">
                 <CardTitle className="text-base font-semibold">
                   내 활동
@@ -564,7 +564,7 @@ export default function MyPage() {
             </Card>
 
             {/* Profile Edit */}
-            <Card>
+            <Card className="glass-surface shadow-none">
               <CardHeader>
                 <CardTitle className="text-lg">프로필 수정</CardTitle>
               </CardHeader>
@@ -615,7 +615,7 @@ export default function MyPage() {
             </Card>
 
             {/* Notifications */}
-            <Card>
+            <Card className="glass-surface shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Bell className="h-5 w-5" />
@@ -675,7 +675,7 @@ export default function MyPage() {
             </Card>
 
             {/* Account Management */}
-            <Card>
+            <Card className="glass-surface shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Shield className="h-5 w-5" />
@@ -740,7 +740,7 @@ export default function MyPage() {
             </Card>
 
             {/* Tip */}
-            <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-900">
+            <div className="glass-surface rounded-lg bg-blue-50 p-4 text-sm text-blue-900">
               <p className="font-medium mb-2">💡 팁</p>
               <p className="text-xs leading-relaxed">
                 개인정보 보호를 위해 비밀번호는 정기적으로 변경하시고, 중요한

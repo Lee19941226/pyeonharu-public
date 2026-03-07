@@ -966,10 +966,10 @@ export default function DietTab() {
 
   return (
     <div className="w-full">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex gap-5 justify-center">
+      <div className="container mx-auto px-4 py-4">
+        <div className="mx-auto flex max-w-6xl justify-center gap-5">
           {/* ═══ 좌측: 일일 기록 ═══ */}
-          <div className="w-full max-w-md space-y-3">
+          <div className="w-full max-w-2xl space-y-3">
             <div className="flex items-center justify-between">
               <Button
                 variant="ghost"
@@ -1097,7 +1097,7 @@ export default function DietTab() {
                         className="fixed inset-0 z-40"
                         onClick={() => setShowShareMenu(false)}
                       />
-                      <div className="absolute right-0 top-10 z-50 w-52 rounded-xl border bg-background shadow-lg p-2 flex flex-col gap-2">
+                      <div className="glass-surface absolute right-0 top-10 z-50 flex w-52 flex-col gap-2 rounded-xl p-2 shadow-sm">
                         <button
                           onClick={shareToday}
                           className="w-full flex items-center gap-3 rounded-lg px-4 min-h-[48px] text-left transition-opacity active:opacity-80"
@@ -1588,7 +1588,7 @@ export default function DietTab() {
             style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
           >
           <motion.div
-            className="w-full max-w-md rounded-t-2xl bg-background p-5 space-y-3"
+            className="glass-surface w-full max-w-md rounded-t-2xl p-5 space-y-3"
             style={{
               paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
             }}
@@ -1699,7 +1699,7 @@ export default function DietTab() {
           onClick={closeManualInput}
         >
           <div
-            className="w-full max-w-sm rounded-xl bg-background p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            className="glass-surface w-full max-w-sm rounded-xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -1895,7 +1895,7 @@ export default function DietTab() {
       {/* 초과 경고 */}
       {showWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-background overflow-hidden">
+          <div className="glass-surface w-full max-w-sm rounded-2xl overflow-hidden">
             <div className="bg-gradient-to-b from-red-100 to-red-50 p-5 text-center">
               <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white text-lg">
                 ⚠️
@@ -1954,7 +1954,7 @@ export default function DietTab() {
             style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
           >
           <motion.div
-            className="w-full max-w-md rounded-t-2xl bg-background p-5 space-y-3"
+            className="glass-surface w-full max-w-md rounded-t-2xl p-5 space-y-3"
             style={{
               paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
             }}
@@ -2147,7 +2147,7 @@ export default function DietTab() {
           onClick={closeMealSelect}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-background p-5 space-y-4 max-h-[85vh] overflow-hidden flex flex-col"
+            className="glass-surface w-full max-w-md rounded-xl p-5 space-y-4 max-h-[85vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">

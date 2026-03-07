@@ -173,10 +173,10 @@ function CommunityWriteContent() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="flex-1 pb-20 md:pb-0">
-        <div className="container mx-auto px-4 py-4">
-          <div className="mx-auto max-w-2xl space-y-4">
-            <div className="flex items-center gap-3">
+      <main className="relative z-10 flex-1 pb-20 md:pb-0">
+        <div className="container mx-auto px-4 py-5">
+          <div className="mx-auto max-w-3xl space-y-4">
+            <div className="glass-surface flex items-center gap-3 rounded-2xl p-2">
               <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -207,7 +207,7 @@ function CommunityWriteContent() {
               </div>
               {mySchools.length === 0 && (
                 <div className="mt-2 rounded-lg border border-dashed border-orange-300 bg-orange-50/50 p-4">
-                  <div className="flex items-center gap-3">
+                  <div className="glass-surface flex items-center gap-3 rounded-2xl p-2">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100">
                       <GraduationCap className="h-4 w-4 text-orange-600" />
                     </div>

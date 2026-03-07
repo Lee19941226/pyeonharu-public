@@ -1,4 +1,5 @@
-let sdkLoadPromise: Promise<void> | null = null;
+﻿let sdkLoadPromise: Promise<void> | null = null;
+const CANONICAL_ORIGIN = "https://www.pyeonharu.com";
 
 function loadKakaoSDK(): Promise<void> {
   if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
@@ -8,7 +9,7 @@ function loadKakaoSDK(): Promise<void> {
   if (sdkLoadPromise) return sdkLoadPromise;
 
   sdkLoadPromise = new Promise<void>((resolve, reject) => {
-    // If layout.tsx already injected the script tag, attach to it
+    // If layout.tsx already injected the script tag, attach to it.
     const existing = document.querySelector<HTMLScriptElement>(
       'script[src*="kakao_js_sdk"]'
     );
@@ -25,9 +26,9 @@ function loadKakaoSDK(): Promise<void> {
       );
       return;
     }
+
     const script = document.createElement("script");
-    script.src =
-      "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
+    script.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Kakao SDK load failed"));
@@ -51,13 +52,13 @@ export async function ensureKakaoReady(): Promise<boolean> {
   }
 }
 
-// 카카오 공유 OG 이미지: app/opengraph-image.tsx를 Next.js가 자동으로 이 URL로 제공
-const KAKAO_OG_IMAGE = "https://pyeonharu.com/opengraph-image.png";
+// Next.js App Router metadata route: app/opengraph-image.tsx
+const KAKAO_OG_IMAGE = `${CANONICAL_ORIGIN}/opengraph-image`;
 
 export interface KakaoShareOptions {
   title: string;
   description: string;
-  imageUrl?: string; // 무시됨 — 항상 KAKAO_OG_IMAGE 사용
+  imageUrl?: string; // currently ignored, fixed OG image is used
   shareUrl: string;
   buttonText?: string;
 }
@@ -74,26 +75,55 @@ export async function shareToKakao(
     buttonText = "편하루에서 확인하기",
   } = options;
 
-  // shareUrl 정규화: localhost/내부IP/상대경로 → pyeonharu.com 기반 절대 URL
+  // Always send links on canonical host to avoid Kakao domain mismatch on mobile origins.
   const normalizeShareUrl = (url: string): string => {
-    const isLocal = /localhost|127\.0\.0\.1|192\.168/.test(url);
-    if (isLocal) {
-      const path = url.replace(/^https?:\/\/[^/]+/, "");
-      return "https://pyeonharu.com" + path;
+    const toCanonical = (pathWithQueryHash: string) => {
+      const safePath = pathWithQueryHash.startsWith("/")
+        ? pathWithQueryHash
+        : `/${pathWithQueryHash}`;
+      return `${CANONICAL_ORIGIN}${safePath}`;
+    };
+
+    if (url.startsWith("/")) return toCanonical(url);
+
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      const isAllowedHost =
+        host === "www.pyeonharu.com" || host === "pyeonharu.com";
+
+      if (isAllowedHost) {
+        return toCanonical(`${parsed.pathname}${parsed.search}${parsed.hash}`);
+      }
+
+      if (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.startsWith("192.168.") ||
+        host.startsWith("10.") ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+      ) {
+        return toCanonical(`${parsed.pathname}${parsed.search}${parsed.hash}`);
+      }
+
+      return CANONICAL_ORIGIN;
+    } catch {
+      if (!url) return CANONICAL_ORIGIN;
+      return toCanonical(url);
     }
-    if (url.startsWith("/")) return "https://pyeonharu.com" + url;
-    return url;
   };
 
   const safeShareUrl = normalizeShareUrl(shareUrl);
 
-  // 페이로드 정규화: 카카오 API 권장 길이 + 10KB 제한 대응
+  // Keep payload small within Kakao recommendation and hard limit (~10KB)
   const safeTitle = title.slice(0, 50);
   const safeDesc = description.slice(0, 100);
-  const safeButtonText = buttonText.slice(0, 28); // 카카오 버튼 텍스트 최대 28자
+  const safeButtonText = buttonText.slice(0, 28);
 
   if (!(await ensureKakaoReady())) {
-    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(safeShareUrl);
+    if (typeof navigator !== "undefined") {
+      navigator.clipboard?.writeText(safeShareUrl);
+    }
     return { success: false, fallback: "clipboard" };
   }
 
@@ -101,7 +131,9 @@ export async function shareToKakao(
     !window.Kakao.Share ||
     typeof window.Kakao.Share.sendDefault !== "function"
   ) {
-    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(safeShareUrl);
+    if (typeof navigator !== "undefined") {
+      navigator.clipboard?.writeText(safeShareUrl);
+    }
     return { success: false, fallback: "clipboard" };
   }
 
@@ -131,8 +163,10 @@ export async function shareToKakao(
     const payloadSize = new Blob([JSON.stringify(payload)]).size;
     console.log("[Kakao Share] safeShareUrl:", safeShareUrl);
     console.log("[Kakao Share] payload size:", payloadSize, "bytes");
-    console.log("카카오 공유 페이로드:", JSON.stringify(payload));
-    if (payloadSize > 10240) console.warn("⚠️ 페이로드 10KB 초과:", payloadSize);
+    console.log("[Kakao Share] payload:", JSON.stringify(payload));
+    if (payloadSize > 10240) {
+      console.warn("[Kakao Share] payload exceeds 10KB:", payloadSize);
+    }
 
     window.Kakao.Share.sendDefault(payload);
     return { success: true };
