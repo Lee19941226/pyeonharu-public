@@ -314,7 +314,7 @@ export async function GET(req: NextRequest) {
 
     // 3. 캐시 저장 (병렬)
     await Promise.all(
-      meals.map(meal =>
+      meals.map((meal: any) =>
         supabase.from("school_meals_cache").upsert({
           school_code: schoolCode,
           meal_date: targetDate,
