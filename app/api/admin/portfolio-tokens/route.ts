@@ -11,7 +11,8 @@ function getSupabase() {
 }
 
 function generateToken(): string {
-  return randomBytes(32).toString("hex");
+  // DB schema is VARCHAR(32), so keep generated token within 32 chars.
+  return randomBytes(16).toString("hex");
 }
 
 const TOKEN_FORMAT = /^[a-zA-Z0-9-]{4,32}$/;
