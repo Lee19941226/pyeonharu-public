@@ -47,6 +47,7 @@ import WhitelistManager from "./whitelist-manager";
 import CacheManager from "./cache-manager";
 import TesterManager from "./tester-manager";
 import AppVersionManager from "./app-version-manager";
+import DataHealthDashboard from "./data-health-dashboard";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
@@ -853,6 +854,7 @@ export default function AdminDashboard() {
           <PortfolioTokens />
         ) : activeTab === "tools" ? (
           <div className="space-y-5">
+            <DataHealthDashboard />
             <RateLimitManager />
             <MaintenanceManager />
             <WhitelistManager />
