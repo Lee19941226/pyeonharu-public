@@ -46,6 +46,7 @@ import MaintenanceManager from "./maintenance-manager";
 import WhitelistManager from "./whitelist-manager";
 import CacheManager from "./cache-manager";
 import TesterManager from "./tester-manager";
+import AppVersionManager from "./app-version-manager";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
 // ─── Admin Tab ───
@@ -857,6 +858,7 @@ export default function AdminDashboard() {
             <WhitelistManager />
             <CacheManager />
             <TesterManager />
+            <AppVersionManager />
           </div>
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
