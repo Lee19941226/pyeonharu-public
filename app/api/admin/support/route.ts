@@ -21,8 +21,10 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return auth.response;
 
     const searchParams = req.nextUrl.searchParams;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const pageRaw = parseInt(searchParams.get("page") || "1", 10);
+    const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+    const limitRaw = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, limitRaw)) : 20;
     const status = searchParams.get("status") || "";
     const search = searchParams.get("search") || "";
     const offset = (page - 1) * limit;

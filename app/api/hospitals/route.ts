@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     // 2) 각 시도에 대해 API 호출
     for (const sidoCd of sidoCodes) {
-      const url = `http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList?serviceKey=${serviceKey}&numOfRows=${numOfRows}&pageNo=1&sidoCd=${sidoCd}`
+      const url = `https://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList?serviceKey=${serviceKey}&numOfRows=${numOfRows}&pageNo=1&sidoCd=${sidoCd}`
 
       console.log(`[Hospitals API] Fetching sidoCd=${sidoCd}...`)
       const response = await fetch(url)
