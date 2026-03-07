@@ -172,9 +172,9 @@ export default function CommunityPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <HomeTabNav />
-      <main className="flex-1 pb-20 md:pb-0">
-        <div className="container mx-auto px-4 py-4">
-          <div className="mx-auto max-w-5xl flex gap-4">
+      <main className="relative z-10 flex-1 pb-20 md:pb-0">
+        <div className="container mx-auto px-4 py-5">
+          <div className="mx-auto flex max-w-6xl gap-4">
 
             {/* ─── 메인 컨텐츠 ─── */}
             <div className="flex-1 min-w-0 space-y-4">
@@ -202,7 +202,7 @@ export default function CommunityPage() {
             )}
 
             {/* ─── 검색 + 정렬 + 글쓰기 ─── */}
-            <div className="flex items-center gap-2">
+            <div className="glass-surface flex items-center gap-2 rounded-2xl p-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -236,7 +236,7 @@ export default function CommunityPage() {
 
             {/* ─── 게시글 테이블 ─── */}
             {isLoading ? (
-              <div className="space-y-0 border rounded-lg overflow-hidden">
+              <div className="glass-surface space-y-0 overflow-hidden rounded-xl">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className={`px-3 py-3 ${i > 0 ? "border-t" : ""}`}>
                     <Skeleton className="h-4 w-3/4" />
@@ -256,7 +256,7 @@ export default function CommunityPage() {
               </div>
             ) : (
               <>
-                <div className="border rounded-lg overflow-hidden">
+                <div className="glass-surface overflow-hidden rounded-xl">
                   {/* 데스크톱 테이블 헤더 */}
                   <div className="hidden sm:grid sm:grid-cols-[1fr_140px_50px_50px_65px] border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
                     <span>제목</span>
@@ -388,7 +388,7 @@ export default function CommunityPage() {
             <aside className="hidden lg:block w-64 shrink-0 space-y-4">
 
               {/* 🔥 핫한 학교 */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="glass-surface overflow-hidden rounded-xl">
                 <div className="bg-muted/50 px-3 py-2 flex items-center justify-between">
                   <span className="text-xs font-bold text-foreground">🔥 핫한 학교</span>
                   <div className="flex gap-1">
@@ -463,7 +463,7 @@ export default function CommunityPage() {
 
               {/* 📊 주간 활동 비교 */}
               {weeklyAverages && (weeklyAverages.posts > 0 || weeklyAverages.likes > 0 || weeklyAverages.comments > 0) && (
-                <div className="border rounded-lg overflow-hidden">
+                <div className="glass-surface overflow-hidden rounded-xl">
                   <div className="bg-muted/50 px-3 py-2">
                     <span className="text-xs font-bold text-foreground">
                       📊 주간 활동{mySchoolStats ? " 비교" : ""}

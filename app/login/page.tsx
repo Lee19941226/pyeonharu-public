@@ -107,7 +107,7 @@ function LoginContent() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-background/95 backdrop-blur">
+      <header className="border-b border-border/70 bg-background/90 backdrop-blur-xl">
         <div className="container mx-auto flex h-16 items-center px-4">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
@@ -163,8 +163,8 @@ function LoginContent() {
         </Card>
       )}
       {/* Main Content */}
-      <main className="flex flex-1 items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-md">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-12">
+        <Card className="glass-surface w-full max-w-md shadow-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">로그인</CardTitle>
             <CardDescription>
@@ -317,7 +317,7 @@ function LoginContent() {
         </Card>
       </main>
       {/* Footer */}
-      <footer className="border-t border-border py-4">
+      <footer className="border-t border-border/70 bg-background/80 py-4 backdrop-blur">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           로그인하면{" "}
           <Link href="/terms" className="underline hover:text-foreground">

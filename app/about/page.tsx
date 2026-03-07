@@ -136,12 +136,12 @@ function CtaSection() {
 
 export default function AboutPage() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="relative z-10 flex-1 pb-20 md:pb-0">
         {/* Hero */}
-        <section className="bg-gradient-to-b from-primary/5 to-background py-16 md:py-24">
+        <section className="border-b border-border/40 py-16 md:py-24">
           <div className="container mx-auto px-4 text-center">
             <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary">
               <span className="text-4xl font-bold text-primary-foreground">

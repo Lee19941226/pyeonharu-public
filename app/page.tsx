@@ -328,11 +328,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="app-atmosphere relative flex min-h-screen flex-col bg-background">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent" />
-      <div className="pointer-events-none absolute -left-20 top-28 h-52 w-52 rounded-full bg-primary/10 blur-3xl" />
-      <div className="pointer-events-none absolute -right-20 top-36 h-56 w-56 rounded-full bg-accent/15 blur-3xl" />
-      {/* ✅ pointer-events-none 추가: 로딩 중에도 뒤 탭 클릭 가능 */}
+    <div className="flex min-h-screen flex-col bg-background">      {/* ✅ pointer-events-none 추가: 로딩 중에도 뒤 탭 클릭 가능 */}
       {isInitialLoading && (
         <div
           className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 pointer-events-none ${isFadingOut ? "opacity-0" : "opacity-100"}`}
