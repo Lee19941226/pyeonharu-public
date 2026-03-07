@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logAction } from "@/lib/utils/action-log";
 import { stripHtml, maskProfanity } from "@/lib/utils/profanity-filter";
 
-// 프로필 + 학교명 조회 헬퍼
+// 프로필 + 학교명 + 재학/졸업 상태 조회 헬퍼
 async function enrichPosts(supabase: any, data: any[], userId?: string) {
   if (!data || data.length === 0) return [];
 
@@ -26,17 +26,24 @@ async function enrichPosts(supabase: any, data: any[], userId?: string) {
     }
   }
 
-  // 학교 이름
+  // 학교 이름 + 작성자별 재학/졸업 상태
   const schoolCodes = [...new Set(data.map((p) => p.school_code))];
   const schoolNameMap: Record<string, string> = {};
+  // key: `${user_id}:${school_code}`
+  const enrollmentMap: Record<string, { enrollment_status: string | null; graduation_year: number | null }> = {};
   if (schoolCodes.length > 0) {
     const { data: schools } = await supabase
       .from("user_schools")
-      .select("school_code, school_name")
-      .in("school_code", schoolCodes);
+      .select("user_id, school_code, school_name, enrollment_status, graduation_year")
+      .in("school_code", schoolCodes)
+      .in("user_id", userIds);
     for (const s of schools || []) {
       if (!schoolNameMap[s.school_code])
         schoolNameMap[s.school_code] = s.school_name;
+      enrollmentMap[`${s.user_id}:${s.school_code}`] = {
+        enrollment_status: s.enrollment_status,
+        graduation_year: s.graduation_year,
+      };
     }
   }
 
@@ -52,14 +59,19 @@ async function enrichPosts(supabase: any, data: any[], userId?: string) {
     likedPostIds = new Set((likes || []).map((l: any) => l.post_id));
   }
 
-  return data.map((post) => ({
-    ...post,
-    schoolName: schoolNameMap[post.school_code] || post.school_code,
-    author: profileMap[post.user_id]?.nickname || "익명",
-    avatarUrl: profileMap[post.user_id]?.avatar_url || null,
-    isLiked: likedPostIds.has(post.id),
-    isOwner: userId === post.user_id,
-  }));
+  return data.map((post) => {
+    const enrollment = enrollmentMap[`${post.user_id}:${post.school_code}`];
+    return {
+      ...post,
+      schoolName: schoolNameMap[post.school_code] || post.school_code,
+      author: profileMap[post.user_id]?.nickname || "익명",
+      avatarUrl: profileMap[post.user_id]?.avatar_url || null,
+      isLiked: likedPostIds.has(post.id),
+      isOwner: userId === post.user_id,
+      enrollmentStatus: enrollment?.enrollment_status || null,
+      graduationYear: enrollment?.graduation_year || null,
+    };
+  });
 }
 
 // GET /api/community — 게시글 목록 조회
@@ -163,11 +175,30 @@ export async function GET(req: NextRequest) {
 
   const posts = await enrichPosts(supabase, data || [], user?.id);
 
+  // 현재 사용자의 해당 학교 재학/졸업 상태 (관계 태그 계산용)
+  let myEnrollment: { enrollment_status: string | null; graduation_year: number | null } | null = null;
+  if (user && schoolCode) {
+    const { data: mySchool } = await supabase
+      .from("user_schools")
+      .select("enrollment_status, graduation_year")
+      .eq("user_id", user.id)
+      .eq("school_code", schoolCode)
+      .is("family_member_id", null)
+      .maybeSingle();
+    if (mySchool) {
+      myEnrollment = {
+        enrollment_status: mySchool.enrollment_status,
+        graduation_year: mySchool.graduation_year,
+      };
+    }
+  }
+
   return NextResponse.json({
     posts,
     total: count || 0,
     page,
     totalPages: Math.ceil((count || 0) / limit),
+    myEnrollment,
   });
 }
 

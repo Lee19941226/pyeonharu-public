@@ -41,6 +41,9 @@ interface MySchool {
   school_name: string
   school_address: string
   created_at: string
+  enrollment_status: "enrolled" | "graduated" | null
+  graduation_year: number | null
+  enrollment_year: number | null
 }
 
 export default function SchoolPage() {
@@ -53,6 +56,13 @@ export default function SchoolPage() {
   const [registeringCode, setRegisteringCode] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [editingSchool, setEditingSchool] = useState<string | null>(null)
+  const [statusForm, setStatusForm] = useState<{
+    enrollmentStatus: "enrolled" | "graduated" | null
+    graduationYear: string
+    enrollmentYear: string
+  }>({ enrollmentStatus: null, graduationYear: "", enrollmentYear: "" })
+  const [savingStatus, setSavingStatus] = useState(false)
 
   useEffect(() => {
     checkAuth()
@@ -161,6 +171,46 @@ export default function SchoolPage() {
 
   const isRegistered = (code: string) => mySchools.some(s => s.school_code === code)
 
+  const openStatusEdit = (school: MySchool) => {
+    setEditingSchool(school.school_code)
+    setStatusForm({
+      enrollmentStatus: school.enrollment_status,
+      graduationYear: school.graduation_year?.toString() || "",
+      enrollmentYear: school.enrollment_year?.toString() || "",
+    })
+  }
+
+  const handleSaveStatus = async (schoolCode: string) => {
+    setSavingStatus(true)
+    try {
+      const res = await fetch("/api/school/register", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schoolCode,
+          enrollmentStatus: statusForm.enrollmentStatus,
+          graduationYear: statusForm.enrollmentStatus === "graduated" && statusForm.graduationYear
+            ? parseInt(statusForm.graduationYear) : null,
+          enrollmentYear: statusForm.enrollmentYear ? parseInt(statusForm.enrollmentYear) : null,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success("상태가 저장되었습니다")
+        setMySchools(prev => prev.map(s =>
+          s.school_code === schoolCode ? { ...s, ...data.school } : s
+        ))
+        setEditingSchool(null)
+      } else {
+        toast.error(data.error || "저장 실패")
+      }
+    } catch {
+      toast.error("저장에 실패했습니다")
+    } finally {
+      setSavingStatus(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -224,31 +274,124 @@ export default function SchoolPage() {
                   <div className="space-y-2">
                     {mySchools.map(school => (
                       <Card key={school.id} className="transition-all hover:shadow-sm">
-                        <CardContent className="flex items-center justify-between p-3">
-                          <button
-                            onClick={() => router.push(`/school/${school.office_code}-${school.school_code}`)}
-                            className="flex flex-1 items-center gap-3 text-left"
-                          >
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-50">
-                              <School className="h-5 w-5 text-orange-600" />
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between">
+                            <button
+                              onClick={() => router.push(`/school/${school.office_code}-${school.school_code}`)}
+                              className="flex flex-1 items-center gap-3 text-left"
+                            >
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-50">
+                                <School className="h-5 w-5 text-orange-600" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium truncate">{school.school_name}</p>
+                                  {school.enrollment_status === "enrolled" && (
+                                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-1.5 py-0">재학생</Badge>
+                                  )}
+                                  {school.enrollment_status === "graduated" && (
+                                    <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[10px] px-1.5 py-0">
+                                      졸업생{school.graduation_year ? ` ('${String(school.graduation_year).slice(2)})` : ""}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {school.school_address && (
+                                  <p className="text-xs text-muted-foreground truncate">{school.school_address}</p>
+                                )}
+                              </div>
+                              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </button>
+                            <div className="flex items-center gap-1 ml-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-11 w-11 shrink-0 text-muted-foreground hover:text-primary"
+                                onClick={() => editingSchool === school.school_code ? setEditingSchool(null) : openStatusEdit(school)}
+                                aria-label="재학/졸업 설정"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleUnregister(school.school_code, school.school_name)}
+                                aria-label={`${school.school_name} 학교 해제`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium truncate">{school.school_name}</p>
-                              {school.school_address && (
-                                <p className="text-xs text-muted-foreground truncate">{school.school_address}</p>
+                          </div>
+
+                          {/* 재학/졸업 설정 패널 */}
+                          {editingSchool === school.school_code && (
+                            <div className="mt-3 rounded-lg border bg-muted/30 p-3 space-y-3">
+                              <p className="text-xs font-medium text-muted-foreground">재학/졸업 상태 설정</p>
+                              <div className="flex gap-2">
+                                {([
+                                  { value: null, label: "미설정" },
+                                  { value: "enrolled" as const, label: "재학생" },
+                                  { value: "graduated" as const, label: "졸업생" },
+                                ]).map(opt => (
+                                  <button
+                                    key={opt.label}
+                                    onClick={() => setStatusForm(prev => ({ ...prev, enrollmentStatus: opt.value }))}
+                                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                      statusForm.enrollmentStatus === opt.value
+                                        ? opt.value === "enrolled"
+                                          ? "border-green-500 bg-green-50 text-green-700"
+                                          : opt.value === "graduated"
+                                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                                            : "border-primary bg-primary/10 text-primary"
+                                        : "border-border hover:bg-muted"
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {statusForm.enrollmentStatus === "graduated" && (
+                                <div>
+                                  <label className="text-xs text-muted-foreground">졸업년도</label>
+                                  <Input
+                                    type="number"
+                                    placeholder="예: 2020"
+                                    value={statusForm.graduationYear}
+                                    onChange={e => setStatusForm(prev => ({ ...prev, graduationYear: e.target.value }))}
+                                    className="mt-1 h-9"
+                                    min={1950}
+                                    max={new Date().getFullYear()}
+                                  />
+                                </div>
                               )}
+
+                              {statusForm.enrollmentStatus && (
+                                <div>
+                                  <label className="text-xs text-muted-foreground">입학년도 (선택)</label>
+                                  <Input
+                                    type="number"
+                                    placeholder="예: 2017"
+                                    value={statusForm.enrollmentYear}
+                                    onChange={e => setStatusForm(prev => ({ ...prev, enrollmentYear: e.target.value }))}
+                                    className="mt-1 h-9"
+                                    min={1950}
+                                    max={new Date().getFullYear()}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setEditingSchool(null)}>
+                                  취소
+                                </Button>
+                                <Button size="sm" onClick={() => handleSaveStatus(school.school_code)} disabled={savingStatus}>
+                                  {savingStatus ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                                  저장
+                                </Button>
+                              </div>
                             </div>
-                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          </button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="ml-2 h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleUnregister(school.school_code, school.school_name)}
-                            aria-label={`${school.school_name} 학교 해제`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          )}
                         </CardContent>
                       </Card>
                     ))}

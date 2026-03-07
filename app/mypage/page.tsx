@@ -295,6 +295,7 @@ export default function MyPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [notifications, setNotifications] = useState({ weather: true });
+  const [showAllergyPublic, setShowAllergyPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 프로필 수정용
@@ -320,13 +321,14 @@ export default function MyPage() {
           // profiles 테이블에서 nickname을 우선 사용 (OAuth 재로그인 시 덮어씌워지는 문제 방지)
           const { data: profile } = await supabase
             .from("profiles")
-            .select("nickname")
+            .select("nickname, show_allergy_public")
             .eq("id", authUser.id)
             .single();
 
           const name = profile?.nickname || authUser.user_metadata?.name || "사용자";
           setUser({ email: authUser.email || "", name });
           setEditName(name);
+          setShowAllergyPublic(profile?.show_allergy_public ?? false);
         }
       } catch (err) {
         setError("사용자 정보를 불러올 수 없습니다.");
@@ -634,6 +636,39 @@ export default function MyPage() {
                       setNotifications({ ...notifications, weather: checked })
                     }
                     aria-label="날씨 알림"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">알레르기 정보 공개</p>
+                    <p className="text-xs text-muted-foreground">
+                      커뮤니티에서 다른 사용자가 내 알레르기 정보를 볼 수 있어요
+                    </p>
+                  </div>
+                  <Switch
+                    checked={showAllergyPublic}
+                    onCheckedChange={async (checked) => {
+                      setShowAllergyPublic(checked);
+                      try {
+                        const res = await fetch("/api/profile", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ showAllergyPublic: checked }),
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                          setShowAllergyPublic(!checked);
+                          toast.error("설정 저장에 실패했습니다");
+                        } else {
+                          toast.success(checked ? "알레르기 정보가 공개됩니다" : "알레르기 정보가 비공개됩니다");
+                        }
+                      } catch {
+                        setShowAllergyPublic(!checked);
+                        toast.error("설정 저장에 실패했습니다");
+                      }
+                    }}
+                    aria-label="알레르기 정보 공개"
                   />
                 </div>
               </CardContent>

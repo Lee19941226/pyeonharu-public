@@ -134,6 +134,73 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
+// PATCH: 학교 재학/졸업 상태 업데이트
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { schoolCode, enrollmentStatus, graduationYear, enrollmentYear } = body
+
+    if (!schoolCode) {
+      return NextResponse.json({ error: "schoolCode가 필요합니다." }, { status: 400 })
+    }
+
+    // enrollmentStatus 유효성 검증
+    if (enrollmentStatus !== null && enrollmentStatus !== undefined &&
+        enrollmentStatus !== "enrolled" && enrollmentStatus !== "graduated") {
+      return NextResponse.json({ error: "유효하지 않은 상태값입니다." }, { status: 400 })
+    }
+
+    // graduationYear 유효성 검증
+    const currentYear = new Date().getFullYear()
+    if (graduationYear !== null && graduationYear !== undefined) {
+      const gy = Number(graduationYear)
+      if (!Number.isInteger(gy) || gy < 1950 || gy > currentYear) {
+        return NextResponse.json({ error: `졸업년도는 1950~${currentYear} 범위여야 합니다.` }, { status: 400 })
+      }
+    }
+
+    // enrollmentYear 유효성 검증
+    if (enrollmentYear !== null && enrollmentYear !== undefined) {
+      const ey = Number(enrollmentYear)
+      if (!Number.isInteger(ey) || ey < 1950 || ey > currentYear) {
+        return NextResponse.json({ error: `입학년도는 1950~${currentYear} 범위여야 합니다.` }, { status: 400 })
+      }
+    }
+
+    const updateData: Record<string, any> = {
+      enrollment_status: enrollmentStatus ?? null,
+      graduation_year: enrollmentStatus === "graduated" && graduationYear ? Number(graduationYear) : null,
+      enrollment_year: enrollmentYear ? Number(enrollmentYear) : null,
+    }
+
+    const { data, error } = await supabase
+      .from("user_schools")
+      .update(updateData)
+      .eq("user_id", user.id)
+      .eq("school_code", schoolCode)
+      .is("family_member_id", null)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[School Status Update] Error:", error)
+      return NextResponse.json({ error: "상태 업데이트에 실패했습니다." }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, school: data })
+  } catch (error) {
+    console.error("[School Status Update] Error:", error)
+    return NextResponse.json({ error: "상태 업데이트에 실패했습니다." }, { status: 500 })
+  }
+}
+
 // GET: 내 학교 목록
 // ?familyMemberId=own       → 본인 학교만 (family_member_id IS NULL)
 // ?familyMemberId=<uuid>    → 해당 구성원 학교만

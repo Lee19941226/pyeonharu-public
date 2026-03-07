@@ -17,7 +17,22 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name } = body;
+  const { name, showAllergyPublic } = body;
+
+  // show_allergy_public만 업데이트하는 경우
+  if (showAllergyPublic !== undefined && !name) {
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ show_allergy_public: !!showAllergyPublic })
+      .eq("id", user.id);
+
+    if (profileError) {
+      console.error("profiles 업데이트 에러:", profileError);
+      return NextResponse.json({ error: "설정 저장 실패" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, showAllergyPublic: !!showAllergyPublic });
+  }
 
   if (!name?.trim()) {
     return NextResponse.json(
@@ -47,12 +62,17 @@ export async function PUT(req: NextRequest) {
   }
 
   // 2. profiles.nickname 동기화
+  const updateData: Record<string, any> = {
+    id: user.id,
+    nickname: trimmedName,
+    updated_at: new Date().toISOString(),
+  };
+  if (showAllergyPublic !== undefined) {
+    updateData.show_allergy_public = !!showAllergyPublic;
+  }
+
   const { error: profileError } = await supabase.from("profiles").upsert(
-    {
-      id: user.id,
-      nickname: trimmedName,
-      updated_at: new Date().toISOString(),
-    },
+    updateData,
     { onConflict: "id" },
   );
 
@@ -89,7 +109,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nickname, avatar_url")
+    .select("nickname, avatar_url, show_allergy_public")
     .eq("id", user.id)
     .single();
 
@@ -97,5 +117,6 @@ export async function GET() {
     name: profile?.nickname || user.user_metadata?.name || "사용자",
     email: user.email || "",
     avatarUrl: profile?.avatar_url || null,
+    showAllergyPublic: profile?.show_allergy_public ?? false,
   });
 }

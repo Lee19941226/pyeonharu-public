@@ -16,10 +16,13 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AdBanner } from "@/components/ad-banner"
+import { AuthorTag } from "@/components/community/author-tag"
+import { UserProfileSheet } from "@/components/community/user-profile-sheet"
 import { toast } from "sonner"
 
 interface Post {
   id: string
+  user_id: string
   school_code: string
   schoolName: string
   title: string
@@ -32,6 +35,8 @@ interface Post {
   isLiked: boolean
   isOwner: boolean
   created_at: string
+  enrollmentStatus: "enrolled" | "graduated" | null
+  graduationYear: number | null
 }
 
 interface UserSchool {
@@ -84,6 +89,9 @@ export default function CommunityPage() {
   const [weeklyAverages, setWeeklyAverages] = useState<{ posts: number; likes: number; comments: number; views: number } | null>(null)
   const [mySchoolStats, setMySchoolStats] = useState<{ posts: number; likes: number; comments: number; views: number } | null>(null)
   const [totalSchools, setTotalSchools] = useState(0)
+  const [myEnrollment, setMyEnrollment] = useState<{ enrollment_status: string | null; graduation_year: number | null } | null>(null)
+  const [profileUserId, setProfileUserId] = useState<string | null>(null)
+  const [showProfile, setShowProfile] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -142,6 +150,7 @@ export default function CommunityPage() {
       const data = await res.json()
       setPosts(data.posts || [])
       setTotalPages(data.totalPages || 1)
+      if (data.myEnrollment !== undefined) setMyEnrollment(data.myEnrollment)
     } catch { toast.error("게시글을 불러오지 못했습니다") }
     finally { setIsLoading(false) }
   }
@@ -297,7 +306,12 @@ export default function CommunityPage() {
                               {post.schoolName}
                             </span>
                           </div>
-                          <span className="truncate text-center text-xs text-muted-foreground">{post.author}</span>
+                          <span className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                            <button onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }} className="truncate hover:underline">
+                              {post.author}
+                            </button>
+                            <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
+                          </span>
                           <span className="text-center text-xs text-muted-foreground">{post.view_count}</span>
                           <span className={`text-center text-xs ${post.like_count > 0 ? "font-semibold text-red-500" : "text-muted-foreground"}`}>{post.like_count}</span>
                           <span className="text-center text-xs text-muted-foreground">{formatDate(post.created_at)}</span>
@@ -322,7 +336,10 @@ export default function CommunityPage() {
                             </div>
                             <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                               <span className="max-w-[80px] truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium">{post.schoolName}</span>
-                              <span className="max-w-[60px] truncate">{post.author}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }} className="max-w-[60px] truncate hover:underline">
+                                {post.author}
+                              </button>
+                              <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
                               <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" />{post.view_count}</span>
                               <span className={`flex items-center gap-0.5 ${post.like_count > 0 ? "text-red-500" : ""}`}>
                                 <Heart className={`h-3 w-3 ${post.like_count > 0 ? "fill-red-500" : ""}`} />{post.like_count}
@@ -501,6 +518,12 @@ export default function CommunityPage() {
         </div>
       </main>
       <MobileNav />
+      <UserProfileSheet
+        open={showProfile}
+        onOpenChange={setShowProfile}
+        userId={profileUserId}
+        schoolCode={selectedSchool}
+      />
     </div>
   )
 }

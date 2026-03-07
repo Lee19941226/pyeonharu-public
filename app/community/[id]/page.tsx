@@ -29,8 +29,11 @@ import { toast } from "sonner";
 import DOMPurify from "dompurify";
 import { Flag } from "lucide-react";
 import { AdBanner } from "@/components/ad-banner";
+import { AuthorTag } from "@/components/community/author-tag";
+import { UserProfileSheet } from "@/components/community/user-profile-sheet";
 interface Post {
   id: string;
+  user_id: string;
   school_code: string;
   schoolName: string;
   title: string;
@@ -44,6 +47,8 @@ interface Post {
   isLiked: boolean;
   isOwner: boolean;
   created_at: string;
+  enrollmentStatus: "enrolled" | "graduated" | null;
+  graduationYear: number | null;
 }
 
 interface Comment {
@@ -93,6 +98,7 @@ export default function PostDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
+  const [myEnrollment, setMyEnrollment] = useState<{ enrollment_status: string | null; graduation_year: number | null } | null>(null);
   const [commentInput, setCommentInput] = useState("");
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(
     null,
@@ -106,6 +112,8 @@ export default function PostDetailPage({
   } | null>(null);
   const [reportReason, setReportReason] = useState("");
   const [isReporting, setIsReporting] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -123,6 +131,7 @@ export default function PostDetailPage({
       const data = await res.json();
       setPost(data.post);
       setComments(data.comments || []);
+      if (data.myEnrollment !== undefined) setMyEnrollment(data.myEnrollment);
     } catch {
       router.push("/community");
     } finally {
@@ -363,9 +372,13 @@ export default function PostDetailPage({
                 {/* 작성자 + 날짜 */}
                 <div className="mb-4 flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setProfileUserId(post.user_id); setShowProfile(true); }}
+                      className="font-medium text-foreground hover:underline"
+                    >
                       {post.author}
-                    </span>
+                    </button>
+                    <AuthorTag enrollmentStatus={post.enrollmentStatus} graduationYear={post.graduationYear} myEnrollment={myEnrollment} isOwner={post.isOwner} />
                     <span>{formatDate(post.created_at)}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -590,6 +603,14 @@ export default function PostDetailPage({
             </div>
           </div>
         </div>
+      )}
+      {post && (
+        <UserProfileSheet
+          open={showProfile}
+          onOpenChange={setShowProfile}
+          userId={profileUserId}
+          schoolCode={post.school_code}
+        />
       )}
     </div>
   );

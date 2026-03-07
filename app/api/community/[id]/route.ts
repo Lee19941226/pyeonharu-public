@@ -48,12 +48,12 @@ export async function GET(
     .eq("id", post.user_id)
     .single();
 
-  // 학교 이름 조회
+  // 학교 이름 + 작성자 재학/졸업 상태 조회
   const { data: schoolInfo } = await supabase
     .from("user_schools")
-    .select("school_name")
+    .select("school_name, enrollment_status, graduation_year")
     .eq("school_code", post.school_code)
-    .limit(1)
+    .eq("user_id", post.user_id)
     .maybeSingle();
 
   // 댓글 조회
@@ -141,6 +141,24 @@ export async function GET(
     }
   }
 
+  // 현재 사용자의 해당 학교 재학/졸업 상태 (관계 태그 계산용)
+  let myEnrollment: { enrollment_status: string | null; graduation_year: number | null } | null = null;
+  if (user) {
+    const { data: mySchool } = await supabase
+      .from("user_schools")
+      .select("enrollment_status, graduation_year")
+      .eq("user_id", user.id)
+      .eq("school_code", post.school_code)
+      .is("family_member_id", null)
+      .maybeSingle();
+    if (mySchool) {
+      myEnrollment = {
+        enrollment_status: mySchool.enrollment_status,
+        graduation_year: mySchool.graduation_year,
+      };
+    }
+  }
+
   const response = NextResponse.json({
     post: {
       ...post,
@@ -150,8 +168,11 @@ export async function GET(
       isLiked: isPostLiked,
       isOwner: user?.id === post.user_id,
       view_count: newViewCount !== null ? newViewCount : (post.view_count || 0),
+      enrollmentStatus: schoolInfo?.enrollment_status || null,
+      graduationYear: schoolInfo?.graduation_year || null,
     },
     comments: topComments,
+    myEnrollment,
   });
 
   // 24시간 동안 중복 조회 방지 쿠키
