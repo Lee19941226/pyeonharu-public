@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -49,17 +49,17 @@ const STATUS_CONFIG: Record<
     icon: CheckCircle,
   },
   scheduled: {
-    label: "예약됨",
+    label: "예약",
     color: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400",
     icon: CalendarClock,
   },
   expired: {
-    label: "만료됨",
+    label: "만료",
     color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
     icon: Clock,
   },
   revoked: {
-    label: "취소됨",
+    label: "취소",
     color: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400",
     icon: XCircle,
   },
@@ -69,7 +69,6 @@ export default function PortfolioTokens() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 생성 폼
   const [showForm, setShowForm] = useState(false);
   const [label, setLabel] = useState("");
   const [customToken, setCustomToken] = useState("");
@@ -77,10 +76,7 @@ export default function PortfolioTokens() {
   const [validUntil, setValidUntil] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // 복사 상태
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  // 삭제 확인
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const fetchTokens = useCallback(async () => {
@@ -102,7 +98,6 @@ export default function PortfolioTokens() {
     fetchTokens();
   }, [fetchTokens]);
 
-  // 통계
   const stats = {
     total: tokens.length,
     active: tokens.filter((t) => getTokenStatus(t) === "active").length,
@@ -113,7 +108,23 @@ export default function PortfolioTokens() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!label.trim() || !validFrom || !validUntil) {
-      toast.error("라벨, 시작일, 종료일을 입력해주세요.");
+      toast.error("레이블, 시작일, 종료일을 입력해 주세요.");
+      return;
+    }
+
+    const fromDate = new Date(validFrom);
+    const untilDate = new Date(validUntil);
+
+    if (
+      Number.isNaN(fromDate.getTime()) ||
+      Number.isNaN(untilDate.getTime())
+    ) {
+      toast.error("유효한 날짜/시간을 입력해 주세요.");
+      return;
+    }
+
+    if (fromDate >= untilDate) {
+      toast.error("종료일은 시작일보다 늦어야 합니다.");
       return;
     }
 
@@ -125,8 +136,8 @@ export default function PortfolioTokens() {
         body: JSON.stringify({
           label: label.trim(),
           token: customToken.trim() || undefined,
-          validFrom,
-          validUntil,
+          validFrom: fromDate.toISOString(),
+          validUntil: untilDate.toISOString(),
         }),
       });
       const data = await res.json();
@@ -157,7 +168,11 @@ export default function PortfolioTokens() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(currentlyRevoked ? "토큰이 복원되었습니다." : "토큰이 취소되었습니다.");
+        toast.success(
+          currentlyRevoked
+            ? "토큰을 복원했습니다."
+            : "토큰을 취소했습니다.",
+        );
         fetchTokens();
       } else {
         toast.error(data.error || "처리 실패");
@@ -176,7 +191,7 @@ export default function PortfolioTokens() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("토큰이 삭제되었습니다.");
+        toast.success("토큰을 삭제했습니다.");
         setDeleteConfirm(null);
         fetchTokens();
       } else {
@@ -190,7 +205,7 @@ export default function PortfolioTokens() {
   function handleCopy(token: string, id: string) {
     navigator.clipboard.writeText(token);
     setCopiedId(id);
-    toast.success("토큰이 복사되었습니다.");
+    toast.success("토큰을 복사했습니다.");
     setTimeout(() => setCopiedId(null), 2000);
   }
 
@@ -204,37 +219,35 @@ export default function PortfolioTokens() {
 
   return (
     <div className="space-y-4">
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-xl border bg-card p-4 text-center">
           <p className="text-2xl font-bold">{stats.total}</p>
           <p className="text-xs text-muted-foreground">전체 토큰</p>
         </div>
-        <div className="rounded-xl border bg-green-50 dark:bg-green-950/20 p-4 text-center">
+        <div className="rounded-xl border bg-green-50 p-4 text-center dark:bg-green-950/20">
           <p className="text-2xl font-bold text-green-700 dark:text-green-400">
             {stats.active}
           </p>
           <p className="text-xs text-green-600 dark:text-green-500">활성</p>
         </div>
-        <div className="rounded-xl border bg-gray-50 dark:bg-gray-800/30 p-4 text-center">
+        <div className="rounded-xl border bg-gray-50 p-4 text-center dark:bg-gray-800/30">
           <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">
             {stats.expired}
           </p>
-          <p className="text-xs text-gray-500">만료됨</p>
+          <p className="text-xs text-gray-500">만료</p>
         </div>
-        <div className="rounded-xl border bg-red-50 dark:bg-red-950/20 p-4 text-center">
+        <div className="rounded-xl border bg-red-50 p-4 text-center dark:bg-red-950/20">
           <p className="text-2xl font-bold text-red-700 dark:text-red-400">
             {stats.revoked}
           </p>
-          <p className="text-xs text-red-600 dark:text-red-500">취소됨</p>
+          <p className="text-xs text-red-600 dark:text-red-500">취소</p>
         </div>
       </div>
 
-      {/* 토큰 생성 버튼 / 폼 */}
       {!showForm ? (
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" />
           토큰 생성
@@ -242,23 +255,23 @@ export default function PortfolioTokens() {
       ) : (
         <form
           onSubmit={handleCreate}
-          className="rounded-xl border bg-card p-5 space-y-4"
+          className="space-y-4 rounded-xl border bg-card p-5"
         >
-          <h3 className="text-sm font-semibold flex items-center gap-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Key className="h-4 w-4" />
-            새 토큰 생성
+            새 포트폴리오 토큰 생성
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-muted-foreground">
-                라벨 (용도) *
+                레이블 (용도) *
               </label>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="예: 2026 상반기 면접용"
-                className="mt-1 w-full rounded-lg border bg-background py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
@@ -269,7 +282,7 @@ export default function PortfolioTokens() {
                 value={customToken}
                 onChange={(e) => setCustomToken(e.target.value)}
                 placeholder="미입력 시 자동 생성 (예: pyeon-a3k9)"
-                className="mt-1 w-full rounded-lg border bg-background py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
@@ -280,7 +293,7 @@ export default function PortfolioTokens() {
                 type="datetime-local"
                 value={validFrom}
                 onChange={(e) => setValidFrom(e.target.value)}
-                className="mt-1 w-full rounded-lg border bg-background py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
@@ -291,7 +304,7 @@ export default function PortfolioTokens() {
                 type="datetime-local"
                 value={validUntil}
                 onChange={(e) => setValidUntil(e.target.value)}
-                className="mt-1 w-full rounded-lg border bg-background py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
           </div>
@@ -300,7 +313,7 @@ export default function PortfolioTokens() {
             <button
               type="submit"
               disabled={creating}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {creating ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -312,7 +325,7 @@ export default function PortfolioTokens() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded-lg border px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="rounded-lg border px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               취소
             </button>
@@ -320,14 +333,13 @@ export default function PortfolioTokens() {
         </form>
       )}
 
-      {/* 토큰 목록 */}
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : tokens.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <Key className="h-10 w-10 mb-3 opacity-30" />
+          <Key className="mb-3 h-10 w-10 opacity-30" />
           <p className="text-sm">생성된 토큰이 없습니다</p>
         </div>
       ) : (
@@ -338,14 +350,10 @@ export default function PortfolioTokens() {
             const StatusIcon = cfg.icon;
 
             return (
-              <div
-                key={t.id}
-                className="rounded-xl border bg-card p-4 shadow-sm"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  {/* 토큰 + 라벨 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+              <div key={t.id} className="rounded-xl border bg-card p-4 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cfg.color}`}
                       >
@@ -358,12 +366,12 @@ export default function PortfolioTokens() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <code className="text-sm font-mono font-semibold">
+                      <code className="font-mono text-sm font-semibold">
                         {t.token}
                       </code>
                       <button
                         onClick={() => handleCopy(t.token, t.id)}
-                        className="rounded-md p-1 hover:bg-muted transition-colors"
+                        className="rounded-md p-1 transition-colors hover:bg-muted"
                         title="토큰 복사"
                       >
                         {copiedId === t.id ? (
@@ -374,7 +382,7 @@ export default function PortfolioTokens() {
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-muted-foreground">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                       <span>
                         기간: {formatDate(t.valid_from)} ~ {formatDate(t.valid_until)}
                       </span>
@@ -390,8 +398,7 @@ export default function PortfolioTokens() {
                     </div>
                   </div>
 
-                  {/* 액션 버튼 */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="shrink-0 flex items-center gap-1.5">
                     <button
                       onClick={() => handleRevoke(t.id, t.is_revoked)}
                       className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
@@ -433,7 +440,7 @@ export default function PortfolioTokens() {
                     ) : (
                       <button
                         onClick={() => setDeleteConfirm(t.id)}
-                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-destructive"
                         title="삭제"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
