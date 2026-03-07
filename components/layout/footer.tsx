@@ -3,7 +3,7 @@ import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-muted/30 pb-20 md:pb-0">
+    <footer className="border-t border-border/70 bg-background/70 backdrop-blur-xl pb-20 md:pb-0">
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col items-center gap-4">
           {/* 로고 + 슬로건 */}

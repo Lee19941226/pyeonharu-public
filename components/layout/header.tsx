@@ -174,7 +174,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
   const isHome = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
       {/* 메인 바 */}
       <div className="border-b border-border/60">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
