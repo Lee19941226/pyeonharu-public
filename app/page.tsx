@@ -78,10 +78,13 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all relative ${active ? `${color} after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[3px] after:rounded-full after:bg-current` : "text-muted-foreground hover:text-foreground"}`}
+      className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-semibold transition-colors relative ${active ? color : "text-muted-foreground hover:text-foreground"}`}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="h-4 w-4" />
       {label}
+      {active && (
+        <span className="absolute bottom-0 left-4 right-4 h-[2.5px] rounded-full bg-current" />
+      )}
     </button>
   );
 }
@@ -100,10 +103,13 @@ function SubTabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm transition-all relative whitespace-nowrap cursor-pointer ${active ? "font-semibold text-foreground after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full after:bg-primary" : "font-medium text-muted-foreground hover:text-foreground"}`}
+      className={`flex items-center justify-center gap-1.5 px-4 py-2 text-[13px] transition-colors relative whitespace-nowrap cursor-pointer ${active ? "font-semibold text-foreground" : "font-medium text-muted-foreground hover:text-foreground"}`}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-3.5 w-3.5" />
       {label}
+      {active && (
+        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
+      )}
     </button>
   );
 }
@@ -349,8 +355,8 @@ export default function HomePage() {
 
       <Header mainTab={mainTab} onMainTabChange={setMainTab} />
 
-      {/* ✅ 모바일 식사/아파요 탭 */}
-      <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
+      {/* 모바일 메인 탭 */}
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-40 border-b border-border/60 bg-background md:hidden">
         <div className="flex">
           <TabButton
             active={mainTab === "meal"}
@@ -369,7 +375,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="sticky top-[calc(7.5rem+env(safe-area-inset-top))] md:top-16 z-30 bg-background border-b">
+      <div className="sticky top-[calc(6rem+env(safe-area-inset-top))] md:top-14 z-30 bg-background border-b border-border/40">
         <div className="container mx-auto px-4">
           <div
             className="flex items-center justify-center overflow-x-auto scrollbar-hide"

@@ -52,7 +52,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       .getUser()
       .then(({ data: { user } }) => {
         if (user) {
-          // profiles 테이블에서 nickname과 role을 함께 가져옴 (OAuth 재로그인 시 덮어씌워지는 문제 방지)
           supabase
             .from("profiles")
             .select("nickname, role")
@@ -81,7 +80,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       if (session?.user) {
         const user = session.user;
         const supabase2 = createClient();
-        // profiles 테이블에서 nickname과 role을 함께 가져옴
         supabase2
           .from("profiles")
           .select("nickname, role")
@@ -104,7 +102,6 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
       setIsLoaded(true);
     });
 
-    // 마이페이지에서 닉네임 변경 시 즉시 반영
     const handleProfileUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.nickname) {
@@ -157,12 +154,10 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
     router.refresh();
   };
 
-  // 서브페이지에서 탭 클릭 시 홈으로 이동
   const handleNavToHome = (tab: "meal" | "sick") => {
     if (isHome && onMainTabChange) {
       onMainTabChange(tab);
     } else {
-      // localStorage에 탭 정보 저장 후 홈으로 이동
       try {
         localStorage.setItem(
           "pyeonharu_nav_tab",
@@ -179,132 +174,154 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
   const isHome = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[env(safe-area-inset-top)]">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center">
-          <PyeonharuLogo size="sm" />
-        </Link>
+    <header className="sticky top-0 z-50 w-full bg-background pt-[env(safe-area-inset-top)]">
+      {/* 메인 바 */}
+      <div className="border-b border-border/60">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4">
+          {/* 좌: 로고 */}
+          <Link href="/" className="flex items-center shrink-0">
+            <PyeonharuLogo size="sm" />
+          </Link>
 
-        {/* 데스크톱: 모든 페이지에서 식사/아파요 탭 표시 */}
-        <nav className="hidden md:flex items-center gap-1 ml-6">
-          <button
-            onClick={() => handleNavToHome("meal")}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isHome && mainTab === "meal" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-          >
-            <UtensilsCrossed className="h-4 w-4" />
-            식사
-          </button>
-          <button
-            onClick={() => handleNavToHome("sick")}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isHome && mainTab === "sick" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-          >
-            <HeartPulse className="h-4 w-4" />
-            아파요
-          </button>
-        </nav>
-
-        <div className="hidden items-center gap-2 md:flex">
-          {isLoggedIn && isAdminUser && (
-            <Link
-              href="/admin"
-              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+          {/* 중: 데스크톱 메인 탭 */}
+          <nav className="hidden md:flex items-center gap-0.5 absolute left-1/2 -translate-x-1/2">
+            <button
+              onClick={() => handleNavToHome("meal")}
+              className={`relative flex items-center gap-1.5 px-5 py-2 text-sm font-semibold transition-colors ${
+                isHome && mainTab === "meal"
+                  ? "text-amber-600"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              관리자
-            </Link>
-          )}
-          {isLoggedIn && userRole === "super_admin" && (
-            <Link
-              href="/portfolio"
-              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              <UtensilsCrossed className="h-4 w-4" />
+              식사
+              {isHome && mainTab === "meal" && (
+                <span className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-amber-500" />
+              )}
+            </button>
+            <button
+              onClick={() => handleNavToHome("sick")}
+              className={`relative flex items-center gap-1.5 px-5 py-2 text-sm font-semibold transition-colors ${
+                isHome && mainTab === "sick"
+                  ? "text-rose-600"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <Code2 className="h-3.5 w-3.5" />
-              포트폴리오
-            </Link>
-          )}
-          {isLoggedIn ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="max-w-[100px] truncate text-sm font-medium">
-                    {nickname}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{nickname}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/mypage" className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    마이페이지
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/bookmarks" className="flex items-center gap-2">
-                    <Bookmark className="h-4 w-4" />
-                    즐겨찾기
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/food/profile"
-                    className="flex items-center gap-2"
-                  >
-                    <ShieldCheck className="h-4 w-4" />내 알레르기 정보
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/support" className="flex items-center gap-2">
-                    <Headphones className="h-4 w-4" />
-                    고객센터
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 text-destructive focus:text-destructive"
-                >
-                  <LogOut className="h-4 w-4" />
-                  로그아웃
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            isLoaded && (
-              <Button asChild>
-                <Link href="/login">로그인</Link>
-              </Button>
-            )
-          )}
-        </div>
+              <HeartPulse className="h-4 w-4" />
+              아파요
+              {isHome && mainTab === "sick" && (
+                <span className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-rose-500" />
+              )}
+            </button>
+          </nav>
 
-        <div className="flex items-center md:hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label={isMobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
+          {/* 우: 데스크톱 액션 */}
+          <div className="hidden items-center gap-1.5 md:flex">
+            {isLoggedIn && isAdminUser && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                관리자
+              </Link>
             )}
-          </Button>
+            {isLoggedIn && userRole === "super_admin" && (
+              <Link
+                href="/portfolio"
+                className="flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              >
+                <Code2 className="h-3.5 w-3.5" />
+                포트폴리오
+              </Link>
+            )}
+            {isLoggedIn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 h-9 rounded-full">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                      <User className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <span className="max-w-[100px] truncate text-sm font-medium">
+                      {nickname}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium">{nickname}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/mypage" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      마이페이지
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/bookmarks" className="flex items-center gap-2">
+                      <Bookmark className="h-4 w-4" />
+                      즐겨찾기
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/food/profile"
+                      className="flex items-center gap-2"
+                    >
+                      <ShieldCheck className="h-4 w-4" />내 알레르기 정보
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/support" className="flex items-center gap-2">
+                      <Headphones className="h-4 w-4" />
+                      고객센터
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    로그아웃
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              isLoaded && (
+                <Button asChild size="sm" className="rounded-full h-9 px-4">
+                  <Link href="/login">로그인</Link>
+                </Button>
+              )
+            )}
+          </div>
+
+          {/* 모바일: 햄버거 */}
+          <div className="flex items-center md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label={isMobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
+      {/* 모바일 풀스크린 메뉴 */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-0 z-[9999] border-t bg-background md:hidden overflow-y-auto"
+          className="fixed inset-x-0 top-[calc(3.5rem+env(safe-area-inset-top))] bottom-0 z-[9999] bg-background md:hidden overflow-y-auto"
           style={{
-            height: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))",
+            height: "calc(100vh - 3.5rem - env(safe-area-inset-top, 0px))",
           }}
         >
           <div className="container mx-auto px-4 py-4">
