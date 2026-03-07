@@ -129,13 +129,21 @@ export default function RootLayout({
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
+                  navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
                     .then(function(reg) {
                       console.log('[SW] 등록 성공:', reg.scope);
+                      reg.update();
                     })
                     .catch(function(err) {
                       console.warn('[SW] 등록 실패:', err);
                     });
+
+                  var refreshing = false;
+                  navigator.serviceWorker.addEventListener('controllerchange', function() {
+                    if (refreshing) return;
+                    refreshing = true;
+                    window.location.reload();
+                  });
                 });
               }
             `,
