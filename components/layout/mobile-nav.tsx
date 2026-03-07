@@ -65,6 +65,18 @@ export function MobileNav() {
   const [todayCal, setTodayCal] = useState(0);
   const [bmr, setBmr] = useState(0);
   const [shareSheetData, setShareSheetData] = useState<ShareBottomSheetData | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const open = () => setIsMenuOpen(true);
+    const close = () => setIsMenuOpen(false);
+    window.addEventListener("mobile-menu-open", open);
+    window.addEventListener("mobile-menu-close", close);
+    return () => {
+      window.removeEventListener("mobile-menu-open", open);
+      window.removeEventListener("mobile-menu-close", close);
+    };
+  }, []);
 
   const openSheet = (mode: CameraMode) => {
     setCameraMode(mode);
@@ -272,12 +284,12 @@ export function MobileNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden"
+        className={`fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden transition-transform ${isMenuOpen ? "hidden" : ""}`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         data-tour="bottom-nav"
       >
         <motion.div
-          className="mx-auto flex max-w-md items-end justify-around px-3 py-2 gap-2"
+          className="mx-auto flex max-w-md items-end justify-around px-3 py-1 gap-2"
           initial="hidden"
           animate="visible"
           variants={{
@@ -296,19 +308,19 @@ export function MobileNav() {
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md"
+            className="relative flex flex-1 flex-col items-center gap-1 rounded-xl bg-white p-2.5 shadow-md"
           >
-            <div className="relative flex items-center justify-center rounded-xl bg-green-50 p-2">
+            <div className="relative flex items-center justify-center rounded-lg bg-green-50 p-1.5">
               {isProcessing && cameraMode === "allergy" ? (
-                <Loader2 className="h-7 w-7 animate-spin text-green-600" />
+                <Loader2 className="h-5 w-5 animate-spin text-green-600" />
               ) : (
-                <ShieldCheck className="h-7 w-7 text-green-600" />
+                <ShieldCheck className="h-5 w-5 text-green-600" />
               )}
-              <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 shadow-sm">
-                <Camera className="h-2.5 w-2.5 text-white" />
+              <div className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-green-500 shadow-sm">
+                <Camera className="h-2 w-2 text-white" />
               </div>
             </div>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-xs font-medium text-gray-700">
               {isProcessing && cameraMode === "allergy" ? "분석중..." : "안전확인"}
             </span>
           </motion.button>
@@ -324,19 +336,19 @@ export function MobileNav() {
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md"
+            className="relative flex flex-1 flex-col items-center gap-1 rounded-xl bg-white p-2.5 shadow-md"
           >
-            <div className="relative flex items-center justify-center rounded-xl bg-purple-50 p-2">
+            <div className="relative flex items-center justify-center rounded-lg bg-purple-50 p-1.5">
               {recommendLoading ? (
-                <Loader2 className="h-7 w-7 animate-spin text-purple-600" />
+                <Loader2 className="h-5 w-5 animate-spin text-purple-600" />
               ) : (
-                <ClipboardList className="h-7 w-7 text-purple-600" />
+                <ClipboardList className="h-5 w-5 text-purple-600" />
               )}
-              <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 shadow-sm">
-                <Sparkles className="h-2.5 w-2.5 text-white" />
+              <div className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400 shadow-sm">
+                <Sparkles className="h-2 w-2 text-white" />
               </div>
             </div>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-xs font-medium text-gray-700">
               {recommendLoading ? "추천중..." : "메뉴추천"}
             </span>
           </motion.button>
@@ -352,19 +364,19 @@ export function MobileNav() {
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md"
+            className="relative flex flex-1 flex-col items-center gap-1 rounded-xl bg-white p-2.5 shadow-md"
           >
-            <div className="relative flex items-center justify-center rounded-xl bg-orange-50 p-2">
+            <div className="relative flex items-center justify-center rounded-lg bg-orange-50 p-1.5">
               {isProcessing && cameraMode === "diet" ? (
-                <Loader2 className="h-7 w-7 animate-spin text-orange-600" />
+                <Loader2 className="h-5 w-5 animate-spin text-orange-600" />
               ) : (
-                <UtensilsCrossed className="h-7 w-7 text-orange-600" />
+                <UtensilsCrossed className="h-5 w-5 text-orange-600" />
               )}
-              <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-400 shadow-sm">
-                <Camera className="h-2.5 w-2.5 text-white" />
+              <div className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-orange-400 shadow-sm">
+                <Camera className="h-2 w-2 text-white" />
               </div>
             </div>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-xs font-medium text-gray-700">
               {isProcessing && cameraMode === "diet" ? "분석중..." : "식단관리"}
             </span>
           </motion.button>

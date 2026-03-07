@@ -122,8 +122,10 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = "hidden";
+      window.dispatchEvent(new CustomEvent("mobile-menu-open"));
     } else {
       document.body.style.overflow = "";
+      window.dispatchEvent(new CustomEvent("mobile-menu-close"));
     }
     return () => {
       document.body.style.overflow = "";
@@ -300,7 +302,7 @@ export function Header({ mainTab, onMainTabChange }: HeaderProps) {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-0 z-[9998] border-t bg-background md:hidden overflow-y-auto"
+          className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-0 z-[9999] border-t bg-background md:hidden overflow-y-auto"
           style={{
             height: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))",
           }}
