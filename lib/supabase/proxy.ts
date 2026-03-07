@@ -1,9 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// ??IP ?リ옇?↑????т빳?껊돥筌뤾쑴逾????노뼌 ???ル┰ (嶺뚮∥???꾨뎨? ?臾믪쪡亦???⑥쥙???꾩렮維쀥젆?
+// ✅ IP 기반 비로그인 스캔 제한 (메모리, 쿠키 우회 방어)
 const ipScanMap = new Map<string, number>();
-// 嶺뚮씞???띠쾸????댁굥?????筌먲퐘遊?
+// 매시간 오래된 키 정리
 setInterval(
   () => {
     ipScanMap.clear();
@@ -11,7 +11,7 @@ setInterval(
   60 * 60 * 1000,
 );
 
-// ????? 嶺뚮ㅄ維獄?嶺?흮??(60??TTL, 嶺???븐슙??DB ?브퀗????꾩렮維?)
+// ✅ 점검 모드 캐시 (60초 TTL, 매 요청 DB 조회 방지)
 let maintenanceCache: {
   enabled: boolean;
   message: string;
@@ -21,7 +21,7 @@ let maintenanceCache: {
   fetchedAt: number;
 } | null = null;
 
-const MAINTENANCE_CACHE_TTL = 60_000; // 60??
+const MAINTENANCE_CACHE_TTL = 60_000; // 60초
 
 async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
   const now = Date.now();
@@ -34,11 +34,11 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !anonKey) {
-      console.error("[maintenance] ???삵렱?곌떠?????怨몃쾳:", { supabaseUrl: !!supabaseUrl, anonKey: !!anonKey });
+      console.error("[maintenance] 환경변수 없음:", { supabaseUrl: !!supabaseUrl, anonKey: !!anonKey });
       return null;
     }
 
-    // Edge Runtime ?筌뤿굞?? raw fetch??Supabase REST API 嶺뚯쉳????筌뤾쑵??(?熬곣뫕???브퀗?????2??怨좊쾪)
+    // Edge Runtime 호환: raw fetch로 Supabase REST API 직접 호출 (전체 조회 — 2행뿐)
     const res = await fetch(
       `${supabaseUrl}/rest/v1/site_settings?select=key,value`,
       {
@@ -52,13 +52,13 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
 
     if (!res.ok) {
       const body = await res.text();
-      console.error("[maintenance] REST API ???덉넮:", res.status, body);
+      console.error("[maintenance] REST API 실패:", res.status, body);
       if (maintenanceCache) return maintenanceCache;
       return null;
     }
 
     const rows: { key: string; value: any }[] = await res.json();
-    console.log("[maintenance] DB ?브퀗????롪퍒???", JSON.stringify(rows));
+    console.log("[maintenance] DB 조회 결과:", JSON.stringify(rows));
 
     const modeRow = rows.find((r) => r.key === "maintenance_mode");
     const wlRow = rows.find((r) => r.key === "whitelist_user_ids");
@@ -75,7 +75,7 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
 
     return maintenanceCache;
   } catch (err) {
-    console.error("[maintenance] DB ?브퀗??????덉넮:", err);
+    console.error("[maintenance] DB 조회 실패:", err);
     if (maintenanceCache) return maintenanceCache;
     return null;
   }
@@ -83,7 +83,7 @@ async function getMaintenanceSettings(): Promise<typeof maintenanceCache> {
 
 export async function updateSession(request: NextRequest) {
   // ==========================================
-  // CSRF ?꾩렮維쀥젆? mutation ??븐슙???Origin ???녹맠 ?롪틵?嶺?
+  // CSRF 방어: mutation 요청의 Origin 헤더 검증
   // ==========================================
   const method = request.method.toUpperCase();
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -91,7 +91,7 @@ export async function updateSession(request: NextRequest) {
     const host = request.headers.get("host");
     if (!origin || !host || new URL(origin).host !== host) {
       return NextResponse.json(
-        { error: "CSRF ?롪틵?嶺????덉넮: ???깅뮔??? ??? ?怨쀫츋????낅퉵??" },
+        { error: "CSRF 검증 실패: 허용되지 않은 출처입니다." },
         { status: 403 },
       );
     }
@@ -129,7 +129,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // ==========================================
-  // 繞벿살탮???β돦裕????롪틵?嶺?(?筌뤾쑬????ルㅎ荑??????
+  // 중복 로그인 검증 (세션 토큰 비교)
   // ==========================================
   const pathname = request.nextUrl.pathname;
   const skipSessionCheck =
@@ -140,14 +140,14 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/portfolio/");
 
   // ==========================================
-  // 繞벿살탮???β돦裕????롪틵?嶺?(API ??븐슙?????ｇ춯?????瑜곷턄嶺뚯솘? ?β돦裕녻キ??繹먮굝裕??곌랜???
+  // 중복 로그인 검증 (API 요청에서만 — 페이지 로드 성능 보호)
   // ==========================================
   const isApiRequest = pathname.startsWith("/api/");
 
   if (user && !skipSessionCheck && isApiRequest) {
     const sessionTokenCookie = request.cookies.get("session_token")?.value;
 
-    // ?臾믪쪡亦????깅굵 ???異??롪틵?嶺?(??怨몃さ嶺????꾨븕 ???β돦裕???嶺뚯쉳???WebView ?臾믪쪡亦???怨룸? ????
+    // 쿠키 있을 때만 검증 (없으면 스킵 — 로그인 직후/WebView 쿠키 이슈 대응)
     if (sessionTokenCookie) {
       try {
         const { data, error } = await supabase
@@ -156,26 +156,26 @@ export async function updateSession(request: NextRequest) {
           .eq("user_id", user.id)
           .single();
 
-        // DB?????뀀쭨????怨몃쾳 ?????깅뮔 (?熬곣뫗異??筌뤾쑬???繹먮굞夷???
-        // ?臾믩닑?????덉넮 ??fail-open
+        // DB에 레코드 없음 → 허용 (아직 세션 등록 전)
+        // 쿼리 실패 → fail-open
         const isValid = error || !data ? true : data.session_token === sessionTokenCookie;
 
         if (!isValid) {
           const apiResponse = NextResponse.json(
-            { error: "duplicate_login", message: "???섎??リ옇?쀧뵳??????β돦裕??筌뤾퍓????β돦裕??熬곣뫗???琉????鍮??" },
+            { error: "duplicate_login", message: "다른 기기에서 로그인되어 로그아웃되었습니다." },
             { status: 401 },
           );
           apiResponse.cookies.delete("session_token");
           return apiResponse;
         }
       } catch {
-        // DB ?臾믩닑?????덉넮 ??fail-open (??얜∥?????깅뮔)
+        // DB 쿼리 실패 → fail-open (접근 허용)
       }
     }
   }
 
   // ==========================================
-  // ????⑤객臾?嶺뚳퐢?얍칰?(?β돦裕?????????異?
+  // 밴 상태 체크 (로그인 사용자만)
   // ==========================================
   const banBypass = ["/banned", "/login", "/auth/", "/api/auth/", "/api/admin/"];
   const isBanBypassPath = banBypass.some((p) => pathname.startsWith(p));
@@ -202,12 +202,12 @@ export async function updateSession(request: NextRequest) {
           const profile = rows[0];
 
           if (profile?.is_banned) {
-            // ban_until??嶺뚯솘?????얠춺????吏???怨몄젷
+            // ban_until이 지났으면 자동 해제
             if (profile.ban_until && new Date(profile.ban_until) < new Date()) {
-              // ???吏???怨몄젷: service role ??怨몃턄 anon key?β돦裕??update ?釉띾쐝??????
-              // /api/admin/users/unban ?筌뤾쑵?????? ?잙갭梨뜻틦????沅???ろ뀞??
-              // ??????怨룹꽘?筌뤾쑬??????吏???怨몄젷 嶺뚳퐣瑗??
-              // Edge?????service_role ?????釉띾쐝? ?????沅????깅뮔
+              // 자동 해제: service role 없이 anon key로는 update 불가하므로
+              // /api/admin/users/unban 호출 대신, 그냥 통과시키고
+              // 클라이언트에서 자동 해제 처리
+              // Edge에서 service_role 사용 불가 → 통과 허용
             } else {
               const url = request.nextUrl.clone();
               url.pathname = "/banned";
@@ -217,17 +217,17 @@ export async function updateSession(request: NextRequest) {
         }
       }
     } catch {
-      // fail-open: DB ?臾믩닑?????덉넮 ????얜∥?????깅뮔
+      // fail-open: DB 쿼리 실패 시 접근 허용
     }
   }
 
   // ==========================================
-  // ??? 嶺뚮ㅄ維獄?嶺뚳퐢?얍칰?
+  // 점검 모드 체크
   // ==========================================
   const maintenanceBypass = ["/maintenance", "/admin", "/api/admin/", "/login", "/auth/", "/api/auth/"];
   const isBypassPath = maintenanceBypass.some((p) => pathname.startsWith(p));
 
-  // ??븐뼚?붷윜? 嶺뚮ㅄ維獄???얜Ŧ堉????? 嶺뚮ㅄ維獄???⑤객臾????녹맠 ?怨뺣뼺?
+  // 디버그: 모든 응답에 점검 모드 상태 헤더 추가
   let debugMaintenanceStatus = "skip:bypass";
 
   if (!isBypassPath) {
@@ -237,7 +237,7 @@ export async function updateSession(request: NextRequest) {
       : "fetch:null";
 
     if (maint?.enabled) {
-      // ??븐슦逾?筌뤾봇遊???덈콦 ????????裕?IP嶺????沅?(??㉱?洹먮봿???????熬곣뫗??嶺뚢뼰維??
+      // 화이트리스트 사용자 또는 IP만 통과 (관리자 포함 전원 차단)
       const clientIp =
         request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         request.headers.get("x-real-ip") ||
@@ -259,16 +259,16 @@ export async function updateSession(request: NextRequest) {
   supabaseResponse.headers.set("x-maintenance-debug", debugMaintenanceStatus);
 
   // ==========================================
-  // ?곌랜????롪퍔?δ빳?嶺뚳퐢?얍칰?
+  // 보호 경로 체크
   // ==========================================
   const protectedPaths = [
-    "/mypage", // 嶺뚮씭????瑜곷턄嶺뚯솘?
-    "/bookmarks", // 嶺뚯빖횧?곗눦???롡뵛
-    "/food/profile", // ??釉? ?熬곣뫁夷??
-    "/family", // ?띠럾?????㉱??
-    "/admin", // ??㉱?洹먮봿??
-    "/reports", // ?낅슣?딂??洹먮뿫竊??
-    "/community/write", // ?롪퍓???룸Ь? ??얜???
+    "/mypage", // 마이페이지
+    "/bookmarks", // 즐겨찾기
+    "/food/profile", // 식품 프로필
+    "/family", // 가족 관리
+    "/admin", // 관리자
+    "/reports", // 주간 리포트
+    "/community/write", // 게시글 작성
   ];
 
   const isProtectedPath = protectedPaths.some((path) =>
@@ -283,7 +283,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // ==========================================
-  // ???т빳?껊돥筌뤾쑴逾????노뼌 ???ル┰ 嶺뚳퐢?얍칰?(IP ?リ옇?↑? ??10??
+  // 비로그인 스캔 제한 체크 (IP 기반, 일 10회)
   // ==========================================
   if (!user && request.nextUrl.pathname === "/api/food/analyze-image") {
     const today = new Date().toISOString().split("T")[0];
@@ -300,7 +300,7 @@ export async function updateSession(request: NextRequest) {
           success: false,
           error: "scan_limit_exceeded",
           message:
-            "??源녿뎄 ???筌??釉뚯뫒?????낅빢(1?????貫?????곕????덈펲. ?β돦裕??筌뤿굝由??類쏅듆 ??嶺뚮씭?????????????곗꽑??",
+            "일일 무료 분석 횟수(1회)를 초과했습니다. 로그인하시면 더 많이 사용할 수 있어요.",
           remainingScans: 0,
         },
         { status: 429 },
