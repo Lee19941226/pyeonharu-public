@@ -1325,7 +1325,7 @@ export default function RestaurantTab() {
                   const appUrl = userCoords
                     ? `tmap://route?startX=${userCoords.lng}&startY=${userCoords.lat}&goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`
                     : `tmap://route?goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`;
-                  const webUrl = `https://tmap.life/route?goalX=${goalX}&goalY=${goalY}&goalName=${goalName}`;
+                  const webUrl = `https://map.naver.com/p/search/${goalName}`;
 
                   // 앱 미설치 시 1.5초 후 웹으로 fallback
                   const fallbackTimer = setTimeout(() => {
@@ -1339,6 +1339,7 @@ export default function RestaurantTab() {
                     }
                   });
 
+                  toast.info("Tmap 앱이 없으면 네이버 지도로 연결됩니다", { duration: 2000 });
                   window.location.href = appUrl;
                   setNavTarget(null);
                 }}
