@@ -216,12 +216,12 @@ export default function SchoolPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="flex-1 pb-20 md:pb-0">
-        <div className="container mx-auto px-4 py-6">
-          <div className="mx-auto max-w-2xl">
+      <main className="relative z-10 flex-1 pb-20 md:pb-0">
+        <div className="container mx-auto px-4 py-5">
+          <div className="mx-auto max-w-3xl">
 
             {/* 헤더 */}
-            <div className="mb-6">
+            <div className="glass-surface mb-6 rounded-2xl p-4">
               <div className="mb-2 flex items-center gap-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
                   <UtensilsCrossed className="h-5 w-5 text-orange-600" />
@@ -234,7 +234,7 @@ export default function SchoolPage() {
             </div>
 
             {/* 검색 */}
-            <div className="mb-6">
+            <div className="glass-surface mb-6 rounded-2xl p-3">
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -268,7 +268,7 @@ export default function SchoolPage() {
                     {[1, 2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
                   </div>
                 ) : mySchools.length === 0 ? (
-                  <Card className="border-dashed">
+                  <Card className="glass-surface border-dashed shadow-none">
                     <CardContent className="flex flex-col items-center justify-center p-6 text-center">
                       <School className="mb-2 h-8 w-8 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground">등록된 학교가 없습니다</p>
@@ -278,7 +278,7 @@ export default function SchoolPage() {
                 ) : (
                   <div className="space-y-2">
                     {mySchools.map(school => (
-                      <Card key={school.id} className="transition-all hover:shadow-sm">
+                      <Card key={school.id} className="glass-surface shadow-none transition-all hover:bg-muted/40">
                         <CardContent className="p-3">
                           <div className="flex items-center justify-between">
                             <button
@@ -427,7 +427,7 @@ export default function SchoolPage() {
                     {results.map(school => {
                       const registered = isRegistered(school.schoolCode)
                       return (
-                        <Card key={school.schoolCode} className="transition-all hover:shadow-sm">
+                        <Card key={school.schoolCode} className="glass-surface shadow-none transition-all hover:bg-muted/40">
                           <CardContent className="p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
@@ -500,7 +500,7 @@ export default function SchoolPage() {
       {/* 재학/졸업 설정 유도 팝업 */}
       {enrollmentPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-card">
+          <div className="glass-surface w-full max-w-sm rounded-2xl p-6 shadow-xl dark:bg-card">
             <div className="mb-4 flex justify-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
                 <GraduationCap className="h-6 w-6 text-blue-600" />
