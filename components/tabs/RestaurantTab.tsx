@@ -226,7 +226,7 @@ function ReviewModal({
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl animate-in zoom-in-95">
+      <div className="glass-surface fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl p-6 shadow-xl animate-in zoom-in-95">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">
             {existingReview ? "리뷰 수정" : "리뷰 작성"}
@@ -310,7 +310,7 @@ function AIAnalysisModal({
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-lg max-h-[80vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-xl animate-in zoom-in-95 flex flex-col">
+      <div className="glass-surface fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-lg max-h-[80vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl shadow-xl animate-in zoom-in-95 flex flex-col">
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b p-4">
           <div>
@@ -956,10 +956,10 @@ export default function RestaurantTab() {
 
   return (
     <div className="w-full">
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-5">
 
           {/* ── 검색바 ── */}
-          <div className="mx-auto mb-4 max-w-4xl space-y-2">
+          <div className="mx-auto mb-4 max-w-6xl space-y-2">
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -981,7 +981,7 @@ export default function RestaurantTab() {
           </div>
 
           {/* ── 모바일: 상단 고정 필터 ── */}
-          <div className="sticky top-16 z-30 -mx-4 mb-4 border-b bg-background/95 px-4 py-3 backdrop-blur md:hidden">
+          <div className="glass-surface sticky top-16 z-30 -mx-4 mb-4 border-b border-border/70 px-4 py-3 md:hidden">
             <div className="overflow-x-auto scrollbar-hide">
               <div className="flex gap-1.5 pb-1">
                 {(["all", "safe", "caution", "danger"] as const).map((f) => (
@@ -1032,7 +1032,7 @@ export default function RestaurantTab() {
           </div>
 
           {/* ── 메인 레이아웃 ── */}
-          <div className="mx-auto flex max-w-4xl gap-6">
+          <div className="mx-auto flex max-w-6xl gap-6">
             <div className="min-w-0 flex-1">
 
               {locationName && hasSearched && (
@@ -1098,7 +1098,7 @@ export default function RestaurantTab() {
 
               {/* ═══ 컴팩트 음식점 리스트 ═══ */}
               {filteredRestaurants.length > 0 && (
-                <div className="rounded-xl border overflow-hidden divide-y">
+                <div className="glass-surface rounded-xl overflow-hidden divide-y">
                   {filteredRestaurants.map((restaurant, idx) => {
                     const risk = RISK_CONFIG[restaurant.riskLevel];
                     const RiskIcon = risk.icon;

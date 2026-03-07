@@ -380,7 +380,7 @@ function SchoolMealCard({
                         return (
                           <div
                             key={i}
-                            className={`min-h-[80px] p-1 bg-white ${isToday ? "ring-2 ring-inset ring-primary" : ""}`}
+                            className={`min-h-[80px] bg-card p-1 ${isToday ? "ring-2 ring-inset ring-primary" : ""}`}
                           >
                             <p
                               className={`text-[10px] font-bold mb-0.5 ${isToday ? "text-primary" : dayOfWeek === 0 ? "text-red-400" : dayOfWeek === 6 ? "text-blue-400" : "text-foreground"}`}
@@ -1016,7 +1016,7 @@ export default function FoodTab({
       />
       <div id="qr-reader-hidden" className="hidden" />
 
-      <div className="mx-auto max-w-2xl space-y-3 px-4 py-4">
+      <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
         {/* ═══ 1. 식품 안전 확인 ═══ */}
         {hasAllergies === false ? (
           <Card className="border-blue-200 bg-blue-50">
@@ -1151,7 +1151,7 @@ export default function FoodTab({
                 return (
                   <Card
                     key={si}
-                    className="border shadow-none cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+                    className="glass-surface cursor-pointer shadow-none transition-colors hover:bg-muted/70 active:bg-muted/80"
                     onClick={() =>
                       router.push(
                         `/school/${entry.school.office_code}-${entry.school.school_code}`,
@@ -1195,7 +1195,7 @@ export default function FoodTab({
           {/* CTA 카드들 */}
           {!user && (
             <Card
-              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+              className="glass-surface bg-muted/30 cursor-pointer shadow-none transition-colors hover:bg-muted/70 active:bg-muted/80"
               onClick={() => setLoginModalOpen(true)}
             >
               <CardContent className="flex items-center justify-between p-4">
@@ -1218,7 +1218,7 @@ export default function FoodTab({
           )}
           {mealStatus === "no-login" && (
             <Card
-              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+              className="glass-surface bg-muted/30 cursor-pointer shadow-none transition-colors hover:bg-muted/70 active:bg-muted/80"
               onClick={() => setLoginModalOpen(true)}
             >
               <CardContent className="flex items-center justify-between p-4">
@@ -1241,7 +1241,7 @@ export default function FoodTab({
           )}
           {mealStatus === "no-school" && (
             <Card
-              className="border shadow-none bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/70"
+              className="glass-surface bg-muted/30 cursor-pointer shadow-none transition-colors hover:bg-muted/70 active:bg-muted/80"
               onClick={() => router.push("/school")}
             >
               <CardContent className="flex items-center justify-between p-4">
@@ -1288,7 +1288,7 @@ export default function FoodTab({
               /* ── 학교 미등록: 학교 등록 유도 / 학교 등록됨: 첫 글 작성 유도 ── */
               !hasSchool ? (
                 <Card
-                  className="border shadow-none border-dashed border-orange-300 cursor-pointer transition-colors hover:bg-orange-50/50"
+                  className="glass-surface border-dashed border-orange-300 cursor-pointer shadow-none transition-colors hover:bg-orange-50/40"
                   onClick={() => router.push("/school")}
                 >
                   <CardContent className="flex items-center justify-between p-4">
@@ -1310,7 +1310,7 @@ export default function FoodTab({
                 </Card>
               ) : (
                 <Card
-                  className="border shadow-none border-dashed cursor-pointer transition-colors hover:bg-muted/50"
+                  className="glass-surface border-dashed cursor-pointer shadow-none transition-colors hover:bg-muted/70"
                   onClick={() => router.push("/community")}
                 >
                   <CardContent className="flex items-center justify-between p-4">
@@ -1332,7 +1332,7 @@ export default function FoodTab({
                 </Card>
               )
             ) : (
-              <Card className="border shadow-none overflow-hidden">
+              <Card className="glass-surface overflow-hidden shadow-none">
                 <CardContent className="p-0">
                   {communityPosts.map((post, i) => (
                     <div
@@ -1377,7 +1377,7 @@ export default function FoodTab({
                   🔥 인기 게시글
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <Card className="border shadow-none overflow-hidden">
+                  <Card className="glass-surface overflow-hidden shadow-none">
                     <CardContent className="p-0">
                       <div className="px-3 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground">
                         ❤️ 좋아요 TOP
@@ -1402,7 +1402,7 @@ export default function FoodTab({
                       ))}
                     </CardContent>
                   </Card>
-                  <Card className="border shadow-none overflow-hidden">
+                  <Card className="glass-surface overflow-hidden shadow-none">
                     <CardContent className="p-0">
                       <div className="px-3 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground">
                         👀 조회수 TOP
