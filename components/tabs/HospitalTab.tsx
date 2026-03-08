@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { NaverMap } from "@/components/medical/naver-map";
@@ -62,26 +62,100 @@ export default function HospitalTab() {
   const [listPage, setListPage] = useState(1);
   const hasLoadedOnce = useRef(false);
   const viewportFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locationWatchIdRef = useRef<number | null>(null);
 
+  const stopLocationWatch = useCallback(() => {
+    if (!navigator.geolocation || locationWatchIdRef.current == null) return;
+    navigator.geolocation.clearWatch(locationWatchIdRef.current);
+    locationWatchIdRef.current = null;
+  }, []);
+
+  const resolveBestLocation = useCallback(
+    async (options?: { targetAccuracy?: number; maxWaitMs?: number }) => {
+      const targetAccuracy = options?.targetAccuracy ?? 35;
+      const maxWaitMs = options?.maxWaitMs ?? 9000;
+
+      if (!navigator.geolocation) {
+        throw new Error("geolocation_not_supported");
+      }
+
+      return await new Promise<{ lat: number; lng: number; accuracy: number }>((resolve, reject) => {
+        let best: { lat: number; lng: number; accuracy: number } | null = null;
+        let settled = false;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+        const finish = (
+          result?: { lat: number; lng: number; accuracy: number },
+          err?: GeolocationPositionError | Error,
+        ) => {
+          if (settled) return;
+          settled = true;
+          if (timeoutId) clearTimeout(timeoutId);
+          stopLocationWatch();
+          if (result) resolve(result);
+          else if (err) reject(err);
+          else reject(new Error("geolocation_failed"));
+        };
+
+        locationWatchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const current = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              accuracy: position.coords.accuracy ?? 9999,
+            };
+            if (!best || current.accuracy < best.accuracy) best = current;
+            if (current.accuracy <= targetAccuracy) finish(current);
+          },
+          (error) => {
+            if (best) {
+              finish(best);
+              return;
+            }
+            finish(undefined, error);
+          },
+          { enableHighAccuracy: true, timeout: maxWaitMs, maximumAge: 0 },
+        );
+
+        timeoutId = setTimeout(() => {
+          if (best) {
+            finish(best);
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              finish({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                accuracy: position.coords.accuracy ?? 9999,
+              });
+            },
+            (error) => finish(undefined, error),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+          );
+        }, maxWaitMs);
+      });
+    },
+    [stopLocationWatch],
+  );
   // 현재 위치 가져오기
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        () => {
-          setUserLocation({ lat: 37.5665, lng: 126.978 });
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-      );
-    } else {
-      setUserLocation({ lat: 37.5665, lng: 126.978 });
-    }
-  }, []);
+    let cancelled = false;
+    resolveBestLocation()
+      .then((loc) => {
+        if (cancelled) return;
+        setUserLocation({ lat: loc.lat, lng: loc.lng });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUserLocation({ lat: 37.5665, lng: 126.978 });
+      });
+
+    return () => {
+      cancelled = true;
+      stopLocationWatch();
+    };
+  }, [resolveBestLocation, stopLocationWatch]);
 
   const calculateDistance = useCallback(
     (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -368,22 +442,18 @@ export default function HospitalTab() {
     skipCacheRef.current = true;
     setLocationName("");
     setMapCenter(null);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
-          setUserLocation(newLoc);
-        },
-        () => {
-          // GPS 실패 시 현재 위치 그대로 재검색
-          fetchPlaces();
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-      );
-    } else {
-      fetchPlaces();
-    }
-  }, [fetchPlaces]);
+    resolveBestLocation({ targetAccuracy: 25, maxWaitMs: 10000 })
+      .then((loc) => {
+        setUserLocation({ lat: loc.lat, lng: loc.lng });
+        if (loc.accuracy > 80) {
+          toast.info("GPS 정확도가 낮아 실내/지하에서 위치 오차가 생길 수 있어요");
+        }
+      })
+      .catch(() => {
+        // GPS 실패 시 현재 위치 그대로 재검색
+        fetchPlaces();
+      });
+  }, [fetchPlaces, resolveBestLocation]);
 
   // 필터링: 영업 중 + 검색어
   const filteredPlaces = places.filter((place) => {
@@ -605,3 +675,5 @@ export default function HospitalTab() {
     </div>
   );
 }
+
+
