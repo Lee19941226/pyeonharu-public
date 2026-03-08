@@ -33,7 +33,7 @@ interface LogActionParams {
 }
 
 /**
- * 요청 헤더에서 IP 주소와 User-Agent 추출
+ * 요청 헤더에서 IP 주소, User-Agent, 리전 정보 추출
  */
 export async function getRequestInfo() {
   const headersList = await headers();
@@ -42,7 +42,18 @@ export async function getRequestInfo() {
     headersList.get("x-real-ip") ||
     "unknown";
   const userAgent = headersList.get("user-agent") || "unknown";
-  return { ipAddress, userAgent };
+
+  // Vercel / Cloudflare 지오 헤더
+  const country =
+    headersList.get("x-vercel-ip-country") ||
+    headersList.get("cf-ipcountry") ||
+    "";
+  const countryRegion =
+    headersList.get("x-vercel-ip-country-region") || "";
+  const city = headersList.get("x-vercel-ip-city") || "";
+  const region = [city, countryRegion, country].filter(Boolean).join(", ");
+
+  return { ipAddress, userAgent, region };
 }
 
 /**
@@ -54,7 +65,7 @@ export async function logAction({
   metadata = {},
 }: LogActionParams) {
   try {
-    const { ipAddress, userAgent } = await getRequestInfo();
+    const { ipAddress, userAgent, region } = await getRequestInfo();
 
     supabaseAdmin
       .from("user_action_logs")
@@ -63,7 +74,7 @@ export async function logAction({
         action_type: actionType,
         ip_address: ipAddress,
         user_agent: userAgent,
-        metadata,
+        metadata: { ...metadata, ...(region && { _region: region }) },
       })
       .then(({ error }) => {
         if (error) {

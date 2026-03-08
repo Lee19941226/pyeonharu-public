@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Eye,
   Download,
+  MapPin,
 } from "lucide-react";
 
 // ─── Types ───
@@ -190,6 +191,7 @@ export default function ActionLogs() {
   const [actionType, setActionType] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [regions, setRegions] = useState<Record<string, string>>({});
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -204,7 +206,34 @@ export default function ActionLogs() {
       });
       const res = await fetch(`/api/admin/action-logs?${params}`);
       if (res.ok) {
-        setData(await res.json());
+        const result: ActionLogsResponse = await res.json();
+        setData(result);
+
+        // 리전 조회: 메타데이터에 _region 없는 고유 IP 추출
+        const needLookup = [
+          ...new Set(
+            result.logs
+              .filter(
+                (l) =>
+                  l.ip_address !== "unknown" &&
+                  !(l.metadata as Record<string, unknown>)?._region,
+              )
+              .map((l) => l.ip_address),
+          ),
+        ].filter((ipAddr) => !regions[ipAddr]);
+
+        if (needLookup.length > 0) {
+          fetch("/api/admin/ip-region", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ips: needLookup }),
+          })
+            .then((r) => r.json())
+            .then((regionData) =>
+              setRegions((prev) => ({ ...prev, ...regionData })),
+            )
+            .catch(console.error);
+        }
       }
     } catch (e) {
       console.error("Action logs fetch error:", e);
@@ -245,12 +274,15 @@ export default function ActionLogs() {
 
       // BOM + CSV 생성
       const BOM = "\uFEFF";
-      const header = ["시간", "사용자", "액션", "IP", "User-Agent", "메타데이터"];
+      const header = ["시간", "사용자", "액션", "IP", "리전", "User-Agent", "메타데이터"];
       const rows = result.logs.map((log) => [
         new Date(log.created_at).toLocaleString("ko-KR"),
         log.nickname || "비로그인",
         getActionConfig(log.action_type).label,
         log.ip_address,
+        (log.metadata as Record<string, unknown>)?._region as string ||
+          regions[log.ip_address] ||
+          "",
         `"${(log.user_agent || "").replace(/"/g, '""')}"`,
         `"${JSON.stringify(log.metadata).replace(/"/g, '""')}"`,
       ]);
@@ -466,6 +498,9 @@ export default function ActionLogs() {
                 <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">
                   IP
                 </th>
+                <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">
+                  리전
+                </th>
                 <th className="px-4 py-3 text-center font-medium">상세</th>
               </tr>
             </thead>
@@ -512,6 +547,14 @@ export default function ActionLogs() {
                     <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell font-mono">
                       {log.ip_address}
                     </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {(log.metadata as Record<string, unknown>)?._region as string ||
+                          regions[log.ip_address] ||
+                          "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => setExpandedRow(isExpanded ? null : log.id)}
@@ -527,7 +570,7 @@ export default function ActionLogs() {
                   </tr>,
                   isExpanded ? (
                     <tr key={`${log.id}-detail`} className="border-b bg-muted/20">
-                      <td colSpan={5} className="px-6 py-4">
+                      <td colSpan={6} className="px-6 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">
