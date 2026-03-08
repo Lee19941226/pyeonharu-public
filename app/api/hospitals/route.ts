@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 
 // ─── 위경도 → 시도코드 매핑 ───
 // HIRA API는 위경도 직접 검색을 지원하지 않으므로
@@ -63,7 +63,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const lat = parseFloat(searchParams.get("lat") ?? "")
   const lng = parseFloat(searchParams.get("lng") ?? "")
-  const radiusM = parseInt(searchParams.get("radius") || "3000")
+  const requestedRadiusM = parseInt(searchParams.get("radius") || "3000")
+  const radiusM = Number.isFinite(requestedRadiusM)
+    ? Math.min(30000, Math.max(100, requestedRadiusM))
+    : 3000
   const department = searchParams.get("department") || ""
   const numOfRows = searchParams.get("numOfRows") || "1000"
 
@@ -73,12 +76,7 @@ export async function GET(req: NextRequest) {
       { status: 400 }
     )
   }
-  if (isNaN(radiusM) || radiusM < 100 || radiusM > 5000) {
-    return NextResponse.json(
-      { error: "radius는 100~5000m 범위여야 합니다." },
-      { status: 400 }
-    )
-  }
+  
 
   try {
     const serviceKey = process.env.DATA_GO_KR_API_KEY
@@ -201,3 +199,4 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+

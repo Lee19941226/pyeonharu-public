@@ -13,6 +13,14 @@ export type ActionType =
   | "food_search"
   | "food_scan"
   | "food_check"
+  | "food_select"
+  | "food_share"
+  | "favorite_add"
+  | "favorite_remove"
+  | "hospital_search"
+  | "hospital_select"
+  | "pharmacy_search"
+  | "pharmacy_select"
   | "community_post_create"
   | "community_comment_create"
   | "community_comment_delete"
@@ -23,8 +31,7 @@ export type ActionType =
   | "account_delete"
   | "doctor_review_create"
   | "doctor_review_delete"
-  | "doctor_review_report"
-  | "food_select";
+  | "doctor_review_report";
 
 interface LogActionParams {
   userId: string | null;
@@ -48,17 +55,13 @@ export async function getRequestInfo() {
     headersList.get("x-vercel-ip-country") ||
     headersList.get("cf-ipcountry") ||
     "";
-  const countryRegion =
-    headersList.get("x-vercel-ip-country-region") || "";
+  const countryRegion = headersList.get("x-vercel-ip-country-region") || "";
   const city = headersList.get("x-vercel-ip-city") || "";
   const region = [city, countryRegion, country].filter(Boolean).join(", ");
 
   return { ipAddress, userAgent, region };
 }
 
-/**
- * 사용자 액션 로그 기록 (fire-and-forget)
- */
 export async function logAction({
   userId,
   actionType,

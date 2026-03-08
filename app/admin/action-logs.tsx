@@ -23,6 +23,8 @@ import {
   Eye,
   Download,
   MapPin,
+  Share2,
+  Star,
 } from "lucide-react";
 
 // ─── Types ───
@@ -88,6 +90,46 @@ const ACTION_CONFIG: Record<
     color: "bg-pink-100 text-pink-700",
     icon: Search,
   },
+  food_select: {
+    label: "식품 선택",
+    color: "bg-teal-100 text-teal-700",
+    icon: Eye,
+  },
+  food_share: {
+    label: "식품 공유",
+    color: "bg-violet-100 text-violet-700",
+    icon: Share2,
+  },
+  favorite_add: {
+    label: "즐겨찾기 추가",
+    color: "bg-amber-100 text-amber-700",
+    icon: Star,
+  },
+  favorite_remove: {
+    label: "즐겨찾기 삭제",
+    color: "bg-stone-100 text-stone-700",
+    icon: Trash2,
+  },
+  hospital_search: {
+    label: "병원 검색",
+    color: "bg-blue-100 text-blue-700",
+    icon: Search,
+  },
+  hospital_select: {
+    label: "병원 선택",
+    color: "bg-blue-100 text-blue-700",
+    icon: Eye,
+  },
+  pharmacy_search: {
+    label: "약국 검색",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Search,
+  },
+  pharmacy_select: {
+    label: "약국 선택",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Eye,
+  },
   community_post_create: {
     label: "게시글 작성",
     color: "bg-indigo-100 text-indigo-700",
@@ -139,7 +181,6 @@ function getActionConfig(type: string) {
     }
   );
 }
-
 
 function InsightList({
   title,
@@ -274,13 +315,21 @@ export default function ActionLogs() {
 
       // BOM + CSV 생성
       const BOM = "\uFEFF";
-      const header = ["시간", "사용자", "액션", "IP", "리전", "User-Agent", "메타데이터"];
+      const header = [
+        "시간",
+        "사용자",
+        "액션",
+        "IP",
+        "리전",
+        "User-Agent",
+        "메타데이터",
+      ];
       const rows = result.logs.map((log) => [
         new Date(log.created_at).toLocaleString("ko-KR"),
         log.nickname || "비로그인",
         getActionConfig(log.action_type).label,
         log.ip_address,
-        (log.metadata as Record<string, unknown>)?._region as string ||
+        ((log.metadata as Record<string, unknown>)?._region as string) ||
           regions[log.ip_address] ||
           "",
         `"${(log.user_agent || "").replace(/"/g, '""')}"`,
@@ -349,7 +398,9 @@ export default function ActionLogs() {
             disabled={downloading || !data}
             className="h-10 rounded-lg border bg-card px-3 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
-            <Download className={`h-4 w-4 ${downloading ? "animate-spin" : ""}`} />
+            <Download
+              className={`h-4 w-4 ${downloading ? "animate-spin" : ""}`}
+            />
             {downloading ? "다운로드 중..." : "Excel"}
           </button>
         </div>
@@ -392,7 +443,9 @@ export default function ActionLogs() {
             <div className="flex items-center justify-between mb-2">
               <Filter className="h-5 w-5 text-blue-600" />
             </div>
-            <p className="text-2xl font-bold">{totalActions.toLocaleString()}</p>
+            <p className="text-2xl font-bold">
+              {totalActions.toLocaleString()}
+            </p>
             <p className="text-xs text-muted-foreground">총 액션</p>
           </div>
 
@@ -408,7 +461,9 @@ export default function ActionLogs() {
                     <Icon className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <p className="text-2xl font-bold">{count.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">{config.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {config.label}
+                  </p>
                 </div>
               );
             })}
@@ -457,13 +512,18 @@ export default function ActionLogs() {
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Activity Visualization</h3>
-            <span className="text-xs text-muted-foreground">Last {period} days</span>
+            <span className="text-xs text-muted-foreground">
+              Last {period} days
+            </span>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <InsightList
               title="Action TOP"
               items={Object.entries(data.actionCounts)
-                .map(([key, count]) => ({ key: getActionConfig(key).label, count }))
+                .map(([key, count]) => ({
+                  key: getActionConfig(key).label,
+                  count,
+                }))
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 8)}
             />
@@ -504,7 +564,7 @@ export default function ActionLogs() {
                 <th className="px-4 py-3 text-center font-medium">상세</th>
               </tr>
             </thead>
-                        <tbody>
+            <tbody>
               {(data?.logs ?? []).flatMap((log) => {
                 const config = getActionConfig(log.action_type);
                 const isExpanded = expandedRow === log.id;
@@ -532,7 +592,7 @@ export default function ActionLogs() {
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                             <Globe className="h-3 w-3" />
-                            ????
+                            비로그인
                           </span>
                         )}
                       </div>
@@ -550,14 +610,17 @@ export default function ActionLogs() {
                     <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
-                        {(log.metadata as Record<string, unknown>)?._region as string ||
+                        {((log.metadata as Record<string, unknown>)
+                          ?._region as string) ||
                           regions[log.ip_address] ||
                           "—"}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() => setExpandedRow(isExpanded ? null : log.id)}
+                        onClick={() =>
+                          setExpandedRow(isExpanded ? null : log.id)
+                        }
                         className="rounded-md p-1 hover:bg-muted transition-colors"
                       >
                         {isExpanded ? (
@@ -569,26 +632,34 @@ export default function ActionLogs() {
                     </td>
                   </tr>,
                   isExpanded ? (
-                    <tr key={`${log.id}-detail`} className="border-b bg-muted/20">
+                    <tr
+                      key={`${log.id}-detail`}
+                      className="border-b bg-muted/20"
+                    >
                       <td colSpan={6} className="px-6 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">
                               User ID
                             </p>
-                            <p className="font-mono text-xs">{log.user_id || "N/A"}</p>
+                            <p className="font-mono text-xs">
+                              {log.user_id || "N/A"}
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">
                               User-Agent
                             </p>
-                            <p className="font-mono text-xs truncate" title={log.user_agent}>
+                            <p
+                              className="font-mono text-xs truncate"
+                              title={log.user_agent}
+                            >
                               {log.user_agent}
                             </p>
                           </div>
                           <div className="md:col-span-2">
                             <p className="text-xs font-semibold text-muted-foreground mb-1">
-                              ?????
+                              메타데이터
                             </p>
                             <pre className="rounded-lg bg-muted p-3 text-xs font-mono overflow-x-auto">
                               {JSON.stringify(log.metadata, null, 2)}
@@ -604,7 +675,6 @@ export default function ActionLogs() {
           </table>
 
           {/* 확장된 메타데이터 */}
-          
         </div>
       )}
 
@@ -618,10 +688,7 @@ export default function ActionLogs() {
             <ChevronLeft className="h-4 w-4" />
           </button>
           {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
-            const start = Math.max(
-              1,
-              Math.min(page - 2, data.totalPages - 4),
-            );
+            const start = Math.max(1, Math.min(page - 2, data.totalPages - 4));
             const p = start + i;
             if (p > data.totalPages) return null;
             return (
@@ -650,4 +717,3 @@ export default function ActionLogs() {
     </div>
   );
 }
-
