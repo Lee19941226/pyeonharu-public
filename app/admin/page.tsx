@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -47,6 +47,7 @@ import WhitelistManager from "./whitelist-manager";
 import CacheManager from "./cache-manager";
 import TesterManager from "./tester-manager";
 import AppVersionManager from "./app-version-manager";
+import MedicineImageManager from "./medicine-image-manager";
 import DataHealthDashboard from "./data-health-dashboard";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
@@ -861,6 +862,7 @@ export default function AdminDashboard() {
             <CacheManager />
             <TesterManager />
             <AppVersionManager />
+            <MedicineImageManager />
           </div>
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
@@ -1341,3 +1343,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

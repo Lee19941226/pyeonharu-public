@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -152,6 +152,20 @@ export function MobileNav() {
             if (response.status === 413) {
               toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
               return;
+            }
+
+            if (response.status === 429) {
+              toast.error("비로그인 스캔 한도를 초과했습니다. 로그인 후 계속 이용해주세요.");
+              router.push("/login");
+              return;
+            }
+
+            const remaining = response.headers.get("X-Remaining-Scans");
+            if (remaining !== null) {
+              const remainingNum = parseInt(remaining, 10);
+              if (remainingNum > 0 && remainingNum <= 2) {
+                toast.info(`비로그인 스캔이 ${remainingNum}회 남았습니다.`);
+              }
             }
 
             const data = await response.json();
@@ -670,3 +684,6 @@ export function MobileNav() {
     </>
   );
 }
+
+
+
