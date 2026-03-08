@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   const body = await req.json();
-  const { query, foodCode, foodName, dataSource } = body;
+  const { query, foodCode, foodName, dataSource, sourcePage } = body;
 
   if (!foodCode || !foodName) {
     return NextResponse.json({ error: "필수 정보 누락" }, { status: 400 });
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       food_code: foodCode,
       food_name: foodName,
       data_source: dataSource || "",
+      source_page: sourcePage || "",
     },
   });
 

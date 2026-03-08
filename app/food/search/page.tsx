@@ -298,6 +298,7 @@ function FoodSearchContent() {
         foodCode,
         foodName: item?.foodName || foodCode,
         dataSource: item?.dataSource || "",
+        sourcePage: "/food/search",
       }),
     }).catch(() => {});
     router.push(`/food/result/${foodCode}`);
@@ -939,6 +940,7 @@ function FoodSearchPageInner() {
           foodCode: item.foodCode,
           foodName: item.foodName,
           dataSource: item.dataSource || "",
+          sourcePage: "/food/search",
         }),
       }).catch(() => {});
     }

@@ -507,8 +507,10 @@ function FoodMainContent() {
   );
   const handlePageChange = (page: number) => setCurrentPage(page);
   const handleProductClick = (foodCode: string) => {
+    const selectedItem = results.find((r) => r.foodCode === foodCode);
+
     if (foodCode.startsWith("ai-")) {
-      const aiResult = results.find((r) => r.foodCode === foodCode);
+      const aiResult = selectedItem;
       if (aiResult) {
         saveAiResult(foodCode, {
           productName: aiResult.foodName,
@@ -526,6 +528,20 @@ function FoodMainContent() {
         });
       }
     }
+
+    // Search selection action log (allowed even without allergy profile)
+    fetch("/api/food/select-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        foodCode,
+        foodName: selectedItem?.foodName || foodCode,
+        dataSource: selectedItem?.dataSource || "",
+        sourcePage: "/food",
+      }),
+    }).catch(() => {});
+
     router.push(`/food/result/${foodCode}`);
   };
   const handleKeywordClick = (keyword: string) => {
