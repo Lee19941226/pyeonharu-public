@@ -13,6 +13,14 @@ export type ActionType =
   | "food_search"
   | "food_scan"
   | "food_check"
+  | "food_select"
+  | "food_share"
+  | "favorite_add"
+  | "favorite_remove"
+  | "hospital_search"
+  | "hospital_select"
+  | "pharmacy_search"
+  | "pharmacy_select"
   | "community_post_create"
   | "community_comment_create"
   | "community_comment_delete"
@@ -23,8 +31,7 @@ export type ActionType =
   | "account_delete"
   | "doctor_review_create"
   | "doctor_review_delete"
-  | "doctor_review_report"
-  | "food_select";
+  | "doctor_review_report";
 
 interface LogActionParams {
   userId: string | null;
@@ -32,9 +39,6 @@ interface LogActionParams {
   metadata?: Record<string, unknown>;
 }
 
-/**
- * 요청 헤더에서 IP 주소와 User-Agent 추출
- */
 export async function getRequestInfo() {
   const headersList = await headers();
   const ipAddress =
@@ -45,9 +49,6 @@ export async function getRequestInfo() {
   return { ipAddress, userAgent };
 }
 
-/**
- * 사용자 액션 로그 기록 (fire-and-forget)
- */
 export async function logAction({
   userId,
   actionType,
