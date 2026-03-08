@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 interface MedicineItem {
   entpName: string;
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
       interaction: cleanHtml(item.intrcQesitm) || "",
       sideEffect: cleanHtml(item.seQesitm) || "",
       storage: cleanHtml(item.depositMethodQesitm) || "",
-      image: item.itemImage || "",
+      image: normalizeMedicineImageUrl(item.itemImage),
       openDate: item.openDe || "",
       updateDate: item.updateDe || "",
     }));
@@ -129,6 +129,30 @@ export async function GET(req: NextRequest) {
   }
 }
 
+function normalizeMedicineImageUrl(rawUrl: string | null | undefined): string {
+  if (!rawUrl) return "";
+  const trimmed = String(rawUrl).trim().replace(/&amp;/g, "&");
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("http://")) {
+    return `https://${trimmed.slice("http://".length)}`;
+  }
+
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return parsed.toString();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
 // HTML 태그 제거 및 텍스트 정리
 function cleanHtml(text: string | null | undefined): string {
   if (!text) return "";
@@ -141,3 +165,6 @@ function cleanHtml(text: string | null | undefined): string {
     .replace(/\s+/g, " ") // 연속 공백 제거
     .trim();
 }
+
+
+

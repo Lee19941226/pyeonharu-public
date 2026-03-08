@@ -128,7 +128,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 
               // 이미지: self + Supabase + Google + 카카오 + 네이버 + 애드센스 + data URI
-              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com https://*.map.naver.com https://*.pstatic.net https://*.naver.net",
+              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com https://*.map.naver.com https://*.pstatic.net https://*.naver.net https://nedrug.mfds.go.kr https://*.mfds.go.kr",
 
               // 폰트: self
               "font-src 'self' data: https://cdn.jsdelivr.net",
@@ -202,4 +202,5 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
 

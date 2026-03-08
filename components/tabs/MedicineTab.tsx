@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ export default function MedicineTab() {
   const [hasSearched, setHasSearched] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [brokenImageIds, setBrokenImageIds] = useState<Record<string, true>>({})
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
@@ -43,6 +44,7 @@ export default function MedicineTab() {
       }
 
       setSearchResults(data.items || [])
+      setBrokenImageIds({})
       setTotalCount(data.totalCount || 0)
     } catch (err) {
       console.error("Search error:", err)
@@ -138,7 +140,7 @@ export default function MedicineTab() {
                     >
                       <CardContent className="min-h-[44px] p-4">
                         <div className="flex items-start gap-4">
-                          {medicine.image ? (
+                          {medicine.image && !brokenImageIds[medicine.id] ? (
                             <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                               <Image
                                 src={medicine.image}
@@ -146,6 +148,7 @@ export default function MedicineTab() {
                                 fill
                                 className="object-cover"
                                 unoptimized
+                                onError={() => setBrokenImageIds((prev) => ({ ...prev, [medicine.id]: true }))}
                               />
                             </div>
                           ) : (
@@ -187,7 +190,7 @@ export default function MedicineTab() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-start gap-4">
-                      {selectedMedicine.image ? (
+                      {selectedMedicine.image && !brokenImageIds[selectedMedicine.id] ? (
                         <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                           <Image
                             src={selectedMedicine.image}
@@ -195,6 +198,7 @@ export default function MedicineTab() {
                             fill
                             className="object-cover"
                             unoptimized
+                            onError={() => setBrokenImageIds((prev) => ({ ...prev, [selectedMedicine.id]: true }))}
                           />
                         </div>
                       ) : (
@@ -319,3 +323,4 @@ export default function MedicineTab() {
     </div>
   )
 }
+
