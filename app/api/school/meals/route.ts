@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { isPyeonharuSchool, getSchoolForDate } from "@/lib/constants/pyeonharu-school"
+import { isPyeonharuSchool, getSchoolForDate, SAMPLE_SCHOOLS_COUNT } from "@/lib/constants/pyeonharu-school"
 
 // 나이스 알레르기 번호 → 알레르기명 매핑
 const NEIS_ALLERGEN_MAP: Record<string, string> = {
@@ -287,62 +287,83 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 단일 날짜 모드 ───────────────────────────────────────────────
-    // 1. 캐시 확인
-    const { data: cached } = await supabase
-      .from("school_meals_cache")
-      .select("*")
-      .eq("school_code", actualSchoolCode)
-      .eq("meal_date", targetDate)
+    // 편하루: 선택된 학교에 데이터 없으면 다른 학교 시도
+    const maxAttempts = isPyeonharu ? SAMPLE_SCHOOLS_COUNT : 1
 
-    if (cached && cached.length > 0) {
-      console.log("[Meals] Cache hit:", actualSchoolCode, targetDate)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (isPyeonharu && attempt > 0) {
+        const fallback = getSchoolForDate(targetDate, attempt)
+        actualSchoolCode = fallback.schoolCode
+        actualOfficeCode = fallback.officeCode
+      }
 
-      const meals = cached.map(c => ({
-        mealType: c.meal_type,
-        mealTypeName: c.meal_type === "1" ? "조식" : c.meal_type === "2" ? "중식" : "석식",
-        menu: c.menu_json,
-        calInfo: c.cal_info,
-        ntrInfo: c.ntr_info,
-        originInfo: c.origin_info,
-      }))
+      // 1. 캐시 확인
+      const { data: cached } = await supabase
+        .from("school_meals_cache")
+        .select("*")
+        .eq("school_code", actualSchoolCode)
+        .eq("meal_date", targetDate)
 
+      if (cached && cached.length > 0) {
+        console.log("[Meals] Cache hit:", actualSchoolCode, targetDate)
+
+        const meals = cached.map((c: any) => ({
+          mealType: c.meal_type,
+          mealTypeName: c.meal_type === "1" ? "조식" : c.meal_type === "2" ? "중식" : "석식",
+          menu: c.menu_json,
+          calInfo: c.cal_info,
+          ntrInfo: c.ntr_info,
+          originInfo: c.origin_info,
+        }))
+
+        const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
+        const matchedMeals = matchAllergens(meals, allergenNames)
+        return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
+      }
+
+      // 2. 나이스 API 호출
+      const meals = await fetchFromNeis(actualSchoolCode, actualOfficeCode, targetDate)
+
+      if (meals.length === 0) {
+        // 편하루: 이 학교에 데이터 없으면 다음 학교 시도
+        if (isPyeonharu && attempt < maxAttempts - 1) continue
+        return NextResponse.json({
+          meals: [],
+          date: targetDate,
+          message: "해당 날짜의 급식 정보가 없습니다.",
+          checkedMember,
+        })
+      }
+
+      // 3. 캐시 저장 (병렬)
+      await Promise.all(
+        meals.map((meal: any) =>
+          supabase.from("school_meals_cache").upsert({
+            school_code: actualSchoolCode,
+            meal_date: targetDate,
+            meal_type: meal.mealType,
+            menu_json: meal.menu,
+            cal_info: meal.calInfo,
+            ntr_info: meal.ntrInfo,
+            origin_info: meal.originInfo,
+          }, { onConflict: "school_code,meal_date,meal_type" })
+        )
+      );
+
+      // 4. 알레르기 매칭
       const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
       const matchedMeals = matchAllergens(meals, allergenNames)
-      return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
+
+      return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })
     }
 
-    // 2. 나이스 API 호출
-    const meals = await fetchFromNeis(actualSchoolCode, actualOfficeCode, targetDate)
-
-    if (meals.length === 0) {
-      return NextResponse.json({
-        meals: [],
-        date: targetDate,
-        message: "해당 날짜의 급식 정보가 없습니다.",
-        checkedMember,
-      })
-    }
-
-    // 3. 캐시 저장 (병렬)
-    await Promise.all(
-      meals.map((meal: any) =>
-        supabase.from("school_meals_cache").upsert({
-          school_code: actualSchoolCode,
-          meal_date: targetDate,
-          meal_type: meal.mealType,
-          menu_json: meal.menu,
-          cal_info: meal.calInfo,
-          ntr_info: meal.ntrInfo,
-          origin_info: meal.originInfo,
-        }, { onConflict: "school_code,meal_date,meal_type" })
-      )
-    );
-
-    // 4. 알레르기 매칭
-    const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
-    const matchedMeals = matchAllergens(meals, allergenNames)
-
-    return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })
+    // 모든 학교 시도 후에도 데이터 없음 (이론상 도달 불가)
+    return NextResponse.json({
+      meals: [],
+      date: targetDate,
+      message: "해당 날짜의 급식 정보가 없습니다.",
+      checkedMember,
+    })
   } catch (error) {
     console.error("[Meals] Error:", error)
     return NextResponse.json({ error: "급식 정보 조회에 실패했습니다." }, { status: 500 })

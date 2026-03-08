@@ -20,12 +20,15 @@ const SAMPLE_SCHOOLS = [
 /**
  * 날짜 기반으로 실제 학교 선택 (같은 날에는 항상 같은 학교)
  * @param date YYYYMMDD 형식
+ * @param offset 데이터 없을 때 다음 학교로 시도하기 위한 오프셋
  */
-export function getSchoolForDate(date: string) {
+export function getSchoolForDate(date: string, offset = 0) {
   const num = parseInt(date, 10) || 0;
-  const idx = num % SAMPLE_SCHOOLS.length;
+  const idx = (num + offset) % SAMPLE_SCHOOLS.length;
   return SAMPLE_SCHOOLS[idx];
 }
+
+export const SAMPLE_SCHOOLS_COUNT = SAMPLE_SCHOOLS.length;
 
 export function isPyeonharuSchool(schoolCode: string, officeCode: string) {
   return (

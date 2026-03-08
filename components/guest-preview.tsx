@@ -42,6 +42,7 @@ const BANNER_KEY = "pyeonharu_guest_banner_dismissed";
 export function GuestPreview() {
   const router = useRouter();
   const [meals, setMeals] = useState<Meal[]>([]);
+  const [mealsLoaded, setMealsLoaded] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [bannerDismissed, setBannerDismissed] = useState(true);
 
@@ -53,8 +54,11 @@ export function GuestPreview() {
       `/api/school/meals?schoolCode=PYEONHARU&officeCode=PYEONHARU&date=${today}`,
     )
       .then((r) => r.json())
-      .then((d) => setMeals(d.meals || []))
-      .catch(() => {});
+      .then((d) => {
+        setMeals(d.meals || []);
+        setMealsLoaded(true);
+      })
+      .catch(() => setMealsLoaded(true));
 
     fetch("/api/community?limit=5")
       .then((r) => r.json())
@@ -97,7 +101,7 @@ export function GuestPreview() {
         )}
 
         {/* 오늘의 급식 */}
-        {meals.length > 0 && (
+        {mealsLoaded && (
           <div className="rounded-xl border bg-card p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold">
@@ -105,23 +109,29 @@ export function GuestPreview() {
                 편하루 고등학교 오늘의 급식
               </h3>
             </div>
-            <div className="space-y-2">
-              {meals.map((meal) => (
-                <div key={meal.mealType}>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {meal.mealTypeName}
-                  </span>
-                  <p className="text-sm">
-                    {meal.menu.map((m) => m.name).join(", ")}
-                  </p>
-                  {meal.calInfo && (
-                    <span className="text-[11px] text-muted-foreground">
-                      {meal.calInfo}
+            {meals.length > 0 ? (
+              <div className="space-y-2">
+                {meals.map((meal) => (
+                  <div key={meal.mealType}>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {meal.mealTypeName}
                     </span>
-                  )}
-                </div>
-              ))}
-            </div>
+                    <p className="text-sm">
+                      {meal.menu.map((m) => m.name).join(", ")}
+                    </p>
+                    {meal.calInfo && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {meal.calInfo}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                오늘은 급식 정보가 없습니다.
+              </p>
+            )}
             <p className="mt-3 text-xs text-muted-foreground">
               로그인하면 내 학교 급식과 알레르기 안전 정보를 확인할 수 있어요
             </p>
