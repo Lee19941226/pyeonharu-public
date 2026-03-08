@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -539,7 +539,7 @@ export default function ActionLogs() {
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                             <Globe className="h-3 w-3" />
-                            ????
+                            비로그인
                           </span>
                         )}
                       </div>
@@ -587,7 +587,7 @@ export default function ActionLogs() {
                           </div>
                           <div className="md:col-span-2">
                             <p className="text-xs font-semibold text-muted-foreground mb-1">
-                              ?????
+                              메타데이터
                             </p>
                             <pre className="rounded-lg bg-muted p-3 text-xs font-mono overflow-x-auto">
                               {JSON.stringify(log.metadata, null, 2)}
@@ -649,4 +649,6 @@ export default function ActionLogs() {
     </div>
   );
 }
+
+
 
