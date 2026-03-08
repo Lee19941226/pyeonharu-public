@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -43,6 +43,7 @@ interface ActionLogsResponse {
   limit: number;
   totalPages: number;
   actionCounts: Record<string, number>;
+  hourlyCounts?: Array<{ key: string; count: number }>;
   foodSelectInsights?: {
     total: number;
     topQueries: Array<{ key: string; count: number }>;
@@ -420,6 +421,31 @@ export default function ActionLogs() {
       )}
 
       {/* 액션 로그 테이블 */}
+      {data && (
+        <div className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Activity Visualization</h3>
+            <span className="text-xs text-muted-foreground">Last {period} days</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <InsightList
+              title="Action TOP"
+              items={Object.entries(data.actionCounts)
+                .map(([key, count]) => ({ key: getActionConfig(key).label, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 8)}
+            />
+            <InsightList
+              title="Hourly TOP"
+              items={(data.hourlyCounts || [])
+                .map((h) => ({ key: h.key + ":00", count: h.count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 8)}
+            />
+          </div>
+        </div>
+      )}
+
       {loading && !data ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -443,11 +469,11 @@ export default function ActionLogs() {
                 <th className="px-4 py-3 text-center font-medium">상세</th>
               </tr>
             </thead>
-            <tbody>
-              {data?.logs.map((log) => {
+                        <tbody>
+              {(data?.logs ?? []).flatMap((log) => {
                 const config = getActionConfig(log.action_type);
                 const isExpanded = expandedRow === log.id;
-                return (
+                return [
                   <tr key={log.id} className="border-b hover:bg-muted/30">
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       <div className="flex items-center gap-1">
@@ -471,7 +497,7 @@ export default function ActionLogs() {
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                             <Globe className="h-3 w-3" />
-                            비로그인
+                            ????
                           </span>
                         )}
                       </div>
@@ -488,9 +514,7 @@ export default function ActionLogs() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() =>
-                          setExpandedRow(isExpanded ? null : log.id)
-                        }
+                        onClick={() => setExpandedRow(isExpanded ? null : log.id)}
                         className="rounded-md p-1 hover:bg-muted transition-colors"
                       >
                         {isExpanded ? (
@@ -500,53 +524,47 @@ export default function ActionLogs() {
                         )}
                       </button>
                     </td>
-                  </tr>
-                );
+                  </tr>,
+                  isExpanded ? (
+                    <tr key={`${log.id}-detail`} className="border-b bg-muted/20">
+                      <td colSpan={5} className="px-6 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">
+                              User ID
+                            </p>
+                            <p className="font-mono text-xs">{log.user_id || "N/A"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">
+                              User-Agent
+                            </p>
+                            <p className="font-mono text-xs truncate" title={log.user_agent}>
+                              {log.user_agent}
+                            </p>
+                          </div>
+                          <div className="md:col-span-2">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">
+                              ?????
+                            </p>
+                            <pre className="rounded-lg bg-muted p-3 text-xs font-mono overflow-x-auto">
+                              {JSON.stringify(log.metadata, null, 2)}
+                            </pre>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null,
+                ];
               })}
             </tbody>
           </table>
 
           {/* 확장된 메타데이터 */}
-          {expandedRow && data?.logs && (
-            (() => {
-              const log = data.logs.find((l) => l.id === expandedRow);
-              if (!log) return null;
-              return (
-                <div className="border-t bg-muted/20 px-6 py-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">
-                        User ID
-                      </p>
-                      <p className="font-mono text-xs">
-                        {log.user_id || "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">
-                        User-Agent
-                      </p>
-                      <p className="font-mono text-xs truncate" title={log.user_agent}>
-                        {log.user_agent}
-                      </p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">
-                        메타데이터
-                      </p>
-                      <pre className="rounded-lg bg-muted p-3 text-xs font-mono overflow-x-auto">
-                        {JSON.stringify(log.metadata, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()
-          )}
+          
         </div>
       )}
 
-      {/* 페이지네이션 */}
       {data && data.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
@@ -589,3 +607,4 @@ export default function ActionLogs() {
     </div>
   );
 }
+

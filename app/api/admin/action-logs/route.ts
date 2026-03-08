@@ -8,6 +8,7 @@ const supabaseAdmin = createClient(
 );
 
 type FoodSelectInsightItem = { key: string; count: number };
+type HourInsightItem = { key: string; count: number };
 
 type FoodSelectInsights = {
   total: number;
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
           limit,
           totalPages: 0,
           actionCounts: {},
+          hourlyCounts: [],
           foodSelectInsights: {
             total: 0,
             topQueries: [],
@@ -115,20 +117,26 @@ export async function GET(req: NextRequest) {
 
     const enrichedLogs = (logs || []).map((log) => ({
       ...log,
-      nickname: log.user_id
-        ? nicknameMap[log.user_id] || "Unknown"
-        : "비로그인",
+      nickname: log.user_id ? nicknameMap[log.user_id] || "Unknown" : "비로그인",
     }));
 
-    // 액션 타입별 통계
+    // 액션 타입/시간대 통계
     const { data: statsData } = await supabaseAdmin
       .from("user_action_logs")
-      .select("action_type")
+      .select("action_type, created_at")
       .gte("created_at", startDate.toISOString());
 
     const actionCounts: Record<string, number> = {};
+    const hourlyMap: Record<string, number> = {};
     statsData?.forEach((s) => {
       actionCounts[s.action_type] = (actionCounts[s.action_type] || 0) + 1;
+      const hour = new Date(s.created_at).getHours().toString().padStart(2, "0");
+      hourlyMap[hour] = (hourlyMap[hour] || 0) + 1;
+    });
+
+    const hourlyCounts: HourInsightItem[] = Array.from({ length: 24 }, (_, hour) => {
+      const key = String(hour).padStart(2, "0");
+      return { key, count: hourlyMap[key] || 0 };
     });
 
     let foodSelectInsights: FoodSelectInsights = {
@@ -196,13 +204,11 @@ export async function GET(req: NextRequest) {
       limit,
       totalPages: Math.ceil((count || 0) / limit),
       actionCounts,
+      hourlyCounts,
       foodSelectInsights,
     });
   } catch (error) {
     console.error("Action logs error:", error);
-    return NextResponse.json(
-      { error: "활동 로그 조회 실패" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "활동 로그 조회 실패" }, { status: 500 });
   }
 }
