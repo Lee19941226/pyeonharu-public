@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
 
@@ -6,6 +6,15 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+type FoodSelectInsightItem = { key: string; count: number };
+
+type FoodSelectInsights = {
+  total: number;
+  topQueries: FoodSelectInsightItem[];
+  topFoods: FoodSelectInsightItem[];
+  bySourcePage: FoodSelectInsightItem[];
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -67,7 +76,20 @@ export async function GET(req: NextRequest) {
     if (searchUserIds !== null) {
       if (searchUserIds.length === 0) {
         // 매칭 결과 없음 → 빈 결과 반환
-        return NextResponse.json({ logs: [], total: 0, page, limit, totalPages: 0, actionCounts: {} });
+        return NextResponse.json({
+          logs: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+          actionCounts: {},
+          foodSelectInsights: {
+            total: 0,
+            topQueries: [],
+            topFoods: [],
+            bySourcePage: [],
+          },
+        });
       }
       query = query.in("user_id", searchUserIds);
     }
@@ -109,6 +131,64 @@ export async function GET(req: NextRequest) {
       actionCounts[s.action_type] = (actionCounts[s.action_type] || 0) + 1;
     });
 
+    let foodSelectInsights: FoodSelectInsights = {
+      total: 0,
+      topQueries: [],
+      topFoods: [],
+      bySourcePage: [],
+    };
+
+    if (!actionType || actionType === "food_select") {
+      let foodSelectQuery = supabaseAdmin
+        .from("user_action_logs")
+        .select("metadata")
+        .eq("action_type", "food_select")
+        .gte("created_at", startDate.toISOString());
+
+      if (userId) foodSelectQuery = foodSelectQuery.eq("user_id", userId);
+      if (ip) {
+        const safeIp = ip.replace(/[%_\\]/g, "");
+        if (safeIp) foodSelectQuery = foodSelectQuery.ilike("ip_address", `%${safeIp}%`);
+      }
+      if (searchUserIds !== null) {
+        if (searchUserIds.length > 0) {
+          foodSelectQuery = foodSelectQuery.in("user_id", searchUserIds);
+        } else {
+          foodSelectQuery = foodSelectQuery.in("user_id", ["00000000-0000-0000-0000-000000000000"]);
+        }
+      }
+
+      const { data: foodSelectRows } = await foodSelectQuery.limit(10000);
+
+      const queryMap: Record<string, number> = {};
+      const foodMap: Record<string, number> = {};
+      const sourceMap: Record<string, number> = {};
+
+      (foodSelectRows || []).forEach((row) => {
+        const metadata = (row.metadata || {}) as Record<string, unknown>;
+        const q = String(metadata.query || "").trim();
+        const food = String(metadata.food_name || "").trim();
+        const source = String(metadata.source_page || "unknown").trim() || "unknown";
+
+        if (q) queryMap[q] = (queryMap[q] || 0) + 1;
+        if (food) foodMap[food] = (foodMap[food] || 0) + 1;
+        sourceMap[source] = (sourceMap[source] || 0) + 1;
+      });
+
+      const toTopItems = (map: Record<string, number>) =>
+        Object.entries(map)
+          .map(([key, count]) => ({ key, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 7);
+
+      foodSelectInsights = {
+        total: (foodSelectRows || []).length,
+        topQueries: toTopItems(queryMap),
+        topFoods: toTopItems(foodMap),
+        bySourcePage: toTopItems(sourceMap),
+      };
+    }
+
     return NextResponse.json({
       logs: enrichedLogs,
       total: count || 0,
@@ -116,6 +196,7 @@ export async function GET(req: NextRequest) {
       limit,
       totalPages: Math.ceil((count || 0) / limit),
       actionCounts,
+      foodSelectInsights,
     });
   } catch (error) {
     console.error("Action logs error:", error);

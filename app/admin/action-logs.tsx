@@ -43,6 +43,12 @@ interface ActionLogsResponse {
   limit: number;
   totalPages: number;
   actionCounts: Record<string, number>;
+  foodSelectInsights?: {
+    total: number;
+    topQueries: Array<{ key: string; count: number }>;
+    topFoods: Array<{ key: string; count: number }>;
+    bySourcePage: Array<{ key: string; count: number }>;
+  };
 }
 
 // ─── 액션 타입 정의 ───
@@ -129,6 +135,45 @@ function getActionConfig(type: string) {
       color: "bg-gray-100 text-gray-700",
       icon: Filter,
     }
+  );
+}
+
+
+function InsightList({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ key: string; count: number }>;
+}) {
+  const max = items[0]?.count || 1;
+
+  return (
+    <div className="rounded-xl border bg-card p-4">
+      <h4 className="mb-3 text-sm font-semibold">{title}</h4>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">데이터가 없습니다</p>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((item) => (
+            <div key={item.key}>
+              <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                <span className="truncate text-foreground" title={item.key}>
+                  {item.key}
+                </span>
+                <span className="shrink-0 font-semibold">{item.count}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted">
+                <div
+                  className="h-1.5 rounded-full bg-primary"
+                  style={{ width: `${Math.max(8, (item.count / max) * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -337,6 +382,30 @@ export default function ActionLogs() {
         </div>
       )}
 
+      {data && (
+        <div className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">식품 선택 시각화</h3>
+            <span className="text-xs text-muted-foreground">
+              총 선택 {data.foodSelectInsights?.total?.toLocaleString() || 0}건
+            </span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <InsightList
+              title="검색어 TOP"
+              items={data.foodSelectInsights?.topQueries || []}
+            />
+            <InsightList
+              title="선택 품목 TOP"
+              items={data.foodSelectInsights?.topFoods || []}
+            />
+            <InsightList
+              title="유입 페이지"
+              items={data.foodSelectInsights?.bySourcePage || []}
+            />
+          </div>
+        </div>
+      )}
       {/* 통계 바 */}
       {data && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
