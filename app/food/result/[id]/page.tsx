@@ -40,6 +40,7 @@ export default function FoodResultPage() {
   const [userName, setUserName] = useState<string>("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [profileAllergens, setProfileAllergens] = useState<string[]>([]);
   const lastLoadedIdRef = useRef<string | undefined>(null);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("me");
@@ -58,6 +59,24 @@ export default function FoodResultPage() {
     lastLoadedIdRef.current = id;
     loadFoodResult();
   }, [params.id]);
+
+  // 서버 응답에 userAllergens가 비었을 때 클라이언트 프로필 알레르기로 보정
+  useEffect(() => {
+    if (!result || profileAllergens.length === 0) return;
+    if ((result.userAllergens || []).length > 0) return;
+
+    const patchedResult: FoodResult = {
+      ...result,
+      userAllergens: profileAllergens,
+    };
+
+    setResult(patchedResult);
+
+    if (!patchedResult.isSafe) {
+      fetchAlternatives(patchedResult);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, profileAllergens]);
 
   // ✅ result가 로드된 후에 즐겨찾기 확인
   useEffect(() => {
@@ -89,6 +108,13 @@ export default function FoodResultPage() {
           setUserName(user.email?.split("@")[0] || "회원");
         }
 
+        const { data: allergyData } = await supabase
+          .from("user_allergies")
+          .select("allergen_name")
+          .eq("user_id", user.id);
+
+        setProfileAllergens((allergyData || []).map((a) => a.allergen_name));
+
         // ✅ 가족 구성원 로드 (user 확인 후 여기서 호출)
         fetch("/api/family")
           .then((r) => r.json())
@@ -97,6 +123,7 @@ export default function FoodResultPage() {
           });
       } else {
         setIsLoggedIn(false);
+        setProfileAllergens([]);
       }
     };
 
@@ -684,7 +711,10 @@ export default function FoodResultPage() {
   const safeAllergens = result?.allergens || [];
   const safeDetectedAllergens = result?.detectedAllergens || [];
   const safeIngredients = result?.ingredients || [];
-  const safeUserAllergens = result.userAllergens || [];
+  const safeUserAllergens =
+    result.userAllergens && result.userAllergens.length > 0
+      ? result.userAllergens
+      : profileAllergens;
   const safeCrossContaminationRisks = result.crossContaminationRisks || [];
 
   return (
