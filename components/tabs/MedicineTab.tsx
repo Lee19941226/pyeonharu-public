@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Pill, Search, AlertTriangle, Clock, Ban, Info, Loader2, ArrowLeft, Package } from "lucide-react"
 import Image from "next/image"
@@ -22,6 +23,7 @@ export default function MedicineTab() {
   const [hasSearched, setHasSearched] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
   const [brokenImageIds, setBrokenImageIds] = useState<Record<string, true>>({})
 
   const handleSearch = async () => {
@@ -141,7 +143,12 @@ export default function MedicineTab() {
                       <CardContent className="min-h-[44px] p-4">
                         <div className="flex items-start gap-4">
                           {medicine.image && !brokenImageIds[medicine.id] ? (
-                            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                            <button
+                              type="button"
+                              className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary"
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage({ src: medicine.image, alt: medicine.name }); }}
+                              aria-label={`${medicine.name} 이미지 크게 보기`}
+                            >
                               <Image
                                 src={medicine.image}
                                 alt={medicine.name}
@@ -150,7 +157,7 @@ export default function MedicineTab() {
                                 unoptimized
                                 onError={() => setBrokenImageIds((prev) => ({ ...prev, [medicine.id]: true }))}
                               />
-                            </div>
+                            </button>
                           ) : (
                             <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                               <Package className="h-8 w-8 text-muted-foreground" />
@@ -191,7 +198,12 @@ export default function MedicineTab() {
                   <CardHeader>
                     <div className="flex items-start gap-4">
                       {selectedMedicine.image && !brokenImageIds[selectedMedicine.id] ? (
-                        <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                        <button
+                          type="button"
+                          className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary"
+                          onClick={() => setPreviewImage({ src: selectedMedicine.image, alt: selectedMedicine.name })}
+                          aria-label={`${selectedMedicine.name} 이미지 크게 보기`}
+                        >
                           <Image
                             src={selectedMedicine.image}
                             alt={selectedMedicine.name}
@@ -200,7 +212,7 @@ export default function MedicineTab() {
                             unoptimized
                             onError={() => setBrokenImageIds((prev) => ({ ...prev, [selectedMedicine.id]: true }))}
                           />
-                        </div>
+                        </button>
                       ) : (
                         <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                           <Package className="h-10 w-10 text-muted-foreground" />
@@ -320,7 +332,24 @@ export default function MedicineTab() {
           </div>
         </div>
       </div>
+      <Dialog open={!!previewImage} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+        <DialogContent className="max-w-xl p-0 overflow-hidden">
+          <DialogTitle className="sr-only">약 이미지 확대 보기</DialogTitle>
+          {previewImage && (
+            <div className="relative w-full aspect-square bg-black/5">
+              <Image
+                src={previewImage.src}
+                alt={previewImage.alt}
+                fill
+                unoptimized
+                className="object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+
 
