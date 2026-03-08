@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/header";
@@ -701,7 +701,7 @@ export default function FoodResultPage() {
           <p className="mb-4 text-sm text-muted-foreground">
             식품 정보를 찾을 수 없거나 오류가 발생했습니다
           </p>
-          <Button onClick={() => router.push("/food")}>
+          <Button onClick={() => router.push("/food/search")}>
             검색으로 돌아가기
           </Button>
         </div>
@@ -950,12 +950,10 @@ export default function FoodResultPage() {
                         <p className="text-sm text-amber-700">
                           등록된 알레르기가 없어 맞춤 분석을 할 수 없어요
                         </p>
-                        <Link
-                          href="/food/profile"
-                          className="mt-1 inline-block text-sm font-medium text-amber-700 underline hover:text-amber-900"
-                        >
-                          알레르기 등록하고 맞춤 분석 받기 →
-                        </Link>
+                        <p className="mt-1 text-sm text-amber-700">
+                          아래 안내에서 알레르기 등록을 완료하면 맞춤 분석이
+                          적용됩니다
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -986,12 +984,10 @@ export default function FoodResultPage() {
                             <p className="text-sm text-green-700">
                               확인된 알레르기 성분이 없습니다
                             </p>
-                            <Link
-                              href="/food/profile"
-                              className="text-sm text-green-600 underline hover:text-green-800"
-                            >
-                              내 알레르기 정보를 등록하고 정확하게 확인하세요 →
-                            </Link>
+                            <p className="text-sm text-green-700">
+                              아래 안내에서 알레르기 등록 후 맞춤 확인을
+                              이용하세요
+                            </p>
                           </>
                         )}
                       </div>
@@ -1016,7 +1012,7 @@ export default function FoodResultPage() {
                         {safeDetectedAllergens
                           .filter((a) => a && a.name)
                           .map((a) => a.name)
-                          .join(", ")}{" "}
+                          .join(", ")} 
                         함유
                       </p>
                       {isLoggedIn ? (
@@ -1033,33 +1029,29 @@ export default function FoodResultPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Link href="/hospital" className="flex-1">
-                      <Button className="w-full" variant="destructive">
-                        <MapPin className="mr-2 h-4 w-4" />
-                        병원 찾기
-                      </Button>
-                    </Link>
                     {isLoggedIn ? (
-                      <Link
-                        href={`/food/guide/${params.id}`}
-                        className="flex-1"
-                      >
-                        <Button className="w-full" variant="outline">
-                          💊 대처법
+                      <Link href={`/food/guide/${params.id}`} className="flex-1">
+                        <Button className="w-full" variant="destructive">
+                          💊 대처법 보기
                         </Button>
                       </Link>
                     ) : (
                       <Link href="/food/profile" className="flex-1">
-                        <Button className="w-full" variant="outline">
-                          🔐 내 정보 등록
+                        <Button className="w-full" variant="destructive">
+                          🔐 내 알레르기 등록
                         </Button>
                       </Link>
                     )}
+                    <Link href="/hospital" className="flex-1">
+                      <Button className="w-full" variant="outline">
+                        <MapPin className="mr-2 h-4 w-4" />
+                        병원 찾기
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
             )}
-            {/* 내 알레르기 검출 (조건부) */}
             {safeUserAllergens.length > 0 ? (
               <Card className="mb-6">
                 <CardContent className="p-6">
