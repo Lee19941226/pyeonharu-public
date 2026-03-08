@@ -1,4 +1,5 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+﻿import medicineImageOverridesJson from "@/data/medicine-image-overrides.json";
+import { NextRequest, NextResponse } from "next/server";
 
 interface MedicineItem {
   entpName: string;
@@ -16,6 +17,39 @@ interface MedicineItem {
   itemImage: string;
 }
 
+
+interface MedicineImageOverrides {
+  byItemSeq?: Record<string, string>;
+  byItemName?: Record<string, string>;
+}
+
+const medicineImageOverrides = medicineImageOverridesJson as MedicineImageOverrides;
+
+function normalizeMedicineName(name: string | null | undefined): string {
+  if (!name) return "";
+  return String(name)
+    .toLowerCase()
+    .replace(/\(.*?\)/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .trim();
+}
+
+function getMedicineImageOverride(itemSeq: string | null | undefined, itemName: string | null | undefined): string {
+  const bySeq = itemSeq ? medicineImageOverrides.byItemSeq?.[itemSeq] : "";
+  if (bySeq) return normalizeMedicineImageUrl(bySeq);
+
+  const targetName = normalizeMedicineName(itemName);
+  if (!targetName) return "";
+
+  const byNameEntries = Object.entries(medicineImageOverrides.byItemName || {});
+  for (const [nameKey, imageUrl] of byNameEntries) {
+    if (normalizeMedicineName(nameKey) === targetName) {
+      return normalizeMedicineImageUrl(imageUrl);
+    }
+  }
+
+  return "";
+}
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -108,7 +142,9 @@ export async function GET(req: NextRequest) {
       interaction: cleanHtml(item.intrcQesitm) || "",
       sideEffect: cleanHtml(item.seQesitm) || "",
       storage: cleanHtml(item.depositMethodQesitm) || "",
-      image: normalizeMedicineImageUrl(item.itemImage),
+      image:
+        normalizeMedicineImageUrl(item.itemImage) ||
+        getMedicineImageOverride(item.itemSeq, item.itemName),
       openDate: item.openDe || "",
       updateDate: item.updateDe || "",
     }));
@@ -165,6 +201,7 @@ function cleanHtml(text: string | null | undefined): string {
     .replace(/\s+/g, " ") // 연속 공백 제거
     .trim();
 }
+
 
 
 
