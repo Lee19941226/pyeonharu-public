@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+﻿/** @type {import('next').NextConfig} */
 /*
   배포 후 브라우저 개발자도구 → 
   Console에서 CSP 위반 오류가 뜨는지 확인하세요. 
@@ -110,7 +110,7 @@ const nextConfig = {
               // - *.map.naver.net 제거: 지도 타일 이미지 도메인, script-src 불필요 (img-src에서 처리)
               // - *.pstatic.net 제거: Naver 정적 이미지 도메인, script-src 불필요 (img-src에서 처리)
               // - www.googletagmanager.com 제거: layout.tsx에 GTM Script 없음 (필요 시 재추가)
-              "script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net https://oapi.map.naver.com https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
+              "script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net https://oapi.map.naver.com https://nrbe.pstatic.net https://*.pstatic.net https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
 
               /*
                * [style-src] 'unsafe-inline' 유지 이유:
@@ -202,3 +202,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+

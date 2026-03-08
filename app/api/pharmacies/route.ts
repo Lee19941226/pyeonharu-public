@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 // ─── 시도 중심 좌표 → 시도코드 매핑 (병원 API와 동일) ───
 const SIDO_CENTERS: Record<string, { lat: number; lng: number; code: string }> =
@@ -86,7 +86,10 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
-  const radiusM = parseInt(searchParams.get("radius") || "3000");
+  const requestedRadiusM = parseInt(searchParams.get("radius") || "3000");
+  const radiusM = Number.isFinite(requestedRadiusM)
+    ? Math.min(30000, Math.max(100, requestedRadiusM))
+    : 3000;
 
   if (!lat || !lng) {
     return NextResponse.json(
@@ -119,12 +122,7 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (isNaN(radiusM) || radiusM < 100 || radiusM > 5000) {
-    return NextResponse.json(
-      { error: "radius는 100~5000m 범위여야 합니다.", pharmacies: [] },
-      { status: 400 },
-    );
-  }
+  
 
   const radiusKm = radiusM / 1000;
 
@@ -270,3 +268,4 @@ function parsePharmaciesXml(
     `[Pharmacies API] 파싱: ${parsed}개 중 반경 내 ${withinRadius}개 (총 ${totalCount}개)`,
   );
 }
+
