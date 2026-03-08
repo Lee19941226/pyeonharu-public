@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -146,7 +146,7 @@ export default function InsightsPage() {
           <p className="text-sm text-muted-foreground text-center">
             식품을 스캔하면 나만의 알레르기 인사이트를 볼 수 있어요
           </p>
-          <Button onClick={() => router.push("/food")}>식품 검색하기</Button>
+          <Button onClick={() => router.push("/food/search")}>식품 검색하기</Button>
         </main>
         <MobileNav />
       </div>
@@ -463,3 +463,4 @@ export default function InsightsPage() {
     </div>
   );
 }
+
