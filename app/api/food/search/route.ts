@@ -138,10 +138,10 @@ export async function GET(req: NextRequest) {
         minuteLimit = 5;
         dailyLimit = 10;
       } else {
-        // 비회원: IP 기반, 분당 2회, 하루 3회
+        // 비회원: IP 기반, 분당 1회, 하루 1회
         identifier = `ip:${ipAddress}`;
-        minuteLimit = 2;
-        dailyLimit = 3;
+        minuteLimit = 1;
+        dailyLimit = 1;
       }
 
       // ── 1분 내 요청 수 체크 ──

@@ -144,9 +144,10 @@ export async function GET(req: NextRequest) {
       );
     }
     if (codes.length > 0) query = query.in("school_code", codes);
-  } else if (schoolCode) {
+  } else if (schoolCode && schoolCode !== "PYEONHARU") {
     query = query.eq("school_code", schoolCode);
   }
+  // schoolCode가 없거나 "PYEONHARU"이면 전체 최신글 반환 (비로그인 포함)
 
   if (search) {
     // PostgREST .or() 파서에서 특수문자가 구분자로 해석되는 것을 방지

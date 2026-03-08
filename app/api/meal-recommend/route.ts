@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 
@@ -19,12 +20,22 @@ export async function GET(req: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user)
-      return NextResponse.json({ error: "로그인 필요" }, { status: 401 });
 
-    // ─── DB 기반 Rate Limit (무료 로그인: 1회/일) ───
-    const identifier = `meal:user:${user.id}`;
+    // ─── DB 기반 Rate Limit (로그인 1회/일, 비로그인 1회/일 IP 기반) ───
+    let identifier: string;
     const dailyLimit = 1;
+
+    if (user) {
+      identifier = `meal:user:${user.id}`;
+    } else {
+      const headersList = await headers();
+      const ip =
+        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        headersList.get("x-real-ip") ||
+        "unknown";
+      identifier = `meal:ip:${ip}`;
+    }
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -36,7 +47,11 @@ export async function GET(req: NextRequest) {
 
     if ((dailyCount || 0) >= dailyLimit) {
       return NextResponse.json(
-        { error: `오늘 메뉴 추천 한도(${dailyLimit}회)를 초과했습니다.` },
+        {
+          error: user
+            ? `오늘 메뉴 추천 한도(${dailyLimit}회)를 초과했습니다.`
+            : `오늘 무료 추천 한도(${dailyLimit}회)를 초과했습니다. 로그인하시면 맞춤 추천을 받을 수 있어요.`,
+        },
         { status: 429 },
       );
     }
@@ -46,51 +61,55 @@ export async function GET(req: NextRequest) {
       .insert({ identifier, analyzed_at: new Date().toISOString() })
       .then(() => {});
 
-    // ─── 1. 사용자 알레르기 ───
-    const { data: allergies } = await supabase
-      .from("user_allergies")
-      .select("allergen_name, severity")
-      .eq("user_id", user.id);
+    // ─── 1~4. 사용자 데이터 (로그인 시만) ───
+    let allergenList: string[] = [];
+    let todayMeals: any[] = [];
+    let weeklyMeals: any[] = [];
+    let bmr = 2000;
 
-    const allergenList = (allergies || []).map((a) => a.allergen_name);
+    if (user) {
+      const { data: allergies } = await supabase
+        .from("user_allergies")
+        .select("allergen_name, severity")
+        .eq("user_id", user.id);
+      allergenList = (allergies || []).map((a) => a.allergen_name);
 
-    // ─── 2. 오늘 식단 (KST) ───
-    const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
-    const startOfDay = `${todayStr}T00:00:00+09:00`;
-    const endOfDay = `${todayStr}T23:59:59+09:00`;
+      const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+      const startOfDay = `${todayStr}T00:00:00+09:00`;
+      const endOfDay = `${todayStr}T23:59:59+09:00`;
 
-    const { data: todayMeals } = await supabase
-      .from("diet_entries")
-      .select("food_name, estimated_cal, emoji, recorded_at")
-      .eq("user_id", user.id)
-      .gte("recorded_at", startOfDay)
-      .lte("recorded_at", endOfDay)
-      .order("recorded_at", { ascending: true });
+      const { data: todayData } = await supabase
+        .from("diet_entries")
+        .select("food_name, estimated_cal, emoji, recorded_at")
+        .eq("user_id", user.id)
+        .gte("recorded_at", startOfDay)
+        .lte("recorded_at", endOfDay)
+        .order("recorded_at", { ascending: true });
+      todayMeals = todayData || [];
 
-    // ─── 3. 최근 7일 식단 (주간 패턴) ───
-    const weekAgo = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toISOString().split("T")[0];
+      const weekAgo = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoStr = weekAgo.toISOString().split("T")[0];
 
-    const { data: weeklyMeals } = await supabase
-      .from("diet_entries")
-      .select("food_name, estimated_cal, recorded_at")
-      .eq("user_id", user.id)
-      .gte("recorded_at", `${weekAgoStr}T00:00:00+09:00`)
-      .order("recorded_at", { ascending: false })
-      .limit(100);
+      const { data: weeklyData } = await supabase
+        .from("diet_entries")
+        .select("food_name, estimated_cal, recorded_at")
+        .eq("user_id", user.id)
+        .gte("recorded_at", `${weekAgoStr}T00:00:00+09:00`)
+        .order("recorded_at", { ascending: false })
+        .limit(100);
+      weeklyMeals = weeklyData || [];
 
-    // ─── 4. BMR ───
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("bmr, height, weight, age, gender")
-      .eq("id", user.id)
-      .single();
-
-    const bmr = profile?.bmr || 2000;
-    const todayCalories = (todayMeals || []).reduce(
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("bmr, height, weight, age, gender")
+        .eq("id", user.id)
+        .single();
+      bmr = profile?.bmr || 2000;
+    }
+    const todayCalories = todayMeals.reduce(
       (sum, m) => sum + (m.estimated_cal || 0),
       0,
     );
@@ -104,16 +123,16 @@ export async function GET(req: NextRequest) {
     else if (kstHour < 18) mealType = "간식";
 
     // ─── 6. 주간 분석 데이터 가공 ───
-    const todayFoodNames = (todayMeals || []).map(
-      (m) => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`,
+    const todayFoodNames = todayMeals.map(
+      (m: any) => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`,
     );
     const recentFoodNames = [
-      ...new Set((weeklyMeals || []).map((m) => m.food_name)),
+      ...new Set(weeklyMeals.map((m: any) => m.food_name)),
     ].slice(0, 20);
 
     // 주간 음식 빈도
     const foodFreq: Record<string, number> = {};
-    (weeklyMeals || []).forEach((m) => {
+    weeklyMeals.forEach((m: any) => {
       foodFreq[m.food_name] = (foodFreq[m.food_name] || 0) + 1;
     });
     const topFoods = Object.entries(foodFreq)
@@ -123,7 +142,7 @@ export async function GET(req: NextRequest) {
 
     // 주간 일별 칼로리
     const dailyCals: Record<string, number> = {};
-    (weeklyMeals || []).forEach((m) => {
+    weeklyMeals.forEach((m: any) => {
       const kst = new Date(
         new Date(m.recorded_at).getTime() + 9 * 60 * 60 * 1000,
       );

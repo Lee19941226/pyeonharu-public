@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client"
 import { AdBanner } from "@/components/ad-banner"
 import { AuthorTag } from "@/components/community/author-tag"
 import { UserProfileSheet } from "@/components/community/user-profile-sheet"
+import { LoginModal } from "@/components/auth/login-modal"
 import { toast } from "sonner"
 
 interface Post {
@@ -92,6 +93,7 @@ export default function CommunityPage() {
   const [myEnrollment, setMyEnrollment] = useState<{ enrollment_status: string | null; graduation_year: number | null } | null>(null)
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
   const [showProfile, setShowProfile] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -134,8 +136,9 @@ export default function CommunityPage() {
   }
 
   useEffect(() => {
-    if (!schoolsLoading && selectedSchool) loadPosts()
-    else if (!schoolsLoading && !selectedSchool) setIsLoading(false)
+    // 비로그인: selectedSchool 없어도 전체 최신글 로드
+    if (!schoolsLoading && (selectedSchool || !user)) loadPosts()
+    else if (!schoolsLoading && !selectedSchool && user) setIsLoading(false)
   }, [selectedSchool, sort, page, schoolsLoading])
 
   const loadPosts = async () => {
@@ -180,7 +183,7 @@ export default function CommunityPage() {
             <div className="flex-1 min-w-0 space-y-4">
 
             {/* ─── 학교 탭 ─── */}
-            {mySchools.length > 0 && (
+            {mySchools.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {mySchools.map((s) => (
                   <button
@@ -199,7 +202,17 @@ export default function CommunityPage() {
                   </button>
                 ))}
               </div>
-            )}
+            ) : !user ? (
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1.5 rounded-full border border-primary bg-primary text-primary-foreground px-3.5 py-2 text-sm font-medium">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  편하루 고등학교
+                </span>
+                <span className="flex items-center text-xs text-muted-foreground">
+                  로그인하면 내 학교 커뮤니티를 이용할 수 있어요
+                </span>
+              </div>
+            ) : null}
 
             {/* ─── 검색 + 정렬 + 글쓰기 ─── */}
             <div className="glass-surface flex items-center gap-2 rounded-2xl p-2">
@@ -222,16 +235,14 @@ export default function CommunityPage() {
                 <ArrowUpDown className="h-3.5 w-3.5" />
                 {sort === "latest" ? "최신순" : "인기순"}
               </Button>
-              {user && (
-                <Button
-                  size="sm"
-                  className="gap-1 shrink-0 h-9"
-                  onClick={() => router.push("/community/write")}
-                >
-                  <PenLine className="h-3.5 w-3.5" />
-                  글쓰기
-                </Button>
-              )}
+              <Button
+                size="sm"
+                className="gap-1 shrink-0 h-9"
+                onClick={() => user ? router.push("/community/write") : setLoginModalOpen(true)}
+              >
+                <PenLine className="h-3.5 w-3.5" />
+                글쓰기
+              </Button>
             </div>
 
             {/* ─── 게시글 테이블 ─── */}
@@ -527,6 +538,11 @@ export default function CommunityPage() {
         onOpenChange={setShowProfile}
         userId={profileUserId}
         schoolCode={selectedSchool}
+      />
+      <LoginModal
+        open={loginModalOpen}
+        onOpenChange={setLoginModalOpen}
+        onSuccess={() => router.refresh()}
       />
     </div>
   )

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { isPyeonharuSchool, getSchoolForDate } from "@/lib/constants/pyeonharu-school"
 
 // 나이스 알레르기 번호 → 알레르기명 매핑
 const NEIS_ALLERGEN_MAP: Record<string, string> = {
@@ -92,6 +93,16 @@ export async function GET(req: NextRequest) {
 
     const targetDate = date || new Date().toISOString().slice(0, 10).replace(/-/g, "")
 
+    // ── 편하루 고등학교: 날짜 기반 실제 학교로 매핑 ──
+    const isPyeonharu = isPyeonharuSchool(schoolCode, officeCode)
+    let actualSchoolCode = schoolCode
+    let actualOfficeCode = officeCode
+    if (isPyeonharu) {
+      const realSchool = getSchoolForDate(targetDate)
+      actualSchoolCode = realSchool.schoolCode
+      actualOfficeCode = realSchool.officeCode
+    }
+
     if (date) {
       if (!/^\d{8}$/.test(date)) {
         return NextResponse.json(
@@ -121,7 +132,7 @@ export async function GET(req: NextRequest) {
     // ── memberId 소유권 검증 및 checkedMember 구성 ──────────────────
     let checkedMember: CheckedMember = { type: "unknown" }
 
-    if (user) {
+    if (user && !isPyeonharu) {
       if (memberId) {
         const { data: member } = await supabase
           .from("family_members")
@@ -150,10 +161,10 @@ export async function GET(req: NextRequest) {
     if (mode === "week") {
       const weekDates = getWeekDates(targetDate)
       // 알레르기 1회만 조회 후 날짜 루프에서 재사용
-      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+      const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
 
       const weekMeals = await Promise.all(
-        weekDates.map(d => fetchMealsForDate(supabase, schoolCode, officeCode, d))
+        weekDates.map(d => fetchMealsForDate(supabase, actualSchoolCode, actualOfficeCode, d))
       )
 
       const weekResults = weekDates.map((d, i) => ({
@@ -176,7 +187,7 @@ export async function GET(req: NextRequest) {
       const { data: cachedAll } = await supabase
         .from("school_meals_cache")
         .select("*")
-        .eq("school_code", schoolCode)
+        .eq("school_code", actualSchoolCode)
         .gte("meal_date", monthStart)
         .lte("meal_date", monthEnd)
 
@@ -212,8 +223,8 @@ export async function GET(req: NextRequest) {
         url.searchParams.append("Type", "json")
         url.searchParams.append("pIndex", "1")
         url.searchParams.append("pSize", "100")
-        url.searchParams.append("ATPT_OFCDC_SC_CODE", officeCode)
-        url.searchParams.append("SD_SCHUL_CODE", schoolCode)
+        url.searchParams.append("ATPT_OFCDC_SC_CODE", actualOfficeCode)
+        url.searchParams.append("SD_SCHUL_CODE", actualSchoolCode)
         url.searchParams.append("MLSV_FROM_YMD", monthStart)
         url.searchParams.append("MLSV_TO_YMD", monthEnd)
         if (apiKey) url.searchParams.append("KEY", apiKey)
@@ -245,7 +256,7 @@ export async function GET(req: NextRequest) {
 
             // 캐시 저장 (비동기)
             supabase.from("school_meals_cache").upsert({
-              school_code: schoolCode,
+              school_code: actualSchoolCode,
               meal_date: mealDate,
               meal_type: meal.mealType,
               menu_json: meal.menu,
@@ -261,7 +272,7 @@ export async function GET(req: NextRequest) {
 
       // 3. 알레르기 매칭 + 결과 조립
       // 알레르기 1회만 조회 후 날짜 루프에서 재사용
-      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+      const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
       const monthResults: { date: string; meals: any[] }[] = []
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${targetDate.slice(0, 6)}${String(d).padStart(2, "0")}`
@@ -280,11 +291,11 @@ export async function GET(req: NextRequest) {
     const { data: cached } = await supabase
       .from("school_meals_cache")
       .select("*")
-      .eq("school_code", schoolCode)
+      .eq("school_code", actualSchoolCode)
       .eq("meal_date", targetDate)
 
     if (cached && cached.length > 0) {
-      console.log("[Meals] Cache hit:", schoolCode, targetDate)
+      console.log("[Meals] Cache hit:", actualSchoolCode, targetDate)
 
       const meals = cached.map(c => ({
         mealType: c.meal_type,
@@ -295,13 +306,13 @@ export async function GET(req: NextRequest) {
         originInfo: c.origin_info,
       }))
 
-      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+      const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
       const matchedMeals = matchAllergens(meals, allergenNames)
       return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
     }
 
     // 2. 나이스 API 호출
-    const meals = await fetchFromNeis(schoolCode, officeCode, targetDate)
+    const meals = await fetchFromNeis(actualSchoolCode, actualOfficeCode, targetDate)
 
     if (meals.length === 0) {
       return NextResponse.json({
@@ -316,7 +327,7 @@ export async function GET(req: NextRequest) {
     await Promise.all(
       meals.map((meal: any) =>
         supabase.from("school_meals_cache").upsert({
-          school_code: schoolCode,
+          school_code: actualSchoolCode,
           meal_date: targetDate,
           meal_type: meal.mealType,
           menu_json: meal.menu,
@@ -328,7 +339,7 @@ export async function GET(req: NextRequest) {
     );
 
     // 4. 알레르기 매칭
-    const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+    const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
     const matchedMeals = matchAllergens(meals, allergenNames)
 
     return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })

@@ -17,22 +17,19 @@ export async function GET() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const headersList = await headers();
 
-    let identifier: string;
-    let dailyLimit: number;
-
-    if (user) {
-      identifier = `analyze:user:${user.id}`;
-      dailyLimit = 2;
-    } else {
-      const ip =
-        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        headersList.get("x-real-ip") ||
-        "unknown";
-      identifier = `analyze:ip:${ip}`;
-      dailyLimit = 1;
+    // 비로그인: 사진 분석 이용 불가
+    if (!user) {
+      return NextResponse.json({
+        used: 0,
+        limit: 0,
+        remaining: 0,
+        loginRequired: true,
+      });
     }
+
+    const identifier = `analyze:user:${user.id}`;
+    const dailyLimit = 2;
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -71,22 +68,17 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ─── DB 기반 Rate Limit (비회원 1회/일, 로그인 2회/일) ───
-  let identifier: string;
-  let limit: number;
-
-  if (user) {
-    identifier = `analyze:user:${user.id}`;
-    limit = 2;
-  } else {
-    const headersList = await headers();
-    const ip =
-      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      headersList.get("x-real-ip") ||
-      "unknown";
-    identifier = `analyze:ip:${ip}`;
-    limit = 1;
+  // ─── 비로그인 완전 차단 ───
+  if (!user) {
+    return NextResponse.json(
+      { error: "사진 분석은 로그인 후 이용할 수 있습니다." },
+      { status: 401 },
+    );
   }
+
+  // ─── DB 기반 Rate Limit (로그인 2회/일) ───
+  const identifier = `analyze:user:${user.id}`;
+  const limit = 2;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);

@@ -158,7 +158,7 @@ export default function MealRecommend() {
     setShowShareSheet(true);
   };
 
-  if (isLoggedIn === false || isLoggedIn === null) return null;
+  if (isLoggedIn === null) return null;
 
   const remainingCal = bmr > 0 ? Math.max(bmr - todayCal, 0) : 0;
   const calPercent = bmr > 0 ? Math.min((todayCal / bmr) * 100, 100) : 0;

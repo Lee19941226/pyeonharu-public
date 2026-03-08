@@ -27,6 +27,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 import { PyeonharuLogo } from "@/components/pyeonharu-logo";
 import MealRecommend from "@/components/meal-recommend";
+import { GuestPreview } from "@/components/guest-preview";
 import { toast } from "sonner";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
 
@@ -453,6 +454,9 @@ export default function HomePage() {
           </div>
         ) : (
           <>
+        {/* ═══ 비로그인 게스트 프리뷰 ═══ */}
+        {!user && <GuestPreview />}
+
         {/* ═══ 식품 탭 (+ AI 추천 사이드바) ═══ */}
         {activeTab === "food" && (
           <div className="container mx-auto px-4 pt-4">
