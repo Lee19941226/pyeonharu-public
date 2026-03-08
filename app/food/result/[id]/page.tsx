@@ -845,6 +845,7 @@ export default function FoodResultPage() {
                         <AllergenDisclaimer
                           dataSource={result.dataSource}
                           isDangerous={!result.isSafe}
+                          variant="inline"
                         />
                       )}
                     </div>
@@ -1557,3 +1558,6 @@ export default function FoodResultPage() {
     </div>
   );
 }
+
+
+
