@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -692,32 +692,8 @@ export default function FoodTab({
       router.push(`/food/search?q=${encodeURIComponent(foodInput.trim())}`);
   };
 
-  const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("이미지 파일만 업로드 가능합니다");
-      return;
-    }
-
-    // ✅ 이미지 크기 사전 검증
-    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error(
-        "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
-      );
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    setIsProcessing(true);
-    toast.info("이미지 분석 중...");
-
-    try {
-      // ✅ 리사이즈 먼저
+  const analyzeFoodImageWithAi = useCallback(
+    async (file: File) => {
       const { base64: base64Data, wasResized } = await resizeImageForAI(file);
       if (wasResized) console.log("[FoodTab] 이미지 리사이즈 완료");
 
@@ -750,7 +726,6 @@ export default function FoodTab({
         body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
       });
 
-      // ── 413 이미지 크기 초과 ──
       if (response.status === 413) {
         toast.error(
           "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
@@ -758,13 +733,11 @@ export default function FoodTab({
         return;
       }
 
-      // ── 스캔 제한 초과 ──
       if (response.status === 429) {
         setLoginPrompt({ open: true, reason: "scan_limit" });
         return;
       }
 
-      // ── 남은 스캔 경고 (비로그인 && 2회 이하) ──
       const remaining = response.headers.get("X-Remaining-Scans");
       if (remaining !== null) {
         const remainingNum = parseInt(remaining);
@@ -795,9 +768,39 @@ export default function FoodTab({
         });
         toast.success("분석 완료");
         router.push(`/food/result/${data.foodCode}`);
-      } else {
-        toast.error(data.error || "분석에 실패했습니다");
+        return;
       }
+
+      toast.error(data.error || "분석에 실패했습니다");
+    },
+    [router],
+  );
+  const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 업로드 가능합니다");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error(
+        "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsProcessing(true);
+    toast.info("이미지 분석 중...");
+
+    try {
+      await analyzeFoodImageWithAi(file);
     } catch (error) {
       console.error("이미지 분석 오류:", error);
       toast.error("이미지 분석 중 오류가 발생했습니다");
@@ -818,35 +821,35 @@ export default function FoodTab({
       return;
     }
 
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error(
+        "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
+      );
+      if (barcodeInputRef.current) barcodeInputRef.current.value = "";
+      return;
+    }
+
     setIsProcessing(true);
     toast.info("바코드 인식 중...");
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const imageData = e.target?.result as string;
-
-        try {
-          const html5QrCode = new Html5Qrcode("qr-reader-hidden");
-          const barcode = await html5QrCode.scanFile(file, false);
-
-          toast.success("바코드 인식 완료");
-          router.push(`/food/result/${barcode}`);
-        } catch (error) {
-          toast.error("바코드를 인식할 수 없습니다");
-          console.log("AI 분석으로 전환 필요");
-        } finally {
-          setIsProcessing(false);
-          if (barcodeInputRef.current) {
-            barcodeInputRef.current.value = "";
-          }
-        }
-      };
-      reader.readAsDataURL(file);
+      const html5QrCode = new Html5Qrcode("qr-reader-hidden");
+      try {
+        const barcode = await html5QrCode.scanFile(file, false);
+        toast.success("바코드 인식 완료");
+        router.push(`/food/result/${barcode}`);
+      } catch {
+        toast.info("바코드 인식 실패, AI 분석으로 전환합니다.");
+        await analyzeFoodImageWithAi(file);
+      }
     } catch (error) {
       console.error("바코드 스캔 오류:", error);
       toast.error("바코드 스캔 중 오류가 발생했습니다");
+    } finally {
       setIsProcessing(false);
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.value = "";
+      }
     }
   };
 
@@ -870,8 +873,6 @@ export default function FoodTab({
       return;
     }
 
-    // ✅ 이미지 크기 사전 검증
-    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
     if (file.size > MAX_IMAGE_SIZE) {
       toast.error(
         "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
@@ -880,117 +881,30 @@ export default function FoodTab({
     }
 
     console.log("📁 파일:", file.name);
+    setIsProcessing(true);
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const imageData = event.target?.result as string;
+    try {
+      console.log("🔍 바코드 감지 시작...");
+      toast.info("바코드 확인 중...");
 
+      const html5QrCode = new Html5Qrcode("qr-reader-hidden");
       try {
-        console.log("🔍 바코드 감지 시작...");
-        toast.info("바코드 확인 중...");
-
-        const html5QrCode = new Html5Qrcode("qr-reader-hidden");
-
-        const arr = imageData.split(",");
-        const mime = arr[0].match(/:(.*?);/)![1];
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const imageFile = new File([u8arr], "drop.jpg", { type: mime });
-
-        try {
-          const barcode = await html5QrCode.scanFile(imageFile, false);
-          console.log("✅ 바코드 발견:", barcode);
-          toast.success("바코드 인식 완료");
-          router.push(`/food/result/${barcode}`);
-        } catch (barcodeError) {
-          console.log("❌ 바코드 없음, AI 분석 시작");
-          toast.info("AI가 성분표를 분석 중...");
-
-          try {
-            // ✅ 원본 File에서 직접 리사이즈 (drop된 file 변수 사용)
-            const { base64: base64Data } = await resizeImageForAI(file);
-
-            const supabase = createClient();
-            const {
-              data: { user: currentUser },
-            } = await supabase.auth.getUser();
-            let userAllergens: string[] = [];
-
-            if (currentUser) {
-              const { data } = await supabase
-                .from("user_allergies")
-                .select("allergen_name")
-                .eq("user_id", currentUser.id);
-              if (data) userAllergens = data.map((item) => item.allergen_name);
-              if (userAllergens.length === 0) {
-                toast.info("알레르기를 등록하면 맞춤 분석 결과를 알려드려요!", {
-                  action: {
-                    label: "등록하기",
-                    onClick: () => router.push("/food/profile"),
-                  },
-                  duration: 5000,
-                });
-              }
-            }
-
-            const response = await fetch("/api/food/analyze-image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
-            });
-
-            // ✅ 413 이미지 크기 초과 처리
-            if (response.status === 413) {
-              toast.error(
-                "이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.",
-              );
-              return;
-            }
-
-            const data = await response.json();
-
-            if (data.success && data.foodCode) {
-              saveAiResult(data.foodCode, {
-                foodCode: data.foodCode,
-                productName: data.productName,
-                manufacturer: data.manufacturer,
-                weight: data.weight,
-                allergens: data.allergens,
-                hasUserAllergen: data.hasUserAllergen,
-                matchedUserAllergens: data.matchedUserAllergens || [],
-                ingredients: data.ingredients || [],
-                rawMaterials: data.rawMaterials || "",
-                nutritionInfo: data.nutritionInfo || null,
-                dataSource: data.dataSource || "ai",
-              });
-              toast.success("분석 완료");
-              router.push(`/food/result/${data.foodCode}`);
-            } else {
-              toast.error(data.error || "분석에 실패했습니다");
-            }
-          } catch (aiError) {
-            console.error("❌ AI 분석 오류:", aiError);
-            toast.error("분석 중 오류가 발생했습니다");
-          }
-        }
-      } catch (error) {
-        console.error("❌ 처리 오류:", error);
-        toast.error("이미지 처리 중 오류가 발생했습니다");
+        const barcode = await html5QrCode.scanFile(file, false);
+        console.log("✅ 바코드 발견:", barcode);
+        toast.success("바코드 인식 완료");
+        router.push(`/food/result/${barcode}`);
+      } catch {
+        console.log("❌ 바코드 없음, AI 분석 시작");
+        toast.info("AI가 성분표를 분석 중...");
+        await analyzeFoodImageWithAi(file);
       }
-    };
-
-    reader.onerror = (error) => {
-      console.error("❌ 파일 읽기 오류:", error);
-      toast.error("파일을 읽을 수 없습니다");
-    };
-
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("❌ 처리 오류:", error);
+      toast.error("이미지 처리 중 오류가 발생했습니다");
+    } finally {
+      setIsProcessing(false);
+    }
   };
-
   // ─── 학교 등록 여부 판단 (커뮤니티 섹션용) ───
   const hasSchool = mySchools.length > 0;
 
@@ -1461,3 +1375,5 @@ export default function FoodTab({
     </div>
   );
 }
+
+
