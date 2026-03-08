@@ -271,26 +271,35 @@ function FoodSearchContent() {
 
   // 제품 클릭
   const handleProductClick = (foodCode: string) => {
-    if (foodCode.startsWith("ai-")) {
-      const aiResult = results.find((r) => r.foodCode === foodCode);
-      if (aiResult) {
-        // ✅ localStorage로 변경
-        saveAiResult(foodCode, {
-          productName: aiResult.foodName,
-          manufacturer: aiResult.manufacturer || "",
-          weight: aiResult.weight || "",
-          detectedIngredients: aiResult.detectedIngredients || [],
-          allergens: aiResult.allergens || [],
-          hasUserAllergen: aiResult.hasAllergen || false,
-          matchedUserAllergens: aiResult.matchedUserAllergens || [],
-          dataSource: "ai",
-          rawMaterials: aiResult.rawMaterials || "",
-          nutritionInfo: aiResult.nutritionInfo || null,
-          ingredients:
-            aiResult.ingredients || aiResult.detectedIngredients || [],
-        });
-      }
+    const item = results.find((r) => r.foodCode === foodCode);
+    if (foodCode.startsWith("ai-") && item) {
+      // ✅ localStorage로 변경
+      saveAiResult(foodCode, {
+        productName: item.foodName,
+        manufacturer: item.manufacturer || "",
+        weight: item.weight || "",
+        detectedIngredients: item.detectedIngredients || [],
+        allergens: item.allergens || [],
+        hasUserAllergen: item.hasAllergen || false,
+        matchedUserAllergens: item.matchedUserAllergens || [],
+        dataSource: "ai",
+        rawMaterials: item.rawMaterials || "",
+        nutritionInfo: item.nutritionInfo || null,
+        ingredients:
+          item.ingredients || item.detectedIngredients || [],
+      });
     }
+    // 검색 결과 선택 액션 로그
+    fetch("/api/food/select-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        foodCode,
+        foodName: item?.foodName || foodCode,
+        dataSource: item?.dataSource || "",
+      }),
+    }).catch(() => {});
     router.push(`/food/result/${foodCode}`);
   };
 
@@ -920,6 +929,18 @@ function FoodSearchPageInner() {
           ingredients: item.ingredients || item.detectedIngredients || [],
         });
       }
+
+      // 검색 결과 선택 액션 로그
+      fetch("/api/food/select-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          foodCode: item.foodCode,
+          foodName: item.foodName,
+          dataSource: item.dataSource || "",
+        }),
+      }).catch(() => {});
     }
 
     router.push(`/food/result/${foodCode}`);
