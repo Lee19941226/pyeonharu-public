@@ -287,87 +287,156 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 단일 날짜 모드 ───────────────────────────────────────────────
-    // 편하루: 선택된 학교에 데이터 없으면 다른 학교 시도
-    const maxAttempts = isPyeonharu ? SAMPLE_SCHOOLS_COUNT : 1
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (isPyeonharu && attempt > 0) {
-        const fallback = getSchoolForDate(targetDate, attempt)
-        actualSchoolCode = fallback.schoolCode
-        actualOfficeCode = fallback.officeCode
-      }
-
-      // 1. 캐시 확인
-      const { data: cached } = await supabase
-        .from("school_meals_cache")
-        .select("*")
-        .eq("school_code", actualSchoolCode)
-        .eq("meal_date", targetDate)
-
-      if (cached && cached.length > 0) {
-        console.log("[Meals] Cache hit:", actualSchoolCode, targetDate)
-
-        const meals = cached.map((c: any) => ({
-          mealType: c.meal_type,
-          mealTypeName: c.meal_type === "1" ? "조식" : c.meal_type === "2" ? "중식" : "석식",
-          menu: c.menu_json,
-          calInfo: c.cal_info,
-          ntrInfo: c.ntr_info,
-          originInfo: c.origin_info,
-        }))
-
-        const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
-        const matchedMeals = matchAllergens(meals, allergenNames)
-        return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
-      }
-
-      // 2. 나이스 API 호출
-      const meals = await fetchFromNeis(actualSchoolCode, actualOfficeCode, targetDate)
-
-      if (meals.length === 0) {
-        // 편하루: 이 학교에 데이터 없으면 다음 학교 시도
-        if (isPyeonharu && attempt < maxAttempts - 1) continue
+    if (isPyeonharu) {
+      // 편하루: 모든 학교 시도 → 없으면 과거 날짜로 최대 30일 전까지 탐색
+      const result = await fetchPyeonharuMeals(supabase, targetDate)
+      if (result) {
+        const matchedMeals = matchAllergens(result.meals, [])
         return NextResponse.json({
-          meals: [],
+          meals: matchedMeals,
           date: targetDate,
-          message: "해당 날짜의 급식 정보가 없습니다.",
+          actualDate: result.actualDate,
+          cached: result.cached,
           checkedMember,
         })
       }
-
-      // 3. 캐시 저장 (병렬)
-      await Promise.all(
-        meals.map((meal: any) =>
-          supabase.from("school_meals_cache").upsert({
-            school_code: actualSchoolCode,
-            meal_date: targetDate,
-            meal_type: meal.mealType,
-            menu_json: meal.menu,
-            cal_info: meal.calInfo,
-            ntr_info: meal.ntrInfo,
-            origin_info: meal.originInfo,
-          }, { onConflict: "school_code,meal_date,meal_type" })
-        )
-      );
-
-      // 4. 알레르기 매칭
-      const allergenNames = isPyeonharu ? [] : await fetchAllergenNames(supabase, user, memberId)
-      const matchedMeals = matchAllergens(meals, allergenNames)
-
-      return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })
+      // 30일 전까지 전부 없음 (거의 불가능)
+      return NextResponse.json({
+        meals: [],
+        date: targetDate,
+        message: "급식 정보를 찾을 수 없습니다.",
+        checkedMember,
+      })
     }
 
-    // 모든 학교 시도 후에도 데이터 없음 (이론상 도달 불가)
-    return NextResponse.json({
-      meals: [],
-      date: targetDate,
-      message: "해당 날짜의 급식 정보가 없습니다.",
-      checkedMember,
-    })
+    // ── 일반 학교 단일 날짜 ──────────────────────────────────────────
+    // 1. 캐시 확인
+    const { data: cached } = await supabase
+      .from("school_meals_cache")
+      .select("*")
+      .eq("school_code", actualSchoolCode)
+      .eq("meal_date", targetDate)
+
+    if (cached && cached.length > 0) {
+      console.log("[Meals] Cache hit:", actualSchoolCode, targetDate)
+
+      const meals = cached.map((c: any) => ({
+        mealType: c.meal_type,
+        mealTypeName: c.meal_type === "1" ? "조식" : c.meal_type === "2" ? "중식" : "석식",
+        menu: c.menu_json,
+        calInfo: c.cal_info,
+        ntrInfo: c.ntr_info,
+        originInfo: c.origin_info,
+      }))
+
+      const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+      const matchedMeals = matchAllergens(meals, allergenNames)
+      return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: true, checkedMember })
+    }
+
+    // 2. 나이스 API 호출
+    const meals = await fetchFromNeis(actualSchoolCode, actualOfficeCode, targetDate)
+
+    if (meals.length === 0) {
+      return NextResponse.json({
+        meals: [],
+        date: targetDate,
+        message: "해당 날짜의 급식 정보가 없습니다.",
+        checkedMember,
+      })
+    }
+
+    // 3. 캐시 저장 (병렬)
+    await Promise.all(
+      meals.map((meal: any) =>
+        supabase.from("school_meals_cache").upsert({
+          school_code: actualSchoolCode,
+          meal_date: targetDate,
+          meal_type: meal.mealType,
+          menu_json: meal.menu,
+          cal_info: meal.calInfo,
+          ntr_info: meal.ntrInfo,
+          origin_info: meal.originInfo,
+        }, { onConflict: "school_code,meal_date,meal_type" })
+      )
+    );
+
+    // 4. 알레르기 매칭
+    const allergenNames = await fetchAllergenNames(supabase, user, memberId)
+    const matchedMeals = matchAllergens(meals, allergenNames)
+
+    return NextResponse.json({ meals: matchedMeals, date: targetDate, cached: false, checkedMember })
   } catch (error) {
     console.error("[Meals] Error:", error)
     return NextResponse.json({ error: "급식 정보 조회에 실패했습니다." }, { status: 500 })
   }
+}
+
+// ── 편하루 급식 탐색: 모든 학교 × 과거 날짜 폴백 ─────────────────────
+async function fetchPyeonharuMeals(supabase: any, targetDate: string) {
+  const y = Number(targetDate.slice(0, 4))
+  const m = Number(targetDate.slice(4, 6)) - 1
+  const d = Number(targetDate.slice(6, 8))
+  const baseDate = new Date(y, m, d)
+
+  // 오늘 → 최대 30일 전까지 탐색
+  for (let dayBack = 0; dayBack <= 30; dayBack++) {
+    const tryDate = new Date(baseDate)
+    tryDate.setDate(tryDate.getDate() - dayBack)
+    const dateStr = `${tryDate.getFullYear()}${String(tryDate.getMonth() + 1).padStart(2, "0")}${String(tryDate.getDate()).padStart(2, "0")}`
+
+    // 이 날짜에 대해 모든 학교 시도
+    for (let offset = 0; offset < SAMPLE_SCHOOLS_COUNT; offset++) {
+      const school = getSchoolForDate(dateStr, offset)
+
+      // 캐시 먼저
+      const { data: cached } = await supabase
+        .from("school_meals_cache")
+        .select("*")
+        .eq("school_code", school.schoolCode)
+        .eq("meal_date", dateStr)
+
+      if (cached && cached.length > 0) {
+        return {
+          meals: cached.map((c: any) => ({
+            mealType: c.meal_type,
+            mealTypeName: c.meal_type === "1" ? "조식" : c.meal_type === "2" ? "중식" : "석식",
+            menu: c.menu_json,
+            calInfo: c.cal_info,
+            ntrInfo: c.ntr_info,
+            originInfo: c.origin_info,
+          })),
+          actualDate: dateStr,
+          cached: true,
+        }
+      }
+
+      // NEIS API
+      try {
+        const meals = await fetchFromNeis(school.schoolCode, school.officeCode, dateStr)
+        if (meals.length > 0) {
+          // 캐시 저장
+          for (const meal of meals) {
+            supabase.from("school_meals_cache").upsert({
+              school_code: school.schoolCode,
+              meal_date: dateStr,
+              meal_type: meal.mealType,
+              menu_json: meal.menu,
+              cal_info: meal.calInfo,
+              ntr_info: meal.ntrInfo,
+              origin_info: meal.originInfo,
+            }, { onConflict: "school_code,meal_date,meal_type" }).then(() => {})
+          }
+          return { meals, actualDate: dateStr, cached: false }
+        }
+      } catch {
+        // 이 학교 실패 → 다음 학교
+        continue
+      }
+    }
+  }
+
+  return null
 }
 
 // ── 나이스 API에서 급식 데이터 가져오기 ──────────────────────────────

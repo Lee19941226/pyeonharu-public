@@ -43,19 +43,21 @@ export function GuestPreview() {
   const router = useRouter();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [mealsLoaded, setMealsLoaded] = useState(false);
+  const [mealDate, setMealDate] = useState<string>("");
   const [posts, setPosts] = useState<Post[]>([]);
   const [bannerDismissed, setBannerDismissed] = useState(true);
 
   useEffect(() => {
     setBannerDismissed(localStorage.getItem(BANNER_KEY) === "1");
 
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, "");
     fetch(
       `/api/school/meals?schoolCode=PYEONHARU&officeCode=PYEONHARU&date=${today}`,
     )
       .then((r) => r.json())
       .then((d) => {
         setMeals(d.meals || []);
+        setMealDate(d.actualDate || today);
         setMealsLoaded(true);
       })
       .catch(() => setMealsLoaded(true));
@@ -106,7 +108,13 @@ export function GuestPreview() {
             <div className="mb-3 flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold">
                 <UtensilsCrossed className="h-4 w-4 text-amber-600" />
-                편하루 고등학교 오늘의 급식
+                편하루 고등학교 {(() => {
+                  const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, "");
+                  if (!mealDate || mealDate === todayStr) return "오늘의 급식";
+                  const m = Number(mealDate.slice(4, 6));
+                  const d = Number(mealDate.slice(6, 8));
+                  return `${m}/${d} 급식`;
+                })()}
               </h3>
             </div>
             {meals.length > 0 ? (
