@@ -22,6 +22,8 @@ import {
   ChevronUp,
   Eye,
   Download,
+  Share2,
+  Star,
 } from "lucide-react";
 
 // ─── Types ───
@@ -86,6 +88,46 @@ const ACTION_CONFIG: Record<
     label: "안전 확인",
     color: "bg-pink-100 text-pink-700",
     icon: Search,
+  },
+  food_select: {
+    label: "식품 선택",
+    color: "bg-teal-100 text-teal-700",
+    icon: Eye,
+  },
+  food_share: {
+    label: "식품 공유",
+    color: "bg-violet-100 text-violet-700",
+    icon: Share2,
+  },
+  favorite_add: {
+    label: "즐겨찾기 추가",
+    color: "bg-amber-100 text-amber-700",
+    icon: Star,
+  },
+  favorite_remove: {
+    label: "즐겨찾기 삭제",
+    color: "bg-stone-100 text-stone-700",
+    icon: Trash2,
+  },
+  hospital_search: {
+    label: "병원 검색",
+    color: "bg-blue-100 text-blue-700",
+    icon: Search,
+  },
+  hospital_select: {
+    label: "병원 선택",
+    color: "bg-blue-100 text-blue-700",
+    icon: Eye,
+  },
+  pharmacy_search: {
+    label: "약국 검색",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Search,
+  },
+  pharmacy_select: {
+    label: "약국 선택",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Eye,
   },
   community_post_create: {
     label: "게시글 작성",
@@ -497,7 +539,7 @@ export default function ActionLogs() {
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                             <Globe className="h-3 w-3" />
-                            ????
+                            비로그인
                           </span>
                         )}
                       </div>
@@ -545,7 +587,7 @@ export default function ActionLogs() {
                           </div>
                           <div className="md:col-span-2">
                             <p className="text-xs font-semibold text-muted-foreground mb-1">
-                              ?????
+                              메타데이터
                             </p>
                             <pre className="rounded-lg bg-muted p-3 text-xs font-mono overflow-x-auto">
                               {JSON.stringify(log.metadata, null, 2)}
@@ -607,4 +649,6 @@ export default function ActionLogs() {
     </div>
   );
 }
+
+
 
