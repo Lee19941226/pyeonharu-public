@@ -41,6 +41,9 @@ export default function FoodResultPage() {
   const [userName, setUserName] = useState<string>("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [allergyProfileStatus, setAllergyProfileStatus] = useState<
+    "unset" | "none" | "has_allergy"
+  >("unset");
   const [profileAllergens, setProfileAllergens] = useState<string[]>([]);
   const lastLoadedIdRef = useRef<string | undefined>(null);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
@@ -102,7 +105,7 @@ export default function FoodResultPage() {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("nickname")
+          .select("nickname, allergy_profile_status")
           .eq("id", user.id)
           .single();
 
@@ -111,6 +114,14 @@ export default function FoodResultPage() {
         } else {
           setUserName(user.email?.split("@")[0] || "회원");
         }
+
+        setAllergyProfileStatus(
+          (profile?.allergy_profile_status as
+            | "unset"
+            | "none"
+            | "has_allergy"
+            | undefined) || "unset",
+        );
 
         const { data: allergyData } = await supabase
           .from("user_allergies")
@@ -127,6 +138,7 @@ export default function FoodResultPage() {
           });
       } else {
         setIsLoggedIn(false);
+        setAllergyProfileStatus("unset");
         setProfileAllergens([]);
       }
     };
@@ -1103,7 +1115,9 @@ export default function FoodResultPage() {
             )}
             {/* 안전 여부 카드 - 안전 */}
             {result.isSafe && (
-              isLoggedIn && safeUserAllergens.length === 0 ? (
+              isLoggedIn &&
+              safeUserAllergens.length === 0 &&
+              allergyProfileStatus !== "none" ? (
                 <Card className="mb-6 border-amber-500 bg-amber-50">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-4">
@@ -1635,7 +1649,8 @@ export default function FoodResultPage() {
             )}
 
             {/* 알레르기 미등록 안내 */}
-            {safeUserAllergens.length === 0 && (
+            {safeUserAllergens.length === 0 &&
+              allergyProfileStatus !== "none" && (
               <Card className="mb-6 border-blue-200 bg-blue-50">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3">
@@ -1727,6 +1742,8 @@ export default function FoodResultPage() {
     </div>
   );
 }
+
+
 
 
 
