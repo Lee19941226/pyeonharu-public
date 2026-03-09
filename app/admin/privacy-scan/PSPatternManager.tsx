@@ -12,6 +12,7 @@ import {
   Play,
   CheckCircle2,
   XCircle,
+  Info,
 } from "lucide-react";
 
 interface Pattern {
@@ -184,6 +185,19 @@ export default function PSPatternManager() {
           {toast.message}
         </div>
       )}
+
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">개인식별정보를 검출하는 정규식 패턴을 관리 (기본 4대 식별정보 + 사용자 정의)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {patternTab === "default"
+              ? "주민등록번호, 운전면허번호, 여권번호, 외국인등록번호 4대 기본 패턴이 제공됩니다. 정규식과 마스킹 범위를 수정할 수 있지만 삭제는 불가합니다."
+              : "기본 패턴 외에 추가로 검출할 개인정보 패턴을 직접 정의할 수 있습니다. (예: 신용카드번호, 계좌번호, 이메일 등)"}
+          </p>
+        </div>
+      </div>
 
       {/* Sub tabs */}
       <div className="flex items-center justify-between">
