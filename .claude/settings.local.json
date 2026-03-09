@@ -23,7 +23,12 @@
       "Bash(npx next:*)",
       "Bash(wc:*)",
       "Bash(pnpm install:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:ip-api.com)",
+      "WebFetch(domain:www.data.go.kr)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.clien.net)",
+      "WebFetch(domain:lite.ip2location.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

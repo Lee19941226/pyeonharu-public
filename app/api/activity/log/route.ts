@@ -46,10 +46,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "지원하지 않는 액션" }, { status: 400 });
     }
 
+    const geoRegion = typeof metadata._geo_region === "string" ? metadata._geo_region : undefined;
+    const geoSource = typeof metadata._geo_source === "string" ? metadata._geo_source : undefined;
+    // _geo_ 필드는 logAction에서 처리하므로 metadata에서 제거
+    const { _geo_region: _, _geo_source: __, ...cleanMeta } = metadata;
+
     logAction({
       userId: user?.id || null,
       actionType: action,
-      metadata,
+      metadata: cleanMeta,
+      geoRegion,
+      geoSource,
     });
 
     return NextResponse.json({ success: true });

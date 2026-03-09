@@ -16,10 +16,15 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
+    const geoRegion = typeof body._geo_region === "string" ? body._geo_region : undefined;
+    const geoSource = typeof body._geo_source === "string" ? body._geo_source : undefined;
+
     logAction({
       userId: user?.id || null,
       actionType: "page_view",
       metadata: { path },
+      geoRegion,
+      geoSource,
     });
 
     return NextResponse.json({ ok: true });
