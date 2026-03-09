@@ -1278,8 +1278,9 @@ export default function FoodResultPage() {
                     );
                   }
 
-                  // ✅ 3순위: AI 감지 재료
+                  // ✅ 3순위: AI 감지 재료 (AI 소스일 때만)
                   if (
+                    result.dataSource === "ai" &&
                     result.detectedIngredients &&
                     result.detectedIngredients.length > 0
                   ) {
@@ -1314,7 +1315,7 @@ export default function FoodResultPage() {
                     );
                   }
 
-                  // ✅ 4순위: 정보 없음
+                  // ✅ 4순위: 정보 없음 (공식 데이터 미제공 또는 추정 정보 없음)
                   return (
                     <div className="rounded-lg bg-muted p-8 text-center">
                       <div className="mb-2 text-4xl">📦</div>
@@ -1322,7 +1323,9 @@ export default function FoodResultPage() {
                         원재료 정보가 제공되지 않습니다
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        제품 포장의 원재료명을 직접 확인하세요
+                        {result.dataSource === "ai"
+                          ? "AI 추정 원재료를 확인하지 못했습니다. 제품 포장의 원재료명을 직접 확인하세요"
+                          : "공식 데이터에서 원재료가 제공되지 않았습니다. 제품 포장의 원재료명을 직접 확인하세요"}
                       </p>
                     </div>
                   );
@@ -1558,6 +1561,11 @@ export default function FoodResultPage() {
     </div>
   );
 }
+
+
+
+
+
 
 
 
