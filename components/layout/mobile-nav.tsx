@@ -28,6 +28,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
+import { saveAiResult } from "@/lib/utils/ai-result-storage";
 import { createClient } from "@/lib/supabase/client";
 import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
@@ -171,22 +172,20 @@ export function MobileNav() {
             const data = await response.json();
 
             if (data.success && data.foodCode) {
-              sessionStorage.setItem(
-                `ai_result_${data.foodCode}`,
-                JSON.stringify({
-                  foodCode: data.foodCode,
-                  productName: data.productName,
-                  manufacturer: data.manufacturer,
-                  weight: data.weight,
-                  allergens: data.allergens,
-                  hasUserAllergen: data.hasUserAllergen,
-                  matchedUserAllergens: data.matchedUserAllergens || [],
-                  ingredients: data.ingredients || [],
-                  rawMaterials: data.rawMaterials || "",
-                  nutritionInfo: data.nutritionInfo || null,
-                  dataSource: data.dataSource || "ai",
-                }),
-              );
+              saveAiResult(data.foodCode, {
+                foodCode: data.foodCode,
+                productName: data.productName,
+                manufacturer: data.manufacturer,
+                weight: data.weight,
+                allergens: data.allergens,
+                hasUserAllergen: data.hasUserAllergen,
+                matchedUserAllergens: data.matchedUserAllergens || [],
+                ingredients: data.ingredients || [],
+                rawMaterials: data.rawMaterials || "",
+                nutritionInfo: data.nutritionInfo || null,
+                dataSource: data.dataSource || "ai",
+                imagePreviewDataUrl: `data:image/jpeg;base64,${base64Data}`,
+              });
               toast.success("분석 완료");
               router.push(`/food/result/${data.foodCode}`);
             } else {
@@ -684,6 +683,11 @@ export function MobileNav() {
     </>
   );
 }
+
+
+
+
+
 
 
 
