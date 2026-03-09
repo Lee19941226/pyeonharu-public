@@ -16,6 +16,8 @@ import {
   Bookmark,
   BarChart3,
   Lightbulb,
+  UserRound,
+  ScanEye,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -39,8 +41,8 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
   {
     icon: <Lock className="h-5 w-5" />,
     title: "인증 (로그인/회원가입)",
-    summary: "Supabase Auth 기반 OAuth 2.0 인증 및 세션 관리 흐름",
-    coreLogic: "사용자가 페이지를 요청하면 가장 먼저 '경비원' 역할의 미들웨어(모든 요청을 가로채는 중간 검사 코드)가 작동합니다. 이 경비원은 직접 판단하지 않고, 전문 담당자인 프록시 모듈(대리인 역할의 별도 파일)에게 '이 사람 로그인 했어? 이 페이지 들어가도 돼?'라고 물어봅니다. 프록시 모듈이 로그인 상태 확인(세션 갱신), 접근 가능 페이지 판단, 같은 IP에서 너무 많은 요청이 오는지 확인(Rate Limit)을 한꺼번에 처리합니다. 경비원과 담당자의 역할을 분리해서 코드가 서로 꼬이지 않는 깔끔한 구조를 유지합니다.",
+    summary: "Supabase Auth 기반 OAuth 2.0 인증, 세션 관리, 점검 모드 및 차단 제어",
+    coreLogic: "사용자가 페이지를 요청하면 가장 먼저 '경비원' 역할의 프록시 미들웨어(모든 요청을 가로채는 중간 검사 코드)가 작동합니다. 이 프록시는 로그인 상태 확인(세션 갱신), 접근 가능 페이지 판단, 같은 IP에서 너무 많은 요청이 오는지 확인(IP 기반 Rate Limit)을 한꺼번에 처리합니다. 추가로 site_settings 테이블을 60초 TTL로 캐싱하여 점검 모드 여부를 판단하고, 화이트리스트 IP/사용자만 통과시킵니다. 차단된 사용자의 자동 해제, 로그인 로그 기록, 계정 삭제 등 인증 생명주기 전체를 관리합니다.",
     steps: [
       {
         file: "app/login/page.tsx",
@@ -59,26 +61,40 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         description: "서버 사이드 Supabase 인스턴스 (쿠키 기반)",
       },
       {
-        file: "middleware.ts",
-        description: "보호 경로 접근 제어 및 세션 갱신",
+        file: "proxy.ts",
+        description: "Next.js 미들웨어 진입점 (보호 경로 매칭, 프록시 위임)",
       },
       {
         file: "lib/supabase/proxy.ts",
-        description: "Supabase 프록시를 통한 환경변수 보호",
+        description: "세션 갱신, IP Rate Limit, 점검 모드 캐싱, 차단 사용자 리다이렉트",
+      },
+      {
+        file: "app/api/auth/delete-account/route.ts",
+        description: "계정 삭제 API (service_role로 사용자 완전 제거)",
+      },
+      {
+        file: "app/api/auth/auto-unban/route.ts",
+        description: "차단 만료 자동 해제 API",
+      },
+      {
+        file: "app/api/auth/log-login/route.ts",
+        description: "로그인 이벤트 로그 기록 API",
       },
     ],
-    techStack: ["Supabase Auth", "JWT", "OAuth 2.0"],
+    techStack: ["Supabase Auth", "JWT", "OAuth 2.0", "Edge Runtime"],
     security: [
       "Open redirect 방지 (화이트리스트 기반 리다이렉트 검증)",
-      "보호 경로 미들웨어 (인증되지 않은 접근 차단)",
+      "보호 경로 프록시 미들웨어 (인증되지 않은 접근 차단)",
+      "IP 기반 비로그인 스캔 제한 (메모리 Map, 쿠키 우회 방어)",
+      "점검 모드 캐싱 (60초 TTL, 화이트리스트 IP/사용자 통과)",
       "SameSite 쿠키 (CSRF 방지)",
     ],
   },
   {
     icon: <Search className="h-5 w-5" />,
     title: "식품 안전 확인",
-    summary: "공공 API와 AI 비전을 활용한 식품 성분 분석 및 안전성 확인",
-    coreLogic: "검색을 2단계로 나눕니다. 1단계에서는 우리 자체 데이터베이스(이전에 검색된 적 있는 식품 정보 저장소)만 뒤져서 0.1~0.3초 만에 결과를 먼저 보여줍니다. 2단계에서는 화면 뒤에서 외부 공공 API(식약처 등)를 동시에 호출해 더 풍부한 정보를 가져옵니다. 가져온 결과는 자체 DB에 자동 저장(캐싱)되므로, 같은 식품을 다시 검색하면 외부 API를 호출할 필요 없이 1단계에서 바로 나옵니다. 사용자가 많이 검색할수록 DB가 풍부해져 비용이 줄어드는 구조입니다. AI는 어디서도 결과를 못 찾았을 때(0건)만 최후 수단으로 호출되어 비싼 AI 비용을 최소화합니다.",
+    summary: "공공 API + AI 비전/텍스트 분석, 성분 파싱, 대체 식품 추천, 스캔 인사이트",
+    coreLogic: "검색을 2단계로 나눕니다. 1단계에서는 자체 DB(food_search_cache)만 뒤져서 0.1~0.3초 만에 결과를 먼저 보여줍니다. 2단계에서는 외부 공공 API(식약처)를 동시 호출해 더 풍부한 정보를 가져오고, 결과는 DB에 자동 캐싱됩니다. 결과 조회 시 괄호 깊이를 고려한 원재료 파싱 함수가 쉼표를 기준으로 분리하되 괄호 내부 쉼표는 무시하여 정확한 성분 목록을 추출합니다. AI는 이미지 분석(Vision)과 텍스트 분석 두 경로를 제공하며, 각각 별도 Rate Limit(이미지: 인증 50회/일, 텍스트: 인증 2회/일)을 적용합니다. 위험 식품 발견 시 AI 기반 대체 식품 추천과 알레르기 가이드를 제공하고, 스캔 기록은 5분 내 중복 방지 후 저장되어 인사이트(30일 추이, 알레르기 빈도 TOP 5) 분석에 활용됩니다.",
     steps: [
       {
         file: "app/food/page.tsx",
@@ -86,32 +102,58 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
       },
       {
         file: "app/api/food/search/route.ts",
-        description: "식약처 공공 API를 통한 식품 정보 검색",
+        description: "식약처 공공 API 검색 + DB 캐싱 (2단계 검색)",
+      },
+      {
+        file: "app/api/food/result/route.ts",
+        description: "식품 결과 조회, 괄호 깊이 고려 원재료 파싱, 초성 추출",
       },
       {
         file: "app/api/food/analyze-image/route.ts",
         description: "OpenAI Vision으로 식품 라벨 이미지 분석",
       },
       {
+        file: "app/api/food/analyze-text/route.ts",
+        description: "OpenAI GPT로 식품 텍스트 분석 (인증 2회/일, 비인증 1회/일)",
+      },
+      {
+        file: "app/api/food/alternatives/route.ts",
+        description: "safe_alternatives + DB + AI 3단계 대체 식품 추천",
+      },
+      {
+        file: "app/api/food/guide/route.ts",
+        description: "알레르기 가이드 AI 생성 (대처법, 대체 식품 안내)",
+      },
+      {
+        file: "app/api/food/scan-log/route.ts",
+        description: "스캔 기록 저장 (5분 내 중복 방지)",
+      },
+      {
+        file: "app/api/food/insights/route.ts",
+        description: "식품 스캔 인사이트 (30일 추이, 알레르기 빈도 TOP 5)",
+      },
+      {
+        file: "app/api/food/image-submissions/route.ts",
+        description: "사용자 제품 이미지 제보 (Magic Byte 검증, pending 상태)",
+      },
+      {
         file: "lib/utils/chosung.ts",
         description: "한글 초성 검색 지원 유틸리티",
       },
-      {
-        file: "lib/utils/openai-rate-limit.ts",
-        description: "OpenAI API 호출 횟수 제한 관리",
-      },
     ],
-    techStack: ["OpenAI Vision", "식약처 공공 API", "GPT-4o-mini", "html5-qrcode"],
+    techStack: ["OpenAI Vision", "OpenAI GPT-4o-mini", "식약처 공공 API", "html5-qrcode"],
     security: [
-      "Rate limiting (인증 사용자 50회/일, 비인증 10회/일)",
-      "입력값 검증 (파일 타입, 크기 제한)",
+      "다중 Rate Limiting (이미지: 인증 50회/비인증 10회/일, 텍스트: 인증 2회/비인증 1회/일)",
+      "인메모리 + DB 이중 Rate Limit (OpenAI 비용 제어)",
+      "입력값 검증 (파일 타입, 크기 제한, Magic Byte 검증)",
+      "스캔 중복 방지 (5분 내 같은 식품 재스캔 차단)",
     ],
   },
   {
     icon: <MessageSquare className="h-5 w-5" />,
     title: "커뮤니티",
-    summary: "리치 텍스트 에디터 기반 게시글/댓글 CRUD 및 XSS 방지",
-    coreLogic: "게시글 100개를 보여줄 때, 각 게시글마다 '작성자 정보 조회 → 좋아요 수 조회 → 댓글 수 조회'를 따로 하면 300번 DB를 호출하게 됩니다(N+1 문제). 이를 해결하기 위해 먼저 게시글에 등장하는 작성자 ID를 중복 없이 모은 뒤(Set 자료구조), 프로필·좋아요·댓글 수를 각각 딱 1번씩, 총 3번의 DB 호출로 한꺼번에 가져옵니다. 가져온 데이터는 '사전(Map)'처럼 ID로 바로 찾을 수 있게 정리해두어, 게시글이 10개든 1000개든 DB 호출 횟수는 항상 3회로 고정됩니다.",
+    summary: "리치 텍스트 게시글/댓글 CRUD, 좋아요/신고, 학교별 랭킹, 사용자 프로필",
+    coreLogic: "게시글 100개를 보여줄 때, 각 게시글마다 '작성자 정보 조회 → 좋아요 수 조회 → 댓글 수 조회'를 따로 하면 300번 DB를 호출하게 됩니다(N+1 문제). 이를 해결하기 위해 먼저 게시글에 등장하는 작성자 ID를 중복 없이 모은 뒤(Set 자료구조), 프로필·좋아요·댓글 수를 각각 딱 1번씩, 총 3번의 DB 호출로 한꺼번에 가져옵니다. 좋아요는 게시글/댓글 모두 토글 방식으로 동작하며, 댓글 좋아요 시 해당 postId 소속인지 검증합니다. 신고는 사유 화이트리스트(스팸/욕설/허위정보/개인정보/기타) 검증 후 DB에 기록되고, 학교별 활동량 랭킹은 최근 7일간 게시글/좋아요/조회수를 집계합니다.",
     steps: [
       {
         file: "app/community/page.tsx",
@@ -129,19 +171,41 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         file: "app/api/community/[id]/comments/route.ts",
         description: "댓글/대댓글 CRUD 및 중첩 제한",
       },
+      {
+        file: "app/api/community/[id]/like/route.ts",
+        description: "게시글/댓글 좋아요 토글 (postId 소속 검증)",
+      },
+      {
+        file: "app/api/community/[id]/report/route.ts",
+        description: "게시글/댓글 신고 (사유 화이트리스트 검증)",
+      },
+      {
+        file: "app/api/community/upload/route.ts",
+        description: "게시글 이미지 업로드 (Supabase Storage)",
+      },
+      {
+        file: "app/api/community/ranking/route.ts",
+        description: "학교별 활동량 랭킹 (7일간 게시글/좋아요/조회수 집계)",
+      },
+      {
+        file: "app/api/community/user-profile/[userId]/route.ts",
+        description: "커뮤니티 공개 프로필 조회 (UUID 형식 검증)",
+      },
     ],
     techStack: ["TipTap Editor", "DOMPurify", "Supabase Storage"],
     security: [
       "XSS 방지 (DOMPurify 클라이언트 + 서버 HTML 스트리핑)",
       "소유권 검증 (본인 게시글/댓글만 수정/삭제)",
+      "신고 사유 화이트리스트 검증 (5종)",
+      "UUID 형식 검증 (프로필 조회 시)",
       "댓글 중첩 깊이 제한",
     ],
   },
   {
     icon: <Shield className="h-5 w-5" />,
     title: "관리자 대시보드",
-    summary: "실시간 통계, 사용자 관리, SSE 기반 온라인 모니터링",
-    coreLogic: "관리자 화면에 접속자 수를 실시간으로 보여주기 위해 SSE(Server-Sent Events, 서버가 클라이언트에게 데이터를 계속 밀어주는 방식)를 사용합니다. 서버는 5초마다 접속자 데이터를 보내는 타이머를 돌리는데, 관리자가 브라우저를 닫으면 이 타이머가 계속 돌아 메모리가 낭비됩니다. 이를 방지하기 위해 브라우저 연결이 끊기는 순간을 자동 감지(AbortSignal)하여 타이머를 즉시 정리합니다. 또한 중간 서버(nginx 등)가 데이터를 모아서 한꺼번에 보내는 것을 막는 특수 헤더를 설정하여 데이터가 지연 없이 즉시 전달되도록 합니다.",
+    summary: "실시간 통계, 사용자/캐시/검색 로그 관리, SSE 모니터링, 점검 모드",
+    coreLogic: "관리자 화면에 접속자 수를 실시간으로 보여주기 위해 SSE(Server-Sent Events)를 사용합니다. 서버는 5초마다 접속자 데이터를 보내는 타이머를 돌리는데, 브라우저 연결이 끊기는 순간을 자동 감지(AbortSignal)하여 타이머를 즉시 정리합니다. 관리 기능은 모듈별로 분리되어 있으며, 사용자 관리(차단/해제), 캐시 초기화, 검색 로그 분석, 식품/의약품 이미지 관리, 앱 버전 관리, 포트폴리오 토큰 발급, 테스터 관리, 화이트리스트 관리, 고객 지원 관리, 데이터 건강도 대시보드, 액션 로그 추적까지 포괄합니다.",
     steps: [
       {
         file: "app/admin/layout.tsx",
@@ -149,7 +213,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
       },
       {
         file: "app/admin/page.tsx",
-        description: "대시보드 UI (차트, 통계, 사용자 목록)",
+        description: "대시보드 UI (차트, 통계, 모듈별 탭 관리)",
       },
       {
         file: "lib/utils/admin-auth.ts",
@@ -163,18 +227,47 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         file: "app/api/admin/stats/route.ts",
         description: "통계 데이터 집계 API",
       },
+      {
+        file: "app/api/admin/users/route.ts",
+        description: "사용자 목록 조회 및 관리 API",
+      },
+      {
+        file: "app/api/admin/users/ban/route.ts",
+        description: "사용자 차단 API (기간 지정)",
+      },
+      {
+        file: "app/api/admin/cache/clear/route.ts",
+        description: "캐시 초기화 API",
+      },
+      {
+        file: "app/api/admin/search-logs/route.ts",
+        description: "검색 로그 분석 API",
+      },
+      {
+        file: "app/api/admin/site-settings/route.ts",
+        description: "사이트 설정 (점검 모드, 화이트리스트) 관리 API",
+      },
+      {
+        file: "app/api/admin/action-logs/route.ts",
+        description: "관리자 액션 로그 추적 API",
+      },
+      {
+        file: "app/api/admin/data-health/route.ts",
+        description: "데이터 건강도 대시보드 API",
+      },
     ],
-    techStack: ["SSE", "Recharts", "service_role key"],
+    techStack: ["SSE", "Recharts", "service_role key", "Zustand"],
     security: [
       "역할 기반 접근 제어 (admin 역할 필수)",
       "서버 사이드 레이아웃 가드 (클라이언트 우회 불가)",
+      "액션 로그 기록 (모든 관리자 행위 추적)",
     ],
   },
   {
     icon: <UtensilsCrossed className="h-5 w-5" />,
     title: "식단 관리",
-    summary: "AI 기반 식단 이미지 분석, 영양소 추정, BMR 계산 및 리포트",
-    coreLogic: "파일 확장자나 브라우저가 알려주는 파일 종류(Content-Type)는 쉽게 속일 수 있어서, 악성 파일이 이미지인 척 업로드될 수 있습니다. 이를 막기 위해 파일의 첫 몇 바이트(Magic Byte)를 직접 읽어 진짜 이미지인지 확인합니다. 예를 들어 JPEG 파일은 항상 FFD8FF로 시작하고, PNG는 89504E47로 시작하는데, 이 고유 서명이 맞지 않으면 거부합니다. 또한 이미지 저장소 업로드가 실패하더라도 AI 분석 자체는 중단하지 않고 계속 진행하여, 부분적인 오류가 전체 기능을 망가뜨리지 않도록 설계했습니다.",
+    summary: "AI 이미지 분석, 영양소 추정, BMR 계산, 식단 기록 CRUD 및 리포트",
+    coreLogic: "파일 확장자나 Content-Type은 쉽게 속일 수 있어서, 파일의 첫 몇 바이트(Magic Byte)를 직접 읽어 진짜 이미지인지 확인합니다. JPEG(FFD8FF), PNG(89504E47), WebP(RIFF...WEBP) 각각의 고유 서명을 검증하고, 일치하지 않으면 거부합니다. 식단 기록은 KST 기준 일별로 관리되며, 기록 조회 시 BMR 프로필을 함께 가져와 일일 칼로리 목표 대비 섭취량을 계산합니다. 이미지 업로드는 식단 기록(entries)과 별도 API로 분리하여, Storage 업로드가 실패해도 AI 분석은 중단하지 않는 부분 실패 허용 설계를 적용했습니다.",
     steps: [
       {
         file: "app/diet/page.tsx",
@@ -183,6 +276,14 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
       {
         file: "app/api/diet/analyze/route.ts",
         description: "OpenAI Vision으로 음식 이미지 분석",
+      },
+      {
+        file: "app/api/diet/entries/route.ts",
+        description: "식단 기록 CRUD (KST 기준 일별 조회, BMR 프로필 연동)",
+      },
+      {
+        file: "app/api/diet/upload-image/route.ts",
+        description: "식단 이미지 업로드 (Magic Byte 검증: JPEG/PNG/WebP)",
       },
       {
         file: "app/api/diet/estimate/route.ts",
@@ -197,8 +298,48 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         description: "일간/주간 식단 리포트 생성",
       },
     ],
-    techStack: ["OpenAI Vision", "BMR Algorithm"],
-    security: ["인증 필수 (로그인된 사용자만 접근 가능)"],
+    techStack: ["OpenAI Vision", "BMR Algorithm", "Supabase Storage"],
+    security: [
+      "인증 필수 (로그인된 사용자만 접근 가능)",
+      "Magic Byte 검증 (파일 서명으로 진짜 이미지인지 확인)",
+      "파일 크기 제한 (업로드 용량 제한)",
+    ],
+  },
+  {
+    icon: <UserRound className="h-5 w-5" />,
+    title: "의사 리뷰",
+    summary: "진료과별 의사 검색, 리뷰 CRUD, 영수증 AI 검증, 신고 시스템",
+    coreLogic: "의사 리뷰의 신뢰성을 확보하기 위해 진료비 영수증 AI 검증 시스템을 도입했습니다. 사용자가 영수증 이미지를 업로드하면 OpenAI Vision이 병원명/의사명이 실제로 기재되어 있는지 분석하여 'verified' 배지를 부여합니다. 리뷰 검색은 3가지 용도를 하나의 API로 처리합니다: 진료과/의사명 통합 검색, 특정 병원의 의사 리뷰 조회, 특정 의사의 개별 리뷰 조회. 리뷰 내용은 비속어 필터(maskProfanity)와 HTML 태그 제거(stripHtml)를 거쳐 저장되고, 의사별로 질환 통계(평균 평점, 리뷰 수)를 집계하여 보여줍니다.",
+    steps: [
+      {
+        file: "components/tabs/DoctorTab.tsx",
+        description: "의사 검색 UI, 진료과 필터, 별점 정렬, 질환별 통계",
+      },
+      {
+        file: "app/api/doctor-reviews/route.ts",
+        description: "의사 리뷰 CRUD (3가지 검색 모드, 비속어 필터, 페이지네이션)",
+      },
+      {
+        file: "app/api/doctor-reviews/[id]/report/route.ts",
+        description: "의사 리뷰 신고 (사유 화이트리스트 5종 검증)",
+      },
+      {
+        file: "app/api/review-verification/route.ts",
+        description: "진료비 영수증 AI 검증 (OpenAI Vision으로 병원/의사명 매칭)",
+      },
+      {
+        file: "lib/utils/profanity-filter.ts",
+        description: "비속어 마스킹 및 HTML 스트리핑 유틸리티",
+      },
+    ],
+    techStack: ["OpenAI Vision", "Supabase Storage", "Supabase RLS"],
+    security: [
+      "비속어 필터링 (maskProfanity + stripHtml 이중 정제)",
+      "신고 사유 화이트리스트 (스팸/욕설/허위정보/개인정보/기타)",
+      "영수증 이미지 검증 (파일 크기 3MB 제한, 타입 화이트리스트)",
+      "Rate Limiting (API 호출 횟수 제한)",
+      "소유권 검증 (본인 리뷰만 수정/삭제, isMine 플래그)",
+    ],
   },
   {
     icon: <Pill className="h-5 w-5" />,
@@ -206,6 +347,10 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     summary: "공공데이터 API를 통한 의약품 정보 검색 및 HTML 정제",
     coreLogic: "공공데이터 API가 돌려주는 의약품 설명에는 <b>, &nbsp; 같은 HTML 코드가 섞여 있습니다. 이를 그대로 화면에 표시하면 악성 스크립트가 실행될 수 있는 보안 위험(XSS)이 있어서, 모든 HTML 태그와 특수 코드를 깨끗하게 제거하는 정제 함수를 거칩니다. 또한 서버 로그에 API 호출 기록을 남길 때, 비밀 API 키가 노출되지 않도록 'KEY_HIDDEN'으로 자동 치환합니다.",
     steps: [
+      {
+        file: "app/medicine/page.tsx",
+        description: "의약품 검색 UI",
+      },
       {
         file: "app/api/medicine/route.ts",
         description: "공공데이터 API 프록시, HTML 태그 정제 후 의약품 정보 반환",
@@ -251,6 +396,10 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     coreLogic: "'한식/백반' '일식/초밥' 등 74개 음식 카테고리별로 '어떤 알레르기 성분이 들어갈 가능성이 높은지' 매핑 테이블을 만들어 두었습니다. 음식점 카테고리가 정확히 일치하지 않아도 '초밥'이 '일식/초밥'에 포함되는지, 반대로 '일식/초밥'이 '초밥'에 포함되는지 양방향으로 확인하는 유연한 매칭을 합니다. 일치하는 알레르겐이 0개면 안전(safe), 1~2개면 주의(caution), 3개 이상이면 위험(danger)으로 자동 분류합니다. 거리 계산은 지구가 둥글다는 점을 반영한 Haversine 공식(구면 삼각법)을 사용하여 직선거리보다 정확한 실제 거리를 구합니다.",
     steps: [
       {
+        file: "app/restaurant/page.tsx",
+        description: "맛집 추천 메인 페이지 UI",
+      },
+      {
         file: "app/api/restaurant/search/route.ts",
         description: "소상공인 API로 반경 내 음식점 검색, 알레르기 위험도 매핑",
       },
@@ -282,7 +431,7 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
   {
     icon: <GraduationCap className="h-5 w-5" />,
     title: "학교 급식",
-    summary: "NEIS 연동 급식 조회, 알레르기 교차 오염 감지, 이메일 알림",
+    summary: "NEIS 연동 급식 조회, 알레르기 교차 오염 감지, 이메일 알림, 급식 추천",
     coreLogic: "계란 알레르기가 있으면 닭고기도 위험할 수 있고, 우유 알레르기가 있으면 쇠고기도 주의해야 합니다. 이런 '연쇄 위험' 관계를 교차 오염 맵으로 정의해 두었습니다. 사용자의 알레르기 목록을 받으면, 이 맵을 거꾸로 뒤져서 '추가로 조심해야 할 성분 목록(위험 Set)'을 자동으로 만듭니다. 그런 다음 급식 메뉴 하나하나를 이 목록과 대조하여, 직접 알레르기 성분이면 위험(빨강), 교차 오염 가능성이면 주의(노랑), 해당 없으면 안전(초록)으로 3단계 분류합니다. 이미 '위험'으로 잡힌 성분은 '주의' 목록에서 자동 제외하여 같은 경고가 두 번 뜨지 않도록 합니다.",
     steps: [
       {
@@ -294,6 +443,10 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         description: "일간/주간 급식 상세 조회, 알레르기 매칭 시각화",
       },
       {
+        file: "app/api/school/search/route.ts",
+        description: "NEIS API 학교 검색 (학교명 자동완성)",
+      },
+      {
         file: "app/api/school/meals/route.ts",
         description: "NEIS API 급식 조회, 캐싱, 알레르기 교차 오염 감지",
       },
@@ -302,11 +455,19 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         description: "학교 등록/해제/목록 API (사용자별 관리)",
       },
       {
+        file: "app/api/school/primary/route.ts",
+        description: "대표 학교 설정/조회 API",
+      },
+      {
+        file: "app/api/meal-recommend/route.ts",
+        description: "AI 기반 급식 메뉴 추천 API",
+      },
+      {
         file: "app/api/cron/daily-meal-check/route.ts",
         description: "Vercel Cron 일일 급식 알레르기 이메일 알림",
       },
     ],
-    techStack: ["NEIS Open API", "Supabase", "Nodemailer (Gmail SMTP)", "Vercel Cron"],
+    techStack: ["NEIS Open API", "Supabase", "Nodemailer (Gmail SMTP)", "Vercel Cron", "OpenAI GPT-4o-mini"],
     security: [
       "인증 필수 (학교 등록/알레르기 매칭)",
       "크론 Bearer 토큰 검증 (CRON_SECRET)",
@@ -394,6 +555,10 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
         file: "app/api/food/favorites/route.ts",
         description: "음식 즐겨찾기 CRUD API (별도 테이블)",
       },
+      {
+        file: "app/api/food/favorites/check/route.ts",
+        description: "음식 즐겨찾기 여부 확인 API",
+      },
     ],
     techStack: ["Supabase RLS", "PostgreSQL Unique Constraint"],
     security: [
@@ -421,6 +586,61 @@ const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
     security: [
       "인증 필수 (보호 경로 미들웨어 + API 인증)",
       "RLS 기반 데이터 격리 (본인 스캔 기록만 조회)",
+    ],
+  },
+  {
+    icon: <ScanEye className="h-5 w-5" />,
+    title: "개인정보 보호 스캔",
+    summary: "기업용 개인정보 검출, 정책/패턴/규칙 관리, 장치 에이전트 모니터링",
+    coreLogic: "개인정보 보호 스캔은 8개 서브모듈로 구성된 관리자 전용 시스템입니다. 대시보드에서 전체 현황을 파악하고, 검출 규칙(정규식 패턴)과 정책(어떤 규칙을 어디에 적용할지)을 정의합니다. 에이전트가 설치된 장치에서 스캔 결과를 업로드하면, 서버에서 규칙 매칭 후 결과를 저장합니다. 라이선스 관리로 에이전트 수를 제어하고, 관리자 권한을 별도 분리하여 개인정보 스캔 전용 접근 제어를 합니다. 스캔 결과는 CSV/Excel 내보내기를 지원합니다.",
+    steps: [
+      {
+        file: "app/admin/privacy-scan/PrivacyScanContainer.tsx",
+        description: "8개 서브탭 라우팅 컨테이너 (대시보드/검사결과/정책/규칙/패턴/장치/관리자/라이선스)",
+      },
+      {
+        file: "app/admin/privacy-scan/PSDashboard.tsx",
+        description: "전체 현황 대시보드 (스캔 통계, 위험도 분포)",
+      },
+      {
+        file: "app/admin/privacy-scan/PSScanResults.tsx",
+        description: "검사 결과 목록, 상세 조회, CSV/Excel 내보내기",
+      },
+      {
+        file: "app/admin/privacy-scan/PSDetectionRules.tsx",
+        description: "검출 규칙 CRUD (정규식 패턴 정의)",
+      },
+      {
+        file: "app/admin/privacy-scan/PSPolicyManager.tsx",
+        description: "정책 관리 (규칙-장치 매핑)",
+      },
+      {
+        file: "app/admin/privacy-scan/PSPatternManager.tsx",
+        description: "패턴 관리 (재사용 가능한 검출 패턴)",
+      },
+      {
+        file: "app/admin/privacy-scan/PSDeviceManager.tsx",
+        description: "장치/에이전트 관리 (등록, 하트비트, 상태 모니터링)",
+      },
+      {
+        file: "app/api/admin/privacy-scan/scan-results/route.ts",
+        description: "스캔 결과 CRUD API (업로드, 조회, 내보내기)",
+      },
+      {
+        file: "app/api/admin/privacy-scan/agents/register/route.ts",
+        description: "에이전트 등록 및 하트비트 API",
+      },
+      {
+        file: "app/api/admin/privacy-scan/policies/route.ts",
+        description: "정책 CRUD API",
+      },
+    ],
+    techStack: ["Supabase RLS", "정규식 패턴 매칭", "CSV/Excel Export"],
+    security: [
+      "관리자 전용 접근 (admin 역할 + 개인정보 스캔 권한)",
+      "에이전트 인증 (등록 토큰 + 하트비트 검증)",
+      "라이선스 기반 장치 수 제어",
+      "스캔 결과 RLS (프로젝트별 데이터 격리)",
     ],
   },
 ];
