@@ -14,6 +14,7 @@ import {
   UserX,
   Wifi,
   WifiOff,
+  Shield,
   ShieldCheck,
   Trash2,
   RotateCcw,
@@ -50,6 +51,7 @@ import AppVersionManager from "./app-version-manager";
 import MedicineImageManager from "./medicine-image-manager";
 import DataHealthDashboard from "./data-health-dashboard";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
+import PrivacyScanContainer from "./privacy-scan/PrivacyScanContainer";
 
 // ─── Admin Tab ───
 type AdminTab =
@@ -59,7 +61,8 @@ type AdminTab =
   | "users"
   | "support"
   | "actionLogs"
-  | "portfolioTokens";
+  | "portfolioTokens"
+  | "privacyScan";
 
 // ─── Types ───
 interface Stats {
@@ -822,6 +825,11 @@ export default function AdminDashboard() {
                     label: "포트폴리오",
                     icon: Key,
                   },
+                  {
+                    key: "privacyScan",
+                    label: "PrivacyScan",
+                    icon: Shield,
+                  },
                 ] as const
               ).map((tab) => (
                 <button
@@ -853,6 +861,8 @@ export default function AdminDashboard() {
           <ActionLogs />
         ) : activeTab === "portfolioTokens" ? (
           <PortfolioTokens />
+        ) : activeTab === "privacyScan" ? (
+          <PrivacyScanContainer />
         ) : activeTab === "tools" ? (
           <div className="space-y-5">
             <DataHealthDashboard />
