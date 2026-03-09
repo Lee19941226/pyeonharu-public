@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
@@ -102,6 +102,8 @@ export async function GET(req: NextRequest) {
   let nutrition = {};
   let servingSize = "";
   let rawMaterialsStr = ""; // 원재료 원본 문자열 (프론트 fallback용)
+  let productImageUrl: string | undefined;
+  let imageSource: string | undefined;
   try {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
@@ -888,7 +890,33 @@ JSON 형식으로만 응답:
         console.error("❌ DB 저장 중 오류:", saveError);
         // 저장 실패해도 사용자에게는 데이터 반환
       }
+    }    // ==========================================
+    // 승인된 제품 이미지 조회 (최신 1건)
+    // ==========================================
+    try {
+      const { data: approvedImage } = await supabaseService
+        .from("food_product_images")
+        .select("storage_path, source_type")
+        .eq("food_code", code)
+        .eq("status", "approved")
+        .order("reviewed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (approvedImage?.storage_path) {
+        const { data: signed } = await supabaseService.storage
+          .from("food-product-images")
+          .createSignedUrl(approvedImage.storage_path, 60 * 60);
+
+        if (signed?.signedUrl) {
+          productImageUrl = signed.signedUrl;
+          imageSource = approvedImage.source_type || "user_upload";
+        }
+      }
+    } catch (imageError) {
+      console.error("⚠️ 제품 이미지 조회 실패:", imageError);
     }
+
     // ==========================================
     // 최종 결과
     // ==========================================
@@ -937,3 +965,6 @@ JSON 형식으로만 응답:
     );
   }
 }
+
+
+

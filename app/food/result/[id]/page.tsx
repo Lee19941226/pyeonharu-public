@@ -17,6 +17,7 @@ import {
   Lightbulb,
   Download,
   Share2,
+  Upload,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -49,6 +50,7 @@ export default function FoodResultPage() {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
   const [showUploadedImage, setShowUploadedImage] = useState(false);
+  const [isSubmittingProductImage, setIsSubmittingProductImage] = useState(false);
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -204,6 +206,57 @@ export default function FoodResultPage() {
     setShowShareSheet(true);
   };
 
+
+  const imageSourceLabel = (source?: string) => {
+    if (source === "official") return "공식 이미지";
+    if (source === "user_upload") return "사용자 제보(승인)";
+    if (source === "admin_upload") return "관리자 등록";
+    if (source === "ai_generated") return "AI 생성(참고용)";
+    return "제품 이미지";
+  };
+
+  const handleSubmitProductImage = async (file: File) => {
+    if (!result) return;
+    if (!isLoggedIn) {
+      toast.error("로그인 후 이용해주세요.");
+      router.push("/login");
+      return;
+    }
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      toast.error("JPG, PNG, WEBP 형식만 업로드 가능합니다.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("이미지 크기는 5MB 이하만 가능합니다.");
+      return;
+    }
+
+    try {
+      setIsSubmittingProductImage(true);
+      const form = new FormData();
+      form.append("foodCode", result.foodCode || "");
+      form.append("foodName", result.foodName || "제품");
+      form.append("image", file);
+
+      const res = await fetch("/api/food/image-submissions", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "이미지 제보에 실패했습니다.");
+        return;
+      }
+
+      toast.success(data.message || "이미지 제보가 접수되었습니다.");
+    } catch {
+      toast.error("이미지 제보 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmittingProductImage(false);
+    }
+  };
   const loadFoodResult = async () => {
     try {
       setIsLoading(true);
@@ -873,6 +926,60 @@ export default function FoodResultPage() {
               </Card>
             )}
 
+
+            {(result.productImageUrl || isLoggedIn) && (
+              <Card className="mb-6">
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900">제품 이미지</h3>
+                    {result.imageSource && (
+                      <Badge variant="outline" className="text-xs">
+                        {imageSourceLabel(result.imageSource)}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {result.productImageUrl ? (
+                    <div className="overflow-hidden rounded-lg border bg-white">
+                      <img
+                        src={result.productImageUrl}
+                        alt={`${result.foodName} 제품 이미지`}
+                        className="h-auto max-h-[420px] w-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed bg-muted/40 p-5 text-center text-sm text-muted-foreground">
+                      대표 이미지가 아직 없습니다.
+                    </div>
+                  )}
+
+                  {isLoggedIn && (
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        더 정확한 식별을 위해 제품 이미지를 제보할 수 있어요. (관리자 승인 후 노출)
+                      </p>
+                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-100">
+                        <Upload className="h-3.5 w-3.5" />
+                        {isSubmittingProductImage ? "업로드 중..." : "이미지 제보"}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          className="hidden"
+                          disabled={isSubmittingProductImage}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleSubmitProductImage(file);
+                            }
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             {result.dataSource === "ai" && uploadedImagePreview && (
               <Card className="mb-6 border-blue-200 bg-blue-50/60">
                 <CardContent className="p-4">
@@ -1620,6 +1727,14 @@ export default function FoodResultPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

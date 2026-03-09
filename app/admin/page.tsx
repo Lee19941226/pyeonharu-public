@@ -48,6 +48,7 @@ import CacheManager from "./cache-manager";
 import TesterManager from "./tester-manager";
 import AppVersionManager from "./app-version-manager";
 import MedicineImageManager from "./medicine-image-manager";
+import FoodImageManager from "./food-image-manager";
 import DataHealthDashboard from "./data-health-dashboard";
 import { useAdminSSE, type OnlineUser } from "@/hooks/useAdminSSE";
 
@@ -863,6 +864,7 @@ export default function AdminDashboard() {
             <TesterManager />
             <AppVersionManager />
             <MedicineImageManager />
+            <FoodImageManager />
           </div>
         ) : loading && !stats ? (
           <div className="flex items-center justify-center py-20">
@@ -1343,4 +1345,6 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
 
