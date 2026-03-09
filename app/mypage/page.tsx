@@ -306,7 +306,7 @@ export default function MyPage() {
     if (typeof window !== "undefined") {
       localStorage.setItem("pyeonharu_nav_tab", "meal:diet");
     }
-    router.push("/");
+    router.push("/?tab=meal:diet");
   };
 
   useEffect(() => {

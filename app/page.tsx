@@ -152,6 +152,29 @@ export default function HomePage() {
   const [homeRestored, setHomeRestored] = useState(false);
   useEffect(() => {
     try {
+      // URL 쿼리(tab)가 있으면 최우선 적용
+      const queryTab = new URLSearchParams(window.location.search).get("tab");
+      if (queryTab) {
+        const [qm, qs] = queryTab.split(":");
+        if (qm === "meal" && ["food", "restaurant", "diet"].includes(qs)) {
+          setMainTab("meal");
+          setMealSubTab(qs as MealSubTab);
+          window.history.replaceState({}, "", "/");
+          setHomeRestored(true);
+          return;
+        }
+        if (
+          qm === "sick" &&
+          ["symptom", "hospital", "medicine", "doctor"].includes(qs)
+        ) {
+          setMainTab("sick");
+          setSickSubTab(qs as SickSubTab);
+          window.history.replaceState({}, "", "/");
+          setHomeRestored(true);
+          return;
+        }
+      }
+
       const stored = localStorage.getItem(HOME_TAB_KEY);
       if (stored) {
         const [main, sub] = stored.split(":");
@@ -176,13 +199,13 @@ export default function HomePage() {
       const [m, s] = navTab.split(":");
       if (m === "meal" && ["food", "restaurant", "diet"].includes(s)) {
         setMainTab("meal");
-        setMealSubTab(s as any);
+        setMealSubTab(s as MealSubTab);
       } else if (
         m === "sick" &&
-        ["symptom", "hospital", "medicine"].includes(s)
+        ["symptom", "hospital", "medicine", "doctor"].includes(s)
       ) {
         setMainTab("sick");
-        setSickSubTab(s as any);
+        setSickSubTab(s as SickSubTab);
       }
     }
   }, []);
