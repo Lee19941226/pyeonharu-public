@@ -11,6 +11,7 @@ import { StatusBarInit } from "@/components/status-bar-init";
 import { OAuthDeepLinkHandler } from "@/components/oauth-deep-link-handler";
 import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
 import { PageTrackerProvider } from "@/components/providers/page-tracker-provider";
+import { GeoRegionProvider } from "@/components/providers/geo-region-provider";
 import { AdSidebar } from "@/components/ad-sidebar";
 
 export const metadata: Metadata = {
@@ -115,7 +116,9 @@ export default function RootLayout({
           <OAuthDeepLinkHandler />
           <HapticProvider>
             <HeartbeatProvider>
-              <PageTrackerProvider>{children}</PageTrackerProvider>
+              <GeoRegionProvider>
+                <PageTrackerProvider>{children}</PageTrackerProvider>
+              </GeoRegionProvider>
             </HeartbeatProvider>
             <Toaster />
           </HapticProvider>

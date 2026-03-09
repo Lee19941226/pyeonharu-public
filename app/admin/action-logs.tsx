@@ -321,20 +321,25 @@ export default function ActionLogs() {
         "액션",
         "IP",
         "리전",
+        "위치출처",
         "User-Agent",
         "메타데이터",
       ];
-      const rows = result.logs.map((log) => [
-        new Date(log.created_at).toLocaleString("ko-KR"),
-        log.nickname || "비로그인",
-        getActionConfig(log.action_type).label,
-        log.ip_address,
-        ((log.metadata as Record<string, unknown>)?._region as string) ||
-          regions[log.ip_address] ||
-          "",
-        `"${(log.user_agent || "").replace(/"/g, '""')}"`,
-        `"${JSON.stringify(log.metadata).replace(/"/g, '""')}"`,
-      ]);
+      const rows = result.logs.map((log) => {
+        const meta = log.metadata as Record<string, unknown>;
+        const region = (meta?._region as string) || regions[log.ip_address] || "";
+        const source = (meta?._geo_source as string) || (regions[log.ip_address] ? "IP" : "");
+        return [
+          new Date(log.created_at).toLocaleString("ko-KR"),
+          log.nickname || "비로그인",
+          getActionConfig(log.action_type).label,
+          log.ip_address,
+          region,
+          source === "gps" ? "GPS" : source ? "IP" : "",
+          `"${(log.user_agent || "").replace(/"/g, '""')}"`,
+          `"${JSON.stringify(log.metadata).replace(/"/g, '""')}"`,
+        ];
+      });
 
       const csv = BOM + [header, ...rows].map((r) => r.join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -608,13 +613,26 @@ export default function ActionLogs() {
                       {log.ip_address}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {((log.metadata as Record<string, unknown>)
-                          ?._region as string) ||
-                          regions[log.ip_address] ||
-                          "—"}
-                      </span>
+                      {(() => {
+                        const meta = log.metadata as Record<string, unknown>;
+                        const region = (meta?._region as string) || regions[log.ip_address] || "";
+                        const source = (meta?._geo_source as string) || (regions[log.ip_address] ? "ip" : "");
+                        return (
+                          <span className="inline-flex items-center gap-1.5">
+                            <MapPin className="h-3 w-3" />
+                            {region || "—"}
+                            {source && (
+                              <span className={`inline-flex items-center rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${
+                                source === "gps"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                                  : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                              }`}>
+                                {source === "gps" ? "GPS" : "IP"}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button

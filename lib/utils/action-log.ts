@@ -37,6 +37,10 @@ interface LogActionParams {
   userId: string | null;
   actionType: ActionType;
   metadata?: Record<string, unknown>;
+  /** 클라이언트 GPS 기반 지역명 (우선 사용) */
+  geoRegion?: string;
+  /** "gps" | "ip" — 지역 정보 출처 */
+  geoSource?: string;
 }
 
 /**
@@ -66,9 +70,15 @@ export async function logAction({
   userId,
   actionType,
   metadata = {},
+  geoRegion,
+  geoSource,
 }: LogActionParams) {
   try {
-    const { ipAddress, userAgent, region } = await getRequestInfo();
+    const { ipAddress, userAgent, region: ipRegion } = await getRequestInfo();
+
+    // GPS 지역이 있으면 우선 사용, 없으면 IP 기반 폴백
+    const finalRegion = geoRegion || ipRegion;
+    const finalSource = geoRegion ? (geoSource || "gps") : (ipRegion ? "ip" : "");
 
     supabaseAdmin
       .from("user_action_logs")
@@ -77,7 +87,11 @@ export async function logAction({
         action_type: actionType,
         ip_address: ipAddress,
         user_agent: userAgent,
-        metadata: { ...metadata, ...(region && { _region: region }) },
+        metadata: {
+          ...metadata,
+          ...(finalRegion && { _region: finalRegion }),
+          ...(finalSource && { _geo_source: finalSource }),
+        },
       })
       .then(({ error }) => {
         if (error) {
