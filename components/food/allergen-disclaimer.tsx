@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AlertTriangle, Info, ShieldAlert, ExternalLink } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +9,7 @@ interface AllergenDisclaimerProps {
   /** 위험 결과(알레르기 검출)인지 여부 */
   isDangerous?: boolean;
   /** 상단 고정 배너용 (결과 페이지 최상단) */
-  variant?: "banner" | "card";
+  variant?: "banner" | "card" | "inline";
 }
 
 /** 데이터 출처별 표시 텍스트 */
@@ -28,6 +28,7 @@ export function AllergenDisclaimer({
   const source = SOURCE_LABEL[dataSource] ?? SOURCE_LABEL["openapi"];
   const isAI = dataSource === "ai";
   const isCommunity = dataSource === "openfood";
+  const isInline = variant === "inline";
 
   // ── 상단 배너 (AI 결과 전용 경고) ──
   if (variant === "banner") {
@@ -57,8 +58,10 @@ export function AllergenDisclaimer({
   // ── 하단 카드 (공통 면책 문구) ──
   return (
     <div
-      className={`rounded-xl border p-4 text-sm space-y-3 ${
-        isDangerous ? "border-red-200 bg-red-50" : "border-gray-200 bg-gray-50"
+      className={`text-sm space-y-3 ${
+        isInline
+          ? "mt-3 border-t border-amber-200 pt-3"
+          : `rounded-xl border p-4 ${isDangerous ? "border-red-200 bg-red-50" : "border-gray-200 bg-gray-50"}`
       }`}
     >
       {/* ── 주요 면책 ── */}
@@ -110,7 +113,11 @@ export function AllergenDisclaimer({
       </div>
 
       {/* ── 데이터 출처 + 링크 ── */}
-      <div className="flex items-center justify-between pt-1 border-t border-gray-200">
+      <div
+        className={`flex items-center justify-between pt-1 ${
+          isInline ? "border-t border-amber-200" : "border-t border-gray-200"
+        }`}
+      >
         <span className="text-xs text-gray-500">
           {source.icon} 데이터 출처: {source.label}
         </span>
