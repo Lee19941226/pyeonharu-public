@@ -31,7 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LoginModal } from "@/components/auth/login-modal";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { Html5Qrcode } from "html5-qrcode";
+import { detectBarcodeValue } from "@/lib/utils/barcode-scan";
 import { toast } from "sonner";
 import { UploadSheet } from "@/components/food/upload-sheet";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
@@ -893,12 +893,11 @@ export default function FoodTab({
     toast.info("바코드 인식 중...");
 
     try {
-      const html5QrCode = new Html5Qrcode("qr-reader-hidden");
-      try {
-        const barcode = await html5QrCode.scanFile(file, false);
+      const barcode = await detectBarcodeValue(file, { readerElementId: "qr-reader-hidden" });
+      if (barcode) {
         toast.success("바코드 인식 완료");
         router.push(`/food/result/${barcode}`);
-      } catch {
+      } else {
         toast.info("바코드 인식 실패, AI 분석으로 전환합니다.");
         await analyzeFoodImageWithAi(file);
       }
@@ -947,13 +946,12 @@ export default function FoodTab({
       console.log("🔍 바코드 감지 시작...");
       toast.info("바코드 확인 중...");
 
-      const html5QrCode = new Html5Qrcode("qr-reader-hidden");
-      try {
-        const barcode = await html5QrCode.scanFile(file, false);
+      const barcode = await detectBarcodeValue(file, { readerElementId: "qr-reader-hidden" });
+      if (barcode) {
         console.log("✅ 바코드 발견:", barcode);
         toast.success("바코드 인식 완료");
         router.push(`/food/result/${barcode}`);
-      } catch {
+      } else {
         console.log("❌ 바코드 없음, AI 분석 시작");
         toast.info("AI가 성분표를 분석 중...");
         await analyzeFoodImageWithAi(file);
@@ -1478,4 +1476,3 @@ export default function FoodTab({
     </div>
   );
 }
-
