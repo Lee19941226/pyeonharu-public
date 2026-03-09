@@ -302,6 +302,13 @@ export default function MyPage() {
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  const goToDietTab = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pyeonharu_nav_tab", "meal:diet");
+    }
+    router.push("/");
+  };
+
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -470,16 +477,17 @@ export default function MyPage() {
               </CardHeader>
               <CardContent className="space-y-1 p-4 pt-0">
                 <BmrSection />
-                <Link
-                  href="/diet"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted transition-colors"
+                <button
+                  type="button"
+                  onClick={goToDietTab}
+                  className="flex w-full items-center justify-between rounded-lg p-3 text-left hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <UtensilsCrossed className="h-5 w-5 text-muted-foreground" />
                     <span>식단관리</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
+                </button>
               </CardContent>
             </Card>
 
