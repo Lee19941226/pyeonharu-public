@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -564,29 +564,29 @@ export default function FoodTab({
   }, []);
 
   // ─── 알레르기 등록 상태 확인 ───
-  useEffect(() => {
+  const loadAllergyProfileStatus = useCallback(async () => {
     if (!user) {
       setAllergyProfileStatus(null);
       return;
     }
 
     const supabase = createClient();
-    Promise.all([
-      supabase
-        .from("profiles")
-        .select("allergy_profile_status")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("user_allergies")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-    ]).then(([profileRes, allergyRes]) => {
+    try {
+      const [profileApiRes, allergyRes] = await Promise.all([
+        fetch("/api/profile", { cache: "no-store" }).then((r) =>
+          r.ok ? r.json() : null,
+        ),
+        supabase
+          .from("user_allergies")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id),
+      ]);
+
       const count = allergyRes.count ?? 0;
       const has = count > 0;
 
       const profileStatus =
-        (profileRes.data?.allergy_profile_status as
+        (profileApiRes?.allergyProfileStatus as
           | "unset"
           | "none"
           | "has_allergy"
@@ -599,9 +599,25 @@ export default function FoodTab({
       } else {
         setAllergyProfileStatus("unset");
       }
-    });
+    } catch {
+      setAllergyProfileStatus("unset");
+    }
   }, [user]);
 
+  useEffect(() => {
+    void loadAllergyProfileStatus();
+  }, [loadAllergyProfileStatus]);
+
+  useEffect(() => {
+    const handleAllergiesUpdated = () => {
+      void loadAllergyProfileStatus();
+    };
+
+    window.addEventListener("allergiesUpdated", handleAllergiesUpdated);
+    return () => {
+      window.removeEventListener("allergiesUpdated", handleAllergiesUpdated);
+    };
+  }, [loadAllergyProfileStatus]);
   const handleMarkNoAllergy = async () => {
     if (!user) return;
     try {
@@ -1462,3 +1478,4 @@ export default function FoodTab({
     </div>
   );
 }
+
