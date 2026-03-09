@@ -134,13 +134,37 @@ export function MobileNav() {
               data: { user },
             } = await supabase.auth.getUser();
             let userAllergens: string[] = [];
+            let allergyProfileStatus: "unset" | "none" | "has_allergy" = "unset";
 
             if (user) {
+              try {
+                const profileRes = await fetch("/api/profile", { cache: "no-store" });
+                if (profileRes.ok) {
+                  const profileData = await profileRes.json();
+                  const status = profileData?.allergyProfileStatus;
+                  if (status === "unset" || status === "none" || status === "has_allergy") {
+                    allergyProfileStatus = status;
+                  }
+                }
+              } catch {
+                // ignore
+              }
+
               const { data } = await supabase
                 .from("user_allergies")
                 .select("allergen_name")
                 .eq("user_id", user.id);
               if (data) userAllergens = data.map((item) => item.allergen_name);
+
+              if (allergyProfileStatus === "unset" && userAllergens.length === 0) {
+                toast.info("알레르기를 등록하면 맞춤 분석 결과를 알려드려요!", {
+                  action: {
+                    label: "등록하기",
+                    onClick: () => router.push("/food/profile"),
+                  },
+                  duration: 5000,
+                });
+              }
             }
 
             const response = await fetch("/api/food/analyze-image", {
