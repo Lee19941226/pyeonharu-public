@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { NaverMap } from "@/components/medical/naver-map";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 export type PlaceType = "hospital" | "pharmacy";
 export type ViewMode = "map" | "list";
+type LocationSource = "gps" | "ip" | "default" | "manual";
 
 export interface Place {
   id: string;
@@ -37,7 +38,18 @@ function zoomToRadius(zoom: number): number {
   if (zoom === 15) return 1000;
   if (zoom === 14) return 2000;
   if (zoom === 13) return 3000;
-  return 5000;
+  if (zoom === 12) return 5000;
+  if (zoom === 11) return 8000;
+  if (zoom === 10) return 12000;
+  return 20000;
+}
+
+const RADIUS_STEPS = [500, 1000, 2000, 3000, 5000, 8000, 12000, 16000, 20000, 30000] as const;
+
+function snapRadiusToStep(radiusMeters: number): number {
+  const clamped = Math.max(300, Math.min(30000, Math.round(radiusMeters)));
+  const matched = RADIUS_STEPS.find((step) => step >= clamped);
+  return matched ?? 30000;
 }
 
 export default function HospitalTab() {
@@ -59,6 +71,8 @@ export default function HospitalTab() {
   const [addressInput, setAddressInput] = useState("");
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
   const [locationName, setLocationName] = useState("");
+  const [locationSource, setLocationSource] = useState<LocationSource>("default");
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [listPage, setListPage] = useState(1);
   const hasLoadedOnce = useRef(false);
   const viewportFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,6 +152,38 @@ export default function HospitalTab() {
     },
     [stopLocationWatch],
   );
+
+  const resolveReverseGeocodeName = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(`/api/restaurant/reverse-geocode?lat=${lat}&lng=${lng}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const resolved =
+        data?.address || data?.full || [data?.sigungu, data?.dong].filter(Boolean).join(" ");
+      if (resolved && typeof resolved === "string") {
+        setLocationName(resolved);
+      }
+    } catch {
+      // 위치명 조회 실패는 치명적이지 않으므로 무시
+    }
+  }, []);
+
+  const resolveIpFallbackLocation = useCallback(async () => {
+    const res = await fetch("/api/location/ip", { cache: "no-store" });
+    if (!res.ok) throw new Error("ip_fallback_failed");
+    const data = await res.json();
+    if (!data?.success || typeof data.lat !== "number" || typeof data.lng !== "number") {
+      throw new Error("ip_fallback_invalid");
+    }
+    return data as {
+      lat: number;
+      lng: number;
+      accuracy?: number;
+      regionLabel?: string;
+      source?: string;
+    };
+  }, []);
+
   // 현재 위치 가져오기
   useEffect(() => {
     let cancelled = false;
@@ -145,17 +191,39 @@ export default function HospitalTab() {
       .then((loc) => {
         if (cancelled) return;
         setUserLocation({ lat: loc.lat, lng: loc.lng });
+        setLocationSource("gps");
+        setLocationAccuracy(Math.max(1, Math.round(loc.accuracy)));
+        void resolveReverseGeocodeName(loc.lat, loc.lng);
       })
-      .catch(() => {
+      .catch(async () => {
         if (cancelled) return;
-        setUserLocation({ lat: 37.5665, lng: 126.978 });
+        try {
+          const ipLoc = await resolveIpFallbackLocation();
+          if (cancelled) return;
+          setUserLocation({ lat: ipLoc.lat, lng: ipLoc.lng });
+          setLocationSource("ip");
+          setLocationAccuracy(
+            typeof ipLoc.accuracy === "number" ? Math.max(1, Math.round(ipLoc.accuracy)) : null,
+          );
+          if (ipLoc.regionLabel) {
+            setLocationName(ipLoc.regionLabel);
+          } else {
+            void resolveReverseGeocodeName(ipLoc.lat, ipLoc.lng);
+          }
+        } catch {
+          if (cancelled) return;
+          setUserLocation({ lat: 37.5665, lng: 126.978 });
+          setLocationSource("default");
+          setLocationAccuracy(null);
+          setLocationName("서울시청(기본 위치)");
+        }
       });
 
     return () => {
       cancelled = true;
       stopLocationWatch();
     };
-  }, [resolveBestLocation, stopLocationWatch]);
+  }, [resolveBestLocation, resolveIpFallbackLocation, resolveReverseGeocodeName, stopLocationWatch]);
 
   const calculateDistance = useCallback(
     (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -186,7 +254,12 @@ export default function HospitalTab() {
     (viewport: { center: { lat: number; lng: number }; zoom: number; radiusMeters: number }) => {
       setMapCenter(viewport.center);
       setMapZoom(viewport.zoom);
-      setMapRadius(Math.max(300, Math.round(viewport.radiusMeters)));
+
+      const zoomBasedRadius = zoomToRadius(viewport.zoom);
+      const viewportRadius = Math.max(300, Math.round(viewport.radiusMeters));
+      const stagedRadius = snapRadiusToStep(Math.max(zoomBasedRadius, viewportRadius));
+
+      setMapRadius((prev) => (prev === stagedRadius ? prev : stagedRadius));
     },
     [],
   );
@@ -201,6 +274,8 @@ export default function HospitalTab() {
         setUserLocation({ lat: data.lat, lng: data.lng });
         setMapCenter({ lat: data.lat, lng: data.lng });
         setLocationName(data.name);
+        setLocationSource("manual");
+        setLocationAccuracy(null);
         setAddressInput("");
       } else {
         toast.error(data.error || "해당 지역을 찾을 수 없어요");
@@ -218,7 +293,7 @@ export default function HospitalTab() {
     const searchCenter = mapCenter ?? userLocation;
     if (!searchCenter) return;
 
-    const searchRadius = Math.max(300, mapRadius || zoomToRadius(mapZoom));
+    const searchRadius = snapRadiusToStep(Math.max(mapRadius || 0, zoomToRadius(mapZoom)));
     const cacheKey = `${searchCenter.lat.toFixed(4)}::${searchCenter.lng.toFixed(4)}::${searchRadius}::${placeType}`;
 
     if (!skipCacheRef.current) {
@@ -440,20 +515,40 @@ export default function HospitalTab() {
   // 새로고침: GPS 재요청 + 캐시 무시
   const handleRefresh = useCallback(() => {
     skipCacheRef.current = true;
-    setLocationName("");
     setMapCenter(null);
     resolveBestLocation({ targetAccuracy: 25, maxWaitMs: 10000 })
       .then((loc) => {
         setUserLocation({ lat: loc.lat, lng: loc.lng });
+        setLocationSource("gps");
+        setLocationAccuracy(Math.max(1, Math.round(loc.accuracy)));
+        setLocationName("");
+        void resolveReverseGeocodeName(loc.lat, loc.lng);
         if (loc.accuracy > 80) {
           toast.info("GPS 정확도가 낮아 실내/지하에서 위치 오차가 생길 수 있어요");
         }
       })
-      .catch(() => {
-        // GPS 실패 시 현재 위치 그대로 재검색
-        fetchPlaces();
+      .catch(async () => {
+        try {
+          const ipLoc = await resolveIpFallbackLocation();
+          setUserLocation({ lat: ipLoc.lat, lng: ipLoc.lng });
+          setLocationSource("ip");
+          setLocationAccuracy(
+            typeof ipLoc.accuracy === "number" ? Math.max(1, Math.round(ipLoc.accuracy)) : null,
+          );
+          if (ipLoc.regionLabel) {
+            setLocationName(ipLoc.regionLabel);
+          } else {
+            setLocationName("");
+            void resolveReverseGeocodeName(ipLoc.lat, ipLoc.lng);
+          }
+          toast.info("위치 권한이 제한되어 IP 기반 대략 위치로 표시했어요");
+        } catch {
+          // 최종 실패 시 현재 위치 그대로 재검색
+          fetchPlaces();
+          toast.error("위치를 갱신하지 못해 현재 기준으로 다시 검색했어요");
+        }
       });
-  }, [fetchPlaces, resolveBestLocation]);
+  }, [fetchPlaces, resolveBestLocation, resolveIpFallbackLocation, resolveReverseGeocodeName]);
 
   // 필터링: 영업 중 + 검색어
   const filteredPlaces = places.filter((place) => {
@@ -510,6 +605,26 @@ export default function HospitalTab() {
                   <span className="text-xs font-medium text-foreground truncate flex-1">{locationName}</span>
                 ) : (
                   <span className="text-xs text-muted-foreground flex-1">현재 위치 기준</span>
+                )}
+                {locationSource === "gps" && (
+                  <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                    GPS{locationAccuracy ? ` ±${locationAccuracy}m` : ""}
+                  </span>
+                )}
+                {locationSource === "ip" && (
+                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    IP 기반(대략)
+                  </span>
+                )}
+                {locationSource === "default" && (
+                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                    기본 위치
+                  </span>
+                )}
+                {locationSource === "manual" && (
+                  <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                    직접 지정
+                  </span>
                 )}
               </div>
               <div className="mt-1.5 flex gap-1">
@@ -675,5 +790,3 @@ export default function HospitalTab() {
     </div>
   );
 }
-
-
