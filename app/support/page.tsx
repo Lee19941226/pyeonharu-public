@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
+import { trackSupportSubmitConversion } from "@/lib/analytics/google-ads";
 import type { RichEditorRef } from "@/components/editor/rich-editor";
 
 const RichEditor = dynamic(() => import("@/components/editor/rich-editor"), {
@@ -152,6 +153,7 @@ function SupportContent() {
       const data = await res.json();
 
       if (data.success) {
+        trackSupportSubmitConversion();
         setSubmitted(true);
         toast.success("문의 접수 완료");
       } else {
@@ -445,3 +447,5 @@ export default function SupportPage() {
     </Suspense>
   );
 }
+
+

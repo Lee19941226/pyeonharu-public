@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Lock, KeyRound, Loader2, ArrowRight } from "lucide-react";
+import { trackPortfolioVerifyConversion } from "@/lib/analytics/google-ads";
 
 const STORAGE_KEY = "portfolio_token";
 
@@ -36,6 +37,7 @@ export function PortfolioTokenGate({ children }: { children: React.ReactNode }) 
       const data = await res.json();
 
       if (res.ok && data.success) {
+        if (!silent) trackPortfolioVerifyConversion();
         sessionStorage.setItem(STORAGE_KEY, value);
         setState("verified");
       } else {

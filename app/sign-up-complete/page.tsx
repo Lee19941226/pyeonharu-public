@@ -1,10 +1,19 @@
-"use client"
+﻿"use client"
 
-import React from "react"
+import React, { useEffect, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { trackSignupCompleteConversion } from "@/lib/analytics/google-ads"
 
 export default function SignUpCompletePage() {
+  const trackedRef = useRef(false)
+
+  useEffect(() => {
+    if (trackedRef.current) return
+    trackedRef.current = true
+    trackSignupCompleteConversion()
+  }, [])
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-background p-8 text-center shadow-lg">
