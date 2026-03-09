@@ -54,6 +54,7 @@ function snapRadiusToStep(radiusMeters: number): number {
 }
 
 export default function HospitalTab() {
+  const [isDesktopClient, setIsDesktopClient] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [placeType, setPlaceType] = useState<PlaceType | "all">("all");
   const [showOpenOnly, setShowOpenOnly] = useState(false);
@@ -84,6 +85,14 @@ export default function HospitalTab() {
     navigator.geolocation.clearWatch(locationWatchIdRef.current);
     locationWatchIdRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ua = navigator.userAgent || "";
+    const isMobileLike = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+    setIsDesktopClient(!isMobileLike);
+  }, []);
+
 
   const resolveBestLocation = useCallback(
     async (options?: { targetAccuracy?: number; maxWaitMs?: number }) => {
@@ -551,6 +560,34 @@ export default function HospitalTab() {
       });
   }, [fetchPlaces, resolveBestLocation, resolveIpFallbackLocation, resolveReverseGeocodeName]);
 
+  const handleDesktopPreciseRetry = useCallback(() => {
+    skipCacheRef.current = true;
+    resolveBestLocation({ targetAccuracy: 25, maxWaitMs: 12000 })
+      .then((loc) => {
+        setUserLocation({ lat: loc.lat, lng: loc.lng });
+        setMapCenter({ lat: loc.lat, lng: loc.lng });
+        setLocationSource("gps");
+        setLocationAccuracy(Math.max(1, Math.round(loc.accuracy)));
+        setLocationName("");
+        void resolveReverseGeocodeName(loc.lat, loc.lng);
+        if (loc.accuracy > 120) {
+          toast.info("데스크탑 환경에서는 위치 오차가 클 수 있어 주소 입력으로 보정해 주세요");
+        } else {
+          toast.success("위치를 다시 가져왔어요");
+        }
+      })
+      .catch(() => {
+        toast.info("정확 위치를 가져오지 못했어요. 주소 입력으로 위치를 지정해 주세요");
+      });
+  }, [resolveBestLocation, resolveReverseGeocodeName]);
+
+  const showDesktopPrecisionCta =
+    isDesktopClient &&
+    (locationSource === "ip" ||
+      locationSource === "default" ||
+      (locationSource === "gps" && (locationAccuracy ?? 9999) > 120));
+
+
   // 필터링: 영업 중 + 검색어
   const filteredPlaces = places.filter((place) => {
     if (showOpenOnly && !place.isOpen) return false;
@@ -628,6 +665,21 @@ export default function HospitalTab() {
                   </span>
                 )}
               </div>
+              {showDesktopPrecisionCta && (
+                <div className="mt-1.5 flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                  <p className="pr-2 text-[11px] text-amber-800">
+                    데스크탑에서는 위치 오차가 클 수 있어요
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 border-amber-300 bg-white px-2 text-[11px] text-amber-900 hover:bg-amber-100"
+                    onClick={handleDesktopPreciseRetry}
+                  >
+                    정확 위치 재시도
+                  </Button>
+                </div>
+              )}
               <div className="mt-1.5 flex gap-1">
                 <Input
                   placeholder="시/구/동 (예: 강남)"
@@ -791,5 +843,7 @@ export default function HospitalTab() {
     </div>
   );
 }
+
+
 
 
