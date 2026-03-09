@@ -13,6 +13,7 @@ import { HeartbeatProvider } from "@/components/providers/heartbeat-provider";
 import { PageTrackerProvider } from "@/components/providers/page-tracker-provider";
 import { GeoRegionProvider } from "@/components/providers/geo-region-provider";
 import { AdSidebar } from "@/components/ad-sidebar";
+import { GOOGLE_ADS_ID, isGoogleAdsEnabled } from "@/lib/analytics/google-ads";
 
 export const metadata: Metadata = {
   title: {
@@ -125,6 +126,28 @@ export default function RootLayout({
         </AuthProvider>
         <Analytics />
         <AdSidebar />
+        {isGoogleAdsEnabled() && (
+          <>
+            <Script
+              id="google-ads-gtag-src"
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+            />
+            <Script
+              id="google-ads-gtag-init"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  window.gtag = gtag;
+                  gtag('js', new Date());
+                  gtag('config', '${GOOGLE_ADS_ID}');
+                `,
+              }}
+            />
+          </>
+        )}
         <Script
           id="sw-register"
           strategy="afterInteractive"
@@ -181,3 +204,6 @@ export default function RootLayout({
     </html>
   );
 }
+
+
+

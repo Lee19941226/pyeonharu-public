@@ -109,8 +109,8 @@ const nextConfig = {
               // - openapi.map.naver.com 제거: 구버전 URL, layout.tsx는 oapi.map.naver.com 사용
               // - *.map.naver.net 제거: 지도 타일 이미지 도메인, script-src 불필요 (img-src에서 처리)
               // - *.pstatic.net 제거: Naver 정적 이미지 도메인, script-src 불필요 (img-src에서 처리)
-              // - www.googletagmanager.com 제거: layout.tsx에 GTM Script 없음 (필요 시 재추가)
-              "script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net https://oapi.map.naver.com https://nrbe.pstatic.net https://*.pstatic.net https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com",
+              // - www.googletagmanager.com 추가: Google Ads gtag 로드 허용
+              "script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net https://oapi.map.naver.com https://nrbe.pstatic.net https://*.pstatic.net https://va.vercel-scripts.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://adservice.google.com https://www.googletagmanager.com",
 
               /*
                * [style-src] 'unsafe-inline' 유지 이유:
@@ -128,7 +128,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 
               // 이미지: self + Supabase + Google + 카카오 + 네이버 + 애드센스 + data URI
-              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com https://*.map.naver.com https://*.pstatic.net https://*.naver.net https://nedrug.mfds.go.kr https://*.mfds.go.kr",
+              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net https://ssl.gstatic.com https://pagead2.googlesyndication.com https://*.map.naver.com https://*.pstatic.net https://*.naver.net https://nedrug.mfds.go.kr https://*.mfds.go.kr https://www.google.com",
 
               // 폰트: self
               "font-src 'self' data: https://cdn.jsdelivr.net",
@@ -152,6 +152,9 @@ const nextConfig = {
                 "https://pagead2.googlesyndication.com",
                 "https://www.googleadservices.com",
                 "https://epi.adtrafficquality.google",
+                "https://www.google-analytics.com",
+                "https://www.googletagmanager.com",
+                "https://googleads.g.doubleclick.net",
               ].join(" "),
 
               // 클릭재킹 방지: 이 사이트가 iframe에 포함되는 것을 차단
@@ -202,5 +205,6 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
 
 
