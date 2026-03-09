@@ -17,13 +17,29 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, showAllergyPublic } = body;
+  const { name, showAllergyPublic, allergyProfileStatus } = body;
 
-  // show_allergy_public만 업데이트하는 경우
-  if (showAllergyPublic !== undefined && !name) {
+  // show_allergy_public / allergy_profile_status만 업데이트하는 경우
+  if (
+    (showAllergyPublic !== undefined || allergyProfileStatus !== undefined) &&
+    !name
+  ) {
+    const updatePayload: Record<string, any> = {};
+
+    if (showAllergyPublic !== undefined) {
+      updatePayload.show_allergy_public = !!showAllergyPublic;
+    }
+
+    if (
+      allergyProfileStatus !== undefined &&
+      ["unset", "none", "has_allergy"].includes(String(allergyProfileStatus))
+    ) {
+      updatePayload.allergy_profile_status = allergyProfileStatus;
+    }
+
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ show_allergy_public: !!showAllergyPublic })
+      .update(updatePayload)
       .eq("id", user.id);
 
     if (profileError) {
@@ -31,7 +47,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "설정 저장 실패" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, showAllergyPublic: !!showAllergyPublic });
+    return NextResponse.json({
+      success: true,
+      showAllergyPublic:
+        showAllergyPublic !== undefined ? !!showAllergyPublic : undefined,
+      allergyProfileStatus:
+        allergyProfileStatus !== undefined ? allergyProfileStatus : undefined,
+    });
   }
 
   if (!name?.trim()) {
@@ -69,6 +91,12 @@ export async function PUT(req: NextRequest) {
   };
   if (showAllergyPublic !== undefined) {
     updateData.show_allergy_public = !!showAllergyPublic;
+  }
+  if (
+    allergyProfileStatus !== undefined &&
+    ["unset", "none", "has_allergy"].includes(String(allergyProfileStatus))
+  ) {
+    updateData.allergy_profile_status = allergyProfileStatus;
   }
 
   const { error: profileError } = await supabase.from("profiles").upsert(
@@ -109,7 +137,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nickname, avatar_url, show_allergy_public")
+    .select("nickname, avatar_url, show_allergy_public, allergy_profile_status")
     .eq("id", user.id)
     .single();
 
@@ -118,5 +146,6 @@ export async function GET() {
     email: user.email || "",
     avatarUrl: profile?.avatar_url || null,
     showAllergyPublic: profile?.show_allergy_public ?? false,
+    allergyProfileStatus: profile?.allergy_profile_status || "unset",
   });
 }

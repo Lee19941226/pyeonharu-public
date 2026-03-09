@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ import {
   Upload,
   ChevronDown,
   Info,
+  Check,
   UtensilsCrossed as MealIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -505,7 +506,7 @@ export default function FoodTab({
     reason: "scan_limit" | "scan_warning" | "feature";
     remainingScans?: number;
   }>({ open: false, reason: "scan_warning" });
-  const [hasAllergies, setHasAllergies] = useState<boolean | null>(null);
+  const [allergyProfileStatus, setAllergyProfileStatus] = useState<"unset" | "none" | "has_allergy" | null>(null);
   // ─── 마운트 시 진행률 알림 ───
   const fetchAnalysisUsage = useCallback(() => {
     fetch("/api/food/analyze-image")
@@ -562,19 +563,62 @@ export default function FoodTab({
     }
   }, []);
 
-  // ─── 알레르기 등록 여부 확인 ───
+  // ─── 알레르기 등록 상태 확인 ───
   useEffect(() => {
     if (!user) {
-      setHasAllergies(null);
+      setAllergyProfileStatus(null);
       return;
     }
+
     const supabase = createClient();
-    supabase
-      .from("user_allergies")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .then(({ count }) => setHasAllergies((count ?? 0) > 0));
+    Promise.all([
+      supabase
+        .from("profiles")
+        .select("allergy_profile_status")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("user_allergies")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]).then(([profileRes, allergyRes]) => {
+      const count = allergyRes.count ?? 0;
+      const has = count > 0;
+
+      const profileStatus =
+        (profileRes.data?.allergy_profile_status as
+          | "unset"
+          | "none"
+          | "has_allergy"
+          | undefined) || "unset";
+
+      if (has) {
+        setAllergyProfileStatus("has_allergy");
+      } else if (profileStatus === "none") {
+        setAllergyProfileStatus("none");
+      } else {
+        setAllergyProfileStatus("unset");
+      }
+    });
   }, [user]);
+
+  const handleMarkNoAllergy = async () => {
+    if (!user) return;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("profiles")
+        .update({ allergy_profile_status: "none" })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      setAllergyProfileStatus("none");
+      toast.success("알레르기 없음으로 설정했어요. 필요하면 언제든 수정할 수 있어요.");
+      window.dispatchEvent(new CustomEvent("allergiesUpdated"));
+    } catch {
+      toast.error("상태 저장 중 오류가 발생했습니다.");
+    }
+  };
 
   // ─── 급식/커뮤니티 로드 ───
   useEffect(() => {
@@ -932,8 +976,8 @@ export default function FoodTab({
 
       <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
         {/* ═══ 1. 식품 안전 확인 ═══ */}
-        {/* 알레르기 미등록 안내 카드 (비로그인 또는 로그인+미등록) */}
-        {(hasAllergies === false || !user) && (
+        {/* 알레르기 안내 카드 */}
+        {!user && (
           <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -942,31 +986,74 @@ export default function FoodTab({
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                    알레르기를 등록하시면 자동으로 위험 성분을 확인해드립니다
+                    로그인하면 내 알레르기 기준으로 자동 위험 성분 체크가 가능해요
                   </p>
-                  {user ? (
-                    <Link href="/food/profile">
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 text-blue-600 dark:text-blue-400"
-                      >
-                        알레르기 등록하러 가기 →
-                      </Button>
-                    </Link>
-                  ) : (
-                    <button
-                      onClick={() => setLoginModalOpen(true)}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      로그인하고 등록하기 →
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setLoginModalOpen(true)}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    로그인하고 시작하기 →
+                  </button>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {user && allergyProfileStatus === "unset" && (
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                    알레르기 프로필을 설정하면 자동으로 위험 성분을 알려드려요
+                  </p>
+                  <div className="mt-1 flex items-center gap-3 text-sm">
+                    <Link
+                      href="/food/profile"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      알레르기 설정하기 →
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleMarkNoAllergy}
+                      className="text-muted-foreground hover:underline"
+                    >
+                      알레르기 없음으로 설정
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {user && allergyProfileStatus === "none" && (
+          <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+                  <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+                    알레르기 없음으로 설정되어 있어요
+                  </p>
+                  <Link
+                    href="/food/profile"
+                    className="text-sm text-emerald-700 dark:text-emerald-300 hover:underline"
+                  >
+                    설정 변경하기 →
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
             음식 사진이나 이름으로 알레르기를 확인하세요
@@ -1375,6 +1462,3 @@ export default function FoodTab({
     </div>
   );
 }
-
-
-

@@ -248,6 +248,9 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
 export default function AllergyProfilePage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [severity, setSeverity] = useState<Record<string, string>>({});
+  const [profileStatus, setProfileStatus] = useState<"unset" | "none" | "has_allergy">("unset");
+  const [savedProfileStatus, setSavedProfileStatus] = useState<"unset" | "none" | "has_allergy">("unset");
+  const [profileMode, setProfileMode] = useState<"none" | "has_allergy">("has_allergy");
   const [savedSelected, setSavedSelected] = useState<Set<string>>(new Set());
   const [savedSeverity, setSavedSeverity] = useState<Record<string, string>>(
     {},
@@ -267,6 +270,7 @@ export default function AllergyProfilePage() {
 
   // ✅ 변경 사항 감지
   const hasChanges = (() => {
+    if (profileStatus !== savedProfileStatus) return true;
     if (selected.size !== savedSelected.size) return true;
     for (const code of selected) {
       if (!savedSelected.has(code)) return true;
@@ -297,28 +301,45 @@ export default function AllergyProfilePage() {
       return;
     }
 
-    const { data } = await supabase
-      .from("user_allergies")
-      .select("*")
-      .eq("user_id", user.id);
+    const [profileRes, allergyRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("allergy_profile_status")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase.from("user_allergies").select("*").eq("user_id", user.id),
+    ]);
 
-    if (data) {
-      const codes = new Set(
-        data.map((item: any) => item.allergen_code as string),
-      );
-      const severityMap: Record<string, string> = {};
-      data.forEach((item: any) => {
-        severityMap[item.allergen_code] = item.severity || "medium";
-      });
-      setSelected(codes);
-      setSeverity(severityMap);
-      setSavedSelected(new Set(codes));
-      setSavedSeverity({ ...severityMap });
-    }
+    const status =
+      (profileRes.data?.allergy_profile_status as
+        | "unset"
+        | "none"
+        | "has_allergy"
+        | undefined) || "unset";
+
+    const data = allergyRes.data || [];
+    const codes = new Set(data.map((item: any) => item.allergen_code as string));
+    const severityMap: Record<string, string> = {};
+    data.forEach((item: any) => {
+      severityMap[item.allergen_code] = item.severity || "medium";
+    });
+
+    const resolvedStatus =
+      codes.size > 0 ? "has_allergy" : status === "none" ? "none" : "unset";
+
+    setSelected(codes);
+    setSeverity(severityMap);
+    setSavedSelected(new Set(codes));
+    setSavedSeverity({ ...severityMap });
+    setProfileStatus(resolvedStatus);
+    setSavedProfileStatus(resolvedStatus);
+    setProfileMode(resolvedStatus === "none" ? "none" : "has_allergy");
     setIsPageLoading(false);
   };
 
   const handleToggle = (code: string) => {
+    setProfileMode("has_allergy");
+    setProfileStatus("has_allergy");
     const newSelected = new Set(selected);
     if (newSelected.has(code)) {
       newSelected.delete(code);
@@ -348,6 +369,8 @@ export default function AllergyProfilePage() {
     const codes = ALLERGENS.filter((a) => a.category === category).map(
       (a) => a.code,
     );
+    setProfileMode("has_allergy");
+    setProfileStatus("has_allergy");
     setSelected((prev) => {
       const next = new Set(prev);
       codes.forEach((c) => {
@@ -362,6 +385,8 @@ export default function AllergyProfilePage() {
     const codes = ALLERGENS.filter((a) => a.category === category).map(
       (a) => a.code,
     );
+    setProfileMode("has_allergy");
+    setProfileStatus("has_allergy");
     setSelected((prev) => {
       const next = new Set(prev);
       codes.forEach((c) => next.delete(c));
@@ -380,9 +405,16 @@ export default function AllergyProfilePage() {
 
     setIsLoading(true);
     try {
+      const nextStatus: "unset" | "none" | "has_allergy" =
+        profileMode === "none"
+          ? "none"
+          : selected.size > 0
+            ? "has_allergy"
+            : "unset";
+
       await supabase.from("user_allergies").delete().eq("user_id", user.id);
 
-      if (selected.size > 0) {
+      if (nextStatus === "has_allergy" && selected.size > 0) {
         const insertData = Array.from(selected).map((code) => {
           const allergen = ALLERGENS.find((a) => a.code === code);
           return {
@@ -395,11 +427,30 @@ export default function AllergyProfilePage() {
         await supabase.from("user_allergies").insert(insertData);
       }
 
-      // 저장 후 기준점 갱신
-      setSavedSelected(new Set(selected));
-      setSavedSeverity({ ...severity });
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ allergy_profile_status: nextStatus })
+        .eq("id", user.id);
 
-      toast.success(`알레르기 ${selected.size}개 저장 완료`);
+      if (profileError) throw profileError;
+
+      const finalSelected =
+        nextStatus === "has_allergy" ? new Set(selected) : new Set<string>();
+      const finalSeverity = nextStatus === "has_allergy" ? { ...severity } : {};
+
+      setSelected(finalSelected);
+      setSeverity(finalSeverity);
+      setSavedSelected(new Set(finalSelected));
+      setSavedSeverity({ ...finalSeverity });
+      setProfileStatus(nextStatus);
+      setSavedProfileStatus(nextStatus);
+
+      if (nextStatus === "none") {
+        toast.success("알레르기 없음으로 저장했어요");
+      } else {
+        toast.success(`알레르기 ${finalSelected.size}개 저장 완료`);
+      }
+
       window.dispatchEvent(new CustomEvent("allergiesUpdated"));
       router.push("/mypage");
       router.refresh();
@@ -503,6 +554,67 @@ export default function AllergyProfilePage() {
               )}
             </div>
 
+            {/* ── 모드 선택 ── */}
+            <Card className="mb-5 border-primary/20">
+              <CardContent className="p-4">
+                <p className="text-sm font-semibold mb-3">알레르기 상태 선택</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileMode("has_allergy");
+                      if (selected.size > 0) setProfileStatus("has_allergy");
+                      else setProfileStatus("unset");
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                      profileMode === "has_allergy"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">알레르기 있음</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      내 알레르기 항목을 직접 선택해 관리
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileMode("none");
+                      setProfileStatus("none");
+                      setSelected(new Set());
+                      setSeverity({});
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                      profileMode === "none"
+                        ? "border-emerald-500 bg-emerald-50"
+                        : "border-border hover:border-emerald-400"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">알레르기 없음</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      알레르기 없음 상태로 간단하게 저장
+                    </p>
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {profileMode === "none" && (
+              <Card className="mb-5 border-emerald-200 bg-emerald-50/70">
+                <CardContent className="p-4">
+                  <p className="text-sm font-semibold text-emerald-800">
+                    알레르기 없음 모드
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-700">
+                    저장하면 등록된 알레르기 목록이 모두 해제됩니다. 나중에 필요하면 다시 설정할 수 있어요.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {profileMode === "has_allergy" && (
+              <>
             {/* ── 선택된 알레르기 요약 ── */}
             {selected.size > 0 ? (
               <Card className="mb-5 border-primary/20">
@@ -530,9 +642,6 @@ export default function AllergyProfilePage() {
                       const allergen = ALLERGENS.find((a) => a.code === code);
                       if (!allergen) return null;
                       const sev = severity[code] || "medium";
-                      const sevOption = SEVERITY_OPTIONS.find(
-                        (s) => s.value === sev,
-                      );
                       return (
                         <div
                           key={code}
@@ -787,6 +896,9 @@ export default function AllergyProfilePage() {
                 );
               })}
             </div>
+
+              </>
+            )}
 
             {/* ── 참고 자료 ── */}
             <div className="mt-5 grid grid-cols-3 gap-2">
