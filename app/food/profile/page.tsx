@@ -251,6 +251,7 @@ export default function AllergyProfilePage() {
   const [profileStatus, setProfileStatus] = useState<"unset" | "none" | "has_allergy">("unset");
   const [savedProfileStatus, setSavedProfileStatus] = useState<"unset" | "none" | "has_allergy">("unset");
   const [profileMode, setProfileMode] = useState<"none" | "has_allergy">("has_allergy");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [savedSelected, setSavedSelected] = useState<Set<string>>(new Set());
   const [savedSeverity, setSavedSeverity] = useState<Record<string, string>>(
     {},
@@ -264,12 +265,14 @@ export default function AllergyProfilePage() {
   const [selectedAllergenDetail, setSelectedAllergenDetail] =
     useState<DetailedAllergenInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showSeverityEditor, setShowSeverityEditor] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
 
   // ✅ 변경 사항 감지
   const hasChanges = (() => {
+    if (!isAuthenticated) return false;
     if (profileStatus !== savedProfileStatus) return true;
     if (selected.size !== savedSelected.size) return true;
     for (const code of selected) {
@@ -285,10 +288,17 @@ export default function AllergyProfilePage() {
     (selected.size / ALLERGENS.length) * 100,
   );
 
+  const effectiveProfileState: "unset" | "none" | "has_allergy" =
+    profileMode === "none" ? "none" : selected.size > 0 ? "has_allergy" : "unset";
+  const headerMainCount =
+    effectiveProfileState === "none" ? "완료" : `${selected.size}/${ALLERGENS.length}`;
+  const headerSubText =
+    effectiveProfileState === "none" ? "알레르기 없음" : "설정됨";
+
   useEffect(() => {
     loadUserAllergens();
     // 기본으로 첫 카테고리 열기
-    setExpandedCategories(new Set(["유제품·계란", "곡물", "갑각류·어패류"]));
+    setExpandedCategories(new Set(["유제품·계란"]));
   }, []);
 
   const loadUserAllergens = async () => {
@@ -297,9 +307,19 @@ export default function AllergyProfilePage() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      setIsAuthenticated(false);
+      setSelected(new Set());
+      setSeverity({});
+      setSavedSelected(new Set());
+      setSavedSeverity({});
+      setProfileStatus("unset");
+      setSavedProfileStatus("unset");
+      setProfileMode("has_allergy");
+      setShowSeverityEditor(false);
       setIsPageLoading(false);
       return;
     }
+    setIsAuthenticated(true);
 
     const [profileRes, allergyRes] = await Promise.all([
       supabase
@@ -334,6 +354,7 @@ export default function AllergyProfilePage() {
     setProfileStatus(resolvedStatus);
     setSavedProfileStatus(resolvedStatus);
     setProfileMode(resolvedStatus === "none" ? "none" : "has_allergy");
+    setShowSeverityEditor(codes.size > 0);
     setIsPageLoading(false);
   };
 
@@ -351,6 +372,7 @@ export default function AllergyProfilePage() {
       setSeverity((prev) => ({ ...prev, [code]: "medium" }));
     }
     setSelected(newSelected);
+    setShowSeverityEditor(newSelected.size > 0);
   };
 
   const handleSeverityChange = (code: string, value: string) => {
@@ -379,6 +401,7 @@ export default function AllergyProfilePage() {
       });
       return next;
     });
+    setShowSeverityEditor(true);
   };
 
   const deselectAllInCategory = (category: string) => {
@@ -390,6 +413,7 @@ export default function AllergyProfilePage() {
     setSelected((prev) => {
       const next = new Set(prev);
       codes.forEach((c) => next.delete(c));
+      setShowSeverityEditor(next.size > 0);
       return next;
     });
   };
@@ -502,6 +526,38 @@ export default function AllergyProfilePage() {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex-1 pb-24">
+          <div className="container mx-auto px-4 py-6">
+            <div className="mx-auto max-w-2xl space-y-4">
+              <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-5">
+                <h1 className="text-xl font-bold">내 알레르기 관리</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  로그인 후 알레르기 프로필을 저장하고 식품 분석에 자동 반영할 수 있어요.
+                </p>
+              </div>
+              <Card>
+                <CardContent className="p-5">
+                  <p className="text-sm text-muted-foreground">
+                    비로그인 상태에서는 프로필 저장이 불가능합니다.
+                  </p>
+                  <Button className="mt-4 w-full" onClick={() => router.push("/login?next=/food/profile")}>
+                    로그인하고 설정하기
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+        <MobileNav />
+      </div>
+    );
+  }
+
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -525,18 +581,13 @@ export default function AllergyProfilePage() {
                 </div>
                 {/* 완성도 */}
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-primary">
-                    {selected.size}
-                    <span className="text-sm font-normal text-muted-foreground">
-                      /{ALLERGENS.length}
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">설정됨</p>
+                  <p className="text-2xl font-bold text-primary">{headerMainCount}</p>
+                  <p className="text-xs text-muted-foreground">{headerSubText}</p>
                 </div>
               </div>
 
               {/* 완성도 바 */}
-              {selected.size > 0 && (
+              {effectiveProfileState === "has_allergy" && selected.size > 0 && (
                 <div className="mt-4">
                   <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
                     <span>알레르기 프로필 완성도</span>
@@ -596,6 +647,10 @@ export default function AllergyProfilePage() {
                       알레르기 없음 상태로 간단하게 저장
                     </p>
                   </button>
+                </div>
+                <div className="mt-3 rounded-lg border bg-muted/30 p-2.5 text-xs text-muted-foreground">
+                  <p>미설정(unset): 아직 선택하지 않은 상태</p>
+                  <p className="mt-1">알레르기 없음(none): 없음으로 저장 완료된 상태</p>
                 </div>
               </CardContent>
             </Card>
@@ -662,10 +717,19 @@ export default function AllergyProfilePage() {
 
                   {/* 심각도 설정 */}
                   <div className="border-t pt-3">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">
-                      심각도 설정 (각 알레르기별 반응 강도)
-                    </p>
-                    <div className="space-y-2">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        심각도 설정 (각 알레르기별 반응 강도)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowSeverityEditor((v) => !v)}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        {showSeverityEditor ? "접기" : "펼치기"}
+                      </button>
+                    </div>
+                    {showSeverityEditor && <div className="space-y-2">
                       {Array.from(selected).map((code) => {
                         const allergen = ALLERGENS.find((a) => a.code === code);
                         if (!allergen) return null;
@@ -695,7 +759,7 @@ export default function AllergyProfilePage() {
                           </div>
                         );
                       })}
-                    </div>
+                    </div>}
                   </div>
                 </CardContent>
               </Card>
@@ -988,3 +1052,4 @@ export default function AllergyProfilePage() {
     </div>
   );
 }
+
