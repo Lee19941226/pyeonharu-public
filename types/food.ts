@@ -1,4 +1,4 @@
-export interface Allergen {
+﻿export interface Allergen {
   code: string;
   name: string;
   emoji: string;
@@ -48,6 +48,8 @@ export interface FoodResult {
   isSafe: boolean;
   hasNutritionInfo?: boolean;
   detectedIngredients?: string[];
+  productImageUrl?: string;
+  imageSource?: "official" | "user_upload" | "ai_generated" | string;
   dataSource?: string;
   alternatives?: Array<{
     barcode: string;
@@ -118,6 +120,8 @@ export interface SearchResult {
   weight?: string;
   ingredients?: string[];
   detectedIngredients?: string[];
+  productImageUrl?: string;
+  imageSource?: "official" | "user_upload" | "ai_generated" | string;
   nutritionInfo?: NutritionInfo;
   matchedUserAllergens?: string[];
 }
@@ -208,3 +212,6 @@ export interface FoodBookmark {
   isSafe: boolean;
   createdAt: string;
 }
+
+
+

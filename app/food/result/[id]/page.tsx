@@ -47,6 +47,8 @@ export default function FoodResultPage() {
   const [alternatives, setAlternatives] = useState<any[]>([]);
   const [altLoading, setAltLoading] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
+  const [showUploadedImage, setShowUploadedImage] = useState(false);
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -129,6 +131,23 @@ export default function FoodResultPage() {
 
     getUserInfo();
   }, []);
+
+  useEffect(() => {
+    if (!result || result.dataSource !== "ai") {
+      setUploadedImagePreview(null);
+      setShowUploadedImage(false);
+      return;
+    }
+
+    const cached = getAiResult(result.foodCode || "");
+    const preview =
+      cached && typeof cached.imagePreviewDataUrl === "string"
+        ? cached.imagePreviewDataUrl
+        : null;
+
+    setUploadedImagePreview(preview);
+    if (!preview) setShowUploadedImage(false);
+  }, [result]);
   const handleKakaoShare = () => {
     if (!result) return;
     setShowShareSheet(true);
@@ -853,6 +872,46 @@ export default function FoodResultPage() {
                 </CardContent>
               </Card>
             )}
+
+            {result.dataSource === "ai" && uploadedImagePreview && (
+              <Card className="mb-6 border-blue-200 bg-blue-50/60">
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        사용자 업로드
+                      </Badge>
+                      <span className="text-sm font-medium text-blue-900">
+                        내가 촬영한 이미지 (참고용)
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowUploadedImage((v) => !v)}
+                      className="text-xs"
+                    >
+                      {showUploadedImage ? "숨기기" : "보기"}
+                    </Button>
+                  </div>
+
+                  {showUploadedImage && (
+                    <div className="overflow-hidden rounded-lg border border-blue-200 bg-white">
+                      <img
+                        src={uploadedImagePreview}
+                        alt="사용자가 업로드한 스캔 이미지"
+                        className="h-auto max-h-[420px] w-full object-contain"
+                      />
+                    </div>
+                  )}
+
+                  <p className="mt-2 text-xs text-blue-700">
+                    이 이미지는 판독 보조용입니다. 최종 판단은 제품 포장지의 원재료/알레르기 표기를 기준으로 하세요.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
             {/* 가족 구성원 선택기 */}
             {isLoggedIn && familyMembers.length > 0 && (
               <div className="rounded-xl border bg-card p-3">
@@ -1561,6 +1620,10 @@ export default function FoodResultPage() {
     </div>
   );
 }
+
+
+
+
 
 
 
