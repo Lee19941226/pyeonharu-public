@@ -7,6 +7,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react";
 
 interface Agent {
@@ -86,6 +87,15 @@ export default function PSDeviceManager() {
           {toast.message}
         </div>
       )}
+
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">대상 서버에 설치된 에이전트(Agent)의 등록 현황 및 연결 상태를 관리</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">대상 서버에 에이전트를 설치하면 자동으로 등록됩니다. 마지막 하트비트 기준으로 온라인/오프라인 상태가 표시됩니다.</p>
+        </div>
+      </div>
 
       {/* Search */}
       <form onSubmit={handleSearch} className="flex items-center gap-2">

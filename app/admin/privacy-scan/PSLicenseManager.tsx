@@ -8,6 +8,7 @@ import {
   X,
   Key,
   Shield,
+  Info,
 } from "lucide-react";
 
 interface License {
@@ -119,6 +120,15 @@ export default function PSLicenseManager() {
           {toast.message}
         </div>
       )}
+
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">에이전트 설치 가능 수량과 유효기간을 관리하는 라이선스 정보</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">라이선스를 등록하면 허용 에이전트 수, 유효기간 등을 관리할 수 있습니다. 라이선스 없이도 기능은 사용 가능하지만, 운영 환경에서는 라이선스 등록을 권장합니다.</p>
+        </div>
+      </div>
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">라이선스</h3>

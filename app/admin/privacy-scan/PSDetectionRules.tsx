@@ -9,6 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react";
 
 interface Rule {
@@ -157,6 +158,15 @@ export default function PSDetectionRules() {
           {toast.message}
         </div>
       )}
+
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">어떤 파일 확장자를 대상으로, 어떤 패턴을 적용할지 규칙으로 정의</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">검출 규칙은 검사 대상 파일 확장자와 적용할 패턴을 묶어서 관리합니다. 생성한 규칙은 정책에 연결하여 사용합니다.</p>
+        </div>
+      </div>
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">검출 규칙</h3>

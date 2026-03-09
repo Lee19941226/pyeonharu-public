@@ -7,6 +7,7 @@ import {
   ShieldAlert,
   Calendar,
   RefreshCw,
+  Info,
 } from "lucide-react";
 import {
   PieChart,
@@ -57,24 +58,42 @@ export default function PSDashboard() {
     fetchData();
   }, [fetchData]);
 
+  const guideCard = (
+    <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+      <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">전체 개인정보 검출 현황을 한눈에 파악하는 종합 모니터링 화면</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">에이전트를 등록하고 검사를 실행하면 검출 현황이 여기에 표시됩니다.</p>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="space-y-5">
+        {guideCard}
+        <div className="flex items-center justify-center py-20">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-20 text-sm text-gray-400">
-        데이터를 불러올 수 없습니다.
+      <div className="space-y-5">
+        {guideCard}
+        <div className="text-center py-20 text-sm text-gray-400">
+          데이터를 불러올 수 없습니다.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
+      {guideCard}
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard

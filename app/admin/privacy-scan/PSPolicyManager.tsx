@@ -9,6 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react";
 
 interface Policy {
@@ -169,6 +170,15 @@ export default function PSPolicyManager() {
           {toast.message}
         </div>
       )}
+
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">검사 대상 경로, 스케줄, 적용 규칙 등을 정책 단위로 관리</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">정책을 생성하여 검사 경로, 예외 경로, 검사 스케줄, 적용할 검출 규칙을 설정하세요. 정책은 에이전트에 할당하여 사용합니다.</p>
+        </div>
+      </div>
 
       {/* Header */}
       <div className="flex items-center justify-between">

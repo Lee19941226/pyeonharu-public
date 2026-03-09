@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Info,
 } from "lucide-react";
 
 interface ScanResult {
@@ -106,6 +107,15 @@ export default function PSScanResults() {
 
   return (
     <div className="space-y-4">
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">각 서버(에이전트)별 검사 결과를 확인하고 파일별 상세 검출 내역을 조회</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">에이전트가 검사를 완료하면 서버별 집계 결과가 표시됩니다. 행을 클릭하면 파일별 상세 정보를 확인할 수 있습니다.</p>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">

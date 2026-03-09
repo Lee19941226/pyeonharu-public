@@ -9,6 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react";
 
 interface PSAdmin {
@@ -134,6 +135,15 @@ export default function PSAdminManager() {
           {toast.message}
         </div>
       )}
+
+      {/* Guide */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3">
+        <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">PrivacyScan 전용 관리자 계정을 관리 (편하루 관리자와 별도)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PrivacyScan 관리 콘솔에 접근할 수 있는 전용 관리자를 등록합니다. 열람(viewer), 관리자(manager), 최고관리자(admin) 3단계 권한이 있습니다.</p>
+        </div>
+      </div>
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">PS 관리자</h3>
