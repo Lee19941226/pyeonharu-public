@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -36,6 +36,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  ReferenceLine,
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import UserManagement from "./user-management";
@@ -177,10 +178,14 @@ function StatCard({
 // ─── Chart Card (디자인 개선) ───
 function ChartCard({
   title,
+  subtitle,
+  extra,
   children,
   className = "",
 }: {
   title: string;
+  subtitle?: string;
+  extra?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -188,10 +193,47 @@ function ChartCard({
     <div
       className={`rounded-2xl bg-white dark:bg-card border border-gray-100 dark:border-gray-800 p-6 shadow-sm ${className}`}
     >
-      <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 mb-5">
-        {title}
-      </h3>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">
+            {title}
+          </h3>
+          {subtitle && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {extra}
+      </div>
       {children}
+    </div>
+  );
+}
+
+function avgOf(nums: number[]) {
+  if (!nums.length) return 0;
+  return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+}
+
+function trendDelta(latest: number, previous: number) {
+  if (previous === 0) return 0;
+  return ((latest - previous) / previous) * 100;
+}
+
+function QuickBadge({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-card px-3 py-2">
+      <p className="text-[10px] text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+        {value}
+      </p>
     </div>
   );
 }
@@ -737,6 +779,34 @@ export default function AdminDashboard() {
       ].filter((d) => d.value > 0)
     : [];
 
+  const dauValues = stats?.dauTrend.map((d) => d.dau) ?? [];
+  const dauAvg = Math.round(avgOf(dauValues));
+  const dauLatest = dauValues[dauValues.length - 1] ?? 0;
+  const dauPrev = dauValues[dauValues.length - 2] ?? 0;
+  const dauDelta = trendDelta(dauLatest, dauPrev);
+
+  const signupValues = stats?.signups.trend.map((d) => d.count) ?? [];
+  const signupAvg = Math.round(avgOf(signupValues));
+  const signupLatest = signupValues[signupValues.length - 1] ?? 0;
+  const signupPrev = signupValues[signupValues.length - 2] ?? 0;
+  const signupDelta = trendDelta(signupLatest, signupPrev);
+
+  const featureDailyTotals =
+    stats?.features.trend.map((d) => d.scans + d.checks + d.searches + d.diet) ??
+    [];
+  const featureDailyAvg = Math.round(avgOf(featureDailyTotals));
+
+  const operationTotal =
+    (stats?.features.scans || 0) +
+    (stats?.features.checks || 0) +
+    (stats?.features.searches || 0) +
+    (stats?.features.dietEntries || 0);
+  const topFeature = [...featurePieData].sort((a, b) => b.value - a.value)[0];
+  const topFeatureShare =
+    operationTotal > 0 && topFeature
+      ? ((topFeature.value / operationTotal) * 100).toFixed(1)
+      : "0.0";
+
   return (
     <div className="min-h-screen bg-gray-50/80 dark:bg-background">
       {/* Header */}
@@ -988,8 +1058,19 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* 차트 영역 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <QuickBadge label="DAU 최근값" value={`${dauLatest.toLocaleString()}명`} />
+                  <QuickBadge label="DAU 전일 대비" value={`${dauDelta >= 0 ? "+" : ""}${dauDelta.toFixed(1)}%`} />
+                  <QuickBadge label="가입 최근값" value={`${signupLatest.toLocaleString()}명`} />
+                  <QuickBadge label="가입 전일 대비" value={`${signupDelta >= 0 ? "+" : ""}${signupDelta.toFixed(1)}%`} />
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <ChartCard title="📈 일별 활성 사용자 (DAU) 추이">
+                  <ChartCard
+                    title="📈 일별 활성 사용자 (DAU) 추이"
+                    subtitle="최근 기간 평균선과 함께 변동을 비교합니다."
+                    extra={<QuickBadge label="평균" value={`${dauAvg.toLocaleString()}명`} />}
+                  >
                     <ResponsiveContainer width="100%" height={280}>
                       <AreaChart data={stats.dauTrend}>
                         <defs>
@@ -1037,6 +1118,13 @@ export default function AdminDashboard() {
                             fontSize: 12,
                           }}
                         />
+                        <ReferenceLine
+                          y={dauAvg}
+                          stroke="#10b981"
+                          strokeDasharray="4 4"
+                          strokeOpacity={0.7}
+                          label={{ value: `평균 ${dauAvg}`, position: "insideTopRight", fill: "#10b981", fontSize: 11 }}
+                        />
                         <Area
                           type="monotone"
                           dataKey="dau"
@@ -1049,7 +1137,11 @@ export default function AdminDashboard() {
                     </ResponsiveContainer>
                   </ChartCard>
 
-                  <ChartCard title="👤 신규 가입자 추이">
+                  <ChartCard
+                    title="👤 신규 가입자 추이"
+                    subtitle="일별 가입자 흐름과 평균 수준을 함께 표시합니다."
+                    extra={<QuickBadge label="평균" value={`${signupAvg.toLocaleString()}명`} />}
+                  >
                     <ResponsiveContainer width="100%" height={280}>
                       <BarChart data={stats.signups.trend}>
                         <CartesianGrid
@@ -1234,9 +1326,18 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* 차트 영역 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <QuickBadge label="일 평균 사용량" value={`${featureDailyAvg.toLocaleString()}회`} />
+                  <QuickBadge label="최다 사용 기능" value={topFeature ? topFeature.name : "-"} />
+                  <QuickBadge label="최다 기능 비중" value={`${topFeatureShare}%`} />
+                  <QuickBadge label="기간 총 사용" value={`${operationTotal.toLocaleString()}회`} />
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <ChartCard
                     title="🔧 기능별 일일 사용량"
+                    subtitle="막대(스캔/안전확인) + 선(검색/식단) 흐름을 동시에 확인합니다."
+                    extra={<QuickBadge label="일 평균" value={`${featureDailyAvg.toLocaleString()}회`} />}
                     className="lg:col-span-2"
                   >
                     <ResponsiveContainer width="100%" height={320}>
@@ -1301,7 +1402,10 @@ export default function AdminDashboard() {
                     </ResponsiveContainer>
                   </ChartCard>
 
-                  <ChartCard title="🎯 기능 사용 비율">
+                  <ChartCard
+                    title="🎯 기능 사용 비율"
+                    subtitle="기간 내 기능별 점유율입니다."
+                  >
                     {featurePieData.length > 0 ? (
                       <ResponsiveContainer width="100%" height={280}>
                         <PieChart>
@@ -1355,6 +1459,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
-
