@@ -20,7 +20,6 @@ import {
   Upload,
   ChevronDown,
   Info,
-  Check,
   UtensilsCrossed as MealIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -769,7 +768,7 @@ export default function FoodTab({
           .select("allergen_name")
           .eq("user_id", currentUser.id);
         if (data) userAllergens = data.map((item) => item.allergen_name);
-        if (userAllergens.length === 0) {
+        if (allergyProfileStatus === "unset" && userAllergens.length === 0) {
           toast.info("알레르기를 등록하면 맞춤 분석 결과를 알려드려요!", {
             action: {
               label: "등록하기",
@@ -833,7 +832,7 @@ export default function FoodTab({
 
       toast.error(data.error || "분석에 실패했습니다");
     },
-    [router],
+    [allergyProfileStatus, router],
   );
   const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
 
@@ -1046,28 +1045,6 @@ export default function FoodTab({
           </Card>
         )}
 
-        {user && allergyProfileStatus === "none" && (
-          <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-                  <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
-                    알레르기 없음으로 설정되어 있어요
-                  </p>
-                  <Link
-                    href="/food/profile"
-                    className="text-sm text-emerald-700 dark:text-emerald-300 hover:underline"
-                  >
-                    설정 변경하기 →
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
             음식 사진이나 이름으로 알레르기를 확인하세요
