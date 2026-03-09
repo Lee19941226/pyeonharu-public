@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { NaverMap } from "@/components/medical/naver-map";
@@ -21,6 +21,7 @@ export interface Place {
   address: string;
   phone: string;
   distance: string;
+  distanceMeters: number;
   isOpen: boolean;
   openTime: string;
   closeTime: string;
@@ -293,6 +294,8 @@ export default function HospitalTab() {
     const searchCenter = mapCenter ?? userLocation;
     if (!searchCenter) return;
 
+    const distanceBase = userLocation ?? searchCenter;
+
     const searchRadius = snapRadiusToStep(Math.max(mapRadius || 0, zoomToRadius(mapZoom)));
     const cacheKey = `${searchCenter.lat.toFixed(4)}::${searchCenter.lng.toFixed(4)}::${searchRadius}::${placeType}`;
 
@@ -350,8 +353,8 @@ export default function HospitalTab() {
                 if (lat === 0 || lng === 0) return;
 
                 const dist = calculateDistance(
-                  searchCenter.lat,
-                  searchCenter.lng,
+                  distanceBase.lat,
+                  distanceBase.lng,
                   lat,
                   lng,
                 );
@@ -382,6 +385,7 @@ export default function HospitalTab() {
                     dist < 1
                       ? `${Math.round(dist * 1000)}m`
                       : `${dist.toFixed(1)}km`,
+                  distanceMeters: Math.max(1, Math.round(dist * 1000)),
                   isOpen: checkIsOpen(),
                   openTime: "09:00",
                   closeTime: "18:00",
@@ -432,8 +436,8 @@ export default function HospitalTab() {
                 if (lat === 0 || lng === 0) return;
 
                 const dist = calculateDistance(
-                  searchCenter.lat,
-                  searchCenter.lng,
+                  distanceBase.lat,
+                  distanceBase.lng,
                   lat,
                   lng,
                 );
@@ -453,6 +457,7 @@ export default function HospitalTab() {
                     dist < 1
                       ? `${Math.round(dist * 1000)}m`
                       : `${dist.toFixed(1)}km`,
+                  distanceMeters: Math.max(1, Math.round(dist * 1000)),
                   isOpen: checkIsOpen(),
                   openTime: "09:00",
                   closeTime: "21:00",
@@ -467,11 +472,7 @@ export default function HospitalTab() {
         }
       }
 
-      results.sort((a, b) => {
-        const distA = parseFloat(a.distance);
-        const distB = parseFloat(b.distance);
-        return distA - distB;
-      });
+      results.sort((a, b) => a.distanceMeters - b.distanceMeters);
 
       setPlaces(results);
       hasLoadedOnce.current = true;
@@ -790,3 +791,5 @@ export default function HospitalTab() {
     </div>
   );
 }
+
+

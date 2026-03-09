@@ -385,7 +385,6 @@ export function NaverMap({
           const place = places.find((p) => p.id === item.id);
           if (place) onSelectPlace(place);
         }
-        mapInstanceRef.current?.panTo(position);
       });
 
       markersRef.current.push(marker);
@@ -421,22 +420,6 @@ export function NaverMap({
     userLocation,
     createMarkerIcon,
   ]);
-
-  // 선택된 장소 변경 시 지도 이동
-  useEffect(() => {
-    if (!mapInstanceRef.current || !selectedPlace || !window.naver) return;
-    if (!selectedPlace.lat || !selectedPlace.lng) return;
-
-    mapInstanceRef.current.panTo(
-      new window.naver.maps.LatLng(selectedPlace.lat, selectedPlace.lng),
-    );
-
-    // 줌 레벨도 가까이
-    const currentZoom = mapInstanceRef.current.getZoom();
-    if (currentZoom < 15) {
-      mapInstanceRef.current.setZoom(16, true);
-    }
-  }, [selectedPlace]);
 
   const handleMoveToCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) return;
