@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
 1. 이미지로부터 가능한 후보 식품 3~5개를 내부적으로 추론하세요.
 2. 각 후보에 대해 시각적 특징, 텍스트 정보, 포장 형태 등을 종합하여 일치 확률(0~100)을 평가하세요.
 3. 가장 높은 확률을 가진 후보 1개만 최종 선택하세요.
-4. 확률이 50 미만이면 productName을 "식별 불확실"로 응답하세요.
+4. 확률이 50 미만이면 productName을 "결과를 알 수 없음"으로 응답하세요.
 
 [식품 유형 구분]
 - 포장식품: 제품명, 제조사, 바코드, 정확한 원재료 추출
@@ -324,7 +324,7 @@ export async function POST(req: NextRequest) {
 
       // 기본값 설정
       const safeAnalysisData = {
-        productName: analysisData.productName || "식별 불확실",
+        productName: analysisData.productName || "결과를 알 수 없음",
         manufacturer: analysisData.manufacturer || "",
         barcode: analysisData.barcode || "",
         confidence: analysisData.confidence ?? 0,
@@ -338,7 +338,7 @@ export async function POST(req: NextRequest) {
 
       if (safeAnalysisData.confidence < 50) {
         console.log("⚠️ 낮은 신뢰도:", safeAnalysisData.confidence);
-        safeAnalysisData.productName = "식별 불확실";
+        safeAnalysisData.productName = "결과를 알 수 없음";
       }
 
       console.log("✅ AI 최종 선택:", {
@@ -589,7 +589,7 @@ export async function POST(req: NextRequest) {
     let dbSaveSuccess = false;
     if (!foodCode) {
       const timestamp = Date.now();
-      const safeName = finalProductName || "알 수 없는 제품";
+      const safeName = finalProductName || "결과를 알 수 없음";
       const productSlug = safeName
         .toLowerCase()
         .replace(/[^a-z0-9가-힣]/g, "-")
@@ -608,7 +608,7 @@ export async function POST(req: NextRequest) {
         .upsert(
           {
             food_code: foodCode,
-            food_name: finalProductName || "알 수 없는 제품",
+            food_name: finalProductName || "결과를 알 수 없음",
             manufacturer:
               apiProductData?.manufacturer ||
               analysisData.manufacturer ||
@@ -641,7 +641,7 @@ export async function POST(req: NextRequest) {
     // ==========================================
     return NextResponse.json({
       success: true,
-      productName: finalProductName || "알 수 없는 제품",
+      productName: finalProductName || "결과를 알 수 없음",
       manufacturer:
         apiProductData?.manufacturer || analysisData.manufacturer || "",
       weight: apiProductData?.weight || analysisData.weight || "",
