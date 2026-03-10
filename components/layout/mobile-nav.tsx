@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
+import { detectBarcodeValue } from "@/lib/utils/barcode-scan";
 import { createClient } from "@/lib/supabase/client";
 import { getDeliveryLinks, openDeliveryApp, isMobileDevice } from "@/lib/utils/delivery";
 import { useBackHandler } from "@/lib/hooks/use-back-handler";
@@ -103,25 +104,14 @@ export function MobileNav() {
       if (cameraMode === "allergy") {
         toast.info("사진 분석 중...");
 
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-
         try {
-          const { Html5Qrcode } = await import("html5-qrcode");
-          const html5QrCode = new Html5Qrcode("qr-reader-nav-hidden");
-          const arr = base64.split(",");
-          const mime = arr[0].match(/:(.*?);/)![1];
-          const bstr = atob(arr[1]);
-          let n = bstr.length;
-          const u8arr = new Uint8Array(n);
-          while (n--) u8arr[n] = bstr.charCodeAt(n);
-          const imageFile = new File([u8arr], "scan.jpg", { type: mime });
-
-          const barcode = await html5QrCode.scanFile(imageFile, false);
-          toast.success("바코드 인식 완료");
+          const barcode = await detectBarcodeValue(file, {
+            readerElementId: "qr-reader-nav-hidden",
+          });
+          if (!barcode) {
+            throw new Error("code_not_found");
+          }
+          toast.success("QR/바코드 인식 완료");
           router.push(`/food/result/${barcode}`);
         } catch {
           toast.info("AI가 성분표를 분석 중...");
@@ -707,11 +697,3 @@ export function MobileNav() {
     </>
   );
 }
-
-
-
-
-
-
-
-

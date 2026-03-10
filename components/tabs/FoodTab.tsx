@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -892,17 +892,20 @@ export default function FoodTab({
     toast.info("바코드 인식 중...");
 
     try {
-      const barcode = await detectBarcodeValue(file, { readerElementId: "qr-reader-hidden" });
+      const barcode = await detectBarcodeValue(file, {
+        readerElementId: "qr-reader-hidden",
+      });
       if (barcode) {
-        toast.success("바코드 인식 완료");
+        toast.success("QR/바코드 인식 완료");
         router.push(`/food/result/${barcode}`);
       } else {
-        toast.info("바코드 인식 실패, AI 분석으로 전환합니다.");
-        await analyzeFoodImageWithAi(file);
+        toast.error(
+          "QR/바코드를 인식하지 못했습니다. 식품 이미지 분석은 업로드(이미지)로 진행해주세요.",
+        );
       }
     } catch (error) {
       console.error("바코드 스캔 오류:", error);
-      toast.error("바코드 스캔 중 오류가 발생했습니다");
+      toast.error("QR/바코드 스캔 중 오류가 발생했습니다");
     } finally {
       setIsProcessing(false);
       if (barcodeInputRef.current) {
@@ -945,10 +948,12 @@ export default function FoodTab({
       console.log("🔍 바코드 감지 시작...");
       toast.info("바코드 확인 중...");
 
-      const barcode = await detectBarcodeValue(file, { readerElementId: "qr-reader-hidden" });
+      const barcode = await detectBarcodeValue(file, {
+        readerElementId: "qr-reader-hidden",
+      });
       if (barcode) {
         console.log("✅ 바코드 발견:", barcode);
-        toast.success("바코드 인식 완료");
+        toast.success("QR/바코드 인식 완료");
         router.push(`/food/result/${barcode}`);
       } else {
         console.log("❌ 바코드 없음, AI 분석 시작");

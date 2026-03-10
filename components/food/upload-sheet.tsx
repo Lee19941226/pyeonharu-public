@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import {
@@ -10,7 +10,7 @@ import {
 import { Camera, Upload, Scan } from "lucide-react";
 import { toast } from "sonner";
 import { useDevice } from "@/lib/hooks/use-device";
-import { Html5Qrcode } from "html5-qrcode";
+import { detectBarcodeValue } from "@/lib/utils/barcode-scan";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
@@ -54,142 +54,125 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
       }
 
       onOpenChange(false);
+      // 먼저 QR/바코드 감지 시도
+      try {
+        toast.info("QR/바코드 확인 중...");
 
-      // 먼저 바코드 감지 시도
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const imageData = event.target?.result as string;
+        const barcode = await detectBarcodeValue(file, {
+          readerElementId: "qr-reader-upload-hidden",
+        });
+
+        if (!barcode) {
+          throw new Error("code_not_found");
+        }
+
+        toast.success("QR/바코드 인식 완료");
+        router.push(`/food/result/${barcode}`);
+      } catch (error) {
+        // ❌ QR/바코드 없음 → AI 분석
+        console.log("QR/바코드 없음, AI 분석 시작");
+        toast.info("AI가 성분표를 분석 중...");
 
         try {
-          toast.info("바코드 확인 중...");
+          // ✅ 원본 file에서 직접 리사이즈
+          const { base64: base64Data } = await resizeImageForAI(file);
 
-          const html5QrCode = new Html5Qrcode("qr-reader-hidden");
+          const supabase = createClient();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          let userAllergens: string[] = [];
+          let allergyProfileStatus: "unset" | "none" | "has_allergy" = "unset";
 
-          // base64 → File 변환
-          const arr = imageData.split(",");
-          const mime = arr[0].match(/:(.*?);/)![1];
-          const bstr = atob(arr[1]);
-          let n = bstr.length;
-          const u8arr = new Uint8Array(n);
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
-          }
-          const imageFile = new File([u8arr], "scan.jpg", { type: mime });
-
-          // 바코드 스캔 시도
-          const barcode = await html5QrCode.scanFile(imageFile, false);
-
-          // ✅ 바코드 발견!
-          toast.success("바코드 인식 완료");
-          router.push(`/food/result/${barcode}`);
-        } catch (error) {
-          // ❌ 바코드 없음 → AI 분석
-          console.log("바코드 없음, AI 분석 시작");
-          toast.info("AI가 성분표를 분석 중...");
-
-          try {
-            // ✅ 원본 file에서 직접 리사이즈
-            const { base64: base64Data } = await resizeImageForAI(file);
-
-            const supabase = createClient();
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-            let userAllergens: string[] = [];
-            let allergyProfileStatus: "unset" | "none" | "has_allergy" = "unset";
-
-            if (user) {
-              try {
-                const profileRes = await fetch("/api/profile", { cache: "no-store" });
-                if (profileRes.ok) {
-                  const profileData = await profileRes.json();
-                  const status = profileData?.allergyProfileStatus;
-                  if (status === "unset" || status === "none" || status === "has_allergy") {
-                    allergyProfileStatus = status;
-                  }
+          if (user) {
+            try {
+              const profileRes = await fetch("/api/profile", { cache: "no-store" });
+              if (profileRes.ok) {
+                const profileData = await profileRes.json();
+                const status = profileData?.allergyProfileStatus;
+                if (status === "unset" || status === "none" || status === "has_allergy") {
+                  allergyProfileStatus = status;
                 }
-              } catch {
-                // ignore
               }
-
-              const { data } = await supabase
-                .from("user_allergies")
-                .select("allergen_name")
-                .eq("user_id", user.id);
-              if (data) userAllergens = data.map((item) => item.allergen_name);
-              if (allergyProfileStatus === "unset" && userAllergens.length === 0) {
-                toast.info("알레르기를 등록하면 맞춤 분석 결과를 알려드려요!", {
-                  action: {
-                    label: "등록하기",
-                    onClick: () => router.push("/food/profile"),
-                  },
-                  duration: 5000,
-                });
-              }
+            } catch {
+              // ignore
             }
 
-            const response = await fetch("/api/food/analyze-image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
-            });
-            // ── 413 이미지 크기 초과 ──
-            if (response.status === 413) {
-              toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
-              return;
-            }
-            // ── 스캔 제한 ──
-            if (response.status === 429) {
-              if (user) {
-                const errData = await response.json().catch(() => ({}));
-                toast.error(errData.error || "오늘 이미지 분석 한도를 초과했습니다.");
-              } else {
-                setLoginPrompt({ open: true, reason: "scan_limit" });
-              }
-              return;
-            }
-
-            // ── 남은 스캔 경고 ──
-            const remaining = response.headers.get("X-Remaining-Scans");
-            if (remaining !== null) {
-              const remainingNum = parseInt(remaining);
-              if (remainingNum <= 2 && remainingNum > 0) {
-                setLoginPrompt({
-                  open: true,
-                  reason: "scan_warning",
-                  remainingScans: remainingNum,
-                });
-              }
-            }
-            const data = await response.json();
-
-            if (data.success && data.foodCode) {
-              saveAiResult(data.foodCode, {
-                foodCode: data.foodCode,
-                productName: data.productName,
-                manufacturer: data.manufacturer,
-                weight: data.weight,
-                allergens: data.allergens,
-                hasUserAllergen: data.hasUserAllergen,
-                matchedUserAllergens: data.matchedUserAllergens || [],
-                ingredients: data.ingredients || [],
-                rawMaterials: data.rawMaterials || "",
-                nutritionInfo: data.nutritionInfo || null,
-                dataSource: data.dataSource || "ai",
+            const { data } = await supabase
+              .from("user_allergies")
+              .select("allergen_name")
+              .eq("user_id", user.id);
+            if (data) userAllergens = data.map((item) => item.allergen_name);
+            if (allergyProfileStatus === "unset" && userAllergens.length === 0) {
+              toast.info("알레르기를 등록하면 맞춤 분석 결과를 알려드려요!", {
+                action: {
+                  label: "등록하기",
+                  onClick: () => router.push("/food/profile"),
+                },
+                duration: 5000,
               });
-              toast.success("분석 완료");
-              router.push(`/food/result/${data.foodCode}`);
-            } else {
-              toast.error(data.error || "분석에 실패했습니다");
             }
-          } catch (aiError) {
-            console.error("AI 분석 오류:", aiError);
-            toast.error("분석 중 오류가 발생했습니다");
           }
-        }
-      };
 
-      reader.readAsDataURL(file);
+          const response = await fetch("/api/food/analyze-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
+          });
+          // ── 413 이미지 크기 초과 ──
+          if (response.status === 413) {
+            toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
+            return;
+          }
+          // ── 스캔 제한 ──
+          if (response.status === 429) {
+            if (user) {
+              const errData = await response.json().catch(() => ({}));
+              toast.error(errData.error || "오늘 이미지 분석 한도를 초과했습니다.");
+            } else {
+              setLoginPrompt({ open: true, reason: "scan_limit" });
+            }
+            return;
+          }
+
+          // ── 남은 스캔 경고 ──
+          const remaining = response.headers.get("X-Remaining-Scans");
+          if (remaining !== null) {
+            const remainingNum = parseInt(remaining);
+            if (remainingNum <= 2 && remainingNum > 0) {
+              setLoginPrompt({
+                open: true,
+                reason: "scan_warning",
+                remainingScans: remainingNum,
+              });
+            }
+          }
+          const data = await response.json();
+
+          if (data.success && data.foodCode) {
+            saveAiResult(data.foodCode, {
+              foodCode: data.foodCode,
+              productName: data.productName,
+              manufacturer: data.manufacturer,
+              weight: data.weight,
+              allergens: data.allergens,
+              hasUserAllergen: data.hasUserAllergen,
+              matchedUserAllergens: data.matchedUserAllergens || [],
+              ingredients: data.ingredients || [],
+              rawMaterials: data.rawMaterials || "",
+              nutritionInfo: data.nutritionInfo || null,
+              dataSource: data.dataSource || "ai",
+            });
+            toast.success("분석 완료");
+            router.push(`/food/result/${data.foodCode}`);
+          } else {
+            toast.error(data.error || "분석에 실패했습니다");
+          }
+        } catch (aiError) {
+          console.error("AI 분석 오류:", aiError);
+          toast.error("분석 중 오류가 발생했습니다");
+        }
+      }
     };
 
     input.click();
@@ -241,6 +224,7 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
           )}
         </div>
       </DialogContent>
+      <div id="qr-reader-upload-hidden" className="hidden" />
       <LoginPromptSheet
         open={loginPrompt.open}
         onClose={() => setLoginPrompt((v) => ({ ...v, open: false }))}
@@ -250,5 +234,3 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
     </Dialog>
   );
 }
-
-
