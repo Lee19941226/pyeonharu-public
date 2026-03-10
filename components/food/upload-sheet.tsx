@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -7,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Camera, Upload, Scan } from "lucide-react";
+import { Camera, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useDevice } from "@/lib/hooks/use-device";
 import { detectBarcodeValue } from "@/lib/utils/barcode-scan";
@@ -15,7 +16,8 @@ import { createClient } from "@/lib/supabase/client";
 import { resizeImageForAI } from "@/lib/utils/image-resize";
 import { saveAiResult } from "@/lib/utils/ai-result-storage";
 import { LoginPromptSheet } from "@/components/auth/login-prompt-sheet";
-import { useState } from "react";
+import { LiveCodeScanner } from "@/components/food/live-code-scanner";
+
 interface UploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,6 +32,23 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
     reason: "scan_limit" | "scan_warning" | "feature";
     remainingScans?: number;
   }>({ open: false, reason: "scan_warning" });
+
+  const [showLiveScanner, setShowLiveScanner] = useState(false);
+
+  const handleCodeDetected = (code: string) => {
+    toast.success("QR/바코드 인식 완료");
+    onOpenChange(false);
+    router.push(`/food/result/${code}`);
+  };
+
+  const handlePrimaryAction = () => {
+    if (isMobile) {
+      onOpenChange(false);
+      setShowLiveScanner(true);
+      return;
+    }
+    handleFileUpload();
+  };
 
   // ==========================================
   // 파일 업로드 (AI 분석만)
@@ -46,15 +65,14 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      // ✅ 이미지 크기 사전 검증
-      const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB
+      const MAX_IMAGE_SIZE = 7 * 1024 * 1024;
       if (file.size > MAX_IMAGE_SIZE) {
         toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
         return;
       }
 
       onOpenChange(false);
-      // 먼저 QR/바코드 감지 시도
+
       try {
         toast.info("QR/바코드 확인 중...");
 
@@ -79,12 +97,10 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
           return;
         }
 
-        // ❌ QR/바코드 없음 → AI 분석
         console.log("QR/바코드 없음, AI 분석 시작");
         toast.info("AI가 성분표를 분석 중...");
 
         try {
-          // ✅ 원본 file에서 직접 리사이즈
           const { base64: base64Data } = await resizeImageForAI(file);
 
           const supabase = createClient();
@@ -129,12 +145,12 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ imageBase64: base64Data, userAllergens }),
           });
-          // ── 413 이미지 크기 초과 ──
+
           if (response.status === 413) {
             toast.error("이미지 크기가 너무 큽니다. 7MB 이하의 이미지를 사용해주세요.");
             return;
           }
-          // ── 스캔 제한 ──
+
           if (response.status === 429) {
             if (user) {
               const errData = await response.json().catch(() => ({}));
@@ -145,10 +161,9 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
             return;
           }
 
-          // ── 남은 스캔 경고 ──
           const remaining = response.headers.get("X-Remaining-Scans");
           if (remaining !== null) {
-            const remainingNum = parseInt(remaining);
+            const remainingNum = parseInt(remaining, 10);
             if (remainingNum <= 2 && remainingNum > 0) {
               setLoginPrompt({
                 open: true,
@@ -157,6 +172,7 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
               });
             }
           }
+
           const data = await response.json();
 
           if (data.success && data.foodCode) {
@@ -189,58 +205,66 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>식품 안전 확인</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>식품 안전 확인</DialogTitle>
+          </DialogHeader>
 
-        <div className="mt-4 space-y-3">
-          {/* 통합된 업로드 버튼 */}
-          <button
-            onClick={handleFileUpload}
-            className="flex w-full items-center gap-4 rounded-xl border-2 border-primary bg-primary/5 p-4 transition-colors hover:bg-primary/10"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20">
-              {isMobile ? (
-                <Camera className="h-6 w-6 text-primary" />
-              ) : (
-                <Upload className="h-6 w-6 text-primary" />
-              )}
-            </div>
-            <div className="flex-1 text-left">
-              <p className="font-semibold text-primary">
-                {isMobile ? "사진 촬영하기" : "이미지 업로드"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {isMobile
-                  ? "바코드 또는 성분표를 촬영하세요"
-                  : "바코드 또는 성분표 스크린샷을 업로드하세요"}
-              </p>
-            </div>
-          </button>
-        </div>
+          <div className="mt-4 space-y-3">
+            <button
+              onClick={handlePrimaryAction}
+              className="flex w-full items-center gap-4 rounded-xl border-2 border-primary bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20">
+                {isMobile ? (
+                  <Camera className="h-6 w-6 text-primary" />
+                ) : (
+                  <Upload className="h-6 w-6 text-primary" />
+                )}
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-semibold text-primary">
+                  {isMobile ? "사진 촬영하기" : "이미지 업로드"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isMobile
+                    ? "바코드 또는 성분표를 촬영하세요"
+                    : "바코드 또는 성분표 스크린샷을 업로드하세요"}
+                </p>
+              </div>
+            </button>
+          </div>
 
-        <div className="mt-4 rounded-lg bg-blue-50 p-3">
-          <p className="text-xs text-blue-900">
-            💡 <strong>자동 처리:</strong> 바코드가 있으면 즉시 인식, 없으면
-            AI가 성분표를 분석합니다
-          </p>
-          {!isMobile && (
-            <p className="mt-2 text-xs text-blue-700">
-              <strong>팁:</strong> Windows + Shift + S 로 QR 코드 부분만
-              캡처하세요
+          <div className="mt-4 rounded-lg bg-blue-50 p-3">
+            <p className="text-xs text-blue-900">
+              💡 <strong>자동 처리:</strong> 바코드가 있으면 즉시 인식, 없으면 AI가 성분표를 분석합니다
             </p>
-          )}
-        </div>
-      </DialogContent>
-      <div id="qr-reader-upload-hidden" className="hidden" />
-      <LoginPromptSheet
-        open={loginPrompt.open}
-        onClose={() => setLoginPrompt((v) => ({ ...v, open: false }))}
-        reason={loginPrompt.reason}
-        remainingScans={loginPrompt.remainingScans}
+            {!isMobile && (
+              <p className="mt-2 text-xs text-blue-700">
+                <strong>팁:</strong> Windows + Shift + S 로 QR 코드 부분만 캡처하세요
+              </p>
+            )}
+          </div>
+        </DialogContent>
+
+        <div id="qr-reader-upload-hidden" className="hidden" />
+
+        <LoginPromptSheet
+          open={loginPrompt.open}
+          onClose={() => setLoginPrompt((v) => ({ ...v, open: false }))}
+          reason={loginPrompt.reason}
+          remainingScans={loginPrompt.remainingScans}
+        />
+      </Dialog>
+
+      <LiveCodeScanner
+        open={showLiveScanner}
+        onOpenChange={setShowLiveScanner}
+        onDetected={handleCodeDetected}
+        onFallbackUpload={handleFileUpload}
       />
-    </Dialog>
+    </>
   );
 }
