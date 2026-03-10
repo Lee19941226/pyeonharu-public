@@ -68,7 +68,17 @@ export function UploadSheet({ open, onOpenChange }: UploadSheetProps) {
 
         toast.success("QR/바코드 인식 완료");
         router.push(`/food/result/${barcode}`);
+        return;
       } catch (error) {
+        const isCodeNotFound =
+          error instanceof Error && error.message === "code_not_found";
+
+        if (!isCodeNotFound) {
+          console.error("QR/바코드 인식 오류:", error);
+          toast.error("QR/바코드 인식 중 오류가 발생했습니다.");
+          return;
+        }
+
         // ❌ QR/바코드 없음 → AI 분석
         console.log("QR/바코드 없음, AI 분석 시작");
         toast.info("AI가 성분표를 분석 중...");

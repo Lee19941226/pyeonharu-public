@@ -113,7 +113,16 @@ export function MobileNav() {
           }
           toast.success("QR/바코드 인식 완료");
           router.push(`/food/result/${barcode}`);
-        } catch {
+          return;
+        } catch (error) {
+          const isCodeNotFound =
+            error instanceof Error && error.message === "code_not_found";
+
+          if (!isCodeNotFound) {
+            console.error("QR/바코드 인식 오류:", error);
+            toast.error("QR/바코드 인식 중 오류가 발생했습니다.");
+            return;
+          }
           toast.info("AI가 성분표를 분석 중...");
 
           try {
