@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
@@ -87,6 +87,102 @@ async function fetchWithTimeout(url: string, timeoutMs = 8000) {
     clearTimeout(timeoutId);
   }
 }
+
+const ALLERGEN_KEYWORDS: Array<{ key: string; aliases: string[] }> = [
+  { key: "계란", aliases: ["계란", "난류", "egg"] },
+  { key: "우유", aliases: ["우유", "유제품", "milk"] },
+  { key: "밀", aliases: ["밀", "wheat"] },
+  { key: "메밀", aliases: ["메밀", "buckwheat"] },
+  { key: "땅콩", aliases: ["땅콩", "peanut"] },
+  { key: "대두", aliases: ["대두", "콩", "soy"] },
+  { key: "호두", aliases: ["호두", "walnut"] },
+  { key: "잣", aliases: ["잣", "pine nut"] },
+  { key: "견과류", aliases: ["견과류", "nuts", "nut"] },
+  { key: "새우", aliases: ["새우", "shrimp", "prawn"] },
+  { key: "게", aliases: ["게", "crab"] },
+  { key: "갑각류", aliases: ["갑각류", "crustacean"] },
+  { key: "고등어", aliases: ["고등어", "mackerel"] },
+  { key: "오징어", aliases: ["오징어", "squid"] },
+  { key: "조개류", aliases: ["조개류", "shellfish", "clam", "mussel", "oyster"] },
+  { key: "생선", aliases: ["생선", "fish"] },
+  { key: "복숭아", aliases: ["복숭아", "peach"] },
+  { key: "토마토", aliases: ["토마토", "tomato"] },
+  { key: "돼지고기", aliases: ["돼지고기", "pork"] },
+  { key: "쇠고기", aliases: ["쇠고기", "소고기", "beef"] },
+  { key: "닭고기", aliases: ["닭고기", "chicken"] },
+  { key: "아황산류", aliases: ["아황산류", "sulfite", "sulphite"] },
+];
+
+function extractAllergensFromText(text: string): string[] {
+  if (!text) return [];
+  const normalized = text.toLowerCase();
+  const matched = ALLERGEN_KEYWORDS.filter((item) =>
+    item.aliases.some((alias) => normalized.includes(alias.toLowerCase())),
+  ).map((item) => item.key);
+  return [...new Set(matched)];
+}
+
+function parseOpenFoodFactsNutrition(nutriments: Record<string, any>) {
+  const details = [
+    { name: "열량", content: nutriments["energy-kcal_100g"] ?? nutriments.energy_kcal_100g ?? "", unit: "kcal" },
+    { name: "나트륨", content: nutriments.sodium_100g ?? "", unit: "g" },
+    { name: "탄수화물", content: nutriments.carbohydrates_100g ?? "", unit: "g" },
+    { name: "당류", content: nutriments.sugars_100g ?? "", unit: "g" },
+    { name: "지방", content: nutriments.fat_100g ?? "", unit: "g" },
+    { name: "단백질", content: nutriments.proteins_100g ?? "", unit: "g" },
+  ].filter((v) => v.content !== "" && v.content !== null && v.content !== undefined);
+
+  const num = (v: any) => {
+    const n = typeof v === "string" ? parseFloat(v) : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  return {
+    servingSize: "100g",
+    details,
+    nutrition: {
+      servingSize: "100g",
+      calories: num(nutriments["energy-kcal_100g"] ?? nutriments.energy_kcal_100g),
+      sodium: num(nutriments.sodium_100g),
+      carbs: num(nutriments.carbohydrates_100g),
+      sugar: num(nutriments.sugars_100g),
+      protein: num(nutriments.proteins_100g),
+      fat: num(nutriments.fat_100g),
+      transFat: 0,
+      saturatedFat: num(nutriments["saturated-fat_100g"] ?? nutriments.saturated_fat_100g),
+      cholesterol: 0,
+    },
+  };
+}
+
+async function fetchOpenFoodFactsByBarcode(code: string) {
+  const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`;
+  const data = await fetchWithTimeout(url, 5000);
+  if (!data || data.status !== 1 || !data.product) return null;
+
+  const product = data.product || {};
+  const productName = product.product_name_ko || product.product_name || "";
+  const manufacturer = product.brands || "";
+  const rawMaterials = product.ingredients_text_ko || product.ingredients_text || "";
+  const nutriments = product.nutriments || {};
+  const { servingSize, details, nutrition } = parseOpenFoodFactsNutrition(nutriments);
+  const allergenText = [product.allergens, product.allergens_tags?.join(",") || "", rawMaterials].join(" ");
+  const allergens = extractAllergensFromText(allergenText);
+
+  if (!productName) return null;
+
+  return {
+    productName,
+    manufacturer,
+    rawMaterials,
+    allergens,
+    servingSize,
+    nutritionDetails: details,
+    nutrition,
+    quantity: product.quantity || "",
+  };
+}
+
 export async function GET(req: NextRequest) {
   let productName = "제품";
   let manufacturer = "";
@@ -104,6 +200,7 @@ export async function GET(req: NextRequest) {
   let rawMaterialsStr = ""; // 원재료 원본 문자열 (프론트 fallback용)
   let productImageUrl: string | undefined;
   let imageSource: string | undefined;
+  let resolvedDataSource: string = "openapi";
   try {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
@@ -139,6 +236,7 @@ export async function GET(req: NextRequest) {
 
     if (cachedData) {
       console.log("✅ DB 캐시에서 발견:", cachedData.food_name);
+      resolvedDataSource = cachedData.data_source || "db";
 
       // 변수에 값 할당 (재선언 ❌)
       productName = cachedData.food_name;
@@ -528,6 +626,7 @@ JSON 형식으로만 응답:
       if (isIncomplete) {
         console.log("🔄 DB 캐시 데이터 불완전, Open API로 보완");
       } else {
+        resolvedDataSource = "openapi";
         console.log("❌ DB 캐시 없음, Open API 조회 진행");
       }
 
@@ -686,86 +785,104 @@ JSON 형식으로만 응답:
       // ==========================================
       // 데이터 확인
       // ==========================================
-      if (allergyItems.length === 0 && !productInfo) {
-        return NextResponse.json(
-          { error: "식품 정보를 찾을 수 없습니다" },
-          { status: 404 },
-        );
+      const hasOpenApiData = !(allergyItems.length === 0 && !productInfo);
+
+      if (!hasOpenApiData) {
+        console.log("⚠️ 식약처 결과 없음, OpenFoodFacts 조회 시도");
+        const openFood = await fetchOpenFoodFactsByBarcode(code);
+
+        if (!openFood) {
+          return NextResponse.json(
+            { error: "식품 정보를 찾을 수 없습니다" },
+            { status: 404 },
+          );
+        }
+
+        productName = openFood.productName;
+        manufacturer = openFood.manufacturer || "정보없음";
+        weight = openFood.quantity || "정보없음";
+        allergyNames = openFood.allergens;
+        rawMaterialsStr = openFood.rawMaterials || "";
+        ingredients = rawMaterialsStr
+          ? parseRawMaterials(rawMaterialsStr).slice(0, 30)
+          : [];
+        nutritionDetails = openFood.nutritionDetails || [];
+        servingSize = openFood.servingSize || "100g";
+        nutrition = openFood.nutrition;
+        resolvedDataSource = "openfood";
+
+        console.log("✅ OpenFoodFacts 대체 조회 성공:", productName);
       }
 
-      // ==========================================
-      // 데이터 추출 및 가공
-      // ==========================================
+      if (hasOpenApiData) {
+        // ==========================================
+        // 데이터 추출 및 가공
+        // ==========================================
+        productName =
+          productInfo?.PRDCT_NM ||
+          allergyItems[0]?.PRDCT_NM ||
+          rawMaterialItems[0]?.PRDCT_NM ||
+          "알 수 없음";
 
-      productName =
-        productInfo?.PRDCT_NM ||
-        allergyItems[0]?.PRDCT_NM ||
-        rawMaterialItems[0]?.PRDCT_NM ||
-        "알 수 없음";
+        manufacturer = productInfo?.MNFCTUR || "정보없음";
+        weight = productInfo?.PRDLST_DCNTS || "정보없음";
 
-      manufacturer = productInfo?.MNFCTUR || "정보없음";
-      weight = productInfo?.PRDLST_DCNTS || "정보없음";
+        allergyNames = [
+          ...new Set(
+            allergyItems
+              .map((item: any) => item.ALG_CSG_MTR_NM)
+              .filter(
+                (name: string) =>
+                  typeof name === "string" && name.trim().length > 0,
+              ),
+          ),
+        ];
 
-      // 알레르기 성분 (중복 제거)
-      allergyNames = [
-        ...new Set(
-          allergyItems
-            .map((item: any) => item.ALG_CSG_MTR_NM)
-            .filter(
-              (name: string) =>
-                typeof name === "string" && name.trim().length > 0,
-            ),
-        ),
-      ];
+        let rawMaterialsText = "";
+        if (rawMaterialItems.length > 0) {
+          rawMaterialsText = rawMaterialItems[0].PRVW_CN || "";
+        }
+        if (!rawMaterialsText && productInfo) {
+          rawMaterialsText = productInfo.RAWMTRL_NM || "";
+        }
 
-      // ✅ 원재료 추출 (수정)
-      let rawMaterialsText = "";
+        rawMaterialsStr = rawMaterialsText;
+        ingredients = rawMaterialsText
+          ? parseRawMaterials(rawMaterialsText).slice(0, 30)
+          : [];
 
-      // 1순위: 원재료 API (PRVW_CN 필드)
-      if (rawMaterialItems.length > 0) {
-        rawMaterialsText = rawMaterialItems[0].PRVW_CN || "";
-      }
-
-      // 2순위: 품목제조정보 API (백업)
-      if (!rawMaterialsText && productInfo) {
-        rawMaterialsText = productInfo.RAWMTRL_NM || "";
-      }
-
-      console.log("📦 원재료 원본 길이:", rawMaterialsText.length);
-
-      rawMaterialsStr = rawMaterialsText;
-      ingredients = rawMaterialsText
-        ? parseRawMaterials(rawMaterialsText).slice(0, 30)
-        : [];
-
-      console.log("📝 파싱된 원재료:", ingredients.length, "개");
-      if (ingredients.length > 0) {
-        console.log("   샘플:", ingredients.slice(0, 3));
+        console.log("📦 원재료 원본 길이:", rawMaterialsText.length);
+        console.log("📝 파싱된 원재료:", ingredients.length, "개");
+        if (ingredients.length > 0) {
+          console.log("   샘플:", ingredients.slice(0, 3));
+        }
       }
 
       // 알레르기 주의사항
       allergyWarning = attentionInfo?.PRDLST_ATNT || "";
 
       // 영양정보 매핑
-      const getNutritionValue = (name: string): number => {
-        const item = nutritionItems.find((item: any) =>
-          item.NTRCN_NM?.includes(name),
-        );
-        return item ? parseFloat(item.CNTNT || "0") || 0 : 0;
-      };
+      if (hasOpenApiData) {
+        const getNutritionValue = (name: string): number => {
+          const item = nutritionItems.find((item: any) =>
+            item.NTRCN_NM?.includes(name),
+          );
+          return item ? parseFloat(item.CNTNT || "0") || 0 : 0;
+        };
 
-      nutrition = {
-        servingSize: servingSize || "",
-        calories: getNutritionValue("열량"),
-        sodium: getNutritionValue("나트륨"),
-        carbs: getNutritionValue("탄수화물"),
-        sugar: getNutritionValue("당류"),
-        protein: getNutritionValue("단백질"),
-        fat: getNutritionValue("지방"),
-        transFat: getNutritionValue("트랜스지방"),
-        saturatedFat: getNutritionValue("포화지방"),
-        cholesterol: getNutritionValue("콜레스테롤"),
-      };
+        nutrition = {
+          servingSize: servingSize || "",
+          calories: getNutritionValue("열량"),
+          sodium: getNutritionValue("나트륨"),
+          carbs: getNutritionValue("탄수화물"),
+          sugar: getNutritionValue("당류"),
+          protein: getNutritionValue("단백질"),
+          fat: getNutritionValue("지방"),
+          transFat: getNutritionValue("트랜스지방"),
+          saturatedFat: getNutritionValue("포화지방"),
+          cholesterol: getNutritionValue("콜레스테롤"),
+        };
+      }
 
       // 교차오염 정보
       if (allergyWarning) {
@@ -865,12 +982,12 @@ JSON 형식으로만 응답:
               food_name: productName,
               manufacturer: manufacturer || null,
               allergens: allergyNames,
-              raw_materials: ingredients.join(", ") || null,
+              raw_materials: rawMaterialsStr || ingredients.join(", ") || null,
               weight: weight || null,
               nutrition_details:
                 nutritionDetails.length > 0 ? nutritionDetails : null,
               serving_size: servingSize || null,
-              data_source: "openapi",
+              data_source: resolvedDataSource,
               chosung: getChosung(productName),
               created_at: new Date().toISOString(),
             },
@@ -941,13 +1058,13 @@ JSON 형식으로만 응답:
       isSafe:
         detectedAllergens.length === 0 && crossContaminationRisks.length === 0,
       hasNutritionInfo: nutritionDetails.length > 0,
-      dataSource: cachedData?.data_source || "openapi",
+      dataSource: resolvedDataSource,
       alternatives: alternatives,
     };
 
     console.log("📋 최종 결과:");
     console.log(`  - 제품명: ${productName}`);
-    console.log(`  - 데이터 소스: ${result.dataSource}`);
+    console.log(`  - 데이터 소스: ${resolvedDataSource}`);
     console.log(`  - 알레르기: ${allergyNames.join(", ")}`);
     console.log(`  - 위험 알레르기: ${detectedAllergens.length}개`);
     console.log(`  - 원재료: ${ingredients.length}개`);
