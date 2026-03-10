@@ -33,8 +33,14 @@ async function buildVariantFiles(file: File): Promise<File[]> {
   const bitmap = await imageBitmapFromFile(file);
   if (!bitmap || typeof document === "undefined") return variants;
 
-  const maxSide = 1800;
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  // 작은 바코드 입력에서 인식률 향상을 위해 업스케일 + 큰 입력은 다운스케일
+  const maxSide = 2200;
+  const minSideForScan = 1000;
+  const longest = Math.max(bitmap.width, bitmap.height);
+  const upScale = longest < minSideForScan ? minSideForScan / longest : 1;
+  const downScale = Math.min(1, maxSide / longest);
+  const scale = Math.max(0.5, Math.min(4, upScale * downScale));
+
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
 
@@ -53,6 +59,30 @@ async function buildVariantFiles(file: File): Promise<File[]> {
   };
 
   await pushCanvasFile(baseCanvas, "barcode-original.jpg");
+
+  // 약간 기울어진 바코드 보정
+  const pushRotatedVariant = async (deg: number, name: string) => {
+    const rad = (deg * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const rw = Math.max(1, Math.round(width * cos + height * sin));
+    const rh = Math.max(1, Math.round(width * sin + height * cos));
+
+    const rotatedCanvas = document.createElement("canvas");
+    rotatedCanvas.width = rw;
+    rotatedCanvas.height = rh;
+    const ctx = rotatedCanvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    ctx.translate(rw / 2, rh / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(baseCanvas, -width / 2, -height / 2);
+
+    await pushCanvasFile(rotatedCanvas, name);
+  };
+
+  await pushRotatedVariant(-4, "barcode-rotated-minus4.jpg");
+  await pushRotatedVariant(4, "barcode-rotated-plus4.jpg");
 
   // 그레이스케일 + 대비 강화
   const grayCanvas = document.createElement("canvas");
@@ -148,4 +178,3 @@ export async function detectBarcodeValue(
 
   return null;
 }
-
