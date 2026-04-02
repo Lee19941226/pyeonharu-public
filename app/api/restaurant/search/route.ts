@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { apiError } from "@/lib/utils/api-response";
 
 // 카테고리별 일반적인 알레르기 위험 성분 매핑
 const CATEGORY_ALLERGY_MAP: Record<string, string[]> = {
@@ -185,7 +186,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (query.length > 60) {
-    return NextResponse.json({ error: "검색어는 60자 이하로 입력해주세요." }, { status: 400 });
+    return apiError(400, "INVALID_QUERY", "검색어는 60자 이하로 입력해주세요.");
   }
 
   const serviceKey = process.env.SBIZ_API_KEY;
@@ -416,6 +417,8 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+
 
 
 

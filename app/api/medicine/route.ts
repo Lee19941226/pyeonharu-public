@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { apiError } from "@/lib/utils/api-response";
 
 interface MedicineItem {
   entpName: string;
@@ -158,7 +159,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (itemName.length > 60) {
-      return NextResponse.json({ error: "약 이름은 60자 이하로 입력해주세요." }, { status: 400 });
+      return apiError(400, "INVALID_ITEM_NAME", "약 이름은 60자 이하로 입력해주세요.");
     }
 
     const url = `https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?serviceKey=${serviceKey}&itemName=${encodeURIComponent(itemName)}&pageNo=${pageNo}&numOfRows=${numOfRows}&type=json`;
@@ -247,6 +248,8 @@ function cleanHtml(text: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+
 
 
 

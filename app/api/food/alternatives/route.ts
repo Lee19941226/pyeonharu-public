@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonArraySafe } from "@/lib/utils/ai-safety";
+import { apiError } from "@/lib/utils/api-response";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -11,12 +12,12 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code");
 
   if (!productName || !productName.trim()) {
-    return NextResponse.json({ error: "제품명 필요" }, { status: 400 });
+    return apiError(400, "INVALID_PRODUCT_NAME", "제품명 필요");
   }
 
   const normalizedProductName = String(productName).trim();
   if (normalizedProductName.length > 80) {
-    return NextResponse.json({ error: "제품명은 80자 이하로 입력해주세요." }, { status: 400 });
+    return apiError(400, "INVALID_PRODUCT_NAME", "제품명은 80자 이하로 입력해주세요.");
   }
 
   const supabase = await createClient();
@@ -188,4 +189,6 @@ JSON만 반환 (다른 텍스트 없이):
     );
   }
 }
+
+
 
