@@ -4,6 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
+import {
+  aiInvalidInputResponse,
+  aiResultUnavailableResponse,
+  aiServiceErrorResponse,
+  logAiSecurityEvent,
+} from "@/lib/utils/ai-api-guard";
+import { clampInt, clampText } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -13,18 +21,19 @@ interface DietEstimateResult {
   emoji: string;
 }
 
+const dietEstimateSchema = z.object({
+  estimated_cal: z.number().int().min(0).max(5000),
+  serving_desc: z.string().trim().max(80),
+  emoji: z.string().trim().max(8),
+});
+
 function normalizeDietEstimateResult(
   parsed: Record<string, unknown>,
 ): DietEstimateResult {
-  const estimatedRaw = Number(parsed.estimated_cal);
-  const estimatedCal = Number.isFinite(estimatedRaw)
-    ? Math.max(0, Math.min(5000, Math.round(estimatedRaw)))
-    : 0;
-
   return {
-    estimated_cal: estimatedCal,
-    serving_desc: String(parsed.serving_desc || "").trim(),
-    emoji: String(parsed.emoji || "").trim() || "🍽️",
+    estimated_cal: clampInt(parsed.estimated_cal, { min: 0, max: 5000, fallback: 0 }),
+    serving_desc: clampText(parsed.serving_desc, 80),
+    emoji: clampText(parsed.emoji, 8, "🍽️"),
   };
 }
 
@@ -44,7 +53,13 @@ export async function POST(req: NextRequest) {
     const { food_name, grams } = body;
 
     if (hasPromptInjectionSignal(String(food_name || ""))) {
-      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다." }, { status: 400 });
+      await logAiSecurityEvent({
+        route: "/api/diet/estimate",
+        reason: "prompt_injection_pattern",
+        userId: user.id,
+        sample: String(food_name || ""),
+      });
+      return aiInvalidInputResponse();
     }
 
     if (!food_name?.trim()) {
@@ -118,27 +133,24 @@ export async function POST(req: NextRequest) {
     const content = completion.choices[0]?.message?.content || "";
     const parsed = parseJsonObjectSafe<Record<string, unknown>>(content);
     if (!parsed) {
-      return NextResponse.json(
-        { error: "AI 분석 결과를 처리할 수 없습니다." },
-        { status: 500 },
-      );
+      return aiResultUnavailableResponse();
     }
 
     const result = normalizeDietEstimateResult(parsed);
+    const validated = dietEstimateSchema.safeParse(result);
+
+    if (!validated.success) {
+      return aiResultUnavailableResponse();
+    }
 
     return NextResponse.json({
       success: true,
-      estimated_cal: result.estimated_cal,
-      serving_desc: result.serving_desc,
-      emoji: result.emoji,
+      estimated_cal: validated.data.estimated_cal,
+      serving_desc: validated.data.serving_desc,
+      emoji: validated.data.emoji,
     });
   } catch (error) {
     console.error("[Diet Estimate] Error:", error);
-    return NextResponse.json(
-      { error: "AI 추정 중 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    return aiServiceErrorResponse();
   }
 }
-
-

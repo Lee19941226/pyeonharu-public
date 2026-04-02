@@ -5,6 +5,9 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
+import { aiResultUnavailableResponse, aiServiceErrorResponse } from "@/lib/utils/ai-api-guard";
+import { ZShortText, ZStringList } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,6 +15,22 @@ const supabaseService = createServiceClient(
 );
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const guideSchema = z.object({
+  allergen: ZShortText(40),
+  immediateActions: ZStringList(6, 80),
+  emergencySymptoms: ZStringList(8, 80),
+  hospitalSymptoms: ZStringList(6, 80),
+  alternatives: z
+    .array(
+      z.object({
+        name: ZShortText(40),
+        emoji: ZShortText(8),
+      }),
+    )
+    .max(6)
+    .default([]),
 });
 
 export async function GET(req: NextRequest) {
@@ -118,17 +137,19 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
     const guide = parseJsonObjectSafe<Record<string, unknown>>(content);
 
     if (!guide) {
-      return NextResponse.json(
-        { error: "AI 응답을 파싱할 수 없습니다" },
-        { status: 500 },
-      );
+      return aiResultUnavailableResponse();
+    }
+
+    const validated = guideSchema.safeParse(guide);
+    if (!validated.success) {
+      return aiResultUnavailableResponse();
     }
 
     try {
       await supabaseService.from("ai_guide_cache").insert({
         allergen_code: cacheKey,
         severity,
-        guide_content: guide,
+        guide_content: validated.data,
       });
     } catch (cacheError) {
       console.error("[food/guide] cache insert failed:", cacheError);
@@ -136,12 +157,10 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
 
     return NextResponse.json({
       success: true,
-      guide,
+      guide: validated.data,
     });
   } catch (error) {
     console.error("[food/guide] error:", error);
-    return NextResponse.json({ error: "가이드 생성 실패" }, { status: 500 });
+    return aiServiceErrorResponse();
   }
 }
-
-

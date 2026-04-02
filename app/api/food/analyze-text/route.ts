@@ -5,6 +5,14 @@ import { headers } from "next/headers";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
+import {
+  aiInvalidInputResponse,
+  aiResultUnavailableResponse,
+  aiServiceErrorResponse,
+  logAiSecurityEvent,
+} from "@/lib/utils/ai-api-guard";
+import { ZShortText, ZStringList } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -16,6 +24,13 @@ interface TextAnalyzeResult {
   ingredients?: string[];
   allergens?: string[];
 }
+
+const textAnalyzeSchema = z.object({
+  productName: ZShortText(120),
+  manufacturer: ZShortText(80).optional().default(""),
+  ingredients: ZStringList(20, 40).optional().default([]),
+  allergens: ZStringList(22, 30).optional().default([]),
+});
 
 function normalizeTextAnalyzeResult(parsed: Record<string, unknown>): TextAnalyzeResult | null {
   const productName = String(parsed.productName || "").trim();
@@ -104,7 +119,13 @@ export async function POST(req: NextRequest) {
 
     const safeQuery = sanitizeAiUserInput(query.trim(), 100);
     if (hasPromptInjectionSignal(query)) {
-      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다." }, { status: 400 });
+      await logAiSecurityEvent({
+        route: "/api/food/analyze-text",
+        reason: "prompt_injection_pattern",
+        userId: user?.id ?? null,
+        sample: query,
+      });
+      return aiInvalidInputResponse();
     }
 
     const response = await openai.chat.completions.create({
@@ -135,23 +156,24 @@ export async function POST(req: NextRequest) {
     const normalized = parsed ? normalizeTextAnalyzeResult(parsed) : null;
 
     if (!normalized) {
-      return NextResponse.json(
-        { error: "AI 분석 결과를 처리할 수 없습니다." },
-        { status: 502 },
-      );
+      return aiResultUnavailableResponse();
+    }
+
+    const validated = textAnalyzeSchema.safeParse(normalized);
+    if (!validated.success) {
+      return aiResultUnavailableResponse();
     }
 
     return NextResponse.json({
       success: true,
-      productName: normalized.productName,
-      manufacturer: normalized.manufacturer || "",
-      detectedIngredients: normalized.ingredients || [],
-      allergens: normalized.allergens || [],
+      productName: validated.data.productName,
+      manufacturer: validated.data.manufacturer || "",
+      detectedIngredients: validated.data.ingredients || [],
+      allergens: validated.data.allergens || [],
       dataSource: "ai-text",
     });
   } catch (error) {
     console.error("AI 텍스트 분석 오류:", error);
-    return NextResponse.json({ error: "분석 중 오류가 발생했습니다" }, { status: 500 });
+    return aiServiceErrorResponse();
   }
 }
-

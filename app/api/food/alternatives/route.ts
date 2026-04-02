@@ -5,6 +5,21 @@ import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonArraySafe } from "@/lib/utils/ai-safety";
 import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
 import { apiError } from "@/lib/utils/api-response";
+import {
+  aiInvalidInputResponse,
+  aiResultUnavailableResponse,
+  aiServiceErrorResponse,
+  logAiSecurityEvent,
+} from "@/lib/utils/ai-api-guard";
+import { ZShortText, ZStringList } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
+
+const alternativeSchema = z.object({
+  productName: ZShortText(120),
+  manufacturer: ZShortText(80).optional().default(""),
+  allergens: ZStringList(22, 30).optional().default([]),
+  reason: ZShortText(120).optional().default("알레르기 없는 유사 제품"),
+});
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -23,7 +38,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient();
   if (hasPromptInjectionSignal(`${productName} ${allergens || ""}`)) {
-    return NextResponse.json({ error: "입력 형식이 올바르지 않습니다." }, { status: 400 });
+    await logAiSecurityEvent({
+      route: "/api/food/alternatives",
+      reason: "prompt_injection_pattern",
+      sample: `${productName} ${allergens || ""}`,
+    });
+    return aiInvalidInputResponse();
   }
 
   const userAllergenList = allergens
@@ -162,29 +182,31 @@ JSON만 반환 (다른 텍스트 없이):
 
     const raw = aiResponse.choices[0].message.content || "[]";
 
-    let aiAlternatives: any[] = [];
     const parsed = parseJsonArraySafe<Record<string, unknown>>(raw) || [];
 
-    aiAlternatives = parsed
+    const aiAlternatives = parsed
+      .map((alt) => alternativeSchema.safeParse(alt))
+      .filter((result) => result.success)
+      .map((result) => result.data)
       .filter((alt) => {
-        const name = String(alt.productName || "").trim();
-        if (!name) return false;
         const nonKorean = /[a-zA-Z\u4E00-\u9FFF]/;
-        return !nonKorean.test(name);
+        return !nonKorean.test(alt.productName);
       })
       .map((alt) => ({
         barcode: null,
-        productName: String(alt.productName || "").trim(),
-        manufacturer: String(alt.manufacturer || "").trim(),
-        allergens: Array.isArray(alt.allergens)
-          ? alt.allergens.map((a) => String(a).trim()).filter(Boolean)
-          : [],
+        productName: alt.productName,
+        manufacturer: alt.manufacturer,
+        allergens: alt.allergens,
         category: "AI 추천",
-        reason: String(alt.reason || "").trim() || "알레르기 없는 유사 제품",
+        reason: alt.reason,
         dataSource: "ai",
       }));
 
     const finalAlternatives = [...dbAlternatives, ...aiAlternatives].slice(0, 3);
+
+    if (finalAlternatives.length === 0) {
+      return aiResultUnavailableResponse();
+    }
 
     return NextResponse.json({
       success: true,
@@ -192,14 +214,6 @@ JSON만 반환 (다른 텍스트 없이):
     });
   } catch (error) {
     console.error("[food/alternatives] error:", error);
-    return NextResponse.json(
-      { error: "대체품 추천 중 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    return aiServiceErrorResponse();
   }
 }
-
-
-
-
-

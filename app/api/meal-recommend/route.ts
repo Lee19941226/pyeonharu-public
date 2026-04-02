@@ -4,9 +4,20 @@ import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
-import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
+import { aiResultUnavailableResponse, aiServiceErrorResponse, logAiSecurityEvent } from "@/lib/utils/ai-api-guard";
+import { clampInt, clampText, ZShortText } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const mealRecommendationSchema = z.object({
+  name: ZShortText(60),
+  emoji: ZShortText(8).default("🍽️"),
+  estimatedCal: z.number().int().min(0).max(2000),
+  reasoning: z.record(z.unknown()).default({}),
+  deliveryKeyword: ZShortText(40).default(""),
+});
 
 function getFallbackMealRecommend(mealType: string) {
   return {
@@ -54,12 +65,15 @@ function normalizeMealRecommendResult(
   return {
     mealType: String(parsed.mealType || mealType).trim() || mealType,
     analysis: {
-      calorieSituation: String(analysisRaw.calorieSituation || "").trim(),
-      weeklyPattern: String(analysisRaw.weeklyPattern || "").trim(),
-      nutritionGap: String(analysisRaw.nutritionGap || "").trim(),
+      calorieSituation: clampText(analysisRaw.calorieSituation, 120),
+      weeklyPattern: clampText(analysisRaw.weeklyPattern, 120),
+      nutritionGap: clampText(analysisRaw.nutritionGap, 120),
     },
-    recommendations,
-    nutritionTip: String(parsed.nutritionTip || "").trim() || "추천을 생성하지 못했습니다.",
+    recommendations: recommendations
+      .map((rec) => mealRecommendationSchema.safeParse(rec))
+      .filter((r) => r.success)
+      .map((r) => r.data),
+    nutritionTip: clampText(parsed.nutritionTip, 160, "추천을 생성하지 못했습니다."),
   };
 }
 
@@ -181,7 +195,7 @@ export async function GET(req: NextRequest) {
 
     // ─── 6. 주간 분석 데이터 가공 ───
     const todayFoodNames = todayMeals.map(
-      (m: any) => `${m.emoji || "🍽️"} ${m.food_name} (${m.estimated_cal}kcal)`,
+      (m: any) => `${m.emoji || "🍽️"} ${sanitizeAiUserInput(String(m.food_name || ""), 40)} (${clampInt(m.estimated_cal, { min: 0, max: 5000, fallback: 0 })}kcal)`,
     );
     const recentFoodNames = [
       ...new Set(weeklyMeals.map((m: any) => m.food_name)),
@@ -195,7 +209,7 @@ export async function GET(req: NextRequest) {
     const topFoods = Object.entries(foodFreq)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
-      .map(([name, count]) => `${name}(${count}회)`);
+      .map(([name, count]) => `${sanitizeAiUserInput(String(name || ""), 40)}(${count}회)`);
 
     // 주간 일별 칼로리
     const dailyCals: Record<string, number> = {};
@@ -309,9 +323,10 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
 
     const raw = completion.choices[0]?.message?.content || "";
     const parsed = parseJsonObjectSafe<Record<string, unknown>>(raw);
-    const result = parsed
-      ? normalizeMealRecommendResult(parsed, mealType)
-      : getFallbackMealRecommend(mealType);
+    if (!parsed) {
+      return aiResultUnavailableResponse();
+    }
+    const result = normalizeMealRecommendResult(parsed, mealType);
 
     return NextResponse.json({
       success: true,
@@ -329,12 +344,16 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
     });
   } catch (error: any) {
     console.error("[meal-recommend]", error);
-    return NextResponse.json(
-      { error: "추천 중 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    return aiServiceErrorResponse();
   }
 }
+
+
+
+
+
+
+
 
 
 

@@ -3,11 +3,46 @@ import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe, redactSensitiveText } from "@/lib/utils/ai-safety";
-import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal } from "@/lib/utils/ai-guardrails";
+import {
+  aiInvalidInputResponse,
+  aiResultUnavailableResponse,
+  aiServiceErrorResponse,
+  logAiSecurityEvent,
+} from "@/lib/utils/ai-api-guard";
+import { clampText, ZShortText, ZStringList } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type RiskLevel = "safe" | "caution" | "danger";
+
+const reviewAnalysisSchema = z.object({
+  topKeywords: ZStringList(10, 30),
+  positiveReviews: ZStringList(6, 80),
+  negativeReviews: ZStringList(6, 80),
+  overallSentiment: ZShortText(120),
+});
+
+const estimatedMenuSchema = z.object({
+  name: ZShortText(60),
+  price: ZShortText(30).optional().default(""),
+  allergens: ZStringList(12, 30),
+  matchedUserAllergens: ZStringList(12, 30),
+  risk: z.enum(["safe", "caution", "danger"]),
+});
+
+const restaurantAnalysisSchema = z.object({
+  riskLevel: z.enum(["safe", "caution", "danger"]),
+  summary: ZShortText(160),
+  popularity: ZShortText(30),
+  popularityNote: ZShortText(120),
+  reviewAnalysis: reviewAnalysisSchema,
+  estimatedMenus: z.array(estimatedMenuSchema).max(8),
+  safeOptions: ZStringList(8, 40),
+  tips: ZShortText(160),
+  overallReview: ZShortText(160),
+});
 
 function normalizeStringArray(value: unknown, limit = 10): string[] {
   if (!Array.isArray(value)) return [];
@@ -21,7 +56,7 @@ function normalizeRestaurantAnalysis(parsed: Record<string, unknown>) {
       ? (risk as RiskLevel)
       : "caution";
 
-  const summary = String(parsed.summary || "").trim();
+  const summary = clampText(parsed.summary, 160);
   if (!summary) return null;
 
   const reviewAnalysisRaw =
@@ -35,8 +70,8 @@ function normalizeRestaurantAnalysis(parsed: Record<string, unknown>) {
           if (!m || typeof m !== "object") return null;
           const mm = m as Record<string, unknown>;
           return {
-            name: String(mm.name || "").trim(),
-            price: String(mm.price || "").trim(),
+            name: clampText(mm.name, 60),
+            price: clampText(mm.price, 30),
             allergens: normalizeStringArray(mm.allergens, 12),
             matchedUserAllergens: normalizeStringArray(mm.matchedUserAllergens, 12),
             risk:
@@ -52,18 +87,18 @@ function normalizeRestaurantAnalysis(parsed: Record<string, unknown>) {
   return {
     riskLevel,
     summary,
-    popularity: String(parsed.popularity || "알 수 없음"),
-    popularityNote: String(parsed.popularityNote || "").trim(),
+    popularity: clampText(parsed.popularity, 30, "알 수 없음"),
+    popularityNote: clampText(parsed.popularityNote, 120),
     reviewAnalysis: {
       topKeywords: normalizeStringArray(reviewAnalysisRaw.topKeywords, 10),
       positiveReviews: normalizeStringArray(reviewAnalysisRaw.positiveReviews, 6),
       negativeReviews: normalizeStringArray(reviewAnalysisRaw.negativeReviews, 6),
-      overallSentiment: String(reviewAnalysisRaw.overallSentiment || "").trim(),
+      overallSentiment: clampText(reviewAnalysisRaw.overallSentiment, 120),
     },
     estimatedMenus,
     safeOptions: normalizeStringArray(parsed.safeOptions, 8),
-    tips: String(parsed.tips || "").trim(),
-    overallReview: String(parsed.overallReview || "").trim(),
+    tips: clampText(parsed.tips, 160),
+    overallReview: clampText(parsed.overallReview, 160),
   };
 }
 
@@ -86,6 +121,17 @@ export async function POST(req: NextRequest) {
         { error: "음식점 이름과 알레르기 정보가 필요합니다." },
         { status: 400 },
       );
+    }
+
+    const injectionSource = `${restaurantName || ""} ${address || ""} ${(userAllergens || []).join(" ")}`;
+    if (hasPromptInjectionSignal(injectionSource)) {
+      await logAiSecurityEvent({
+        route: "/api/restaurant/analyze",
+        reason: "prompt_injection_pattern",
+        userId: user.id,
+        sample: injectionSource,
+      });
+      return aiInvalidInputResponse();
     }
 
     const rateResult = await checkApiRateLimit({
@@ -152,22 +198,23 @@ export async function POST(req: NextRequest) {
     const normalized = parsed ? normalizeRestaurantAnalysis(parsed) : null;
 
     if (!normalized) {
-      return NextResponse.json(
-        { error: "AI 분석 결과를 처리할 수 없습니다." },
-        { status: 502 },
-      );
+      return aiResultUnavailableResponse();
+    }
+
+    const validated = restaurantAnalysisSchema.safeParse(normalized);
+    if (!validated.success) {
+      return aiResultUnavailableResponse();
     }
 
     return NextResponse.json({
       success: true,
       analysis: {
-        ...normalized,
+        ...validated.data,
         disclaimer: "AI가 추정한 정보입니다. 실제 메뉴와 성분은 매장에 직접 확인하세요.",
       },
     });
   } catch (error) {
     console.error("[Restaurant Analyze] Error:", error);
-    return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 500 });
+    return aiServiceErrorResponse();
   }
 }
-
