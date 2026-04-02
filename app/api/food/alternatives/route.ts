@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonArraySafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
 import { apiError } from "@/lib/utils/api-response";
 
 export async function GET(req: NextRequest) {
@@ -15,12 +16,16 @@ export async function GET(req: NextRequest) {
     return apiError(400, "INVALID_PRODUCT_NAME", "제품명 필요");
   }
 
-  const normalizedProductName = String(productName).trim();
+  const normalizedProductName = sanitizeAiUserInput(String(productName).trim(), 80);
   if (normalizedProductName.length > 80) {
     return apiError(400, "INVALID_PRODUCT_NAME", "제품명은 80자 이하로 입력해주세요.");
   }
 
   const supabase = await createClient();
+  if (hasPromptInjectionSignal(`${productName} ${allergens || ""}`)) {
+    return NextResponse.json({ error: "입력 형식이 올바르지 않습니다." }, { status: 400 });
+  }
+
   const userAllergenList = allergens
     ? allergens
         .split(",")
@@ -126,6 +131,10 @@ export async function GET(req: NextRequest) {
       max_tokens: 600,
       messages: [
         {
+          role: "system",
+          content: aiGuardSystemPrompt("대체 식품 추천만 수행하고 JSON 배열만 반환하세요."),
+        },
+        {
           role: "user",
           content: `"${normalizedProductName}"과 비슷한 한국 실제 제품 ${needed}가지를 추천해주세요.
 
@@ -189,6 +198,8 @@ JSON만 반환 (다른 텍스트 없이):
     );
   }
 }
+
+
 
 
 

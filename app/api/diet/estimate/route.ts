@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { food_name, grams } = body;
 
+    if (hasPromptInjectionSignal(String(food_name || ""))) {
+      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다." }, { status: 400 });
+    }
+
     if (!food_name?.trim()) {
       return NextResponse.json({ error: "음식 이름을 입력해주세요." }, { status: 400 });
     }
@@ -67,6 +72,10 @@ export async function POST(req: NextRequest) {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
+        {
+          role: "system",
+          content: aiGuardSystemPrompt("칼로리 추정만 수행하고 JSON 객체만 반환하세요."),
+        },
         {
           role: "system",
           content: `당신은 한국 음식 영양 전문가입니다. 음식 이름과 양을 보고 칼로리를 추정합니다.
@@ -99,7 +108,7 @@ export async function POST(req: NextRequest) {
         },
         {
           role: "user",
-          content: `"${food_name.trim()}" 음식의 칼로리를 ${gramsInfo} 추정해주세요.`,
+          content: `"${sanitizeAiUserInput(food_name.trim(), 80)}" 음식의 칼로리를 ${gramsInfo} 추정해주세요.`,
         },
       ],
       max_tokens: 150,
@@ -131,3 +140,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+

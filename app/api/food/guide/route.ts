@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -102,7 +103,13 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "system",
+          content: aiGuardSystemPrompt("알레르기 대응 가이드 작성만 수행하고 JSON 객체만 반환하세요."),
+        },
+        { role: "user", content: prompt },
+      ],
       temperature: 0.3,
       max_tokens: 1500,
     });
@@ -136,3 +143,5 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
     return NextResponse.json({ error: "가이드 생성 실패" }, { status: 500 });
   }
 }
+
+

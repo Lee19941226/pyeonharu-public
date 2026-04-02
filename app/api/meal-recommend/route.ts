@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -296,8 +297,9 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
       messages: [
         {
           role: "system",
-          content:
-            "한국 식단 영양사. 데이터 기반 근거를 명확히 제시하는 메뉴 추천. JSON만 응답.",
+          content: aiGuardSystemPrompt(
+            "한국 식단 영양사. 데이터 기반 근거를 명확히 제시하는 메뉴 추천만 수행하고 JSON만 응답하세요.",
+          ),
         },
         { role: "user", content: prompt },
       ],
@@ -305,7 +307,7 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
       max_tokens: 2500,
     });
 
-        const raw = completion.choices[0]?.message?.content || "";
+    const raw = completion.choices[0]?.message?.content || "";
     const parsed = parseJsonObjectSafe<Record<string, unknown>>(raw);
     const result = parsed
       ? normalizeMealRecommendResult(parsed, mealType)
@@ -333,5 +335,7 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
     );
   }
 }
+
+
 
 

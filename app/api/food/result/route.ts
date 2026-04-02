@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -309,8 +310,12 @@ export async function GET(req: NextRequest) {
             model: "gpt-4o-mini",
             messages: [
               {
+                role: "system",
+                content: aiGuardSystemPrompt("식품 실존 여부와 알레르기/원재료 보완 정보만 JSON으로 반환하세요."),
+              },
+              {
                 role: "user",
-                content: `"${productName}" (제조사: ${manufacturer || "알 수 없음"})의 정확한 제품 정보를 알려주세요.
+                content: `"${sanitizeAiUserInput(productName, 80)}" (제조사: ${sanitizeAiUserInput(manufacturer || "알 수 없음", 80)})의 정확한 제품 정보를 알려주세요.
 
 **중요: 실제로 한국에서 판매되는 제품의 정보만 제공하세요.**
 
@@ -1104,6 +1109,8 @@ JSON 형식으로만 응답:
     );
   }
 }
+
+
 
 
 

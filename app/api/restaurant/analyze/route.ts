@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 import { parseJsonObjectSafe, redactSensitiveText } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -135,7 +136,13 @@ export async function POST(req: NextRequest) {
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "system",
+          content: aiGuardSystemPrompt("음식점 알레르기 위험 분석만 수행하고 JSON 객체만 반환하세요."),
+        },
+        { role: "user", content: prompt },
+      ],
       temperature: 0.3,
       max_tokens: 2000,
     });
@@ -163,3 +170,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
+

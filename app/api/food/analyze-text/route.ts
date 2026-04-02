@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
-import { parseJsonObjectSafe, redactSensitiveText } from "@/lib/utils/ai-safety";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -101,11 +102,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "검색어는 100자 이하로 입력해주세요." }, { status: 400 });
     }
 
-    const safeQuery = redactSensitiveText(query.trim());
+    const safeQuery = sanitizeAiUserInput(query.trim(), 100);
+    if (hasPromptInjectionSignal(query)) {
+      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다." }, { status: 400 });
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
+        {
+          role: "system",
+          content: aiGuardSystemPrompt("식품명/원재료/알레르기 분석만 수행하고 JSON 형식만 반환하세요."),
+        },
         {
           role: "user",
           content: `당신은 식품 정보 전문가입니다.
@@ -146,3 +154,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "분석 중 오류가 발생했습니다" }, { status: 500 });
   }
 }
+

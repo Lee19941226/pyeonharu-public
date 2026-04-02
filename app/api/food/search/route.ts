@@ -8,6 +8,7 @@ import { logAction } from "@/lib/utils/action-log";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { correctFoodTypo, jamoSimilarity } from "@/lib/utils/korean-typo";
 import { parseJsonArraySafe, parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -112,6 +113,7 @@ export async function GET(req: NextRequest) {
 
     const supabase = await createClient();
     const normalizedQuery = query.toLowerCase();
+    const aiSafeQuery = sanitizeAiUserInput(query, 80);
     // PostgREST .or() 파서에서 특수문자가 구분자로 해석되는 것을 방지
     const safeQuery = normalizedQuery.replace(/[,.()"'\\]/g, "");
     if (!safeQuery) {
@@ -490,6 +492,10 @@ export async function GET(req: NextRequest) {
                   model: "gpt-4o-mini",
                   messages: [
                     {
+                      role: "system",
+                      content: aiGuardSystemPrompt("식품 정보 번역/분석만 수행하고 JSON 형식만 반환하세요."),
+                    },
+                    {
                       role: "user",
                       content: `다음 식품 정보를 한국어로 번역하고 알레르기 성분을 추출하세요:
 
@@ -579,9 +585,13 @@ export async function GET(req: NextRequest) {
         const aiResponse = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
-            {
-              role: "user",
-              content: `한국에서 실제로 판매되는 식품 중 "${query}"와 관련된 제품 15개를 찾아주세요.
+                    {
+                      role: "system",
+                      content: aiGuardSystemPrompt("식품 정보 번역/분석만 수행하고 JSON 형식만 반환하세요."),
+                    },
+                    {
+                      role: "user",
+              content: `한국에서 실제로 판매되는 식품 중 "${aiSafeQuery}"와 관련된 제품 15개를 찾아주세요.
 
 **중요 규칙:**
 1. 제품명은 반드시 한국어로만 작성하세요
@@ -949,6 +959,8 @@ JSON 배열 형식으로만 반환:
     );
   }
 }
+
+
 
 
 

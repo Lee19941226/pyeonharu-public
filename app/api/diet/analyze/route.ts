@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt } from "@/lib/utils/ai-guardrails";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -179,6 +180,10 @@ export async function POST(req: NextRequest) {
       model: "gpt-4o-mini",
       messages: [
         {
+          role: "system",
+          content: aiGuardSystemPrompt("음식 사진 칼로리 분석만 수행하고 JSON 객체만 반환하세요."),
+        },
+        {
           role: "user",
           content: [
             {
@@ -262,3 +267,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
+
+
