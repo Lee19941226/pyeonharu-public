@@ -73,7 +73,7 @@ async function fetchWithTimeout(
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
-    const query = searchParams.get("q") || "";
+    const query = (searchParams.get("q") || "").trim();
     const rawPhase = searchParams.get("phase");
     const phase = rawPhase === "1" || rawPhase === "full" ? rawPhase : "full";
     const serviceKey = process.env.FOOD_API_KEY;
@@ -100,14 +100,23 @@ export async function GET(req: NextRequest) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    if (!query || query.length < 1) {
+        if (!query || query.length < 1) {
       return NextResponse.json({ success: true, items: [], totalCount: 0 });
+    }
+    if (query.length > 80) {
+      return NextResponse.json(
+        { error: "검색어는 80자 이하로 입력해주세요." },
+        { status: 400 },
+      );
     }
 
     const supabase = await createClient();
-    const normalizedQuery = query.toLowerCase().trim();
+    const normalizedQuery = query.toLowerCase();
     // PostgREST .or() 파서에서 특수문자가 구분자로 해석되는 것을 방지
     const safeQuery = normalizedQuery.replace(/[,.()"'\\]/g, "");
+    if (!safeQuery) {
+      return NextResponse.json({ success: true, items: [], totalCount: 0 });
+    }
 
     const {
       data: { user },
@@ -940,5 +949,8 @@ JSON 배열 형식으로만 반환:
     );
   }
 }
+
+
+
 
 

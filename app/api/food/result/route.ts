@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
@@ -209,9 +209,18 @@ export async function GET(req: NextRequest) {
   let resolvedDataSource: string = "openapi";
   try {
     const searchParams = req.nextUrl.searchParams;
-    const code = searchParams.get("code") || "";
+    const code = (searchParams.get("code") || "").trim();
 
-    debugLog("🔍 검색 바코드/코드:", code);
+    if (!code) {
+      return NextResponse.json({ error: "제품 코드가 필요합니다." }, { status: 400 });
+    }
+
+    const normalizedCode = code.replace(/\s+/g, "");
+    if (!/^[0-9A-Za-z_-]{5,32}$/.test(normalizedCode)) {
+      return NextResponse.json({ error: "유효하지 않은 제품 코드입니다." }, { status: 400 });
+    }
+
+    debugLog("🔍 검색 바코드/코드:", normalizedCode);
 
     const supabase = await createClient();
 
@@ -221,7 +230,7 @@ export async function GET(req: NextRequest) {
     const { data: cachedData } = await supabase
       .from("food_search_cache")
       .select("*")
-      .eq("food_code", code)
+      .eq("food_code", normalizedCode)
       .maybeSingle();
 
     // ✅ 사용자 알레르기 조회 (먼저 가져오기)
@@ -446,7 +455,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("pageNo", "1");
                 url.searchParams.append("numOfRows", "100");
                 url.searchParams.append("type", "json");
-                url.searchParams.append("brcd_no", code);
+                url.searchParams.append("brcd_no", normalizedCode);
                 const data = await fetchWithTimeout(url.toString());
                 return data?.body?.items || [];
               })(),
@@ -460,7 +469,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("pageNo", "1");
                 url.searchParams.append("numOfRows", "100");
                 url.searchParams.append("type", "json");
-                url.searchParams.append("brcd_no", code);
+                url.searchParams.append("brcd_no", normalizedCode);
                 const data = await fetchWithTimeout(url.toString());
                 return data?.body?.items || [];
               })(),
@@ -477,7 +486,7 @@ JSON 형식으로만 응답:
                 url.searchParams.append("pageNo", "1");
                 url.searchParams.append("numOfRows", "50");
                 url.searchParams.append("type", "json");
-                url.searchParams.append("brcd_no", code);
+                url.searchParams.append("brcd_no", normalizedCode);
                 const data = await fetchWithTimeout(url.toString());
                 return data?.body?.items || [];
               })(),
@@ -579,7 +588,7 @@ JSON 형식으로만 응답:
             await supabaseService
               .from("food_search_cache")
               .update(updateData)
-              .eq("food_code", code);
+              .eq("food_code", normalizedCode);
 
             debugLog("✅ Open API 데이터 보완 완료:", {
               원재료: updateData.raw_materials ? "보완됨" : "기존 유지",
@@ -670,7 +679,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("pageNo", "1");
           url.searchParams.append("numOfRows", "1");
           url.searchParams.append("type", "json");
-          url.searchParams.append("brcd_no", code);
+          url.searchParams.append("brcd_no", normalizedCode);
           const data = await fetchWithTimeout(url.toString());
           return data?.body?.items?.[0] || null;
         })(),
@@ -682,7 +691,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("pageNo", "1");
           url.searchParams.append("numOfRows", "100");
           url.searchParams.append("type", "json");
-          url.searchParams.append("brcd_no", code);
+          url.searchParams.append("brcd_no", normalizedCode);
           const data = await fetchWithTimeout(url.toString());
           return data?.body?.items || [];
         })(),
@@ -694,7 +703,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("pageNo", "1");
           url.searchParams.append("numOfRows", "100");
           url.searchParams.append("type", "json");
-          url.searchParams.append("brcd_no", code);
+          url.searchParams.append("brcd_no", normalizedCode);
           const data = await fetchWithTimeout(url.toString());
           return data?.body?.items || [];
         })(),
@@ -706,7 +715,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("pageNo", "1");
           url.searchParams.append("numOfRows", "50");
           url.searchParams.append("type", "json");
-          url.searchParams.append("brcd_no", code);
+          url.searchParams.append("brcd_no", normalizedCode);
           const data = await fetchWithTimeout(url.toString());
           return data?.body?.items || [];
         })(),
@@ -718,7 +727,7 @@ JSON 형식으로만 응답:
           url.searchParams.append("pageNo", "1");
           url.searchParams.append("numOfRows", "1");
           url.searchParams.append("type", "json");
-          url.searchParams.append("brcd_no", code);
+          url.searchParams.append("brcd_no", normalizedCode);
           const data = await fetchWithTimeout(url.toString());
           return data?.body?.items?.[0] || null;
         })(),
@@ -802,7 +811,7 @@ JSON 형식으로만 응답:
 
       if (!hasOpenApiData) {
         debugLog("⚠️ 식약처 결과 없음, OpenFoodFacts 조회 시도");
-        const openFood = await fetchOpenFoodFactsByBarcode(code);
+        const openFood = await fetchOpenFoodFactsByBarcode(normalizedCode);
 
         if (!openFood) {
           return NextResponse.json(
@@ -991,7 +1000,7 @@ JSON 형식으로만 응답:
           .from("food_search_cache")
           .upsert(
             {
-              food_code: code,
+              food_code: normalizedCode,
               food_name: productName,
               manufacturer: manufacturer || null,
               allergens: allergyNames,
@@ -1027,7 +1036,7 @@ JSON 형식으로만 응답:
       const { data: approvedImage } = await supabaseService
         .from("food_product_images")
         .select("storage_path, source_type")
-        .eq("food_code", code)
+        .eq("food_code", normalizedCode)
         .eq("status", "approved")
         .order("reviewed_at", { ascending: false })
         .limit(1)
@@ -1095,6 +1104,8 @@ JSON 형식으로만 응답:
     );
   }
 }
+
+
 
 
 

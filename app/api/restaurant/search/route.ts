@@ -162,17 +162,30 @@ export async function GET(req: NextRequest) {
       if (error) console.error("rate limit 기록 실패:", error);
     });
 
-  const userLat = parseFloat(searchParams.get("lat") || "0");
-  const userLng = parseFloat(searchParams.get("lng") || "0");
-  const radius = searchParams.get("radius") || "2000";
-  const query = searchParams.get("query") || "";
-  const page = searchParams.get("page") || "1";
+  const userLat = Number.parseFloat(searchParams.get("lat") || "");
+  const userLng = Number.parseFloat(searchParams.get("lng") || "");
+  const radiusRaw = Number.parseInt(searchParams.get("radius") || "2000", 10);
+  const radius = Number.isFinite(radiusRaw) ? Math.min(Math.max(radiusRaw, 100), 2000) : 2000;
+  const query = (searchParams.get("query") || "").trim();
+  const pageRaw = Number.parseInt(searchParams.get("page") || "1", 10);
+  const page = Number.isFinite(pageRaw) ? Math.min(Math.max(pageRaw, 1), 10) : 1;
 
-  if (!userLat || !userLng) {
+  if (
+    !Number.isFinite(userLat) ||
+    !Number.isFinite(userLng) ||
+    userLat < -90 ||
+    userLat > 90 ||
+    userLng < -180 ||
+    userLng > 180
+  ) {
     return NextResponse.json(
       { error: "위치 정보(lat, lng)가 필요합니다." },
       { status: 400 },
     );
+  }
+
+  if (query.length > 60) {
+    return NextResponse.json({ error: "검색어는 60자 이하로 입력해주세요." }, { status: 400 });
   }
 
   const serviceKey = process.env.SBIZ_API_KEY;
@@ -234,13 +247,13 @@ export async function GET(req: NextRequest) {
     apiUrl.searchParams.append("serviceKey", decodedKey);
     apiUrl.searchParams.append(
       "radius",
-      Math.min(parseInt(radius), 2000).toString(),
+      radius.toString(),
     );
     apiUrl.searchParams.append("cx", userLng.toString()); // cx = 경도(lng)
     apiUrl.searchParams.append("cy", userLat.toString()); // cy = 위도(lat)
     apiUrl.searchParams.append("indsLclsCd", "I2"); // ★ 음식점만 조회
     apiUrl.searchParams.append("numOfRows", numOfRows.toString());
-    apiUrl.searchParams.append("pageNo", page);
+    apiUrl.searchParams.append("pageNo", String(page));
     apiUrl.searchParams.append("type", "json");
     if (process.env.NODE_ENV === "development") {
       console.log("[Restaurant Search] API URL:", apiUrl.toString().replace(decodedKey, "***KEY***"));
@@ -391,7 +404,7 @@ export async function GET(req: NextRequest) {
       success: true,
       total: totalCount,
       count: restaurants.length,
-      page: parseInt(page),
+      page,
       restaurants,
       userAllergens,
     });
@@ -403,6 +416,8 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+
 
 
 

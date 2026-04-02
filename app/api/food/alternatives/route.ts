@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
@@ -10,8 +10,13 @@ export async function GET(req: NextRequest) {
   const allergens = searchParams.get("allergens");
   const code = searchParams.get("code");
 
-  if (!productName) {
+  if (!productName || !productName.trim()) {
     return NextResponse.json({ error: "제품명 필요" }, { status: 400 });
+  }
+
+  const normalizedProductName = String(productName).trim();
+  if (normalizedProductName.length > 80) {
+    return NextResponse.json({ error: "제품명은 80자 이하로 입력해주세요." }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -19,7 +24,8 @@ export async function GET(req: NextRequest) {
     ? allergens
         .split(",")
         .map((a) => a.trim())
-        .filter(Boolean)
+        .filter((a) => a.length > 0 && a.length <= 30)
+        .slice(0, 22)
     : [];
 
   try {
@@ -47,7 +53,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (dbAlternatives.length < 3) {
-      const keyword = productName
+      const keyword = normalizedProductName
         .replace(/\(.*?\)/g, "")
         .trim()
         .slice(0, 4);
@@ -120,7 +126,7 @@ export async function GET(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `"${productName}"과 비슷한 한국 실제 제품 ${needed}가지를 추천해주세요.
+          content: `"${normalizedProductName}"과 비슷한 한국 실제 제품 ${needed}가지를 추천해주세요.
 
 **필수 조건:**
 - 반드시 실제로 한국 마트에서 판매되는 제품
@@ -182,3 +188,4 @@ JSON만 반환 (다른 텍스트 없이):
     );
   }
 }
+

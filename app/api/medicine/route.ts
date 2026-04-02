@@ -133,11 +133,13 @@ export async function GET(req: NextRequest) {
     await loadMedicineImageOverridesFromDb();
 
     const { searchParams } = new URL(req.url);
-    const itemName = searchParams.get("itemName") || "";
-    const pageNo = searchParams.get("pageNo") || "1";
-    const numOfRows = searchParams.get("numOfRows") || "10";
+    const itemName = (searchParams.get("itemName") || "").trim();
+    const pageNoRaw = Number.parseInt(searchParams.get("pageNo") || "1", 10);
+    const numOfRowsRaw = Number.parseInt(searchParams.get("numOfRows") || "10", 10);
+    const pageNo = Number.isFinite(pageNoRaw) ? Math.min(Math.max(pageNoRaw, 1), 100) : 1;
+    const numOfRows = Number.isFinite(numOfRowsRaw) ? Math.min(Math.max(numOfRowsRaw, 1), 50) : 10;
 
-    if (!itemName.trim()) {
+    if (!itemName) {
       return NextResponse.json(
         { error: "약 이름을 입력해주세요." },
         { status: 400 },
@@ -153,6 +155,10 @@ export async function GET(req: NextRequest) {
         { error: "API 키가 설정되지 않았습니다." },
         { status: 500 },
       );
+    }
+
+    if (itemName.length > 60) {
+      return NextResponse.json({ error: "약 이름은 60자 이하로 입력해주세요." }, { status: 400 });
     }
 
     const url = `https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?serviceKey=${serviceKey}&itemName=${encodeURIComponent(itemName)}&pageNo=${pageNo}&numOfRows=${numOfRows}&type=json`;
@@ -188,8 +194,8 @@ export async function GET(req: NextRequest) {
         success: true,
         totalCount: 0,
         items: [],
-        pageNo: parseInt(pageNo),
-        numOfRows: parseInt(numOfRows),
+        pageNo,
+        numOfRows,
       });
     }
 
@@ -218,8 +224,8 @@ export async function GET(req: NextRequest) {
       success: true,
       totalCount,
       items: medicines,
-      pageNo: parseInt(pageNo),
-      numOfRows: parseInt(numOfRows),
+      pageNo,
+      numOfRows,
     });
   } catch (error) {
     console.error("Medicine search error:", error);
@@ -241,5 +247,7 @@ function cleanHtml(text: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+
 
 

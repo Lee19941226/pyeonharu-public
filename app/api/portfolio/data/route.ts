@@ -2,6 +2,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const PORTFOLIO_FALLBACK = {
   categories: [],
@@ -14,7 +15,7 @@ let portfolioData: typeof PORTFOLIO_FALLBACK | Record<string, unknown> = PORTFOL
 
 try {
   const raw = readFileSync(join(process.cwd(), "data/portfolio-data.json"), "utf-8");
-  portfolioData = JSON.parse(raw);
+  portfolioData = parseJsonObjectSafe<Record<string, unknown>>(raw) || PORTFOLIO_FALLBACK;
 } catch {
   console.warn("[Portfolio] data/portfolio-data.json not found. fallback 사용");
 }
@@ -123,3 +124,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
