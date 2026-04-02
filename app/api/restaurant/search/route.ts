@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 // 카테고리별 일반적인 알레르기 위험 성분 매핑
 const CATEGORY_ALLERGY_MAP: Record<string, string[]> = {
@@ -241,11 +242,9 @@ export async function GET(req: NextRequest) {
     apiUrl.searchParams.append("numOfRows", numOfRows.toString());
     apiUrl.searchParams.append("pageNo", page);
     apiUrl.searchParams.append("type", "json");
-
-    console.log(
-      "[Restaurant Search] API URL:",
-      apiUrl.toString().replace(decodedKey, "***KEY***"),
-    );
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Restaurant Search] API URL:", apiUrl.toString().replace(decodedKey, "***KEY***"));
+    }
 
     let apiData: any = null;
     let debugInfo: any = {};
@@ -263,7 +262,7 @@ export async function GET(req: NextRequest) {
       if (apiRes.ok) {
         // JSON 응답 파싱
         if (apiText.trim().startsWith("{") || apiText.trim().startsWith("[")) {
-          apiData = JSON.parse(apiText);
+          apiData = parseJsonObjectSafe<Record<string, unknown>>(apiText);
         } else if (apiText.includes("<resultCode>")) {
           // XML 응답이 온 경우 (type=json인데 XML이 오는 에러 상황)
           const resultCode = apiText.match(
@@ -404,3 +403,8 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+
+
+
+

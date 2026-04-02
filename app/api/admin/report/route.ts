@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { verifyAdmin } from "@/lib/utils/admin-auth";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -10,8 +11,9 @@ export async function POST(req: NextRequest) {
     if (!auth.ok) return auth.response;
 
     const { stats, period } = await req.json();
-    if (!stats)
+    if (!stats) {
       return NextResponse.json({ error: "통계 데이터 필요" }, { status: 400 });
+    }
 
     const prompt = `다음은 편하루(식품 알레르기 관리 웹앱)의 최근 ${period}일간 운영 지표입니다. 한국어로 분석해주세요.
 
@@ -58,28 +60,23 @@ ${JSON.stringify(stats.signups.trend.slice(-7))}
       max_tokens: 3000,
     });
 
-    let analysis: any;
-    try {
-      const cleaned = (completion.choices[0]?.message?.content || "{}")
-        .replace(/```json\n?|```/g, "")
-        .trim();
-      analysis = JSON.parse(cleaned);
-    } catch {
-      analysis = {
+    const parsed = parseJsonObjectSafe<Record<string, unknown>>(
+      completion.choices[0]?.message?.content || "",
+    );
+
+    const analysis =
+      parsed ||
+      ({
         overall_grade: "N/A",
         overall_summary: "AI 분석 파싱 실패",
         strengths: [],
         improvements: [],
         action_items: [],
-      };
-    }
+      } as Record<string, unknown>);
 
     return NextResponse.json({ success: true, analysis, stats, period });
   } catch (error: any) {
     console.error("Admin report error:", error);
-    return NextResponse.json(
-      { error: "분석 실패" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "분석 실패" }, { status: 500 });
   }
 }

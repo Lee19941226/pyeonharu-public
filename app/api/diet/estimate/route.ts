@@ -1,9 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+interface DietEstimateResult {
+  estimated_cal: number;
+  serving_desc: string;
+  emoji: string;
+}
+
+function normalizeDietEstimateResult(
+  parsed: Record<string, unknown>,
+): DietEstimateResult {
+  const estimatedRaw = Number(parsed.estimated_cal);
+  const estimatedCal = Number.isFinite(estimatedRaw)
+    ? Math.max(0, Math.min(5000, Math.round(estimatedRaw)))
+    : 0;
+
+  return {
+    estimated_cal: estimatedCal,
+    serving_desc: String(parsed.serving_desc || "").trim(),
+    emoji: String(parsed.emoji || "").trim() || "🍽️",
+  };
+}
 
 // POST /api/diet/estimate — 음식 이름으로 AI 칼로리 추정
 export async function POST(req: NextRequest) {
@@ -14,23 +36,16 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
 
     const body = await req.json();
     const { food_name, grams } = body;
 
     if (!food_name?.trim()) {
-      return NextResponse.json(
-        { error: "음식 이름을 입력해주세요." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "음식 이름을 입력해주세요." }, { status: 400 });
     }
 
-    // Rate limit 체크 (OpenAI 호출 직전)
     const rateResult = await checkApiRateLimit({
       prefix: "estimate",
       userId: user.id,
@@ -45,8 +60,8 @@ export async function POST(req: NextRequest) {
     }
 
     const gramsInfo =
-      grams && parseInt(grams) > 0
-        ? `${parseInt(grams)}g 기준으로`
+      grams && parseInt(grams, 10) > 0
+        ? `${parseInt(grams, 10)}g 기준으로`
         : "일반적인 1인분 기준으로";
 
     const completion = await openai.chat.completions.create({
@@ -92,26 +107,21 @@ export async function POST(req: NextRequest) {
     });
 
     const content = completion.choices[0]?.message?.content || "";
-
-    let result;
-    try {
-      const cleaned = content
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-      result = JSON.parse(cleaned);
-    } catch {
+    const parsed = parseJsonObjectSafe<Record<string, unknown>>(content);
+    if (!parsed) {
       return NextResponse.json(
         { error: "AI 분석 결과를 처리할 수 없습니다." },
         { status: 500 },
       );
     }
 
+    const result = normalizeDietEstimateResult(parsed);
+
     return NextResponse.json({
       success: true,
-      estimated_cal: result.estimated_cal || 0,
-      serving_desc: result.serving_desc || "",
-      emoji: result.emoji || "🍽️",
+      estimated_cal: result.estimated_cal,
+      serving_desc: result.serving_desc,
+      emoji: result.emoji,
     });
   } catch (error) {
     console.error("[Diet Estimate] Error:", error);

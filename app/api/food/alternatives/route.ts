@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
+import { parseJsonArraySafe } from "@/lib/utils/ai-safety";
 
 export async function GET(req: NextRequest) {
-  console.log("test");
   const { searchParams } = req.nextUrl;
   const productName = searchParams.get("name");
-  const allergens = searchParams.get("allergens"); // "우유,계란" 형태
+  const allergens = searchParams.get("allergens");
   const code = searchParams.get("code");
 
   if (!productName) {
@@ -16,13 +16,13 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient();
   const userAllergenList = allergens
-    ? allergens.split(",").map((a) => a.trim())
+    ? allergens
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean)
     : [];
 
   try {
-    // ==========================================
-    // 0단계: safe_alternatives 검증 대체품 먼저
-    // ==========================================
     let dbAlternatives: any[] = [];
 
     if (userAllergenList.length > 0) {
@@ -46,9 +46,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ==========================================
-    // 1단계: safe_alternatives 부족하면 food_search_cache 보완
-    // ==========================================
     if (dbAlternatives.length < 3) {
       const keyword = productName
         .replace(/\(.*?\)/g, "")
@@ -67,7 +64,7 @@ export async function GET(req: NextRequest) {
       if (dbProducts && dbProducts.length > 0) {
         const cacheAlternatives = dbProducts
           .filter((p) => {
-            if (existingNames.includes(p.food_name)) return false; // 중복 제거
+            if (existingNames.includes(p.food_name)) return false;
             const pAllergens: string[] = p.allergens || [];
             return !pAllergens.some((pa) =>
               userAllergenList.some((ua) => pa.includes(ua) || ua.includes(pa)),
@@ -88,15 +85,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // DB에서 3개 찾으면 AI 스킵
     if (dbAlternatives.length >= 3) {
       return NextResponse.json({ success: true, alternatives: dbAlternatives });
     }
 
-    // ==========================================
-    // 2단계: AI로 나머지 채우기
-    // ==========================================
-    // Rate limit 체크 (OpenAI 호출 직전)
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -153,45 +145,40 @@ JSON만 반환 (다른 텍스트 없이):
     });
 
     const raw = aiResponse.choices[0].message.content || "[]";
-    const clean = raw
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
 
     let aiAlternatives: any[] = [];
-    try {
-      const parsed = JSON.parse(clean);
-      aiAlternatives = parsed
-        .filter((alt: any) => {
-          if (!alt.productName) return false;
-          // 비한국어 필터
-          const nonKorean = /[a-zA-Z\u4E00-\u9FFF]/;
-          return !nonKorean.test(alt.productName);
-        })
-        .map((alt: any) => ({
-          barcode: null, // AI 추천은 바코드 없음
-          productName: alt.productName,
-          manufacturer: alt.manufacturer || "",
-          allergens: alt.allergens || [],
-          category: "AI 추천",
-          reason: alt.reason || "알레르기 없는 유사 제품",
-          dataSource: "ai",
-        }));
-    } catch (e) {
-      console.error("AI 대체품 파싱 실패:", e);
-    }
+    const parsed = parseJsonArraySafe<Record<string, unknown>>(raw) || [];
 
-    const finalAlternatives = [...dbAlternatives, ...aiAlternatives].slice(
-      0,
-      3,
-    );
+    aiAlternatives = parsed
+      .filter((alt) => {
+        const name = String(alt.productName || "").trim();
+        if (!name) return false;
+        const nonKorean = /[a-zA-Z\u4E00-\u9FFF]/;
+        return !nonKorean.test(name);
+      })
+      .map((alt) => ({
+        barcode: null,
+        productName: String(alt.productName || "").trim(),
+        manufacturer: String(alt.manufacturer || "").trim(),
+        allergens: Array.isArray(alt.allergens)
+          ? alt.allergens.map((a) => String(a).trim()).filter(Boolean)
+          : [],
+        category: "AI 추천",
+        reason: String(alt.reason || "").trim() || "알레르기 없는 유사 제품",
+        dataSource: "ai",
+      }));
+
+    const finalAlternatives = [...dbAlternatives, ...aiAlternatives].slice(0, 3);
 
     return NextResponse.json({
       success: true,
       alternatives: finalAlternatives,
     });
   } catch (error) {
-    console.error("대체품 추천 오류:", error);
-    return NextResponse.json({ error: "대체품 추천 중 오류가 발생했습니다." }, { status: 500 });
+    console.error("[food/alternatives] error:", error);
+    return NextResponse.json(
+      { error: "대체품 추천 중 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 }

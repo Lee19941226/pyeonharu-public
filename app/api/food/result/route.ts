@@ -3,11 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+const isDev = process.env.NODE_ENV === "development";
+const debugLog = (...args: unknown[]) => {
+  if (isDev) console.log(...args);
+};
 
 // ✅ 초성 추출 함수 추가
 function getChosung(str: string): string {
@@ -205,7 +211,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
 
-    console.log("🔍 검색 바코드/코드:", code);
+    debugLog("🔍 검색 바코드/코드:", code);
 
     const supabase = await createClient();
 
@@ -235,7 +241,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (cachedData) {
-      console.log("✅ DB 캐시에서 발견:", cachedData.food_name);
+      debugLog("✅ DB 캐시에서 발견:", cachedData.food_name);
       resolvedDataSource = cachedData.data_source || "db";
 
       // 변수에 값 할당 (재선언 ❌)
@@ -255,7 +261,7 @@ export async function GET(req: NextRequest) {
       nutritionDetails = cachedData.nutrition_details || [];
       servingSize = cachedData.serving_size || "";
 
-      console.log("📊 DB 캐시 영양정보:", nutritionDetails.length, "개");
+      debugLog("📊 DB 캐시 영양정보:", nutritionDetails.length, "개");
       // ==========================================
       // 데이터 보완 로직 (원재료 또는 알레르기 없을 때)
       // ==========================================
@@ -281,11 +287,11 @@ export async function GET(req: NextRequest) {
           );
         }
 
-        console.log("🔄 DB 데이터 불완전, AI로 보완 시작...");
-        console.log(
+        debugLog("🔄 DB 데이터 불완전, AI로 보완 시작...");
+        debugLog(
           `  - 원재료: ${cachedData.raw_materials ? "있음" : "없음"}`,
         );
-        console.log(`  - 알레르기: ${cachedData.allergens?.length || 0}개`);
+        debugLog(`  - 알레르기: ${cachedData.allergens?.length || 0}개`);
 
         try {
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -316,30 +322,38 @@ JSON 형식으로만 응답:
           });
 
           const aiText = enrichResponse.choices[0].message.content || "{}";
-          const clean = aiText
-            .replace(/```json\n?/g, "")
-            .replace(/```\n?/g, "")
-            .trim();
-          const enrichData = JSON.parse(clean);
+          const enrichData = parseJsonObjectSafe<Record<string, unknown>>(aiText);
+          if (!enrichData) {
+            throw new Error("AI 보완 응답 파싱 실패");
+          }
+
+          const exists = Boolean(enrichData.exists);
+          const confidenceRaw = Number(enrichData.confidence);
+          const confidence = Number.isFinite(confidenceRaw) ? confidenceRaw : 0;
+          const aiIngredients = Array.isArray(enrichData.ingredients)
+            ? enrichData.ingredients.map((v) => String(v).trim()).filter(Boolean)
+            : [];
+          const aiAllergens = Array.isArray(enrichData.allergens)
+            ? enrichData.allergens.map((v) => String(v).trim()).filter(Boolean)
+            : [];
 
           // ✅ 실제 제품이고 신뢰도 높을 때만 업데이트
-          if (enrichData.exists && enrichData.confidence >= 0.7) {
-            console.log(
+          if (exists && confidence >= 0.7) {
+            debugLog(
               "✅ AI 보완 데이터 획득 (신뢰도:",
-              enrichData.confidence,
+              confidence,
               ")",
             );
 
-            // DB 업데이트
             const updateData: any = {};
 
-            if (enrichData.ingredients && enrichData.ingredients.length > 0) {
-              updateData.raw_materials = enrichData.ingredients.join(", ");
-              ingredients = enrichData.ingredients;
+            if (aiIngredients.length > 0) {
+              updateData.raw_materials = aiIngredients.join(", ");
+              ingredients = aiIngredients;
             }
 
-            if (enrichData.allergens && enrichData.allergens.length > 0) {
-              const cleanAllergens = enrichData.allergens.filter(
+            if (aiAllergens.length > 0) {
+              const cleanAllergens = aiAllergens.filter(
                 (a: string) => a && a.trim().length > 0,
               );
 
@@ -349,14 +363,13 @@ JSON 형식으로만 응답:
               }
             }
 
-            // ✅ 업데이트 실행
             if (Object.keys(updateData).length > 0) {
               await supabaseService
                 .from("food_search_cache")
                 .update(updateData)
                 .eq("food_code", cachedData.food_code);
 
-              console.log("✅ DB 업데이트 완료:", {
+              debugLog("✅ DB 업데이트 완료:", {
                 원재료: updateData.raw_materials ? "보완됨" : "기존 유지",
                 알레르기: updateData.allergens
                   ? `${updateData.allergens.length}개 보완`
@@ -364,7 +377,7 @@ JSON 형식으로만 응답:
               });
             }
           } else {
-            console.log("⚠️ AI 보완 실패 - 신뢰도 낮거나 제품 미존재");
+            debugLog("⚠️ AI 보완 실패 - 신뢰도 낮거나 제품 미존재");
           }
         } catch (enrichError) {
           console.error("❌ AI 데이터 보완 실패:", enrichError);
@@ -373,7 +386,7 @@ JSON 형식으로만 응답:
       }
       // ✅✅ 추가: AI 제품 보완 후 Open API 스킵
       if (cachedData.data_source === "ai") {
-        console.log("🤖 AI 제품이므로 Open API 호출 스킵");
+        debugLog("🤖 AI 제품이므로 Open API 호출 스킵");
 
         // ✅ 사용자 알레르기와 매칭 (이 부분만 실행)
         detectedAllergens = allergyNames
@@ -396,19 +409,19 @@ JSON 형식으로만 응답:
           })
           .filter(Boolean);
 
-        console.log("📊 AI 제품 정보:");
-        console.log("  - 원재료:", ingredients.length, "개");
-        console.log("  - 알레르기:", allergyNames.length, "개");
-        console.log("  - 위험 알레르기:", detectedAllergens.length, "개");
+        debugLog("📊 AI 제품 정보:");
+        debugLog("  - 원재료:", ingredients.length, "개");
+        debugLog("  - 알레르기:", allergyNames.length, "개");
+        debugLog("  - 위험 알레르기:", detectedAllergens.length, "개");
       }
       // ✅✅ 추가: Open API 데이터 보완
       if (needsEnrichment && cachedData.data_source === "openapi") {
-        console.log("🔄 Open API 데이터 불완전, 재호출 시작...");
-        console.log(
+        debugLog("🔄 Open API 데이터 불완전, 재호출 시작...");
+        debugLog(
           `  - 원재료: ${cachedData.raw_materials ? "있음" : "없음"}`,
         );
-        console.log(`  - 알레르기: ${cachedData.allergens?.length || 0}개`);
-        console.log(
+        debugLog(`  - 알레르기: ${cachedData.allergens?.length || 0}개`);
+        debugLog(
           `  - 영양정보: ${cachedData.nutrition_details?.length || 0}개`,
         );
 
@@ -568,7 +581,7 @@ JSON 형식으로만 응답:
               .update(updateData)
               .eq("food_code", code);
 
-            console.log("✅ Open API 데이터 보완 완료:", {
+            debugLog("✅ Open API 데이터 보완 완료:", {
               원재료: updateData.raw_materials ? "보완됨" : "기존 유지",
               알레르기: updateData.allergens
                 ? `${updateData.allergens.length}개 보완`
@@ -603,10 +616,10 @@ JSON 형식으로만 응답:
         })
         .filter(Boolean);
 
-      console.log("📊 DB 캐시 정보:");
-      console.log("  - 원재료:", ingredients.length, "개");
-      console.log("  - 알레르기:", allergyNames.length, "개");
-      console.log("  - 위험 알레르기:", detectedAllergens.length, "개");
+      debugLog("📊 DB 캐시 정보:");
+      debugLog("  - 원재료:", ingredients.length, "개");
+      debugLog("  - 알레르기:", allergyNames.length, "개");
+      debugLog("  - 위험 알레르기:", detectedAllergens.length, "개");
     }
 
     // ==========================================
@@ -624,10 +637,10 @@ JSON 형식으로만 응답:
     //  AI 제품은 Open API 호출 스킵
     if (!cachedData || isIncomplete) {
       if (isIncomplete) {
-        console.log("🔄 DB 캐시 데이터 불완전, Open API로 보완");
+        debugLog("🔄 DB 캐시 데이터 불완전, Open API로 보완");
       } else {
         resolvedDataSource = "openapi";
-        console.log("❌ DB 캐시 없음, Open API 조회 진행");
+        debugLog("❌ DB 캐시 없음, Open API 조회 진행");
       }
 
       const serviceKey = process.env.FOOD_API_KEY;
@@ -641,7 +654,7 @@ JSON 형식으로만 응답:
       // ==========================================
       // Open API 병렬 호출 (Promise.allSettled)
       // ==========================================
-      console.log("🚀 5개 API 병렬 호출 시작...");
+      debugLog("🚀 5개 API 병렬 호출 시작...");
 
       const [
         productResult,
@@ -711,7 +724,7 @@ JSON 형식으로만 응답:
         })(),
       ]);
 
-      console.log("✅ 병렬 호출 완료");
+      debugLog("✅ 병렬 호출 완료");
 
       // ==========================================
       // 결과 추출 (성공한 것만)
@@ -728,16 +741,16 @@ JSON 형식으로만 응답:
         attentionResult.status === "fulfilled" ? attentionResult.value : null;
 
       // 각 결과 로깅
-      console.log("📊 API 결과:");
-      console.log(`  - 품목제조정보: ${productInfo ? "✅" : "❌"}`);
-      console.log(`  - 알레르기: ${allergyItems.length}개`);
-      console.log(`  - 원재료: ${rawMaterialItems.length}개`);
-      console.log(`  - 영양정보: ${nutritionItems.length}개`);
-      console.log(`  - 주의사항: ${attentionInfo ? "✅" : "❌"}`);
+      debugLog("📊 API 결과:");
+      debugLog(`  - 품목제조정보: ${productInfo ? "✅" : "❌"}`);
+      debugLog(`  - 알레르기: ${allergyItems.length}개`);
+      debugLog(`  - 원재료: ${rawMaterialItems.length}개`);
+      debugLog(`  - 영양정보: ${nutritionItems.length}개`);
+      debugLog(`  - 주의사항: ${attentionInfo ? "✅" : "❌"}`);
       // ==========================================
       // 영양정보 추출 (수정)
       // ==========================================
-      console.log("📊 영양정보 원본 개수:", nutritionItems.length);
+      debugLog("📊 영양정보 원본 개수:", nutritionItems.length);
 
       // 1회 제공량 정보
       const servingSizeItem = nutritionItems.find(
@@ -752,7 +765,7 @@ JSON 형식으로만 응답:
           `${servingSizeItem.CNTNT || ""}${servingSizeItem.UNIT || ""}`.trim();
       }
 
-      console.log("📊 1회 제공량:", servingSize);
+      debugLog("📊 1회 제공량:", servingSize);
 
       // 영양성분 목록 (필드명 수정)
       nutritionDetails = nutritionItems
@@ -778,9 +791,9 @@ JSON 형식으로만 응답:
         })
         .filter((item: any) => item && item.name && item.content);
 
-      console.log("📊 파싱된 영양정보:", nutritionDetails.length, "개");
+      debugLog("📊 파싱된 영양정보:", nutritionDetails.length, "개");
       if (nutritionDetails.length > 0) {
-        console.log("   샘플:", nutritionDetails.slice(0, 3));
+        debugLog("   샘플:", nutritionDetails.slice(0, 3));
       }
       // ==========================================
       // 데이터 확인
@@ -788,7 +801,7 @@ JSON 형식으로만 응답:
       const hasOpenApiData = !(allergyItems.length === 0 && !productInfo);
 
       if (!hasOpenApiData) {
-        console.log("⚠️ 식약처 결과 없음, OpenFoodFacts 조회 시도");
+        debugLog("⚠️ 식약처 결과 없음, OpenFoodFacts 조회 시도");
         const openFood = await fetchOpenFoodFactsByBarcode(code);
 
         if (!openFood) {
@@ -811,7 +824,7 @@ JSON 형식으로만 응답:
         nutrition = openFood.nutrition;
         resolvedDataSource = "openfood";
 
-        console.log("✅ OpenFoodFacts 대체 조회 성공:", productName);
+        debugLog("✅ OpenFoodFacts 대체 조회 성공:", productName);
       }
 
       if (hasOpenApiData) {
@@ -851,10 +864,10 @@ JSON 형식으로만 응답:
           ? parseRawMaterials(rawMaterialsText).slice(0, 30)
           : [];
 
-        console.log("📦 원재료 원본 길이:", rawMaterialsText.length);
-        console.log("📝 파싱된 원재료:", ingredients.length, "개");
+        debugLog("📦 원재료 원본 길이:", rawMaterialsText.length);
+        debugLog("📝 파싱된 원재료:", ingredients.length, "개");
         if (ingredients.length > 0) {
-          console.log("   샘플:", ingredients.slice(0, 3));
+          debugLog("   샘플:", ingredients.slice(0, 3));
         }
       }
 
@@ -971,7 +984,7 @@ JSON 형식으로만 응답:
     // Open API 데이터 → DB 캐시 저장
     // ==========================================
     if (!cachedData) {
-      console.log("💾 Open API 데이터를 DB에 저장 시작...");
+      debugLog("💾 Open API 데이터를 DB에 저장 시작...");
 
       try {
         const { error: saveError } = await supabaseService
@@ -997,11 +1010,11 @@ JSON 형식으로만 응답:
         if (saveError) {
           console.error("❌ DB 저장 실패:", saveError);
         } else {
-          console.log("✅ Open API 데이터 DB 저장 완료");
-          console.log("  - 제품명:", productName);
-          console.log("  - 원재료:", ingredients.length, "개");
-          console.log("  - 영양정보:", nutritionDetails.length, "개");
-          console.log("  - 1회제공량:", servingSize);
+          debugLog("✅ Open API 데이터 DB 저장 완료");
+          debugLog("  - 제품명:", productName);
+          debugLog("  - 원재료:", ingredients.length, "개");
+          debugLog("  - 영양정보:", nutritionDetails.length, "개");
+          debugLog("  - 1회제공량:", servingSize);
         }
       } catch (saveError) {
         console.error("❌ DB 저장 중 오류:", saveError);
@@ -1062,13 +1075,13 @@ JSON 형식으로만 응답:
       alternatives: alternatives,
     };
 
-    console.log("📋 최종 결과:");
-    console.log(`  - 제품명: ${productName}`);
-    console.log(`  - 데이터 소스: ${resolvedDataSource}`);
-    console.log(`  - 알레르기: ${allergyNames.join(", ")}`);
-    console.log(`  - 위험 알레르기: ${detectedAllergens.length}개`);
-    console.log(`  - 원재료: ${ingredients.length}개`);
-    console.log(`  - 대체품: ${alternatives.length}개`);
+    debugLog("📋 최종 결과:");
+    debugLog(`  - 제품명: ${productName}`);
+    debugLog(`  - 데이터 소스: ${resolvedDataSource}`);
+    debugLog(`  - 알레르기: ${allergyNames.join(", ")}`);
+    debugLog(`  - 위험 알레르기: ${detectedAllergens.length}개`);
+    debugLog(`  - 원재료: ${ingredients.length}개`);
+    debugLog(`  - 대체품: ${alternatives.length}개`);
 
     return NextResponse.json({
       success: true,
@@ -1082,6 +1095,11 @@ JSON 형식으로만 응답:
     );
   }
 }
+
+
+
+
+
 
 
 

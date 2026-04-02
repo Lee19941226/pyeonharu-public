@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -76,14 +77,17 @@ function isStrongNameMatch(expectedName: string, extractedName: string): boolean
 }
 
 function parseJsonObject(text: string): VerificationAiResult | null {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return null;
+  const parsed = parseJsonObjectSafe<Record<string, unknown>>(text);
+  if (!parsed) return null;
 
-  try {
-    return JSON.parse(match[0]) as VerificationAiResult;
-  } catch {
-    return null;
-  }
+  return {
+    found: Boolean(parsed.found),
+    documentType: String(parsed.documentType || "").trim(),
+    confidence: Number(parsed.confidence || 0),
+    hospitalName: String(parsed.hospitalName || "").trim(),
+    doctorName: String(parsed.doctorName || "").trim(),
+    reason: String(parsed.reason || "").trim(),
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -277,3 +281,4 @@ JSON으로만 응답:
     return NextResponse.json({ error: "인증 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
+

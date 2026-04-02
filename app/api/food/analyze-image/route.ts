@@ -1,15 +1,21 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getChosung } from "@/lib/utils/chosung";
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+const isDev = process.env.NODE_ENV === "development";
+const debugLog = (...args: unknown[]) => {
+  if (isDev) console.log(...args);
+};
 
 export async function GET() {
   try {
@@ -135,7 +141,7 @@ export async function POST(req: NextRequest) {
       ? userAllergens.filter((a: unknown) => typeof a === "string").slice(0, 50)
       : [];
 
-    console.log("🤖 AI 이미지 분석 시작...");
+    debugLog("🤖 AI 이미지 분석 시작...");
 
     // ==========================================
     // Step 1: OpenAI Vision으로 이미지 분석
@@ -320,7 +326,12 @@ export async function POST(req: NextRequest) {
         throw new Error("AI 응답이 비어있습니다");
       }
 
-      analysisData = JSON.parse(messageContent) as OpenAIVisionResponse;
+      const parsed = parseJsonObjectSafe<Record<string, unknown>>(messageContent);
+      if (!parsed) {
+        throw new Error("AI 응답 파싱 실패");
+      }
+
+      analysisData = parsed as unknown as OpenAIVisionResponse;
 
       // 기본값 설정
       const safeAnalysisData = {
@@ -337,11 +348,11 @@ export async function POST(req: NextRequest) {
       };
 
       if (safeAnalysisData.confidence < 50) {
-        console.log("⚠️ 낮은 신뢰도:", safeAnalysisData.confidence);
+        debugLog("⚠️ 낮은 신뢰도:", safeAnalysisData.confidence);
         safeAnalysisData.productName = "결과를 알 수 없음";
       }
 
-      console.log("✅ AI 최종 선택:", {
+      debugLog("✅ AI 최종 선택:", {
         name: safeAnalysisData.productName,
         confidence: safeAnalysisData.confidence,
         category: safeAnalysisData.category,
@@ -387,7 +398,7 @@ export async function POST(req: NextRequest) {
     const hasUserAllergen = matchedUserAllergens.length > 0;
 
     if (process.env.NODE_ENV === "development") {
-      console.log("✅ 매칭 결과:", {
+      debugLog("✅ 매칭 결과:", {
         detectedAllergens,
         matchedUserAllergens,
         hasUserAllergen,
@@ -400,7 +411,7 @@ export async function POST(req: NextRequest) {
     let dbProductData = null;
 
     if (analysisData.productName) {
-      console.log("🔍 DB 캐시 검색:", analysisData.productName);
+      debugLog("🔍 DB 캐시 검색:", analysisData.productName);
 
       try {
         const { data: cacheData } = await supabase
@@ -421,9 +432,9 @@ export async function POST(req: NextRequest) {
             weight: cacheData.weight || "",
             nutritionInfo: cacheData.nutrition_info || null,
           };
-          console.log("✅ DB 캐시에서 발견:", dbProductData.productName);
+          debugLog("✅ DB 캐시에서 발견:", dbProductData.productName);
         } else {
-          console.log("❌ DB 캐시에 없음, Open API 진행");
+          debugLog("❌ DB 캐시에 없음, Open API 진행");
         }
       } catch (dbError) {
         console.error("⚠️ DB 조회 오류:", dbError);
@@ -437,7 +448,7 @@ export async function POST(req: NextRequest) {
     let apiProductData = null;
 
     if (!dbProductData && analysisData.barcode) {
-      console.log("📊 바코드 발견, 식약처 API 조회:", analysisData.barcode);
+      debugLog("📊 바코드 발견, 식약처 API 조회:", analysisData.barcode);
 
       const serviceKey = process.env.FOOD_API_KEY || "";
       const baseUrl = "https://apis.data.go.kr/1471000/FoodQrInfoService01";
@@ -498,7 +509,7 @@ export async function POST(req: NextRequest) {
               protein: nutritionMap["단백질"] || "",
             };
 
-            console.log("✅ 영양정보 추출:", nutritionInfo);
+            debugLog("✅ 영양정보 추출:", nutritionInfo);
           }
 
           apiProductData = {
@@ -511,7 +522,7 @@ export async function POST(req: NextRequest) {
             nutritionInfo: nutritionInfo,
           };
 
-          console.log("✅ Open API 제품 발견:", apiProductData);
+          debugLog("✅ Open API 제품 발견:", apiProductData);
         }
       } catch (apiError) {
         console.error("❌ 식약처 API 조회 실패:", apiError);
@@ -540,7 +551,7 @@ export async function POST(req: NextRequest) {
         finalIngredients = rawMaterialsList;
       }
 
-      console.log("✅ DB 캐시 데이터 우선 적용");
+      debugLog("✅ DB 캐시 데이터 우선 적용");
       foodCode = dbProductData.barcode;
     }
     // 2순위: Open API
@@ -557,11 +568,11 @@ export async function POST(req: NextRequest) {
         finalIngredients = rawMaterialsList;
       }
 
-      console.log("✅ Open API 데이터 적용");
+      debugLog("✅ Open API 데이터 적용");
     }
     // 3순위: AI 분석 결과
     else {
-      console.log("✅ AI 분석 결과 사용");
+      debugLog("✅ AI 분석 결과 사용");
     }
 
     // 사용자 알레르기 재매칭
@@ -629,7 +640,7 @@ export async function POST(req: NextRequest) {
       if (saveError) {
         console.error("❌ DB 저장 실패:", saveError);
       } else {
-        console.log("✅ 분석 결과 DB 저장 완료:", foodCode);
+        debugLog("✅ 분석 결과 DB 저장 완료:", foodCode);
         dbSaveSuccess = true;
       }
     } catch (saveError) {
@@ -670,3 +681,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+

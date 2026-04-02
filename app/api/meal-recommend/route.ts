@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import OpenAI from "openai";
@@ -305,20 +305,11 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
       max_tokens: 2500,
     });
 
-    let result: any;
-    try {
-      const raw = (completion.choices[0]?.message?.content || "{}")
-        .replace(/```json\n?|```/g, "")
-        .trim();
-      result = JSON.parse(raw);
-    } catch {
-      result = {
-        mealType,
-        analysis: { calorieSituation: "", weeklyPattern: "", nutritionGap: "" },
-        recommendations: [],
-        nutritionTip: "추천을 생성하지 못했습니다.",
-      };
-    }
+        const raw = completion.choices[0]?.message?.content || "";
+    const parsed = parseJsonObjectSafe<Record<string, unknown>>(raw);
+    const result = parsed
+      ? normalizeMealRecommendResult(parsed, mealType)
+      : getFallbackMealRecommend(mealType);
 
     return NextResponse.json({
       success: true,
@@ -342,3 +333,5 @@ ${todayFoodNames.length > 0 ? todayFoodNames.join("\n") : "아직 없음"}
     );
   }
 }
+
+

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
@@ -13,6 +13,11 @@ const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+const isDev = process.env.NODE_ENV === "development";
+const debugLog = (...args: unknown[]) => {
+  if (isDev) console.log(...args);
+};
 
 interface ProductScore {
   foodCode: string;
@@ -119,7 +124,7 @@ export async function GET(req: NextRequest) {
     const userAgent = headersList.get("user-agent") || "unknown";
 
     if (process.env.NODE_ENV === "development") {
-      console.log("[dev] IP:", ipAddress, "UA:", userAgent);
+      debugLog("[dev] IP:", ipAddress, "UA:", userAgent);
     }
 
     // ==========================================
@@ -329,7 +334,7 @@ export async function GET(req: NextRequest) {
           searchUrl.searchParams.append("type", "json");
           searchUrl.searchParams.append("prdct_nm", query);
 
-          console.log("🔗 푸드QR API 호출:", searchUrl.toString());
+          debugLog("🔗 푸드QR API 호출:", searchUrl.toString());
 
           const searchData = await fetchWithTimeout(searchUrl.toString(), {
             cache: "no-store",
@@ -345,7 +350,7 @@ export async function GET(req: NextRequest) {
               : [searchData.body.items.item];
           }
 
-          console.log(`📡 푸드QR: ${productItems.length}개 발견`);
+          debugLog(`📡 푸드QR: ${productItems.length}개 발견`);
 
           if (productItems.length === 0) return [];
 
@@ -428,8 +433,8 @@ export async function GET(req: NextRequest) {
 
           const offUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodedQuery}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,ingredients_text,allergens_tags,code,brands`;
 
-          console.log("🌍 Open Food Facts 검색:", query);
-          console.log("🔗 URL:", offUrl);
+          debugLog("🌍 Open Food Facts 검색:", query);
+          debugLog("🔗 URL:", offUrl);
 
           const offData = await fetchWithTimeout(offUrl, {
             cache: "no-store",
@@ -440,11 +445,11 @@ export async function GET(req: NextRequest) {
 
           const products = offData?.products || [];
 
-          console.log(`🌍 Open Food Facts: ${products.length}개 발견`);
+          debugLog(`🌍 Open Food Facts: ${products.length}개 발견`);
 
           if (products.length === 0) return [];
 
-          console.log(
+          debugLog(
             "🔍 첫 번째 제품 구조:",
             JSON.stringify(products[0], null, 2),
           );
@@ -468,7 +473,7 @@ export async function GET(req: NextRequest) {
               }
 
               try {
-                console.log(
+                debugLog(
                   `🤖 [${index}] AI 번역 시작: ${product.product_name}`,
                 );
 
@@ -515,7 +520,7 @@ export async function GET(req: NextRequest) {
                 const ingredientsKr =
                   parsed.ingredientsKr || product.ingredients_text;
 
-                console.log(`✅ [${index}] 번역 완료: ${productNameKr}`);
+                debugLog(`✅ [${index}] 번역 완료: ${productNameKr}`);
 
                 return {
                   FOOD_CD: product.code || `off-${Date.now()}-${Math.random()}`,
@@ -540,7 +545,7 @@ export async function GET(req: NextRequest) {
           const results = await Promise.all(aiPromises);
           const validResults = results.filter(Boolean);
 
-          console.log(
+          debugLog(
             `✅ Open Food Facts 번역/분석 완료: ${validResults.length}개`,
           );
 
@@ -560,7 +565,7 @@ export async function GET(req: NextRequest) {
       dbItems.length + openApiItems.length + openFoodItems.length;
 
     if (totalResults === 0 && query.length >= 1) {
-      console.log("🤖 결과 부족, AI 호출 시작...");
+      debugLog("🤖 결과 부족, AI 호출 시작...");
       try {
         const aiResponse = await openai.chat.completions.create({
           model: "gpt-4o-mini",
@@ -636,16 +641,16 @@ JSON 배열 형식으로만 반환:
 
           return true;
         });
-        console.log(`✅ AI 결과: ${aiItems.length}개 추가`);
+        debugLog(`✅ AI 결과: ${aiItems.length}개 추가`);
       } catch (e) {
         console.error("❌ AI 분석 실패:", e);
         aiItems = [];
       }
     } else {
-      console.log("✅ 충분한 결과 있음 (AI 호출 스킵)");
+      debugLog("✅ 충분한 결과 있음 (AI 호출 스킵)");
     }
 
-    console.log(
+    debugLog(
       `📊 최종 검색 결과 - DB: ${dbItems.length}, 푸드QR: ${openApiItems.length}, OpenFood: ${openFoodItems.length}, AI: ${aiItems.length}`,
     );
 
@@ -823,7 +828,7 @@ JSON 배열 형식으로만 반환:
       }
     });
 
-    console.log(
+    debugLog(
       `✅ 중복 제거 완료: ${allResults.length}개 → ${deduped.length}개`,
     );
 
@@ -834,7 +839,7 @@ JSON 배열 형식으로만 반환:
       ["openapi", "ai", "openfood"].includes(r.dataSource),
     );
     if (toCache.length > 0) {
-      console.log(`💾 검색 결과 ${toCache.length}개 DB 캐시 저장 시작...`);
+      debugLog(`💾 검색 결과 ${toCache.length}개 DB 캐시 저장 시작...`);
 
       supabaseService
         .from("food_search_cache")
@@ -866,7 +871,7 @@ JSON 배열 형식으로만 반환:
           if (error) {
             console.error("❌ DB 캐시 저장 실패:", error);
           } else {
-            console.log("✅ DB 캐시 저장 완료");
+            debugLog("✅ DB 캐시 저장 완료");
           }
         });
     }
@@ -935,3 +940,5 @@ JSON 배열 형식으로만 반환:
     );
   }
 }
+
+

@@ -1,6 +1,7 @@
 ﻿import medicineImageOverridesJson from "@/data/medicine-image-overrides.json";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 interface MedicineItem {
   entpName: string;
@@ -156,15 +157,10 @@ export async function GET(req: NextRequest) {
 
     const url = `https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?serviceKey=${serviceKey}&itemName=${encodeURIComponent(itemName)}&pageNo=${pageNo}&numOfRows=${numOfRows}&type=json`;
 
-    console.log(
-      "[Medicine API] 요청 URL:",
-      url.replace(serviceKey, "KEY_HIDDEN"),
-    );
 
     const response = await fetch(url);
     const text = await response.text();
 
-    console.log("[Medicine API] 응답 상태:", response.status);
 
     if (!response.ok) {
       console.error(
@@ -178,11 +174,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      console.error("JSON 파싱 실패:", text.substring(0, 500));
+    const data = parseJsonObjectSafe<Record<string, any>>(text);
+    if (!data) {
       return NextResponse.json(
         { error: "API 응답 파싱 실패" },
         { status: 502 },
@@ -248,3 +241,5 @@ function cleanHtml(text: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+
