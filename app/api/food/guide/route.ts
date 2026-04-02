@@ -13,13 +13,13 @@ const openai = new OpenAI({
 });
 
 export async function GET(req: NextRequest) {
-  console.log("🚀 가이드 API 호출됨");
+  console.log("🚀 가이드 API 호출");
 
   try {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get("code") || "";
 
-    console.log("📦 받은 코드:", code);
+    console.log("📦 가이드 대상 코드 수신");
 
     // ==========================================
     // ✅ 쿠키를 포함해서 result API 호출
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     );
     const resultData = await resultResponse.json();
 
-    console.log("📋 Result 데이터:", resultData);
+    // 민감 데이터 로깅 방지: 전체 resultData 출력 금지
 
     // ==========================================
     // ✅ 조건 수정: detectedAllergens가 있는지 직접 확인
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     const severity =
       resultData.result.detectedAllergens[0]?.severity || "medium";
 
-    console.log(`✅ 알레르기 감지: ${allergen} (심각도: ${severity})`);
+    console.log("✅ 알레르기 감지");
 
     // ==========================================
     // 캐시 확인
@@ -133,7 +133,7 @@ JSON 형식으로만 반환하세요. 다른 설명 없이:
     });
 
     const content = response.choices[0].message.content || "{}";
-    console.log("🤖 OpenAI 응답:", content.substring(0, 200));
+    console.log("🤖 가이드 생성 응답 수신");
 
     // ✅ JSON 파싱 개선
     let guide;

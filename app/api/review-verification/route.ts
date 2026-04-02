@@ -1,10 +1,91 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkApiRateLimit } from "@/lib/utils/api-rate-limit";
 
-// POST /api/review-verification
-// 진료비 영수증 또는 진료 확인서 이미지를 AI로 분석하여
-// 병원명/의사명 매칭 여부를 확인하고, 이미지를 저장한다.
+const supabaseService = createServiceClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
+
+type VerifyType = "hospital" | "doctor";
+
+interface VerificationAiResult {
+  found: boolean;
+  documentType?: string;
+  confidence?: number;
+  hospitalName?: string;
+  doctorName?: string;
+  reason?: string;
+}
+
+function normalizeName(s: string): string {
+  return s
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .replace(/의원|병원|클리닉|센터|원장|전문의/g, "");
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      );
+    }
+  }
+
+  return dp[m][n];
+}
+
+function similarity(a: string, b: string): number {
+  const aa = normalizeName(a);
+  const bb = normalizeName(b);
+  if (!aa || !bb) return 0;
+  const dist = levenshtein(aa, bb);
+  return 1 - dist / Math.max(aa.length, bb.length);
+}
+
+function isStrongNameMatch(expectedName: string, extractedName: string): boolean {
+  const expected = normalizeName(expectedName);
+  const extracted = normalizeName(extractedName);
+
+  if (!expected || !extracted) return false;
+  if (extracted.length < 2) return false;
+  if (expected === extracted) return true;
+
+  const includeMatch =
+    (expected.includes(extracted) || extracted.includes(expected)) &&
+    Math.min(expected.length, extracted.length) >= 3;
+
+  if (includeMatch) return true;
+
+  return similarity(expectedName, extractedName) >= 0.8;
+}
+
+function parseJsonObject(text: string): VerificationAiResult | null {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+
+  try {
+    return JSON.parse(match[0]) as VerificationAiResult;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const {
@@ -12,16 +93,15 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json(
-      { error: "로그인이 필요합니다." },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
   const formData = await req.formData();
   const image = formData.get("image") as File | null;
-  const type = formData.get("type") as string; // "hospital" | "doctor"
-  const expectedName = formData.get("expectedName") as string; // 병원명 또는 의사명
+  const type = formData.get("type") as VerifyType | null;
+  const expectedNameRaw = formData.get("expectedName") as string | null;
+
+  const expectedName = String(expectedNameRaw || "").trim();
 
   if (!image || !type || !expectedName) {
     return NextResponse.json(
@@ -30,22 +110,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (image.size > 3 * 1024 * 1024) {
+  if (type !== "hospital" && type !== "doctor") {
+    return NextResponse.json({ error: "유효하지 않은 인증 타입입니다." }, { status: 400 });
+  }
+
+  if (expectedName.length < 2 || expectedName.length > 60) {
     return NextResponse.json(
-      { error: "이미지 크기는 3MB 이하만 가능합니다." },
+      { error: "대상 이름은 2~60자 사이로 입력해주세요." },
       { status: 400 },
     );
+  }
+
+  if (image.size > 3 * 1024 * 1024) {
+    return NextResponse.json({ error: "이미지 크기는 3MB 이하만 가능합니다." }, { status: 400 });
   }
 
   const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
   if (!ALLOWED_TYPES.includes(image.type)) {
-    return NextResponse.json(
-      { error: "JPG, PNG, WEBP 형식만 가능합니다." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "JPG, PNG, WEBP 형식만 가능합니다." }, { status: 400 });
   }
 
-  // 매직 넘버 검증
   const bytes = await image.arrayBuffer();
   const buf = new Uint8Array(bytes);
   const isJpeg = buf[0] === 0xff && buf[1] === 0xd8;
@@ -54,19 +138,16 @@ export async function POST(req: NextRequest) {
     buf[0] === 0x52 && buf[1] === 0x49 && buf[8] === 0x57 && buf[9] === 0x45;
 
   if (!isJpeg && !isPng && !isWebp) {
-    return NextResponse.json(
-      { error: "유효하지 않은 이미지 파일입니다." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "유효하지 않은 이미지 파일입니다." }, { status: 400 });
   }
 
-  // Rate limit 체크 (OpenAI 호출 직전)
   const rateResult = await checkApiRateLimit({
     prefix: "review",
     userId: user.id,
     dailyLimitLogin: 5,
     dailyLimitAnon: 0,
   });
+
   if (!rateResult.allowed) {
     return NextResponse.json(
       { error: "일일 인증 한도(5회)를 초과했습니다. 내일 다시 시도해주세요." },
@@ -74,13 +155,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 1. OpenAI Vision API로 이미지 분석
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
-    return NextResponse.json(
-      { error: "AI 서비스를 사용할 수 없습니다." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "AI 서비스를 사용할 수 없습니다." }, { status: 500 });
   }
 
   const base64 = Buffer.from(bytes).toString("base64");
@@ -88,18 +165,16 @@ export async function POST(req: NextRequest) {
 
   const prompt =
     type === "hospital"
-      ? `이 이미지는 진료비 영수증 또는 진료비 계산서입니다.
-이미지에서 병원 이름(의료기관명)을 정확히 추출해주세요.
-다음 JSON 형식으로만 응답하세요:
-{"found": true, "hospitalName": "추출된 병원명"}
-병원명을 찾을 수 없거나 진료비 영수증이 아닌 경우:
-{"found": false, "reason": "사유"}`
-      : `이 이미지는 진료 확인서 또는 진단서입니다.
-이미지에서 담당 의사 이름과 병원 이름을 정확히 추출해주세요.
-다음 JSON 형식으로만 응답하세요:
-{"found": true, "doctorName": "추출된 의사명", "hospitalName": "추출된 병원명"}
-의사명을 찾을 수 없거나 진료 확인서가 아닌 경우:
-{"found": false, "reason": "사유"}`;
+      ? `이 이미지는 진료비 영수증/계산서입니다. 병원 이름을 추출하세요.
+JSON으로만 응답:
+{"found":true,"documentType":"receipt","confidence":0~100,"hospitalName":"...","reason":"..."}
+찾지 못하면:
+{"found":false,"documentType":"unknown","confidence":0~100,"reason":"..."}`
+      : `이 이미지는 진료 확인서/진단서입니다. 담당 의사명과 병원명을 추출하세요.
+JSON으로만 응답:
+{"found":true,"documentType":"certificate","confidence":0~100,"doctorName":"...","hospitalName":"...","reason":"..."}
+찾지 못하면:
+{"found":false,"documentType":"unknown","confidence":0~100,"reason":"..."}`;
 
   try {
     const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -119,75 +194,53 @@ export async function POST(req: NextRequest) {
             ],
           },
         ],
-        max_tokens: 200,
+        max_tokens: 250,
         temperature: 0,
       }),
     });
 
     if (!aiRes.ok) {
       console.error("[review-verification] OpenAI error:", aiRes.status);
-      return NextResponse.json(
-        { error: "AI 분석에 실패했습니다." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "AI 분석에 실패했습니다." }, { status: 500 });
     }
 
     const aiData = await aiRes.json();
     const content = aiData.choices?.[0]?.message?.content || "";
+    const parsed = parseJsonObject(content);
 
-    // JSON 파싱
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({
-        verified: false,
-        reason: "이미지에서 정보를 추출할 수 없습니다.",
-      });
+    if (!parsed) {
+      return NextResponse.json(
+        { verified: false, reason: "이미지에서 정보를 추출할 수 없습니다." },
+        { status: 200 },
+      );
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    if (!parsed.found) {
-      return NextResponse.json({
-        verified: false,
-        reason:
-          parsed.reason ||
-          (type === "hospital"
-            ? "진료비 영수증이 아니거나 병원명을 확인할 수 없습니다."
-            : "진료 확인서가 아니거나 의사명을 확인할 수 없습니다."),
-      });
+    const confidence = Number(parsed.confidence || 0);
+    if (!parsed.found || !Number.isFinite(confidence) || confidence < 70) {
+      return NextResponse.json(
+        {
+          verified: false,
+          reason:
+            parsed.reason ||
+            "문서 인식 신뢰도가 낮아 인증할 수 없습니다. 더 선명한 이미지를 업로드해주세요.",
+        },
+        { status: 200 },
+      );
     }
 
-    // 이름 매칭 확인 (부분 매칭 허용)
-    const normalize = (s: string) =>
-      s.replace(/\s+/g, "").toLowerCase().replace(/의원|병원|클리닉|센터/g, "");
+    const extractedName =
+      type === "hospital" ? String(parsed.hospitalName || "") : String(parsed.doctorName || "");
 
-    let matched = false;
-    if (type === "hospital") {
-      const extracted = normalize(parsed.hospitalName || "");
-      const expected = normalize(expectedName);
-      matched =
-        extracted.includes(expected) ||
-        expected.includes(extracted) ||
-        extracted === expected;
-    } else {
-      const extractedDoctor = normalize(parsed.doctorName || "");
-      const expectedDoctor = normalize(expectedName);
-      matched =
-        extractedDoctor.includes(expectedDoctor) ||
-        expectedDoctor.includes(extractedDoctor) ||
-        extractedDoctor === expectedDoctor;
+    if (!isStrongNameMatch(expectedName, extractedName)) {
+      return NextResponse.json(
+        {
+          verified: false,
+          reason: `문서에서 확인된 ${type === "hospital" ? "병원" : "의사"}명은 "${extractedName || "확인 불가"}"이며, 선택한 "${expectedName}"과 일치하지 않습니다.`,
+        },
+        { status: 200 },
+      );
     }
 
-    if (!matched) {
-      const extractedLabel =
-        type === "hospital" ? parsed.hospitalName : parsed.doctorName;
-      return NextResponse.json({
-        verified: false,
-        reason: `문서에서 확인된 ${type === "hospital" ? "병원" : "의사"}명은 "${extractedLabel}"이며, 선택한 "${expectedName}"과 일치하지 않습니다.`,
-      });
-    }
-
-    // 2. 이미지 저장
     const ext = isJpeg ? "jpg" : isPng ? "png" : "webp";
     const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
@@ -198,29 +251,29 @@ export async function POST(req: NextRequest) {
         upsert: false,
       });
 
-    if (uploadError) {
+    if (uploadError || !uploadData?.path) {
       console.error("[review-verification] Upload error:", uploadError);
-      return NextResponse.json(
-        { error: "이미지 저장에 실패했습니다." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "이미지 저장에 실패했습니다." }, { status: 500 });
     }
 
-    const { data: urlData } = supabase.storage
+    // 민감 이미지 노출 방지를 위해 Public URL 대신 짧은 만료 서명 URL 반환
+    const { data: signedData, error: signedError } = await supabaseService.storage
       .from("review-verifications")
-      .getPublicUrl(uploadData.path);
+      .createSignedUrl(uploadData.path, 60 * 10);
+
+    if (signedError || !signedData?.signedUrl) {
+      console.error("[review-verification] Signed URL error:", signedError);
+      return NextResponse.json({ error: "이미지 URL 생성에 실패했습니다." }, { status: 500 });
+    }
 
     return NextResponse.json({
       verified: true,
-      imageUrl: urlData.publicUrl,
-      extractedName:
-        type === "hospital" ? parsed.hospitalName : parsed.doctorName,
+      imageUrl: signedData.signedUrl,
+      extractedName,
+      confidence,
     });
   } catch (err) {
     console.error("[review-verification] Error:", err);
-    return NextResponse.json(
-      { error: "인증 처리 중 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "인증 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

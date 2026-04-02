@@ -4,6 +4,35 @@ import { verifyAdmin } from "@/lib/utils/admin-auth";
 // 서버 인스턴스 수준 캐시 (재배포 전까지 유지)
 const regionCache = new Map<string, string>();
 
+async function lookupRegionByIp(ip: string): Promise<string> {
+  const endpoint = `https://ipwho.is/${encodeURIComponent(ip)}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    if (!res.ok) return "-";
+    const data = await res.json();
+    if (!data?.success) return "-";
+
+    const region = [data.city, data.region, data.country]
+      .filter(Boolean)
+      .join(", ");
+
+    return region || "-";
+  } catch {
+    return "-";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const auth = await verifyAdmin();
@@ -20,7 +49,12 @@ export async function POST(req: NextRequest) {
     for (const ip of ips) {
       if (regionCache.has(ip)) {
         result[ip] = regionCache.get(ip)!;
-      } else if (ip === "unknown" || ip === "127.0.0.1" || ip.startsWith("192.168.") || ip.startsWith("10.")) {
+      } else if (
+        ip === "unknown" ||
+        ip === "127.0.0.1" ||
+        ip.startsWith("192.168.") ||
+        ip.startsWith("10.")
+      ) {
         result[ip] = "로컬";
         regionCache.set(ip, "로컬");
       } else {
@@ -28,37 +62,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ip-api.com 배치 조회 (최대 100개, 무료)
+    // HTTPS 기반 개별 조회 (최대 50개)
     if (uncachedIps.length > 0) {
       try {
-        const batch = uncachedIps.slice(0, 100);
-        const res = await fetch(
-          "http://ip-api.com/batch?fields=query,country,regionName,city,status",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(batch),
-          },
+        const targets = uncachedIps.slice(0, 50);
+        const resolved = await Promise.all(
+          targets.map(async (ip) => ({ ip, region: await lookupRegionByIp(ip) })),
         );
 
-        if (res.ok) {
-          const data = await res.json();
-          for (const item of data) {
-            if (item.status === "success") {
-              const region = [item.city, item.regionName, item.country]
-                .filter(Boolean)
-                .join(", ");
-              regionCache.set(item.query, region);
-              result[item.query] = region;
-            } else {
-              regionCache.set(item.query, "-");
-              result[item.query] = "-";
-            }
-          }
+        for (const item of resolved) {
+          regionCache.set(item.ip, item.region);
+          result[item.ip] = item.region;
+        }
+
+        // 조회 상한 초과분은 미확인 처리
+        for (const ip of uncachedIps.slice(50)) {
+          regionCache.set(ip, "-");
+          result[ip] = "-";
         }
       } catch (e) {
-        console.error("[ip-region] Batch lookup failed:", e);
-        // 실패 시 조회 불가 표시
+        console.error("[ip-region] Region lookup failed:", e);
         for (const ip of uncachedIps) {
           if (!result[ip]) result[ip] = "-";
         }
