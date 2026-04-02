@@ -1,9 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { parseJsonObjectSafe, redactSensitiveText } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal, sanitizeAiUserInput } from "@/lib/utils/ai-guardrails";
+import {
+  aiInvalidInputResponse,
+  aiResultUnavailableResponse,
+  aiServiceErrorResponse,
+  logAiSecurityEvent,
+} from "@/lib/utils/ai-api-guard";
+import { clampInt, clampText, ZShortText, ZStringList } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
+const symptomAnalyzeSchema = z.object({
+  suspectedDisease: ZShortText(80),
+  department: ZShortText(40),
+  confidence: z.number().int().min(50).max(95),
+  healthAdvice: ZStringList(6, 120),
+  dietaryAdvice: z
+    .array(
+      z.object({
+        item: ZShortText(40),
+        emoji: ZShortText(8),
+        reason: ZShortText(120),
+      }),
+    )
+    .max(8)
+    .default([]),
+  avoidFoods: ZStringList(10, 40),
+  visitTip: ZShortText(120),
+  emergencyLevel: z.enum(["normal", "urgent", "emergency"]),
+  possibleDepartments: ZStringList(6, 40),
+});
 
 // 잔여 횟수 조회
 export async function GET() {
@@ -63,7 +92,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "증상은 500자 이하로 입력해주세요." }, { status: 400 });
     }
 
-    const redactedSymptom = redactSensitiveText(symptom.trim());
+    if (hasPromptInjectionSignal(symptom)) {
+      await logAiSecurityEvent({
+        route: "/api/symptom-analyze",
+        reason: "prompt_injection_pattern",
+        userId: user?.id ?? null,
+        sample: symptom,
+      });
+      return aiInvalidInputResponse();
+    }
+
+    const redactedSymptom = sanitizeAiUserInput(redactSensitiveText(symptom.trim()), 500);
 
     const today = new Date().toISOString().split("T")[0];
     let identifier: string;
@@ -112,8 +151,8 @@ export async function POST(req: NextRequest) {
 
     await supabase.from("symptom_rate_limits").insert({ identifier });
 
-    const systemPrompt = `당신은 한국의 의료 안내 AI 어시스턴트 "편하루 AI"입니다.
-사용자가 입력한 증상을 분석하여 의심 질환과 적합한 진료과를 추천하고, 건강 조언을 제공해주세요.
+    const systemPrompt = aiGuardSystemPrompt(`당신은 한국의 의료 안내 AI 어시스턴트 "편하루 AI"입니다.
+사용자가 입력한 증상을 분석하여 의심 질환과 적합한 진료과를 추천하고, 건강 조언을 제공합니다.
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
 {
@@ -126,7 +165,7 @@ export async function POST(req: NextRequest) {
   "visitTip": "방문 팁",
   "emergencyLevel": "normal 또는 urgent 또는 emergency",
   "possibleDepartments": ["대안 진료과1"]
-}`;
+}`);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -146,24 +185,61 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 502 });
+      return aiResultUnavailableResponse();
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      return NextResponse.json({ error: "AI 응답을 받지 못했습니다." }, { status: 502 });
+      return aiResultUnavailableResponse();
     }
 
     const parsed = parseJsonObjectSafe<Record<string, unknown>>(content);
     if (!parsed) {
-      return NextResponse.json({ error: "AI 응답 파싱에 실패했습니다." }, { status: 502 });
+      return aiResultUnavailableResponse();
     }
 
-    return NextResponse.json(parsed);
+    const normalized = {
+      suspectedDisease: clampText(parsed.suspectedDisease, 80),
+      department: clampText(parsed.department, 40),
+      confidence: clampInt(parsed.confidence, { min: 50, max: 95, fallback: 70 }),
+      healthAdvice: Array.isArray(parsed.healthAdvice)
+        ? parsed.healthAdvice.map((v) => clampText(v, 120)).filter(Boolean).slice(0, 6)
+        : [],
+      dietaryAdvice: Array.isArray(parsed.dietaryAdvice)
+        ? parsed.dietaryAdvice
+            .map((v) => {
+              const row = (v || {}) as Record<string, unknown>;
+              return {
+                item: clampText(row.item, 40),
+                emoji: clampText(row.emoji, 8, "🍽️"),
+                reason: clampText(row.reason, 120),
+              };
+            })
+            .filter((v) => v.item)
+            .slice(0, 8)
+        : [],
+      avoidFoods: Array.isArray(parsed.avoidFoods)
+        ? parsed.avoidFoods.map((v) => clampText(v, 40)).filter(Boolean).slice(0, 10)
+        : [],
+      visitTip: clampText(parsed.visitTip, 120),
+      emergencyLevel: ["normal", "urgent", "emergency"].includes(String(parsed.emergencyLevel))
+        ? String(parsed.emergencyLevel)
+        : "normal",
+      possibleDepartments: Array.isArray(parsed.possibleDepartments)
+        ? parsed.possibleDepartments.map((v) => clampText(v, 40)).filter(Boolean).slice(0, 6)
+        : [],
+    };
+
+    const validated = symptomAnalyzeSchema.safeParse(normalized);
+    if (!validated.success) {
+      return aiResultUnavailableResponse();
+    }
+
+    return NextResponse.json(validated.data);
   } catch (error) {
     console.error("Symptom analyze error:", error);
-    return NextResponse.json({ error: "분석 중 오류가 발생했습니다." }, { status: 500 });
+    return aiServiceErrorResponse();
   }
 }

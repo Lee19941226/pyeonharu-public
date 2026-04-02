@@ -6,6 +6,10 @@ import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
+import { aiGuardSystemPrompt, hasPromptInjectionSignal } from "@/lib/utils/ai-guardrails";
+import { aiInvalidInputResponse, aiResultUnavailableResponse, aiServiceErrorResponse, logAiSecurityEvent } from "@/lib/utils/ai-api-guard";
+import { clampFloat, clampText, ZShortText, ZStringList } from "@/lib/utils/ai-output-guard";
+import { z } from "zod";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -119,6 +123,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { imageBase64, userAllergens } = body;
 
+    if (hasPromptInjectionSignal(String((userAllergens || []).join(" ")))) {
+      await logAiSecurityEvent({
+        route: "/api/food/analyze-image",
+        reason: "prompt_injection_pattern",
+        userId: user.id,
+        sample: String((userAllergens || []).join(" ")),
+      });
+      return aiInvalidInputResponse();
+    }
+
     // ─── 입력 검증 ───
     if (!imageBase64 || typeof imageBase64 !== "string") {
       return NextResponse.json(
@@ -166,6 +180,28 @@ export async function POST(req: NextRequest) {
       } | null;
       identificationReason: string;
     }
+const nutritionSchema = z.object({
+  servingSize: ZShortText(30).optional().default(""),
+  calories: ZShortText(30).optional().default(""),
+  sodium: ZShortText(30).optional().default(""),
+  carbs: ZShortText(30).optional().default(""),
+  sugars: ZShortText(30).optional().default(""),
+  fat: ZShortText(30).optional().default(""),
+  protein: ZShortText(30).optional().default(""),
+});
+
+const openAIVisionSchema = z.object({
+  productName: ZShortText(120),
+  manufacturer: ZShortText(80).default(""),
+  barcode: ZShortText(40).default(""),
+  confidence: z.number().min(0).max(100),
+  category: z.enum(["포장식품", "조리음식", "식재료"]),
+  ingredients: ZStringList(40, 40),
+  allergens: ZStringList(22, 30),
+  weight: ZShortText(30).default(""),
+  nutritionInfo: nutritionSchema.nullable().default(null),
+  identificationReason: ZShortText(200).default(""),
+});
 
     // ✅ 타입 변경
     let analysisData: OpenAIVisionResponse;
@@ -173,6 +209,10 @@ export async function POST(req: NextRequest) {
       const visionResponse = await openai.chat.completions.create({
         model: "gpt-4o-2024-08-06",
         messages: [
+          {
+            role: "system",
+            content: aiGuardSystemPrompt("식품 이미지 판별만 수행하고 JSON 객체만 반환하세요."),
+          },
           {
             role: "user",
             content: [
@@ -319,38 +359,41 @@ export async function POST(req: NextRequest) {
         temperature: 0.2,
       });
 
-      // 이제 파싱 불필요! 바로 사용
-      const messageContent = visionResponse.choices[0]?.message?.content;
+            const messageContent = visionResponse.choices[0]?.message?.content;
 
       if (!messageContent) {
-        throw new Error("AI 응답이 비어있습니다");
+        return aiResultUnavailableResponse();
       }
 
       const parsed = parseJsonObjectSafe<Record<string, unknown>>(messageContent);
       if (!parsed) {
-        throw new Error("AI 응답 파싱 실패");
+        return aiResultUnavailableResponse();
       }
 
-      analysisData = parsed as unknown as OpenAIVisionResponse;
+      const validated = openAIVisionSchema.safeParse(parsed);
+      if (!validated.success) {
+        return aiResultUnavailableResponse();
+      }
 
-      // 기본값 설정
-      const safeAnalysisData = {
-        productName: analysisData.productName || "결과를 알 수 없음",
-        manufacturer: analysisData.manufacturer || "",
-        barcode: analysisData.barcode || "",
-        confidence: analysisData.confidence ?? 0,
-        category: analysisData.category || "식재료",
-        ingredients: analysisData.ingredients || [],
-        allergens: analysisData.allergens || [],
-        weight: analysisData.weight || "",
-        nutritionInfo: analysisData.nutritionInfo || null,
-        identificationReason: analysisData.identificationReason || "",
+      const safeAnalysisData: OpenAIVisionResponse = {
+        productName: clampText(validated.data.productName, 120, "결과를 알 수 없음"),
+        manufacturer: clampText(validated.data.manufacturer, 80),
+        barcode: clampText(validated.data.barcode, 40),
+        confidence: clampFloat(validated.data.confidence, { min: 0, max: 100, fallback: 0 }),
+        category: validated.data.category,
+        ingredients: validated.data.ingredients,
+        allergens: validated.data.allergens,
+        weight: clampText(validated.data.weight, 30),
+        nutritionInfo: validated.data.nutritionInfo,
+        identificationReason: clampText(validated.data.identificationReason, 200),
       };
 
       if (safeAnalysisData.confidence < 50) {
         debugLog("⚠️ 낮은 신뢰도:", safeAnalysisData.confidence);
         safeAnalysisData.productName = "결과를 알 수 없음";
       }
+
+      analysisData = safeAnalysisData;
 
       debugLog("✅ AI 최종 선택:", {
         name: safeAnalysisData.productName,
@@ -368,10 +411,7 @@ export async function POST(req: NextRequest) {
         .then(() => {});
     } catch (aiError) {
       console.error("❌ AI 분석 실패:", aiError);
-      return NextResponse.json(
-        { error: "AI 이미지 분석에 실패했습니다. 다시 시도해주세요." },
-        { status: 500 },
-      );
+      return aiServiceErrorResponse();
     }
 
     // ==========================================
@@ -675,11 +715,15 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("💥 전체 분석 에러:", error);
-    return NextResponse.json(
-      { error: "이미지 분석 중 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    return aiServiceErrorResponse();
   }
 }
+
+
+
+
+
+
+
 
 
