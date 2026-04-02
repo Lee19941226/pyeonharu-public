@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -11,12 +12,29 @@ function detectImageMime(buf: Uint8Array): string | null {
   // PNG: 89 50 4E 47
   if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
   // WebP: RIFF....WEBP
-  if (buf.length > 11 &&
-      buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
-      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return "image/webp";
+  if (
+    buf.length > 11 &&
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50
+  ) {
+    return "image/webp";
+  }
   // HEIC/HEIF: ISO Base Media File (ftyp box at offset 4)
-  if (buf.length > 11 &&
-      buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return "image/heic";
+  if (
+    buf.length > 11 &&
+    buf[4] === 0x66 &&
+    buf[5] === 0x74 &&
+    buf[6] === 0x79 &&
+    buf[7] === 0x70
+  ) {
+    return "image/heic";
+  }
   return null;
 }
 
@@ -28,6 +46,39 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/heif": "heif",
 };
 
+interface DietAnalyzeResult {
+  food_name: string;
+  estimated_cal: number;
+  confidence: number;
+  emoji: string;
+}
+
+function normalizeDietAnalyzeResult(
+  parsed: Record<string, unknown>,
+): DietAnalyzeResult | null {
+  const foodName = String(parsed.food_name || "").trim();
+  if (!foodName) return null;
+
+  const estimatedCalRaw = Number(parsed.estimated_cal);
+  const estimatedCal = Number.isFinite(estimatedCalRaw)
+    ? Math.max(0, Math.min(5000, Math.round(estimatedCalRaw)))
+    : 0;
+
+  const confidenceRaw = Number(parsed.confidence);
+  const confidence = Number.isFinite(confidenceRaw)
+    ? Math.max(0, Math.min(1, confidenceRaw))
+    : 0.5;
+
+  const emoji = String(parsed.emoji || "").trim() || "🍽️";
+
+  return {
+    food_name: foodName,
+    estimated_cal: estimatedCal,
+    confidence,
+    emoji,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -36,10 +87,7 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
 
     // ─── 일일 분석 횟수 제한 (20회) ───
@@ -57,14 +105,12 @@ export async function POST(req: NextRequest) {
         { status: 429 },
       );
     }
+
     const formData = await req.formData();
     const image = formData.get("image") as File | null;
 
     if (!image) {
-      return NextResponse.json(
-        { error: "이미지가 필요합니다." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "이미지가 필요합니다." }, { status: 400 });
     }
 
     // ─── 파일 크기 제한 (7MB) ───
@@ -88,15 +134,14 @@ export async function POST(req: NextRequest) {
     const bytes = await image.arrayBuffer();
     const buf = new Uint8Array(bytes);
     const detectedMime = detectImageMime(buf);
+
     // HEIC와 HEIF는 동일한 ftyp 컨테이너를 사용하므로 함께 허용
     const isHeicFamily =
       detectedMime === "image/heic" &&
       (image.type === "image/heic" || image.type === "image/heif");
+
     if (!detectedMime || (detectedMime !== image.type && !isHeicFamily)) {
-      return NextResponse.json(
-        { error: "파일 형식이 유효하지 않습니다." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "파일 형식이 유효하지 않습니다." }, { status: 400 });
     }
 
     const base64 = Buffer.from(bytes).toString("base64");
@@ -151,7 +196,7 @@ export async function POST(req: NextRequest) {
 - 여러 음식이 보이면 전체를 하나의 식사로 합산
 - 칼로리는 통상적인 1인분 기준으로 추정
 - confidence: 명확하면 0.8+, 애매하면 0.5~0.7, 잘 안보이면 0.3 이하
-- 음식이 아닌 사진이면 estimated_cal을 0으로`,
+- 음식이 아닌 사진이면 estimated_cal을 0으로, food_name은 "인식불가"로`,
             },
             {
               type: "image_url",
@@ -167,26 +212,12 @@ export async function POST(req: NextRequest) {
     });
 
     const content = completion.choices[0]?.message?.content || "";
+    const parsed = parseJsonObjectSafe<Record<string, unknown>>(content);
+    const result = parsed ? normalizeDietAnalyzeResult(parsed) : null;
 
-    let result;
-    try {
-      const cleaned = content
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-      result = JSON.parse(cleaned);
-    } catch {
+    if (!result || !result.food_name || result.estimated_cal === 0) {
       return NextResponse.json(
-        { error: "AI 분석 결과를 처리할 수 없습니다." },
-        { status: 500 },
-      );
-    }
-
-    if (!result.food_name || result.estimated_cal === 0) {
-      return NextResponse.json(
-        {
-          error: "음식을 인식할 수 없습니다. 다시 촬영해주세요.",
-        },
+        { error: "음식을 인식할 수 없습니다. 다시 촬영해주세요." },
         { status: 400 },
       );
     }
@@ -208,10 +239,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      return NextResponse.json(
-        { error: "저장에 실패했습니다." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "저장에 실패했습니다." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -231,9 +259,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("[Diet Analyze] Error:", error);
-    return NextResponse.json(
-      { error: "AI 분석 중 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "AI 분석 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

@@ -3,8 +3,64 @@ import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import OpenAI from "openai";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+import { parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+function getFallbackMealRecommend(mealType: string) {
+  return {
+    mealType,
+    analysis: { calorieSituation: "", weeklyPattern: "", nutritionGap: "" },
+    recommendations: [],
+    nutritionTip: "추천을 생성하지 못했습니다.",
+  };
+}
+
+function normalizeMealRecommendResult(
+  parsed: Record<string, unknown>,
+  mealType: string,
+) {
+  const analysisRaw =
+    parsed.analysis && typeof parsed.analysis === "object"
+      ? (parsed.analysis as Record<string, unknown>)
+      : {};
+
+  const recommendations = Array.isArray(parsed.recommendations)
+    ? parsed.recommendations
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const rec = item as Record<string, unknown>;
+          const name = String(rec.name || "").trim();
+          if (!name) return null;
+          const estimatedCalRaw = Number(rec.estimatedCal);
+          return {
+            name,
+            emoji: String(rec.emoji || "🍽️").trim() || "🍽️",
+            estimatedCal: Number.isFinite(estimatedCalRaw)
+              ? Math.max(0, Math.min(2000, Math.round(estimatedCalRaw)))
+              : 0,
+            reasoning:
+              rec.reasoning && typeof rec.reasoning === "object"
+                ? rec.reasoning
+                : {},
+            deliveryKeyword: String(rec.deliveryKeyword || "").trim(),
+          };
+        })
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+
+  return {
+    mealType: String(parsed.mealType || mealType).trim() || mealType,
+    analysis: {
+      calorieSituation: String(analysisRaw.calorieSituation || "").trim(),
+      weeklyPattern: String(analysisRaw.weeklyPattern || "").trim(),
+      nutritionGap: String(analysisRaw.nutritionGap || "").trim(),
+    },
+    recommendations,
+    nutritionTip: String(parsed.nutritionTip || "").trim() || "추천을 생성하지 못했습니다.",
+  };
+}
 
 export async function GET(req: NextRequest) {
   // ✅ 인메모리 Rate Limit (보조)

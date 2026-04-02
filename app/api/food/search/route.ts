@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { logAction } from "@/lib/utils/action-log";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
 import { correctFoodTypo, jamoSimilarity } from "@/lib/utils/korean-typo";
+import { parseJsonArraySafe, parseJsonObjectSafe } from "@/lib/utils/ai-safety";
 
 const supabaseService = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -506,8 +507,8 @@ export async function GET(req: NextRequest) {
                 });
 
                 const aiText = aiResponse.choices[0].message.content || "{}";
-                const clean = aiText.replace(/```json|```/g, "").trim();
-                const parsed = JSON.parse(clean);
+                const parsed =
+                  parseJsonObjectSafe<Record<string, unknown>>(aiText) || {};
 
                 const productNameKr =
                   parsed.productNameKr || product.product_name;
@@ -613,11 +614,7 @@ JSON 배열 형식으로만 반환:
         });
 
         const aiText = aiResponse.choices[0].message.content || "[]";
-        const clean = aiText
-          .replace(/```json\n?/g, "")
-          .replace(/```\n?/g, "")
-          .trim();
-        aiItems = JSON.parse(clean);
+        aiItems = parseJsonArraySafe<Record<string, unknown>>(aiText) || [];
 
         // 한국어가 아닌 제품명 필터링
         aiItems = aiItems.filter((item: any) => {

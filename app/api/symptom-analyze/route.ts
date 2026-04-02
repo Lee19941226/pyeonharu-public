@@ -2,26 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { checkOpenAIRateLimit } from "@/lib/utils/openai-rate-limit";
+import { parseJsonObjectSafe, redactSensitiveText } from "@/lib/utils/ai-safety";
 
-function redactSensitiveText(input: string): string {
-  return input
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL]")
-    .replace(/\b01[0-9]-?\d{3,4}-?\d{4}\b/g, "[PHONE]")
-    .replace(/\b\d{2,3}-?\d{3,4}-?\d{4}\b/g, "[PHONE]")
-    .replace(/\b\d{6}-?[1-4]\d{6}\b/g, "[RRN]")
-    .trim();
-}
-
-function tryParseJson(content: string) {
-  const cleaned = content.replace(/```json\s?/g, "").replace(/```/g, "").trim();
-  const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    return JSON.parse(match[0]);
-  } catch {
-    return null;
-  }
-}
 
 // 잔여 횟수 조회
 export async function GET() {
@@ -174,7 +156,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "AI 응답을 받지 못했습니다." }, { status: 502 });
     }
 
-    const parsed = tryParseJson(content);
+    const parsed = parseJsonObjectSafe<Record<string, unknown>>(content);
     if (!parsed) {
       return NextResponse.json({ error: "AI 응답 파싱에 실패했습니다." }, { status: 502 });
     }
