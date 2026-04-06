@@ -1,66 +1,32 @@
-2026-02-04 13:18 이진원
-npm install @radix-ui/react-collapsible
+﻿# 🍀 편하루 (pyeonharu) - 통합 건강관리 앱
 
-2026-02-05 13:18 이진원
-npm install @radix-ui/react-dropdown-menu
+> Team Project | 2026.02 - 2026.03 | 2인 프로젝트
 
-2026-02-09 15:52 이용재
-npm install html5-qrcode
+식품 알레르기 확인 · 급식 체크 · 병원/약국 찾기 통합 건강관리 앱입니다.
 
-2026-02-11 02:14 이진원
-npm install nodemailer
-npm install -D @types/nodemailer
-npm install -g pnpm
+## 🛠 기술 스택
+- **Frontend**: React 19, TailwindCSS, html5-qrcode, Recharts, shadcn/ui
+- **Backend**: Next.js 16 App Router, API Routes
+- **Database**: Supabase (PostgreSQL + RLS + Auth + Storage)
+- **AI/API**: OpenAI GPT-4o / Vision, 식약처 공공API, NEIS, Naver Maps, Open Food Facts
+- **Deploy**: Vercel (Web), React Native (Android 개발 중)
 
-2026-02-11 11:10 이진원
-npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-link @tiptap/extension-underline @tiptap/extension-placeholder @tiptap/extension-dropcursor @tiptap/pm
-npm install @tiptap/extension-bubble-menu
+## 👤 담당 기능 (이용재)
+- **식품 탭 (검색 & 스캔)**: DB 캐시 우선 조회(0.1~0.3초) → 외부 API 병렬 호출 2단계 검색 구조
+- **식품 상세 & AI 분석**: 괄호 중첩 원재료 파싱 알고리즘, 알레르기 매칭 & 하이라이트
+- **AI 기능**: GPT-4o 기반 대처법 가이드 + 3단계 대체식품 추천
+- **마이페이지 & 개인화**: RLS 기반 데이터 격리, 30일 알레르기 인사이트 차트
+- **관리자 도구**: 데이터 대시보드, 캐시 및 Rate Limit 관리, 활동 로그 시각화
+- **비용 최적화**: 등급별 Rate Limiting 차등 적용, 5분 내 중복 스캔 방지
 
-2026-02-13 22:04 이용재
-npm install react-kakao-sdk
+## ⚡ 성능 개선
+| 항목 | Before | After |
+|------|--------|-------|
+| 식품 검색 응답 | 2~3초 (매번 외부 API) | 0.1~0.3초 (DB 캐시) |
+| API 비용 | 중복 호출 발생 | 캐싱 + 중복 차단 |
 
-2026-02-15 16:29 이용재
-npm install @vercel/og
+## 📐 아키텍처
+React 19 → Next.js App Router (API Routes) → Supabase (PostgreSQL + RLS) / External APIs (식약처, OpenAI)
 
-2026-02-16 01:27 이진원
-npm install dompurify
-npm install -D @types/dompurify
-
-2026-02-24 17:00 이용재
-npm install @radix-ui/react-tooltip
-
-2026-02-24 23:15 이진원
-npm install @capacitor/haptics
-npx cap sync
-npm install @capacitor/app
-npx cap sync
-pnpm add @capacitor/status-bar
-
-2026-03-05 17:21 이용재
-npm install framer-motion
-
-2026-03-07 02:39 이용재
-npm install zustand
-
----
-
-# 1. 편하루 프로젝트로 이동
-
-cd C:\Users\ljw94\Desktop\편하루프로젝트폴더
-
-# 2. Capacitor 설치
-
-npm install @capacitor/core @capacitor/cli
-
-# 3. Capacitor 초기화
-
-npx cap init "편하루" "com.pyeonharu.app" --web-dir=out
-
-# 4. Android 플랫폼 추가
-
-npm install @capacitor/android
-npx cap add android
-
-# 5. out 폴더 + 더미 index.html 생성
-
-mkdir out
+## 🔗 Links
+- [배포 URL](https://leeyongjae-portfolio.vercel.app) (포트폴리오)
