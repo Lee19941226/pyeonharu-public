@@ -1,8 +1,8 @@
-﻿# 🍀 편하루 (pyeonharu) - 통합 건강관리 앱
+﻿# 🍀 편하루 (pyeonharu) - 통합 건강관리 웹
 
 > Team Project | 2026.02 - 2026.03 | 2인 프로젝트
 
-식품 알레르기 확인 · 급식 체크 · 병원/약국 찾기 통합 건강관리 앱입니다.
+식품 알레르기 확인 · 급식 체크 · 병원/약국 찾기 통합 건강관리 웹입니다.
 
 ## 🛠 기술 스택
 - **Frontend**: React 19, TailwindCSS, html5-qrcode, Recharts, shadcn/ui
@@ -30,3 +30,4 @@ React 19 → Next.js App Router (API Routes) → Supabase (PostgreSQL + RLS) / E
 
 ## 🔗 Links
 - [배포 URL](https://leeyongjae-portfolio.vercel.app) (포트폴리오)
+
